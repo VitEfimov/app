@@ -27,6 +27,8 @@ export const updateTaskAsync = createAsyncThunk('task/updateTaskAsync', async (u
     if (completed !== undefined) payload.completed = completed;
     if (completionDate !== undefined) payload.completionDate = completionDate;
     if (time !== undefined) payload.time = time;
+    if (updateData.reminder !== undefined) payload.reminder = updateData.reminder;
+    if (updateData.notificationId !== undefined) payload.notificationId = updateData.notificationId;
     if (description !== undefined) {
         payload.description = { text: description.text || '', img: description.img || '', url: description.url || '' };
     }
@@ -78,6 +80,8 @@ const taskSlice = createSlice({
                 task.completed = completed !== undefined ? completed : task.completed;
                 task.completionDate = completionDate !== undefined ? completionDate : task.completionDate;
                 task.time = time !== undefined ? time : task.time;
+                task.reminder = action.payload.reminder !== undefined ? action.payload.reminder : task.reminder;
+                task.notificationId = action.payload.notificationId !== undefined ? action.payload.notificationId : task.notificationId;
                 if (description) {
                     task.description = {
                         text: description.text || '',

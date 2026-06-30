@@ -14,46 +14,8 @@ const loadFromLocalStoragePomodoro = () => {
     intervalCount: { count: 5, progress: 0, passed: 0 },
     workSound: 'default',
     breakSound: 'default',
+    isSettingsOpen: false,
   }];
-};
-      }
-
-      // Ensure all time values exist and are valid
-      if (!pomodoro.initialTime || pomodoro.initialTime <= 0) {
-        console.log('Fixing invalid initialTime:', pomodoro.initialTime);
-        pomodoro.initialTime = DEFAULT_WORK_TIME;
-      }
-      if (!pomodoro.time || pomodoro.time <= 0) {
-        console.log('Fixing invalid time:', pomodoro.time);
-        pomodoro.time = pomodoro.initialTime;
-      }
-      if (!pomodoro.breakInterval || pomodoro.breakInterval <= 0) {
-        console.log('Fixing invalid breakInterval:', pomodoro.breakInterval);
-        pomodoro.breakInterval = DEFAULT_BREAK_TIME;
-      }
-
-      // Reset progress and passed when loading from storage
-      pomodoro.progress = 0;
-      pomodoro.passed = 0;
-      pomodoro.isActive = false;
-      pomodoro.isBreak = false;
-
-      // Ensure sound settings exist
-      if (!pomodoro.workSound) pomodoro.workSound = 'default';
-      if (!pomodoro.breakSound) pomodoro.breakSound = 'default';
-
-      // Save the corrected data back to localStorage
-      AsyncStorage.setItem('pomodoro', JSON.stringify(savedData));
-      console.log('Saved corrected Pomodoro data:', savedData);
-    }
-
-    return savedData;
-  } catch (error) {
-    console.error('Error loading Pomodoro data from localStorage:', error);
-    console.log('Using default Pomodoro data');
-    AsyncStorage.setItem('pomodoro', JSON.stringify(defaultPomodoro));
-    return defaultPomodoro;
-  }
 };
 
 const initialState = {
@@ -113,6 +75,9 @@ export const pomodoroSlice = createSlice({
     toggleBreak: (state) => {
       state.pomodoro[0].isBreak = !state.pomodoro[0].isBreak;
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
+    },
+    togglePomodoroSettings: (state, action) => {
+      state.isSettingsOpen = action.payload;
     },
     setBreakInterval: (state, action) => {
       // Convert minutes to seconds for consistency
@@ -195,6 +160,7 @@ export const { hydratePomodoroState,
   completeBreakInterval,
   setWorkSound,
   setBreakSound,
+  togglePomodoroSettings,
 } = pomodoroSlice.actions;
 
 export default pomodoroSlice.reducer;

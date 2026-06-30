@@ -22,7 +22,10 @@ const initialState = {
   taskNameWrap: loaded?.taskNameWrap || 'wrap',
   timeFormat: loaded?.timeFormat || '12h',
   userPicture: loaded?.userPicture || null,
-  headerBackgroundFit: loaded?.headerBackgroundFit || 'cover'
+  headerBackgroundFit: loaded?.headerBackgroundFit || 'cover',
+  sourceColor: loaded?.sourceColor || '#6750A4',
+  themeMode: loaded?.themeMode || 'dark',
+  calendarPanePosition: loaded?.calendarPanePosition || null
 };
 
 const themeSlice = createSlice({
@@ -39,6 +42,14 @@ const themeSlice = createSlice({
     },
     setFontSize: (state, action) => {
       state.fontSize = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setSourceColor: (state, action) => {
+      state.sourceColor = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setThemeMode: (state, action) => {
+      state.themeMode = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setColumnWidth: (state, action) => {
@@ -69,6 +80,8 @@ const themeSlice = createSlice({
       state.dateFormat = 'short';
       state.taskNameWrap = 'wrap';
       state.timeFormat = '12h';
+      state.sourceColor = '#6750A4';
+      state.themeMode = 'dark';
       AsyncStorage.removeItem('customTheme');
     },
     setDefaultTaskLimit: (state, action) => {
@@ -94,9 +107,13 @@ const themeSlice = createSlice({
     setHeaderBackgroundFit: (state, action) => {
       state.headerBackgroundFit = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setCalendarPanePosition: (state, action) => {
+      state.calendarPanePosition = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
 
-export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit } = themeSlice.actions;
+export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit, setSourceColor, setThemeMode, setCalendarPanePosition } = themeSlice.actions;
 export default themeSlice.reducer;

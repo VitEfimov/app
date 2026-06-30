@@ -1,26 +1,90 @@
 import React from 'react';
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import BoardScreen from '../screens/BoardScreen';
+import CalendarScreen from '../screens/CalendarScreen';
 import PomodoroScreen from '../screens/PomodoroScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
+import Header from '../components/Header';
+import { useTheme } from '../styles/ThemeContext';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
-const Drawer = createDrawerNavigator();
+const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-function DrawerNavigator() {
+const IconDashboard = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="3" y="3" width="7" height="9" rx="1" />
+    <Rect x="14" y="3" width="7" height="5" rx="1" />
+    <Rect x="14" y="12" width="7" height="9" rx="1" />
+    <Rect x="3" y="16" width="7" height="5" rx="1" />
+  </Svg>
+);
+
+const IconBoard = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+  </Svg>
+);
+
+const IconCalendar = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <Path d="M16 2v4M8 2v4M3 10h18" />
+  </Svg>
+);
+
+const IconSettings = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="3" />
+    <Path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+  </Svg>
+);
+
+const IconPomodoro = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="10" />
+    <Path d="M12 22V12l4.5-4.5" />
+  </Svg>
+);
+
+function TabNavigator() {
+  const { colors } = useTheme();
   return (
-    <Drawer.Navigator initialRouteName="Dashboard">
-      <Drawer.Screen name="Dashboard" component={DashboardScreen} />
-      <Drawer.Screen name="Board" component={BoardScreen} />
-      <Drawer.Screen name="Pomodoro" component={PomodoroScreen} />
-      <Drawer.Screen name="Settings" component={SettingsScreen} />
-    </Drawer.Navigator>
+    <Tab.Navigator 
+      initialRouteName="Dashboard"
+      sceneContainerStyle={{ backgroundColor: colors.bgMain }}
+      screenOptions={({ route }) => ({
+        header: (props) => <Header {...props} />,
+        tabBarIcon: ({ color }) => {
+          if (route.name === 'Dashboard') return <IconDashboard color={color} />;
+          if (route.name === 'Board') return <IconBoard color={color} />;
+          if (route.name === 'Calendar') return <IconCalendar color={color} />;
+          if (route.name === 'Pomodoro') return <IconPomodoro color={color} />;
+          if (route.name === 'Settings') return <IconSettings color={color} />;
+        },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarStyle: {
+          backgroundColor: colors.bgCard,
+          borderTopColor: colors.surfaceContainerHigh,
+        },
+        headerStyle: {
+          backgroundColor: colors.bgHeader
+        }
+      })}
+    >
+      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen name="Board" component={BoardScreen} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} />
+      <Tab.Screen name="Pomodoro" component={PomodoroScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
   );
 }
 
@@ -30,7 +94,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       {isAuthenticated || isGuest ? (
-        <DrawerNavigator />
+        <TabNavigator />
       ) : (
         <Stack.Navigator>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
