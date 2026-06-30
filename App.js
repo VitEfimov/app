@@ -31,7 +31,7 @@ axios.defaults.baseURL = 'https://task-manager-v2-indol.vercel.app';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -40,6 +40,7 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
+    this.setState({ errorInfo });
   }
 
   render() {
@@ -47,9 +48,12 @@ class ErrorBoundary extends React.Component {
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10, color: 'red' }}>Oops! Something went wrong.</Text>
-          <Text style={{ textAlign: 'center', color: '#333', marginBottom: 20 }}>{this.state.error?.toString()}</Text>
+          <Text style={{ textAlign: 'center', color: '#333', marginBottom: 10 }}>{this.state.error?.toString()}</Text>
+          <Text style={{ fontSize: 10, color: '#666', marginBottom: 20, textAlign: 'left' }}>
+            {this.state.errorInfo?.componentStack || 'No component stack available'}
+          </Text>
           <TouchableOpacity 
-            onPress={() => this.setState({ hasError: false, error: null })} 
+            onPress={() => this.setState({ hasError: false, error: null, errorInfo: null })} 
             style={{ padding: 12, backgroundColor: '#2196f3', borderRadius: 8 }}
           >
             <Text style={{ color: 'white', fontWeight: 'bold' }}>Try Again</Text>
