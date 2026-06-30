@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
-import axios from 'axios';
+// import axios from 'axios';
 
+/* --- VERCEL BACKEND THUNKS (COMMENTED OUT FOR LOCAL-ONLY MODE) ---
 export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_) => {
     const response = await axios.get('/api/tasks', { withCredentials: true });
     return response.data;
@@ -42,6 +43,16 @@ export const updateTaskAsync = createAsyncThunk('task/updateTaskAsync', async (u
 export const deleteTaskAsync = createAsyncThunk('task/deleteTaskAsync', async (taskId) => {
     await axios.delete(`/api/tasks/${taskId}`, { withCredentials: true });
     return taskId;
+});
+--- */
+
+export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_) => {
+    try {
+        const tasksJson = await AsyncStorage.getItem('tasks');
+        return tasksJson ? JSON.parse(tasksJson) : [];
+    } catch (e) {
+        return [];
+    }
 });
 
 const loadGuestTasksFromLocalStorage = () => [];
@@ -112,24 +123,32 @@ const taskSlice = createSlice({
 
 export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, updateTaskSync, clearTasks, loadGuestTasks } = taskSlice.actions;
 
-export const addTask = (payload) => (dispatch) => {
+export const addTask = (payload) => async (dispatch, getState) => {
     dispatch(addTaskSync(payload)); 
-    dispatch(addTaskAsync(payload.task)); 
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    // dispatch(addTaskAsync(payload.task)); 
 };
 
-export const addMultipleTasks = (payload) => (dispatch) => {
+export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     dispatch(addMultipleTasksSync(payload));
-    dispatch(addMultipleTasksAsync(payload.tasks));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    // dispatch(addMultipleTasksAsync(payload.tasks));
 };
 
-export const deleteTask = (payload) => (dispatch) => {
+export const deleteTask = (payload) => async (dispatch, getState) => {
     dispatch(deleteTaskSync(payload));
-    dispatch(deleteTaskAsync(payload.taskId));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    // dispatch(deleteTaskAsync(payload.taskId));
 };
 
-export const updateTask = (payload) => (dispatch) => {
+export const updateTask = (payload) => async (dispatch, getState) => {
     dispatch(updateTaskSync(payload));
-    dispatch(updateTaskAsync(payload));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    // dispatch(updateTaskAsync(payload));
 };
 
 export default taskSlice.reducer;

@@ -93,6 +93,7 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
+      {/* VERCEL BACKEND AUTH CHECK (COMMENTED OUT FOR LOCAL-ONLY MODE) 
       {isAuthenticated || isGuest ? (
         <TabNavigator />
       ) : (
@@ -100,6 +101,8 @@ export default function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       )}
+      */}
+      <TabNavigator />
     </NavigationContainer>
   );
 }

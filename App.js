@@ -9,6 +9,7 @@ import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 
 import { hydrateUserState } from './src/features/userSlice';
 import { hydrateThemeState } from './src/features/themeSlice';
+import { fetchTasks } from './src/features/taskSlice';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
@@ -26,12 +27,12 @@ if (typeof queueMicrotask === 'undefined') {
 }
 
 // Configure Axios for remote Vercel backend
-axios.defaults.baseURL = 'https://task-manager-v2-indol.vercel.app';
+// axios.defaults.baseURL = 'https://task-manager-v2-indol.vercel.app';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -40,6 +41,7 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
+    this.setState({ errorInfo });
   }
 
   render() {
@@ -47,9 +49,12 @@ class ErrorBoundary extends React.Component {
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10, color: 'red' }}>Oops! Something went wrong.</Text>
-          <Text style={{ textAlign: 'center', color: '#333', marginBottom: 20 }}>{this.state.error?.toString()}</Text>
+          <Text style={{ textAlign: 'center', color: '#333', marginBottom: 10 }}>{this.state.error?.toString()}</Text>
+          <Text style={{ fontSize: 10, color: '#666', marginBottom: 20, textAlign: 'left' }}>
+            {this.state.errorInfo?.componentStack || 'No component stack available'}
+          </Text>
           <TouchableOpacity 
-            onPress={() => this.setState({ hasError: false, error: null })} 
+            onPress={() => this.setState({ hasError: false, error: null, errorInfo: null })} 
             style={{ padding: 12, backgroundColor: '#2196f3', borderRadius: 8 }}
           >
             <Text style={{ color: 'white', fontWeight: 'bold' }}>Try Again</Text>
@@ -68,13 +73,15 @@ function InitApp() {
   useEffect(() => {
     const loadStorage = async () => {
       try {
-        const theme = await AsyncStorage.getItem('customTheme');
+        const theme = await AsyncStorage.getItem('theme');
         if (theme) dispatch(hydrateThemeState(JSON.parse(theme)));
 
-        const isGuest = await AsyncStorage.getItem('isGuest') === 'true';
-        if (isGuest) dispatch(hydrateUserState({ isGuest }));
+        const boardsJson = await AsyncStorage.getItem('boards');
+        if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
 
-        // Check auth with backend here if needed
+        // Load tasks from local storage
+        await dispatch(fetchTasks()).unwrap();
+
         await registerForPushNotificationsAsync();
       } catch (e) {
         console.error(e);
