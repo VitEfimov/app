@@ -122,18 +122,18 @@ export default function TaskRow({ task, hideDate = false, onPress }) {
         </View>
       </View>
 
-      {!hideDate && task.completionDate && (
+      {(!hideDate && task.completionDate) ? (
         <View style={styles.dateContainer}>
           <Text style={[styles.date, { color: colors.textPrimary }]}>
             {dayjs(task.completionDate).format('MMM D')}
           </Text>
-          {task.time && (
+          {task.time ? (
             <Text style={[styles.time, { color: colors.textSecondary }]}>
               {task.time}
             </Text>
-          )}
+          ) : null}
         </View>
-      )}
+      ) : null}
     </TouchableOpacity>
   );
 }
