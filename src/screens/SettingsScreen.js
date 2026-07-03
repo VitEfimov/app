@@ -21,7 +21,7 @@ const IconSave = ({ color }) => (
   </Svg>
 );
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   
@@ -53,11 +53,12 @@ export default function SettingsScreen() {
 
   const handleSave = () => {
     Alert.alert('Settings Saved', 'Your preferences have been updated.');
+    if (navigation) {
+      navigation.navigate('Board');
+    }
   };
 
-  const handleAbout = () => {
-    Alert.alert('About TaskFlow', 'TaskFlow version 1.0.0\nBuilt with React Native & Expo.');
-  };
+
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
@@ -93,24 +94,24 @@ export default function SettingsScreen() {
         </View>
 
         {/* Customization Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 10 }]}>Customization</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary, paddingTop: 20 }]}>Customization</Text>
         <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
           
           {/* Text wrapping Dropdown */}
           <View style={[styles.dropdownRow, { zIndex: 20 }]}>
             <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>Text wrapping</Text>
             <View style={styles.dropdownWrapper}>
-              <TouchableOpacity style={styles.dropdownBtn} onPress={() => setWrapDropdownOpen(!wrapDropdownOpen)}>
-                <Text style={styles.dropdownBtnText}>{taskNameWrap === 'wrap' ? 'Full' : 'Truncate'}</Text>
+              <TouchableOpacity style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} onPress={() => setWrapDropdownOpen(!wrapDropdownOpen)}>
+                <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]}>{taskNameWrap === 'wrap' ? 'Full' : 'Truncate'}</Text>
                 <Text style={styles.dropdownBtnIcon}>▼</Text>
               </TouchableOpacity>
               {wrapDropdownOpen && (
-                <View style={styles.dropdownList}>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setTaskNameWrap('wrap')); setWrapDropdownOpen(false); }}>
-                    <Text>Full</Text>
+                <View style={[styles.dropdownList, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setTaskNameWrap('wrap')); setWrapDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Full</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setTaskNameWrap('nowrap')); setWrapDropdownOpen(false); }}>
-                    <Text>Truncate</Text>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setTaskNameWrap('nowrap')); setWrapDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Truncate</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -121,22 +122,22 @@ export default function SettingsScreen() {
           <View style={[styles.dropdownRow, { zIndex: 10 }]}>
             <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>Font size</Text>
             <View style={styles.dropdownWrapper}>
-              <TouchableOpacity style={styles.dropdownBtn} onPress={() => setFontDropdownOpen(!fontDropdownOpen)}>
-                <Text style={styles.dropdownBtnText}>
+              <TouchableOpacity style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} onPress={() => setFontDropdownOpen(!fontDropdownOpen)}>
+                <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]}>
                   {fontSize === 'small' ? 'Small' : fontSize === 'big' ? 'Big' : 'Normal'}
                 </Text>
                 <Text style={styles.dropdownBtnIcon}>▼</Text>
               </TouchableOpacity>
               {fontDropdownOpen && (
-                <View style={styles.dropdownList}>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setFontSize('small')); setFontDropdownOpen(false); }}>
-                    <Text>Small</Text>
+                <View style={[styles.dropdownList, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setFontSize('small')); setFontDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Small</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setFontSize('normal')); setFontDropdownOpen(false); }}>
-                    <Text>Normal</Text>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setFontSize('normal')); setFontDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Normal</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setFontSize('big')); setFontDropdownOpen(false); }}>
-                    <Text>Big</Text>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setFontSize('big')); setFontDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Big</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -148,10 +149,7 @@ export default function SettingsScreen() {
             <Text style={styles.actionBtnText}>🎨 Customize theme</Text>
           </TouchableOpacity>
 
-          {/* About Button */}
-          <TouchableOpacity style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary }]} onPress={handleAbout}>
-            <Text style={styles.actionBtnText}>ℹ️ About TaskFlow</Text>
-          </TouchableOpacity>
+
 
         </View>
 
@@ -178,7 +176,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 15,
   },
   pageTitle: {
     fontSize: 32,
@@ -205,12 +203,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 10,
+    paddingTop: 5,
   },
   card: {
     borderRadius: 20,
-    padding: 20,
-    marginBottom: 30,
+    padding: 15,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -220,7 +219,7 @@ const styles = StyleSheet.create({
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   profileIconContainer: {
     width: 50,
@@ -256,7 +255,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 15,
     zIndex: 1,
   },
   dropdownLabel: {
@@ -272,7 +271,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#e6e6ea',
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 15,
@@ -291,7 +289,6 @@ const styles = StyleSheet.create({
     top: 45,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 10,

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal } from 'react-native';
-import { useDispatch } from 'react-redux';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Keyboard } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 import { addTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
@@ -24,9 +24,13 @@ export default function InlineAddTask({ sectionId }) {
   const [isEditing, setIsEditing] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [inputHeight, setInputHeight] = useState(46);
   
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
+  const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
+
+  const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
 
   const getCompletionDate = (id) => {
     const FILTERS = getFilters();
@@ -37,18 +41,24 @@ export default function InlineAddTask({ sectionId }) {
       case 'on-next-week': return dayjs(FILTERS['on-next-week']).format('YYYY-MM-DD');
       case 'later': return dayjs(FILTERS['on-next-week']).add(1, 'week').format('YYYY-MM-DD');
       case 'missed': return dayjs().subtract(1, 'day').format('YYYY-MM-DD');
-      default: return dayjs().format('YYYY-MM-DD');
+      default: 
+        if (dayjs(id).isValid()) return dayjs(id).format('YYYY-MM-DD');
+        return dayjs().format('YYYY-MM-DD');
     }
   };
 
   const [selectedDate, setSelectedDate] = useState(getCompletionDate(sectionId));
+
+  useEffect(() => {
+    setSelectedDate(getCompletionDate(sectionId));
+  }, [sectionId]);
 
   const handleAdd = () => {
     if (!taskName.trim()) return;
 
     const newTask = {
       id: new Date().getTime().toString(),
-      boardId: 'main',
+      boardId: activeBoardId,
       taskname: taskName,
       creationDate: new Date().toLocaleDateString(),
       lastUpdatedDate: null,
@@ -62,6 +72,7 @@ export default function InlineAddTask({ sectionId }) {
     setTaskName('');
     setSelectedDate(getCompletionDate(sectionId));
     setIsEditing(false);
+    Keyboard.dismiss();
   };
 
   if (!isEditing) {
@@ -70,8 +81,12 @@ export default function InlineAddTask({ sectionId }) {
         style={[styles.addBtn, { borderBottomColor: colors.borderColor }]} 
         onPress={() => setIsEditing(true)}
       >
-        <IconPlus color={colors.textSecondary} />
-        <Text style={[styles.addText, { color: colors.textSecondary }]}>Add task</Text>
+        <View style={styles.iconWrapper}>
+          <IconPlus color={colors.textSecondary} />
+        </View>
+        <View style={styles.textWrapper}>
+          <Text style={[styles.addText, { color: colors.textSecondary }]}>Add task</Text>
+        </View>
       </TouchableOpacity>
     );
   }
@@ -79,12 +94,16 @@ export default function InlineAddTask({ sectionId }) {
   return (
     <View style={[styles.editContainer, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
       <TextInput
-        style={[styles.input, { color: colors.textPrimary, borderBottomColor: colors.primary }]}
+        style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
         placeholder="Enter task name..."
         placeholderTextColor={colors.textSecondary}
         value={taskName}
         onChangeText={setTaskName}
+        onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
         autoFocus
+        multiline={true}
+        scrollEnabled={false}
+        blurOnSubmit={true}
         onSubmitEditing={handleAdd}
       />
       <View style={styles.actionsRow}>
@@ -159,8 +178,18 @@ const styles = StyleSheet.create({
     width: '90%',
     alignSelf: 'center',
   },
+  iconWrapper: {
+    width: 24,
+    height: 24,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  textWrapper: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
   addText: {
-    marginLeft: 10,
     fontSize: 15,
   },
   editContainer: {
@@ -168,10 +197,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   input: {
-    fontSize: 16,
-    paddingVertical: 8,
-    marginLeft: 34,
+    fontSize: 15,
+    padding: 12,
     marginBottom: 15,
+    borderWidth: 1,
+    borderRadius: 8,
+    textAlignVertical: 'top',
   },
   actionsRow: {
     flexDirection: 'row',

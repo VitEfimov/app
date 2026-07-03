@@ -67,20 +67,19 @@ export default function Header() {
 
   const HeaderContent = () => (
     <View style={[styles.headerContainer, { backgroundColor: userPicture ? 'rgba(0,0,0,0.5)' : colors.bgHeader }]}>
-      <View /> {/* Empty view to push rightSection to the right */}
-      {/* Right side: Pomodoro, Date, Theme Toggle */}
+      <View />
       <View style={styles.rightSection}>
-        {isPomodoroActive && !isTimeOver && (
+        {(!!isPomodoroActive && !isTimeOver) ? (
           <View style={styles.pomodoroBadge}>
             <Text style={styles.pomodoroText}>Pomodoro: {timeRemaining}s</Text>
           </View>
-        )}
+        ) : null}
         
-        {isTimeOver && (
+        {!!isTimeOver ? (
           <View style={[styles.pomodoroBadge, { backgroundColor: colors.danger }]}>
             <Text style={[styles.pomodoroText, { color: '#fff' }]}>Time's Up!</Text>
           </View>
-        )}
+        ) : null}
 
         <Text style={[styles.dateText, { color: colors.textSecondary }]}>
           {dayjs().format('ddd, MMM D')}

@@ -1,18 +1,20 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import getFilters from '../utils/filters';
 import Svg, { Circle } from 'react-native-svg';
-import TaskRow from '../components/TaskRow';
+import TaskDetailsModal from '../components/TaskDetailsModal';
 
 dayjs.extend(isSameOrBefore);
 
-export default function DashboardScreen() {
+export default function DashboardScreen({ navigation }) {
   const { colors } = useTheme();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [isDetailsVisible, setDetailsVisible] = useState(false);
 
   const FILTERS = getFilters();
   
@@ -31,7 +33,8 @@ export default function DashboardScreen() {
   const laterTasks = tasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week']) && !task.completed);
   const missedTasks = tasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed);
 
-  const totalTasks = tasks.length;
+  const uncompletedTasks = tasks.filter(task => !task.completed);
+  const totalTasks = uncompletedTasks.length;
   const completedTasks = tasks.filter(task => task.completed).length;
   const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   const currentFill = Math.max(0, Math.min(100, 100 - completionPercentage)); // dashoffset factor
@@ -45,15 +48,30 @@ export default function DashboardScreen() {
     return 'Keep going!';
   };
 
-  const CategoryCard = ({ title, sub, num, color }) => (
-    <View style={[styles.catCard, { backgroundColor: colors.bgCard, borderTopColor: color }]}>
+  const CategoryCard = ({ title, sub, num, color, sectionId }) => (
+    <TouchableOpacity 
+      activeOpacity={0.8}
+      onPress={() => {
+        if (sectionId) {
+          navigation.navigate('Board', { sectionId });
+        } else {
+          navigation.navigate('Board');
+        }
+      }}
+      style={[
+        styles.catCard, 
+        { backgroundColor: colors.bgCard, borderTopColor: color }
+      ]}
+    >
       <View style={styles.catInfo}>
         <Text style={[styles.catTitle, { color: colors.textPrimary }]}>{title}</Text>
         <Text style={[styles.catSub, { color: colors.textSecondary }]}>{sub}</Text>
       </View>
       <Text style={[styles.catNum, { color: colors.textPrimary }]}>{num}</Text>
-    </View>
+    </TouchableOpacity>
   );
+
+
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.bgMain }]} contentContainerStyle={styles.scrollContent}>
@@ -86,7 +104,7 @@ export default function DashboardScreen() {
         <View style={styles.progressInfo}>
           <Text style={[styles.progressGreeting, { color: colors.textPrimary }]}>{getGreetingText()}</Text>
           <Text style={[styles.progressDetails, { color: colors.textSecondary }]}>
-            {completedTasks} of {totalTasks} tasks{"\n"}completed today
+            {completedTasks} of {totalTasks} tasks{"\n"}completed
           </Text>
           <View style={styles.tagsContainer}>
             {missedTasks.length > 0 && (
@@ -105,26 +123,25 @@ export default function DashboardScreen() {
 
       {/* Categories */}
       <View style={styles.categoriesGrid}>
-        <CategoryCard title="Total tasks" sub="all tasks" num={totalTasks} color="#4caf50" />
-        <CategoryCard title="Completed" sub="done" num={completedTasks} color="#4caf50" />
-        <CategoryCard title="Today" sub="due today" num={todayTasks.length} color="#ff9800" />
-        <CategoryCard title="Tomorrow" sub="coming up" num={tomorrowTasks.length} color="#2196f3" />
-        <CategoryCard title="This week" sub="this week" num={thisWeekTasks.length} color="#9c27b0" />
-        <CategoryCard title="Next week" sub="next week" num={nextWeekTasks.length} color="#009688" />
-        <CategoryCard title="Later" sub="future" num={laterTasks.length} color="#d84315" />
-        <CategoryCard title="Missed" sub="overdue" num={missedTasks.length} color="#f44336" />
+        <CategoryCard title="Total tasks" sub="all uncompleted" num={totalTasks} color="#4caf50" sectionId={null} />
+        <CategoryCard title="Completed" sub="done" num={completedTasks} color="#4caf50" sectionId="completed" />
+        <CategoryCard title="Today" sub="due today" num={todayTasks.length} color="#ff9800" sectionId="today" />
+        <CategoryCard title="Tomorrow" sub="coming up" num={tomorrowTasks.length} color="#2196f3" sectionId="tomorrow" />
+        <CategoryCard title="This week" sub="this week" num={thisWeekTasks.length} color="#9c27b0" sectionId="on-this-week" />
+        <CategoryCard title="Next week" sub="next week" num={nextWeekTasks.length} color="#009688" sectionId="on-next-week" />
+        <CategoryCard title="Later" sub="future" num={laterTasks.length} color="#d84315" sectionId="later" />
+        <CategoryCard title="Missed" sub="overdue" num={missedTasks.length} color="#f44336" sectionId="missed" />
       </View>
       
-      {/* Today's Tasks */}
-      {todayTasks.length > 0 && (
-        <View style={{ marginTop: 20 }}>
-          <Text style={[styles.categoriesTitle, { color: colors.textSecondary }]}>TODAY'S TASKS</Text>
-          {todayTasks.map(task => (
-            <TaskRow key={task.id} task={task} hideDate={true} />
-          ))}
-        </View>
-      )}
 
+
+
+
+      <TaskDetailsModal 
+        task={selectedTask}
+        isVisible={isDetailsVisible}
+        onClose={() => setDetailsVisible(false)}
+      />
     </ScrollView>
   );
 }

@@ -2,25 +2,26 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
-import { setSourceColor, setUserPicture, setHeaderBackgroundFit, resetTheme } from '../features/themeSlice';
+import { setSourceColor, resetTheme, setUserPicture } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
-import ColorPicker, { Panel1, HueSlider } from 'reanimated-color-picker';
 
-const PREDEFINED_COLORS = ['#4caf50', '#2196f3', '#9c27b0', '#ffeb3b', '#e91e63'];
+const PREDEFINED_COLORS = [
+  '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
+  '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50',
+  '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800',
+  '#ff5722', '#795548', '#9e9e9e', '#607d8b'
+];
 
 export default function ThemeSettingsModal({ isVisible, onClose }) {
   const dispatch = useDispatch();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   
   const currentSourceColor = useSelector(state => state.themeReducer.sourceColor);
-  const currentFit = useSelector(state => state.themeReducer.headerBackgroundFit) || 'cover';
   const currentUserPicture = useSelector(state => state.themeReducer.userPicture);
 
   const [tempColor, setTempColor] = useState(currentSourceColor);
-  const [tempFit, setTempFit] = useState(currentFit);
   const [tempImage, setTempImage] = useState(currentUserPicture);
-  const [isDropdownOpen, setDropdownOpen] = useState(false);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -41,8 +42,8 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   };
 
   const handleSave = () => {
-    dispatch(setSourceColor(tempColor));
-    dispatch(setHeaderBackgroundFit(tempFit));
+    const finalColor = tempColor.startsWith('#') ? tempColor : `#${tempColor}`;
+    dispatch(setSourceColor(finalColor));
     if (tempImage !== currentUserPicture) {
       dispatch(setUserPicture(tempImage));
     }
@@ -76,21 +77,21 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
       onBackdropPress={onClose}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
-      <View style={styles.modalContent}>
+      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
           <View style={styles.dragHandleContainer}>
-            <View style={styles.dragHandle} />
+            <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           
-          <View style={styles.header}>
-            <Text style={styles.title}>Theme Settings</Text>
+          <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>Theme Settings</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeText}>✕</Text>
+              <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.scrollArea}>
-            <Text style={styles.sectionTitle}>Material You Theme</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Material You Theme</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Choose a source color and we'll generate a complete, accessible theme palette for you automatically.
             </Text>
 
@@ -105,74 +106,34 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
             </View>
 
             <View style={styles.customColorRow}>
-              <Text style={styles.customColorLabel}>Custom Color:</Text>
-              <View style={[styles.customColorPreview, { backgroundColor: tempColor }]} />
+              <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>Custom Hex:</Text>
+              <View style={[styles.customColorPreview, { backgroundColor: tempColor, borderColor: colors.borderColor }]} />
               <TextInput 
-                style={styles.colorInput}
+                style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary }]}
                 value={tempColor}
                 onChangeText={setTempColor}
                 autoCapitalize="none"
               />
             </View>
 
-            <View style={styles.colorPickerContainer}>
-              <ColorPicker 
-                style={styles.colorPicker} 
-                value={tempColor || '#4caf50'} 
-                onComplete={({ hex }) => setTempColor(hex)}
-              >
-                <Panel1 style={styles.colorPanel} />
-                <HueSlider style={styles.hueSlider} />
-              </ColorPicker>
-            </View>
-
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Header banner image</Text>
-            <TouchableOpacity style={styles.uploadBox} onPress={handlePickImage}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginTop: 20 }]}>Background Picture</Text>
+            <TouchableOpacity style={[styles.uploadBox, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fa' }]} onPress={handlePickImage}>
               {tempImage ? (
-                <Text style={styles.uploadText}>Image selected. Tap to change.</Text>
+                <Text style={[styles.uploadText, { color: colors.textSecondary }]}>Image selected. Tap to change.</Text>
               ) : (
-                <Text style={styles.uploadText}>📷 Tap to upload (max 1MB)</Text>
+                <Text style={[styles.uploadText, { color: colors.textSecondary }]}>📷 Tap to upload</Text>
               )}
             </TouchableOpacity>
             {tempImage && (
               <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 5 }}>
-                <Text style={{ color: '#d32f2f', fontSize: 12 }}>Remove Image</Text>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: 'bold' }}>Remove Image</Text>
               </TouchableOpacity>
-            )}
-
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Header Image Fit</Text>
-            
-            <TouchableOpacity 
-              style={styles.dropdownToggle} 
-              onPress={() => setDropdownOpen(!isDropdownOpen)}
-            >
-              <Text style={styles.dropdownText}>
-                {tempFit === 'cover' ? 'Cover (Crop to fill)' : 'Contain (Show entire image)'}
-              </Text>
-              <Text>▼</Text>
-            </TouchableOpacity>
-            
-            {isDropdownOpen && (
-              <View style={styles.dropdownMenu}>
-                <TouchableOpacity 
-                  style={styles.dropdownItem} 
-                  onPress={() => { setTempFit('cover'); setDropdownOpen(false); }}
-                >
-                  <Text>Cover (Crop to fill)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.dropdownItem, { borderBottomWidth: 0 }]} 
-                  onPress={() => { setTempFit('contain'); setDropdownOpen(false); }}
-                >
-                  <Text>Contain (Show entire image)</Text>
-                </TouchableOpacity>
-              </View>
             )}
 
           </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
+          <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
+            <TouchableOpacity style={[styles.resetBtn, { backgroundColor: colors.error || '#c62828' }]} onPress={handleReset}>
               <Text style={styles.resetText}>Reset Defaults</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.doneBtn, { backgroundColor: colors.primary }]} onPress={handleSave}>
@@ -192,7 +153,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
@@ -246,12 +206,14 @@ const styles = StyleSheet.create({
   },
   colorRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 15,
     marginBottom: 20,
+    justifyContent: 'center'
   },
   colorCircle: {
-    width: 45,
-    height: 45,
+    width: 40,
+    height: 40,
     borderRadius: 25,
     borderWidth: 2,
     borderColor: '#333',
@@ -279,69 +241,22 @@ const styles = StyleSheet.create({
   },
   colorInput: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderRadius: 8,
     fontSize: 14,
   },
-  colorPickerContainer: {
-    height: 250,
-    marginBottom: 10,
-  },
-  colorPicker: {
-    width: '100%',
-    height: '100%',
-  },
-  colorPanel: {
-    flex: 1,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  hueSlider: {
-    borderRadius: 10,
-    height: 30,
-  },
   uploadBox: {
     borderWidth: 1,
-    borderColor: '#ccc',
     borderStyle: 'dashed',
     borderRadius: 10,
-    backgroundColor: '#f9f9fa',
     padding: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 10,
   },
   uploadText: {
-    color: '#666',
     fontSize: 14,
-  },
-  dropdownToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#e6e6ea',
-    padding: 15,
-    borderRadius: 20,
-    marginTop: 5,
-  },
-  dropdownText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  dropdownMenu: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    marginTop: 5,
-    backgroundColor: '#fff',
-  },
-  dropdownItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   footer: {
     flexDirection: 'row',

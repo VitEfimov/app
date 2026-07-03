@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Modal as RNModal } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
 import { togglePomodoroSettings, setTime, setBreakInterval, setIntervalCount, setWorkSound, setBreakSound } from '../features/pomodoroSlice';
@@ -9,6 +9,12 @@ import Svg, { Path } from 'react-native-svg';
 const IconClose = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M18 6L6 18M6 6l12 12" />
+  </Svg>
+);
+
+const IconChevronDown = ({ color }) => (
+  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M6 9l6 6 6-6" />
   </Svg>
 );
 
@@ -28,7 +34,9 @@ export default function PomodoroSettingsModal() {
   const currentPomodoro = pomodoro[0] || {};
 
   const [workMin, setWorkMin] = useState('25');
+  const [workSec, setWorkSec] = useState('0');
   const [breakMin, setBreakMin] = useState('5');
+  const [breakSec, setBreakSec] = useState('0');
   const [sessions, setSessions] = useState('5');
   const [workSound, setWorkSoundState] = useState('default');
   const [breakSound, setBreakSoundState] = useState('default');
@@ -36,7 +44,9 @@ export default function PomodoroSettingsModal() {
   useEffect(() => {
     if (isSettingsOpen) {
       setWorkMin(String(Math.floor((currentPomodoro.initialTime || 1500) / 60)));
+      setWorkSec(String((currentPomodoro.initialTime || 1500) % 60));
       setBreakMin(String(Math.floor((currentPomodoro.breakInterval || 300) / 60)));
+      setBreakSec(String((currentPomodoro.breakInterval || 300) % 60));
       setSessions(String(typeof currentPomodoro.intervalCount === 'object' ? currentPomodoro.intervalCount.count : 5));
       setWorkSoundState(currentPomodoro.workSound || 'default');
       setBreakSoundState(currentPomodoro.breakSound || 'default');
@@ -44,12 +54,20 @@ export default function PomodoroSettingsModal() {
   }, [isSettingsOpen, currentPomodoro]);
 
   const handleSave = () => {
-    const wMin = parseInt(workMin) || 25;
-    const bMin = parseInt(breakMin) || 5;
+    const wMin = parseInt(workMin) || 0;
+    const wSec = parseInt(workSec) || 0;
+    const bMin = parseInt(breakMin) || 0;
+    const bSec = parseInt(breakSec) || 0;
     const sCount = parseInt(sessions) || 5;
 
-    dispatch(setTime(wMin * 60));
-    dispatch(setBreakInterval(bMin * 60));
+    let workTime = wMin * 60 + wSec;
+    if (workTime === 0) workTime = 25 * 60;
+
+    let breakTime = bMin * 60 + bSec;
+    if (breakTime === 0) breakTime = 5 * 60;
+
+    dispatch(setTime(workTime));
+    dispatch(setBreakInterval(breakTime));
     dispatch(setIntervalCount(Math.min(sCount, 10))); // Max 10 sessions
     dispatch(setWorkSound(workSound));
     dispatch(setBreakSound(breakSound));
@@ -57,29 +75,44 @@ export default function PomodoroSettingsModal() {
     dispatch(togglePomodoroSettings(false));
   };
 
+  const Dropdown = ({ value, options, onSelect }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const selectedLabel = options.find(o => o.value === value)?.label || value;
+    const surfaceLighter = colors.surfaceContainerHigh;
+    
+    return (
+      <View>
+        <TouchableOpacity 
+          style={[styles.dropdownBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
+          onPress={() => setIsOpen(true)}
+        >
+          <Text style={[styles.dropdownText, { color: colors.textPrimary }]}>{selectedLabel}</Text>
+          <IconChevronDown color={colors.textSecondary} />
+        </TouchableOpacity>
+        
+        <RNModal visible={isOpen} transparent animationType="fade">
+          <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setIsOpen(false)}>
+            <View style={[styles.dropdownMenu, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+              {options.map(opt => (
+                <TouchableOpacity 
+                  key={opt.value} 
+                  style={styles.dropdownItem} 
+                  onPress={() => { onSelect(opt.value); setIsOpen(false); }}
+                >
+                  <Text style={[styles.dropdownItemText, { color: opt.value === value ? colors.primary : colors.textPrimary, fontWeight: opt.value === value ? 'bold' : 'normal' }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </RNModal>
+      </View>
+    );
+  };
+
   const SoundPicker = ({ label, selectedValue, onSelect }) => (
     <View style={styles.settingRow}>
       <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{label}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.soundScroll}>
-        {predefinedSounds.map((sound) => (
-          <TouchableOpacity
-            key={sound.value}
-            style={[
-              styles.soundChip, 
-              { borderColor: colors.borderColor },
-              selectedValue === sound.value && { backgroundColor: colors.primary, borderColor: colors.primary }
-            ]}
-            onPress={() => onSelect(sound.value)}
-          >
-            <Text style={[
-              styles.soundChipText,
-              { color: selectedValue === sound.value ? colors.textInverse : colors.textPrimary }
-            ]}>
-              {sound.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <Dropdown value={selectedValue} options={predefinedSounds} onSelect={onSelect} />
     </View>
   );
 
@@ -106,25 +139,53 @@ export default function PomodoroSettingsModal() {
           </View>
 
           <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Work duration (min)</Text>
-            <TextInput
-              style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
-              value={workMin}
-              onChangeText={setWorkMin}
-              keyboardType="numeric"
-              maxLength={3}
-            />
+            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Work duration</Text>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={workMin}
+                onChangeText={setWorkMin}
+                keyboardType="numeric"
+                maxLength={3}
+                placeholder="Min"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={workSec}
+                onChangeText={setWorkSec}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="Sec"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
           </View>
 
           <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Break duration (min)</Text>
-            <TextInput
-              style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
-              value={breakMin}
-              onChangeText={setBreakMin}
-              keyboardType="numeric"
-              maxLength={3}
-            />
+            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Break duration</Text>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={breakMin}
+                onChangeText={setBreakMin}
+                keyboardType="numeric"
+                maxLength={3}
+                placeholder="Min"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={breakSec}
+                onChangeText={setBreakSec}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="Sec"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
           </View>
 
           <View style={styles.settingRow}>
@@ -195,12 +256,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
   },
   settingLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 8,
+    flex: 1,
   },
   input: {
     borderWidth: 1,
@@ -208,21 +272,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 12,
     fontSize: 16,
-    width: 100,
+    width: 80,
+    textAlign: 'center',
   },
-  soundScroll: {
+  dropdownBtn: {
     flexDirection: 'row',
-  },
-  soundChip: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
+    borderRadius: 8,
     paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    minWidth: 150,
+  },
+  dropdownText: {
+    fontSize: 14,
     marginRight: 10,
   },
-  soundChipText: {
-    fontSize: 14,
-    fontWeight: '500',
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownMenu: {
+    width: 250,
+    borderRadius: 8,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  dropdownItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  dropdownItemText: {
+    fontSize: 16,
   },
   saveBtn: {
     paddingVertical: 15,

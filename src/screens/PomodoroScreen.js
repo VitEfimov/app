@@ -85,6 +85,7 @@ export default function PomodoroScreen() {
     ? pomodoro.breakSound : 'start_sound.mp3';
 
   const appState = useRef(AppState.currentState);
+  const notificationIdRef = useRef(null);
 
   useEffect(() => {
     setLocalTime(pomodoro.time);
@@ -135,7 +136,6 @@ export default function PomodoroScreen() {
     if (localIsBreak) {
       dispatch(completeBreakInterval());
       playAudio(breakSoundKey);
-      scheduleLocalNotification('Break time is over!', 'Time to get back to work.', null);
 
       if (localCompletedIntervals + 1 >= staticIntervalCountRef.current) {
         dispatch(resetTimer());
@@ -143,17 +143,29 @@ export default function PomodoroScreen() {
     } else {
       dispatch(completeWorkInterval());
       playAudio(workSoundKey);
-      scheduleLocalNotification('Work session complete!', 'Take a short break.', null);
     }
   };
 
-  const handleStartTimer = () => {
+  const handleStartTimer = async () => {
     if (localIsActive) return;
     
     setLocalIsActive(true);
     dispatch(startTimer());
     
-    targetEndTimeRef.current = Date.now() + (localTime * 1000);
+    const endTime = Date.now() + (localTime * 1000);
+    targetEndTimeRef.current = endTime;
+
+    // Schedule the notification to fire exactly when the timer ends
+    // This ensures it works even if the app goes to sleep or device locks
+    const title = localIsBreak ? 'Break time is over!' : 'Work session complete!';
+    const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
+    const triggerDate = new Date(endTime);
+    
+    import('../utils/notifications').then(({ scheduleLocalNotification }) => {
+      scheduleLocalNotification(title, body, triggerDate).then(id => {
+        notificationIdRef.current = id;
+      });
+    });
 
     intervalRef.current = setInterval(() => {
       setLocalTime(prevTime => {
@@ -178,6 +190,13 @@ export default function PomodoroScreen() {
     setLocalIsActive(false);
     targetEndTimeRef.current = null;
     dispatch(pauseTimer());
+    
+    import('../utils/notifications').then(({ cancelNotification }) => {
+      if (notificationIdRef.current) {
+        cancelNotification(notificationIdRef.current);
+        notificationIdRef.current = null;
+      }
+    });
   };
 
   const handleResetTimer = () => {
@@ -187,6 +206,13 @@ export default function PomodoroScreen() {
     setLocalCompletedIntervals(0);
     targetEndTimeRef.current = null;
     dispatch(resetTimer());
+
+    import('../utils/notifications').then(({ cancelNotification }) => {
+      if (notificationIdRef.current) {
+        cancelNotification(notificationIdRef.current);
+        notificationIdRef.current = null;
+      }
+    });
   };
 
   const formatTime = (timeInSeconds) => {
@@ -226,17 +252,17 @@ export default function PomodoroScreen() {
         
         {/* Work / Break Toggle */}
         <View style={styles.toggleContainer}>
-          <View style={[styles.toggleBtn, !localIsBreak && [styles.toggleBtnActive, { backgroundColor: colors.primary }]]}>
+          <View style={[styles.toggleBtn, !localIsBreak ? styles.toggleBtnActive : null, !localIsBreak ? { backgroundColor: colors.primary } : null]}>
             <Text style={[styles.toggleText, !localIsBreak && { color: colors.textInverse }]}>Work Time</Text>
           </View>
-          <View style={[styles.toggleBtn, localIsBreak && [styles.toggleBtnActive, { backgroundColor: '#ff9800' }]]}>
+          <View style={[styles.toggleBtn, localIsBreak ? styles.toggleBtnActive : null, localIsBreak ? { backgroundColor: '#ff9800' } : null]}>
             <Text style={[styles.toggleText, localIsBreak && { color: '#fff' }]}>Break Time</Text>
           </View>
         </View>
 
         {/* Circular Timer */}
         <View style={styles.circleTimer}>
-          <Svg viewBox="0 0 100 100" width="250" height="250">
+          <Svg viewBox="0 0 100 100" width="220" height="220">
             <Circle cx="50" cy="50" r="45" stroke={colors.surfaceContainerHigh} strokeWidth="5" fill="none" />
             <Circle 
               cx="50" cy="50" r="45" 
@@ -308,7 +334,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 15,
   },
   title: {
     fontSize: 28,
@@ -332,7 +358,7 @@ const styles = StyleSheet.create({
   },
   timerCard: {
     alignItems: 'center',
-    padding: 30,
+    padding: 20,
     borderRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -345,7 +371,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.05)',
     borderRadius: 25,
     padding: 5,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   toggleBtn: {
     paddingHorizontal: 20,
@@ -386,13 +412,13 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 25,
     gap: 20,
   },
   playPauseBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -402,14 +428,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   resetBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dotsContainer: {
-    marginTop: 40,
+    marginTop: 25,
     alignItems: 'center',
   },
   dots: {

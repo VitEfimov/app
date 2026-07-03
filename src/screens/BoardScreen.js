@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import TaskRow from '../components/TaskRow';
-import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import PromptModal from '../components/PromptModal';
+import InlineAddTask from '../components/InlineAddTask';
+import Modal from 'react-native-modal';
 import getFilters from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
@@ -21,7 +22,7 @@ const IconChevronDown = ({ color, isCollapsed }) => (
   </Svg>
 );
 
-export default function BoardScreen() {
+export default function BoardScreen({ route }) {
   const { colors } = useTheme();
   const dispatch = useDispatch();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
@@ -33,10 +34,18 @@ export default function BoardScreen() {
   const [isDetailsVisible, setDetailsVisible] = useState(false);
   
   const [promptConfig, setPromptConfig] = useState({ isVisible: false, type: null, targetBoard: null });
+  const [sectionOptionsConfig, setSectionOptionsConfig] = useState({ isVisible: false, section: null });
+  const [sortConfig, setSortConfig] = useState({});
+  const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
 
-  const [collapsedSections, setCollapsedSections] = useState([
-    'missed', 'tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed'
-  ]);
+  const allSectionIds = ['missed', 'today', 'tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed'];
+
+  const [collapsedSections, setCollapsedSections] = useState(() => {
+    if (route?.params?.sectionId) {
+      return allSectionIds.filter(id => id !== route.params.sectionId);
+    }
+    return ['tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed'];
+  });
 
   const toggleSection = (sectionId) => {
     if (collapsedSections.includes(sectionId)) {
@@ -44,6 +53,45 @@ export default function BoardScreen() {
     } else {
       setCollapsedSections([...collapsedSections, sectionId]);
     }
+  };
+
+  const toggleTaskSelection = (taskId) => {
+    setSelectionMode(prev => {
+      const isSelected = prev.selectedTaskIds.includes(taskId);
+      return {
+        ...prev,
+        selectedTaskIds: isSelected 
+          ? prev.selectedTaskIds.filter(id => id !== taskId)
+          : [...prev.selectedTaskIds, taskId]
+      };
+    });
+  };
+
+  const handleSelectAll = () => {
+    const section = sections.find(s => s.id === selectionMode.sectionId);
+    if (!section) return;
+    const taskIds = section.data.map(t => t.id);
+    setSelectionMode(prev => ({ ...prev, selectedTaskIds: taskIds }));
+  };
+
+  const handleCompleteSelected = () => {
+    selectionMode.selectedTaskIds.forEach(id => {
+      dispatch(updateTask({ taskId: id, completed: true }));
+    });
+    setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectionMode.selectedTaskIds.length === 0) return;
+    Alert.alert('Delete Tasks', `Delete ${selectionMode.selectedTaskIds.length} tasks?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        selectionMode.selectedTaskIds.forEach(id => {
+          dispatch(deleteTask({ taskId: id }));
+        });
+        setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
+      }}
+    ]);
   };
 
   const handleTaskPress = (task) => {
@@ -54,20 +102,42 @@ export default function BoardScreen() {
   // Group tasks
   const FILTERS = getFilters();
   const boardTasks = tasks.filter(task => (task.boardId || 'main') === activeBoardId);
-  const todayTasks = boardTasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed);
-  const tomorrowTasks = boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed);
-  const thisWeekTasks = boardTasks.filter(task =>
+  const sortTasks = (tasksArr, sectionId) => {
+    const sortBy = sortConfig[sectionId] || 'time';
+    return tasksArr.sort((a, b) => {
+      const dateA = a.completionDate || '9999-12-31';
+      const dateB = b.completionDate || '9999-12-31';
+      const timeA = a.time || '23:59';
+      const timeB = b.time || '23:59';
+
+      if (sortBy === 'priority') {
+        const pValues = { high: 3, medium: 2, low: 1, none: 0 };
+        const pA = pValues[a.priority?.toLowerCase()] || 0;
+        const pB = pValues[b.priority?.toLowerCase()] || 0;
+        if (pA !== pB) return pB - pA; // Higher priority first
+      }
+
+      const dateCompare = dateA.localeCompare(dateB);
+      if (dateCompare !== 0) return dateCompare;
+      
+      return timeA.localeCompare(timeB);
+    });
+  };
+
+  const todayTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed), 'today');
+  const tomorrowTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed), 'tomorrow');
+  const thisWeekTasks = sortTasks(boardTasks.filter(task =>
     !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') &&
     !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
     dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed
-  );
-  const nextWeekTasks = boardTasks.filter(task =>
+  ), 'on-this-week');
+  const nextWeekTasks = sortTasks(boardTasks.filter(task =>
     !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
     dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') &&
     dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed
-  );
-  const laterTasks = boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed);
-  const missedTasks = boardTasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed);
+  ), 'on-next-week');
+  const laterTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed), 'later');
+  const missedTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed), 'missed');
   const completedTasks = boardTasks.filter(task => task.completed);
 
   const sections = [
@@ -79,6 +149,14 @@ export default function BoardScreen() {
     { id: 'later', title: 'Upcoming', data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
     ...(completedTasks.length > 0 ? [{ id: 'completed', title: 'Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4caf50' }] : []),
   ];
+
+  React.useEffect(() => {
+    if (route?.params?.sectionId) {
+      setCollapsedSections(allSectionIds.filter(id => id !== route.params.sectionId));
+    } else {
+      setCollapsedSections(['tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed']);
+    }
+  }, [route?.params?.sectionId]);
 
   const handleCompleteSection = (section) => {
     section.data.forEach(task => {
@@ -109,17 +187,7 @@ export default function BoardScreen() {
   };
 
   const handleMenuPress = (section) => {
-    const options = [];
-    if (section.id !== 'completed' && section.id !== 'later') {
-      options.push({ text: 'Complete all', onPress: () => handleCompleteSection(section) });
-      options.push({ text: 'Move forward', onPress: () => handleMoveForward(section) });
-    } else if (section.id === 'later') {
-      options.push({ text: 'Complete all', onPress: () => handleCompleteSection(section) });
-    }
-    options.push({ text: 'Delete all', onPress: () => handleDeleteSection(section), style: 'destructive' });
-    options.push({ text: 'Cancel', style: 'cancel' });
-
-    Alert.alert(`Options for ${section.title}`, '', options);
+    setSectionOptionsConfig({ isVisible: true, section });
   };
 
   const handleAddBoard = () => {
@@ -171,9 +239,12 @@ export default function BoardScreen() {
           <IconChevronDown color={colors.textSecondary} isCollapsed={collapsedSections.includes(section.id)} />
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{section.title}</Text>
         </TouchableOpacity>
-        <View style={[styles.badge, { backgroundColor: `${section.color}20` }]}>
+        <TouchableOpacity 
+          style={[styles.badge, { backgroundColor: `${section.color}20` }]}
+          onPress={() => handleMenuPress(section)}
+        >
           <Text style={[styles.badgeText, { color: section.color }]}>{section.count}</Text>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={styles.ellipsisBtn} 
           onPress={() => handleMenuPress(section)}
@@ -185,15 +256,17 @@ export default function BoardScreen() {
   };
 
   const renderSectionFooter = ({ section }) => {
-    if (section.id === 'completed' || collapsedSections.includes(section.id)) return null;
+    if (section.id === 'completed' || section.id === 'missed' || collapsedSections.includes(section.id)) return null;
     return <InlineAddTask sectionId={section.id} />;
   };
 
   return (
-    <TouchableOpacity 
-      activeOpacity={1} 
-      style={[styles.container, { backgroundColor: colors.bgMain }]}
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       
       {/* Top Tabs */}
       <View style={[styles.topBar, { borderBottomColor: colors.borderColor }]}>
@@ -222,26 +295,27 @@ export default function BoardScreen() {
         </ScrollView>
       </View>
 
-      {/* Columns */}
-      <View style={[styles.columnsRow, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
-        <Text style={[styles.columnText, { color: colors.textPrimary }]}>TASKS</Text>
-        <Text style={[styles.columnText, { color: colors.textPrimary }]}>DUE DATE</Text>
-      </View>
-
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
+        renderItem={({ item, section }) => (
           <TaskRow 
             task={item} 
             onPress={() => handleTaskPress(item)} 
+            isSelectionMode={selectionMode.isActive && selectionMode.sectionId === section.id}
+            isSelected={selectionMode.selectedTaskIds.includes(item.id)}
+            onToggleSelect={() => toggleTaskSelection(item.id)}
           />
         )}
         renderSectionHeader={renderSectionHeader}
         renderSectionFooter={renderSectionFooter}
         contentContainerStyle={styles.listContent}
         stickySectionHeadersEnabled={true}
-        keyboardShouldPersistTaps="never"
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'ios'}
       />
 
       <TaskDetailsModal 
@@ -260,7 +334,84 @@ export default function BoardScreen() {
         onSubmit={handlePromptSubmit}
       />
 
-    </TouchableOpacity>
+      <Modal 
+        isVisible={sectionOptionsConfig.isVisible} 
+        onSwipeComplete={() => setSectionOptionsConfig({ isVisible: false, section: null })}
+        swipeDirection={['down']}
+        propagateSwipe={true}
+        onBackdropPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
+        style={{ margin: 0, justifyContent: 'flex-end' }}
+      >
+        <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+          <View style={styles.optionsModalDragHandle} />
+          <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
+            Options for {sectionOptionsConfig.section?.title}
+          </Text>
+          
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+            <Text style={[styles.optionText, { color: colors.textPrimary }]}>Sort by Time</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+            <Text style={[styles.optionText, { color: colors.textPrimary }]}>Sort by Priority</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+            setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
+            setSectionOptionsConfig({ isVisible: false, section: null }); 
+          }}>
+            <Text style={[styles.optionText, { color: colors.primary }]}>Select Tasks</Text>
+          </TouchableOpacity>
+          
+          {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
+            <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { handleCompleteSection(sectionOptionsConfig.section); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+              <Text style={[styles.optionText, { color: colors.textPrimary }]}>Complete all</Text>
+            </TouchableOpacity>
+          )}
+
+          {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
+            <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { handleMoveForward(sectionOptionsConfig.section); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+              <Text style={[styles.optionText, { color: colors.textPrimary }]}>Move forward</Text>
+            </TouchableOpacity>
+          )}
+
+          {sectionOptionsConfig.section?.id === 'later' && (
+            <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { handleCompleteSection(sectionOptionsConfig.section); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+              <Text style={[styles.optionText, { color: colors.textPrimary }]}>Complete all</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { handleDeleteSection(sectionOptionsConfig.section); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+            <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>Delete all</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}>
+            <Text style={[styles.optionText, { color: colors.textSecondary }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {selectionMode.isActive && (
+        <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
+          <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} Selected</Text>
+          <View style={styles.actionBarButtons}>
+            <TouchableOpacity onPress={handleSelectAll} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleCompleteSelected} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Complete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDeleteSelected} style={styles.actionBtn}>
+              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>Delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
+              <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -318,7 +469,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    width: '90%',
+    width: '95%',
     alignSelf: 'center',
     zIndex: 10,
   },
@@ -348,5 +499,58 @@ const styles = StyleSheet.create({
   ellipsisText: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  optionsModalContent: {
+    padding: 20,
+    paddingBottom: 40,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    alignItems: 'center',
+  },
+  optionsModalDragHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#999',
+    borderRadius: 3,
+    marginBottom: 20,
+    opacity: 0.5,
+  },
+  optionsModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  optionBtn: {
+    width: '100%',
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    alignItems: 'center',
+  },
+  optionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 15,
+    borderTopWidth: 1,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  actionBarText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  actionBarButtons: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  actionBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
   }
 });

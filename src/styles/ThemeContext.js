@@ -47,7 +47,7 @@ export const ThemeProvider = ({ children }) => {
       colors.borderColor = primaryHex;
       colors.danger = '#ff3333';
     } else {
-      colors.bgMain = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(12)) : hexFromArgb(matTheme.palettes.primary.tone(95));
+      colors.bgMain = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(16)) : hexFromArgb(matTheme.palettes.neutral.tone(94));
       colors.bgSidebar = hexFromArgb(scheme.surfaceVariant);
       colors.bgCard = hexFromArgb(scheme.surface);
       colors.bgHeader = hexFromArgb(scheme.surface);

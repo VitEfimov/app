@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import { StatusBar } from 'react-native';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import BoardScreen from '../screens/BoardScreen';
@@ -73,6 +74,9 @@ function TabNavigator() {
         tabBarStyle: {
           backgroundColor: colors.bgCard,
           borderTopColor: colors.surfaceContainerHigh,
+          height: 80,
+          paddingBottom: 20,
+          paddingTop: 10,
         },
         headerStyle: {
           backgroundColor: colors.bgHeader
@@ -90,9 +94,26 @@ function TabNavigator() {
 
 export default function AppNavigator() {
   const { isAuthenticated, isGuest } = useSelector((state) => state.userReducer);
+  const { colors, isDark } = useTheme();
+
+  const MyTheme = {
+    dark: isDark,
+    colors: {
+      primary: colors.primary,
+      background: colors.bgMain,
+      card: colors.bgCard,
+      text: colors.textPrimary,
+      border: colors.borderColor,
+      notification: colors.primary,
+    },
+  };
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={MyTheme}>
+      <StatusBar 
+        backgroundColor={colors.bgHeader} 
+        barStyle={isDark ? 'light-content' : 'dark-content'} 
+      />
       {/* VERCEL BACKEND AUTH CHECK (COMMENTED OUT FOR LOCAL-ONLY MODE) 
       {isAuthenticated || isGuest ? (
         <TabNavigator />

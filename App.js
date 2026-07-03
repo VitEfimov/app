@@ -73,7 +73,7 @@ function InitApp() {
   useEffect(() => {
     const loadStorage = async () => {
       try {
-        const theme = await AsyncStorage.getItem('theme');
+        const theme = await AsyncStorage.getItem('customTheme');
         if (theme) dispatch(hydrateThemeState(JSON.parse(theme)));
 
         const boardsJson = await AsyncStorage.getItem('boards');
@@ -103,8 +103,17 @@ function InitApp() {
   return <AppNavigator />;
 }
 
+function RootWrapper({ children }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bgMain }}>
+      {children}
+    </View>
+  );
+}
+
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ThemeProvider } from './src/styles/ThemeContext';
+import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
 
 export default function App() {
   return (
@@ -113,7 +122,9 @@ export default function App() {
         <SafeAreaProvider>
           <Provider store={store}>
             <ThemeProvider>
-              <InitApp />
+              <RootWrapper>
+                <InitApp />
+              </RootWrapper>
             </ThemeProvider>
           </Provider>
         </SafeAreaProvider>

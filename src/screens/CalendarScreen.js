@@ -1,50 +1,67 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Dimensions } from 'react-native';
+import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
 import { useTheme } from '../styles/ThemeContext';
-import { setCalendarPanePosition } from '../features/themeSlice';
 import TaskRow from '../components/TaskRow';
+import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import dayjs from 'dayjs';
 
 export default function CalendarScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
 
-  const savedPosition = useSelector(state => state.themeReducer.calendarPanePosition);
   const dispatch = useDispatch();
 
   // Custom Bottom Sheet State
   const MIN_Y = 0; // Fully expanded (covers calendar)
   const maxYRef = useRef(360); // Default, updated onLayout
+  const isInitialized = useRef(false);
   
-  const panY = useRef(new Animated.Value(savedPosition !== null ? savedPosition : 360)).current;
-  const lastY = useRef(savedPosition !== null ? savedPosition : 360);
+  const panY = useRef(new Animated.Value(360)).current;
+  const lastY = useRef(360);
 
   const handleCalendarLayout = (event) => {
     const { height } = event.nativeEvent.layout;
     if (Math.abs(maxYRef.current - height) > 5) {
       maxYRef.current = height;
-      if (savedPosition === null && lastY.current > 100) {
+      if (!isInitialized.current) {
         panY.setValue(height);
         lastY.current = height;
-      } else if (savedPosition !== null && savedPosition > height) {
-        panY.setValue(height);
-        lastY.current = height;
-        dispatch(setCalendarPanePosition(height));
+        isInitialized.current = true;
       }
     }
   };
+
+  React.useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      Animated.timing(panY, {
+        toValue: MIN_Y,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      lastY.current = MIN_Y;
+    });
+
+    return () => {
+      keyboardDidShowListener.remove();
+    };
+  }, []);
   
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderGrant: () => {
+        panY.stopAnimation((value) => {
+          lastY.current = value;
+        });
       },
       onPanResponderMove: (evt, gestureState) => {
         let newY = lastY.current + gestureState.dy;
@@ -68,13 +85,11 @@ export default function CalendarScreen() {
 
         lastY.current = targetY;
 
-        Animated.spring(panY, {
+        Animated.timing(panY, {
           toValue: targetY,
+          duration: 300,
           useNativeDriver: false,
-          bounciness: 0,
-        }).start(() => {
-          dispatch(setCalendarPanePosition(targetY));
-        });
+        }).start();
       }
     })
   ).current;
@@ -88,26 +103,37 @@ export default function CalendarScreen() {
   const markedDates = useMemo(() => {
     const marks = {};
     tasks.forEach(task => {
-      if (task.completionDate && !task.completed) {
+      if (task.completionDate) {
         const dateStr = dayjs(task.completionDate).format('YYYY-MM-DD');
-        let dotColor = colors.primary;
-        if (task.priority === 'High') dotColor = '#f44336';
-        if (task.priority === 'Medium') dotColor = '#ff9800';
-        if (task.priority === 'Low') dotColor = '#4caf50';
-
-        marks[dateStr] = { marked: true, dotColor: dotColor };
+        if (!marks[dateStr]) {
+          marks[dateStr] = { tasks: [] };
+        }
+        marks[dateStr].tasks.push(task);
       }
     });
 
+    const finalMarks = {};
+    Object.keys(marks).forEach(dateStr => {
+      const dayTasks = marks[dateStr].tasks;
+      const allCompleted = dayTasks.every(t => t.completed);
+      const anyMissed = dayTasks.some(t => !t.completed && dayjs(t.completionDate).isBefore(dayjs(), 'day'));
+
+      let dotColor = colors.primary;
+      if (allCompleted) dotColor = '#ffffff';
+      else if (anyMissed) dotColor = '#f44336';
+
+      finalMarks[dateStr] = { marked: true, dotColor: dotColor };
+    });
+
     // Mark the currently selected date
-    if (marks[selectedDate]) {
-      marks[selectedDate].selected = true;
-      marks[selectedDate].selectedColor = colors.primary;
+    if (finalMarks[selectedDate]) {
+      finalMarks[selectedDate].selected = true;
+      finalMarks[selectedDate].selectedColor = colors.primary;
     } else {
-      marks[selectedDate] = { selected: true, selectedColor: colors.primary };
+      finalMarks[selectedDate] = { selected: true, selectedColor: colors.primary };
     }
 
-    return marks;
+    return finalMarks;
   }, [tasks, selectedDate, colors]);
 
   // Get tasks for selected date
@@ -122,12 +148,13 @@ export default function CalendarScreen() {
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <View onLayout={handleCalendarLayout}>
         <Calendar
+          key={`${colors.bgMain}-${isDark}`}
           current={selectedDate}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={markedDates}
           theme={{
             backgroundColor: colors.bgMain,
-            calendarBackground: colors.bgCard,
+            calendarBackground: colors.bgMain,
             textSectionTitleColor: colors.textSecondary,
             selectedDayBackgroundColor: colors.primary,
             selectedDayTextColor: colors.textInverse,
@@ -157,17 +184,16 @@ export default function CalendarScreen() {
           { backgroundColor: colors.bgCard, top: panY }
         ]}
       >
-        <View 
-          {...panResponder.panHandlers} 
-          style={styles.dragHandleContainer}
-        >
-          <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
-        </View>
+        <View {...panResponder.panHandlers}>
+          <View style={styles.dragHandleContainer}>
+            <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
+          </View>
 
-        <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
-          <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
-            Tasks for {dayjs(selectedDate).format('MMM D, YYYY')}
-          </Text>
+          <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
+            <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
+              Tasks for {dayjs(selectedDate).format('MMM D, YYYY')}
+            </Text>
+          </View>
         </View>
 
         {selectedTasks.length > 0 ? (
@@ -175,14 +201,22 @@ export default function CalendarScreen() {
             style={{ flex: 1 }}
             data={selectedTasks}
             keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <TaskRow task={item} hideDate={true} onPress={() => handleTaskPress(item)} />}
+            renderItem={({ item }) => <TaskRow task={item} hideDate={true} disableInlineEdit={true} onPress={() => handleTaskPress(item)} />}
             contentContainerStyle={styles.listContent}
+            initialNumToRender={10}
+            maxToRenderPerBatch={5}
+            windowSize={3}
+            removeClippedSubviews={Platform.OS === 'ios'}
           />
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No tasks scheduled for this day.</Text>
           </View>
         )}
+        
+        <View style={{ marginBottom: 20 }}>
+          <InlineAddTask sectionId={selectedDate} />
+        </View>
       </Animated.View>
 
       <TaskDetailsModal 

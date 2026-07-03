@@ -83,7 +83,7 @@ const taskSlice = createSlice({
              state.tasks = state.tasks.filter(t => t.id !== taskId);
         },
         updateTaskSync(state, action) {
-            const { taskId, name, priority, completed, description, completionDate, time } = action.payload;
+            const { taskId, name, priority, completed, description, completionDate, time, subtasks } = action.payload;
             const task = state.tasks.find(task => task.id === taskId);
             if (task) {
                 task.taskname = name !== undefined ? name : task.taskname;
@@ -99,6 +99,9 @@ const taskSlice = createSlice({
                         img: description.img || '',
                         url: description.url || '',
                     };
+                }
+                if (subtasks !== undefined) {
+                    task.subtasks = subtasks;
                 }
                 task.lastUpdatedDate = new Date().toISOString();
             }
