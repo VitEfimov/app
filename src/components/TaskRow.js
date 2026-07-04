@@ -211,7 +211,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
               </Text>
             )}
           </View>
-          {hasNotes && <View style={styles.descIndicatorRelative} />}
+          {hasNotes && <View style={styles.descIndicator} />}
         </View>
       </View>
     </TouchableOpacity>
@@ -272,8 +272,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 15,
-    marginRight: 10,
-    position: 'relative',
+    marginRight: 5,
   },
   rightStack: {
     alignItems: 'flex-end',
@@ -296,15 +295,12 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     marginRight: 16,
   },
-  descIndicatorRelative: {
-    position: 'absolute',
-    right: -14,
-    top: '50%',
-    marginTop: -2.5,
+  descIndicator: {
     width: 5,
     height: 5,
     borderRadius: 5,
     backgroundColor: '#5e7d68',
+    marginLeft: 8,
   },
   subtaskBadge: {
     paddingHorizontal: 4,

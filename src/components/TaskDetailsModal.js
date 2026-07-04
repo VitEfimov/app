@@ -467,8 +467,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                     onChangeText={(text) => updateSubtask(subtask.id, text)}
                     placeholder="Subtask..."
                     placeholderTextColor={colors.textSecondary}
-                    onSubmitEditing={addSubtask}
-                    blurOnSubmit={false}
+                    blurOnSubmit={true}
                   />
                   <TouchableOpacity onPress={() => removeSubtask(subtask.id)} style={{ padding: 4 }}>
                     <IconClose color={colors.textSecondary} />
