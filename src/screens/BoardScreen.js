@@ -107,7 +107,7 @@ export default function BoardScreen({ route }) {
         const notes = t.description?.text ? t.description.text.replace(/<[^>]+>/g, '').trim() : '';
         const subtasks = t.subtasks || [];
 
-        return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- [${s.completed ? 'x' : ' '}] ${s.text}`).join('\n')}` : ''}`.trim();
+        return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`.trim();
       }).join('\n\n------------------------\n\n');
       
       await Share.share({
