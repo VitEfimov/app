@@ -7,7 +7,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
 import { Alert } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { scheduleTaskReminder, cancelNotification } from '../utils/notifications';
@@ -73,15 +73,15 @@ const IconListNumbered = ({ color }) => (
 
 const IconSquare = ({ color }) => (
   <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
   </Svg>
 );
 
 const IconImage = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <circle cx="8.5" cy="8.5" r="1.5" />
-    <polyline points="21 15 16 10 5 21" />
+    <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <Circle cx="8.5" cy="8.5" r="1.5" />
+    <Polyline points="21 15 16 10 5 21" />
   </Svg>
 );
 
