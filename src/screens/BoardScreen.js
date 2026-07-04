@@ -101,12 +101,17 @@ export default function BoardScreen({ route }) {
     try {
       const selectedTasksObjects = boardTasks.filter(t => selectionMode.selectedTaskIds.includes(t.id));
       const shareText = selectedTasksObjects.map(t => {
-        const dateStr = t.completionDate ? ` (Due: ${dayjs(t.completionDate).format('MMM D')})` : '';
-        return `- ${t.taskname}${dateStr}`;
-      }).join('\n');
+        const taskName = t.taskname;
+        const selectedDate = t.completionDate;
+        const selectedTime = t.time;
+        const notes = t.description?.text ? t.description.text.replace(/<[^>]+>/g, '').trim() : '';
+        const subtasks = t.subtasks || [];
+
+        return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- [${s.completed ? 'x' : ' '}] ${s.text}`).join('\n')}` : ''}`.trim();
+      }).join('\n\n------------------------\n\n');
       
       await Share.share({
-        message: `Tasks:\n${shareText}`,
+        message: `Tasks:\n\n${shareText}`,
       });
       setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
     } catch (error) {
