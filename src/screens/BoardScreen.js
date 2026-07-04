@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import TaskRow from '../components/TaskRow';
@@ -47,6 +47,12 @@ export default function BoardScreen({ route }) {
     return ['tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed'];
   });
 
+  useEffect(() => {
+    if (route?.params?.sectionId) {
+      setCollapsedSections(allSectionIds.filter(id => id !== route.params.sectionId));
+    }
+  }, [route?.params?.sectionId]);
+
   const toggleSection = (sectionId) => {
     if (collapsedSections.includes(sectionId)) {
       setCollapsedSections(collapsedSections.filter(id => id !== sectionId));
@@ -82,16 +88,30 @@ export default function BoardScreen({ route }) {
   };
 
   const handleDeleteSelected = () => {
-    if (selectionMode.selectedTaskIds.length === 0) return;
-    Alert.alert('Delete Tasks', `Delete ${selectionMode.selectedTaskIds.length} tasks?`, [
+    Alert.alert('Delete Tasks', `Are you sure you want to delete ${selectionMode.selectedTaskIds.length} tasks?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => {
-        selectionMode.selectedTaskIds.forEach(id => {
-          dispatch(deleteTask({ taskId: id }));
-        });
+        selectionMode.selectedTaskIds.forEach(id => dispatch(deleteTask({ taskId: id })));
         setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
       }}
     ]);
+  };
+
+  const handleShareSelected = async () => {
+    try {
+      const selectedTasksObjects = boardTasks.filter(t => selectionMode.selectedTaskIds.includes(t.id));
+      const shareText = selectedTasksObjects.map(t => {
+        const dateStr = t.completionDate ? ` (Due: ${dayjs(t.completionDate).format('MMM D')})` : '';
+        return `- ${t.taskname}${dateStr}`;
+      }).join('\n');
+      
+      await Share.share({
+        message: `Tasks:\n${shareText}`,
+      });
+      setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   const handleTaskPress = (task) => {
@@ -396,6 +416,9 @@ export default function BoardScreen({ route }) {
           <View style={styles.actionBarButtons}>
             <TouchableOpacity onPress={handleSelectAll} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleShareSelected} style={styles.actionBtn}>
+              <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>Share</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleCompleteSelected} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Complete</Text>

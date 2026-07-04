@@ -90,9 +90,9 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
-      case 'high': return '#f44336';
-      case 'medium': return '#ff9800';
-      case 'low': return '#4caf50';
+      case 'high': return '#B3261E';
+      case 'medium': return '#A15C00';
+      case 'low': return '#3F7D3F';
       default: return null;
     }
   };
@@ -105,8 +105,8 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
   const hasSubtasks = totalSubtasksCount > 0;
 
   return (
-    <TouchableOpacity 
-      style={[styles.container, { borderBottomColor: colors.borderColor }]} 
+    <TouchableOpacity
+      style={[styles.container, { borderBottomColor: colors.borderColor }]}
       onPress={(e) => {
         if (isSelectionMode) {
           if (onToggleSelect) onToggleSelect();
@@ -125,10 +125,10 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
       ) : (
         <View style={styles.priorityPlaceholder} />
       )}
-      
+
       <View style={styles.innerContainer}>
-        <TouchableOpacity 
-          style={styles.checkbox} 
+        <TouchableOpacity
+          style={styles.checkbox}
           onPress={() => {
             if (isSelectionMode) {
               if (onToggleSelect) onToggleSelect();
@@ -145,75 +145,75 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
           )}
         </TouchableOpacity>
 
-      <View style={styles.content}>
-        <View style={styles.taskNameBox}>
-          {isEditing ? (
-            <View style={{ position: 'relative', flexShrink: 1 }}>
-              <Text 
-                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
-                style={[
-                  styles.title, 
-                  { color: 'transparent', fontSize: titleFontSize, flexShrink: 1 }
-                ]}
-              >
-                {editName}
-              </Text>
-              <TextInput
-                style={[
-                  styles.title,
-                  styles.titleInput,
-                  { color: colors.textPrimary, fontSize: titleFontSize, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }
-                ]}
-                value={editName}
-                onChangeText={setEditName}
-                onBlur={submitEdit}
-                onSubmitEditing={submitEdit}
-                autoFocus={true}
-                selection={cursorSelection}
-                onSelectionChange={(e) => setCursorSelection(e.nativeEvent.selection)}
-                multiline={true}
-                blurOnSubmit={true}
-                returnKeyType="done"
-              />
-            </View>
-          ) : (
-            <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0 }}>
-              <Text 
-                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
-                ellipsizeMode="tail"
-                style={[
-                  styles.title, 
-                  { color: colors.textPrimary, fontSize: titleFontSize, flex: 1, minWidth: 0 },
-                  task.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
-                ]}
-              >
-                {task.taskname}
-              </Text>
-            </TouchableOpacity>
-          )}
+        <View style={styles.content}>
+          <View style={styles.taskNameBox}>
+            {isEditing ? (
+              <View style={{ position: 'relative', flexShrink: 1 }}>
+                <Text
+                  numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
+                  style={[
+                    styles.title,
+                    { color: 'transparent', fontSize: titleFontSize, flexShrink: 1 }
+                  ]}
+                >
+                  {editName}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.title,
+                    styles.titleInput,
+                    { color: colors.textPrimary, fontSize: titleFontSize, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }
+                  ]}
+                  value={editName}
+                  onChangeText={setEditName}
+                  onBlur={submitEdit}
+                  onSubmitEditing={submitEdit}
+                  autoFocus={true}
+                  selection={cursorSelection}
+                  onSelectionChange={(e) => setCursorSelection(e.nativeEvent.selection)}
+                  multiline={true}
+                  blurOnSubmit={true}
+                  returnKeyType="done"
+                />
+              </View>
+            ) : (
+              <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
+                  ellipsizeMode="tail"
+                  style={[
+                    styles.title,
+                    { color: colors.textPrimary, fontSize: titleFontSize, flex: 1, minWidth: 0 },
+                    task.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
+                  ]}
+                >
+                  {task.taskname}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
 
-      <View style={styles.rightColumn}>
-        <View style={styles.rightStack}>
-          {hasSubtasks && (
-            <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard }]}>
-              <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
-            </View>
-          )}
-          {(!hideDate && task.completionDate) && (
-            <Text style={[styles.date, { color: colors.textPrimary }]}>
-              {dayjs(task.completionDate).format('MMM D')}
-            </Text>
-          )}
-          {task.time && (
-            <Text style={[styles.time, { color: colors.textSecondary }]}>
-              {formatDisplayTime(task.time)}
-            </Text>
-          )}
+        <View style={styles.rightColumn}>
+          <View style={styles.rightStack}>
+            {hasSubtasks && (
+              <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard }]}>
+                <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
+              </View>
+            )}
+            {(!hideDate && task.completionDate) && (
+              <Text style={[styles.date, { color: colors.textPrimary }]}>
+                {dayjs(task.completionDate).format('MMM D')}
+              </Text>
+            )}
+            {task.time && (
+              <Text style={[styles.time, { color: colors.textSecondary }]}>
+                {formatDisplayTime(task.time)}
+              </Text>
+            )}
+          </View>
         </View>
-      </View>
-      {hasNotes && <View style={styles.descIndicatorFixed} />}
+        {hasNotes && <View style={styles.descIndicatorFixed} />}
       </View>
     </TouchableOpacity>
   );
@@ -304,10 +304,10 @@ const styles = StyleSheet.create({
     right: 6,
     top: '50%',
     marginTop: -3,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#4caf50',
+    width: 5,
+    height: 5,
+    borderRadius: 5,
+    backgroundColor: '#5e7d68',
   },
   subtaskBadge: {
     paddingHorizontal: 4,
