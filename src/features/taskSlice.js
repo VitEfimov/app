@@ -131,44 +131,12 @@ const taskSlice = createSlice({
 
 export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, updateTaskSync, clearTasks, loadGuestTasks } = taskSlice.actions;
 
-const syncWidget = async (tasks) => {
-    try {
-        const todayStr = dayjs().format('YYYY-MM-DD');
-        const todayTasks = tasks.filter(task => {
-            if (!task.completionDate) return false;
-            if (task.completed) return false; // Maybe only show active? Let's show all for today
-            const taskDate = dayjs(task.completionDate).format('YYYY-MM-DD');
-            return taskDate === todayStr || dayjs(task.completionDate).isBefore(dayjs(), 'day');
-        });
-        
-        // Save today tasks specifically for the widget
-        await AsyncStorage.setItem('widget_today_tasks', JSON.stringify(todayTasks));
-        
-        if (Platform.OS === 'android') {
-            const { requestWidgetUpdate } = require('react-native-android-widget');
-            const { TodayTasksWidget } = require('../../widget/TodayTasksWidget');
-            requestWidgetUpdate({
-                widgetName: 'TodayTasksWidget',
-                renderWidget: () => <TodayTasksWidget tasks={todayTasks} />
-            });
-        } else if (Platform.OS === 'ios') {
-            try {
-                const { setItem } = require('react-native-widget-extension');
-                setItem('widget_today_tasks', JSON.stringify(todayTasks), 'group.com.vitvalef.app.expowidgets');
-            } catch (iosErr) {
-                console.log('Failed to write iOS widget data:', iosErr);
-            }
-        }
-    } catch (e) {
-        console.log('Widget sync error:', e);
-    }
-};
+
 
 export const addTask = (payload) => async (dispatch, getState) => {
     dispatch(addTaskSync(payload)); 
     const tasks = getState().taskReducer.tasks;
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
-    await syncWidget(tasks);
     // dispatch(addTaskAsync(payload.task)); 
 };
 
@@ -176,7 +144,6 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     dispatch(addMultipleTasksSync(payload));
     const tasks = getState().taskReducer.tasks;
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
-    await syncWidget(tasks);
     // dispatch(addMultipleTasksAsync(payload.tasks));
 };
 
@@ -184,7 +151,6 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
     dispatch(deleteTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
-    await syncWidget(tasks);
     // dispatch(deleteTaskAsync(payload.taskId));
 };
 
@@ -192,7 +158,6 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     dispatch(updateTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
-    await syncWidget(tasks);
     // dispatch(updateTaskAsync(payload));
 };
 

@@ -41,29 +41,6 @@
             "minSdkVersion": 24
           }
         }
-      ],
-      [
-        "react-native-android-widget",
-        {
-          "widgets": [
-            {
-              "name": "TodayTasksWidget",
-              "label": "Today's Tasks",
-              "minWidth": "250dp",
-              "minHeight": "110dp",
-              "description": "View your tasks for today",
-              "updatePeriodMillis": 86400000
-            }
-          ]
-        }
-      ],
-      [
-        "react-native-widget-extension",
-        {
-          "frequentUpdates": false,
-          "widgetsFolder": "targets/widgets"
-        }
-      ]
     ]
   }
 }

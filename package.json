@@ -29,7 +29,6 @@
     "react": "18.2.0",
     "react-dom": "^18.2.0",
     "react-native": "0.74.5",
-    "react-native-android-widget": "^0.20.3",
     "react-native-calendars": "^1.1314.0",
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-gesture-handler": "~2.16.1",
@@ -39,7 +38,6 @@
     "react-native-screens": "3.31.1",
     "react-native-svg": "15.2.0",
     "react-native-web": "^0.19.13",
-    "react-native-widget-extension": "^0.2.0",
     "react-redux": "^9.3.0",
     "reanimated-color-picker": "^5.1.1"
   },
@@ -47,13 +45,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web",
-    "postinstall": "patch-package"
+    "web": "expo start --web"
   },
-  "private": true,
-  "overrides": {
-    "react-native-widget-extension": {
-      "@expo/config-plugins": "~8.0.0"
-    }
-  }
+  "private": true
 }
