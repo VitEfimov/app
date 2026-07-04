@@ -379,11 +379,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   toggleBtnActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    // Android has a bug where elevation + dynamic background color breaks border radius
+    // So we remove the shadow to ensure the pill shape renders perfectly
   },
   toggleText: {
     fontWeight: 'bold',

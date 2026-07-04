@@ -29,7 +29,16 @@ export const pomodoroSlice = createSlice({
   initialState,
   reducers: {
     hydratePomodoroState: (state, action) => {
-      state.pomodoro = action.payload;
+      const payload = action.payload;
+      if (payload && payload[0]) {
+        if (payload[0].breakInterval === undefined) {
+          payload[0].breakInterval = 10 * 60; // default to 10 minutes
+        }
+        if (payload[0].isBreak && !payload[0].time) {
+          payload[0].time = payload[0].breakInterval;
+        }
+      }
+      state.pomodoro = payload;
     },
     startTimer: (state) => {
       state.pomodoro[0].isActive = true;
