@@ -105,7 +105,6 @@ export default function PomodoroScreen() {
           if (newTime <= 0) {
             handlePauseTimer();
             handlePeriodEnd();
-            setLocalTime(0);
           } else {
             setLocalTime(newTime);
           }
@@ -168,20 +167,18 @@ export default function PomodoroScreen() {
     });
 
     intervalRef.current = setInterval(() => {
-      setLocalTime(prevTime => {
-        const remainingMs = targetEndTimeRef.current - Date.now();
-        const newTime = Math.round(remainingMs / 1000);
+      const remainingMs = targetEndTimeRef.current - Date.now();
+      const newTime = Math.round(remainingMs / 1000);
 
-        if (newTime <= 0) {
-          clearInterval(intervalRef.current);
-          setLocalIsActive(false);
-          dispatch(pauseTimer());
-          handlePeriodEnd();
-          return 0;
-        }
+      if (newTime <= 0) {
+        clearInterval(intervalRef.current);
+        setLocalIsActive(false);
+        dispatch(pauseTimer());
+        handlePeriodEnd();
+      } else {
+        setLocalTime(newTime);
         dispatch(updateTime(newTime));
-        return newTime;
-      });
+      }
     }, 1000);
   };
 
