@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks } from '../features/taskSlice';
-import { setTaskNameWrap, setFontSize } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
@@ -28,10 +28,12 @@ export default function SettingsScreen({ navigation }) {
   const theme = useSelector(state => state.themeReducer);
   const taskNameWrap = theme.taskNameWrap || 'wrap';
   const fontSize = theme.fontSize || 'normal';
+  const progressMode = theme.progressMode || 'daily';
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [wrapDropdownOpen, setWrapDropdownOpen] = useState(false);
   const [fontDropdownOpen, setFontDropdownOpen] = useState(false);
+  const [progressDropdownOpen, setProgressDropdownOpen] = useState(false);
 
   const handleDeleteData = () => {
     Alert.alert(
@@ -138,6 +140,35 @@ export default function SettingsScreen({ navigation }) {
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setFontSize('big')); setFontDropdownOpen(false); }}>
                     <Text style={{ color: colors.textPrimary }}>Big</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Progress Mode Dropdown */}
+          <View style={[styles.dropdownRow, { zIndex: 5 }]}>
+            <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>Dashboard Progress</Text>
+            <View style={styles.dropdownWrapper}>
+              <TouchableOpacity style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} onPress={() => setProgressDropdownOpen(!progressDropdownOpen)}>
+                <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]}>
+                  {progressMode === 'daily' ? 'Daily Goal' : progressMode === 'active' ? 'Active Workload' : progressMode === 'weekly' ? 'Weekly Sprint' : 'Lifetime'}
+                </Text>
+                <Text style={styles.dropdownBtnIcon}>▼</Text>
+              </TouchableOpacity>
+              {progressDropdownOpen && (
+                <View style={[styles.dropdownList, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setProgressMode('daily')); setProgressDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Daily Goal</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setProgressMode('active')); setProgressDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Active Workload</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setProgressMode('weekly')); setProgressDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Weekly Sprint</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setProgressMode('lifetime')); setProgressDropdownOpen(false); }}>
+                    <Text style={{ color: colors.textPrimary }}>Lifetime</Text>
                   </TouchableOpacity>
                 </View>
               )}

@@ -25,7 +25,8 @@ const initialState = {
   headerBackgroundFit: loaded?.headerBackgroundFit || 'cover',
   sourceColor: loaded?.sourceColor || '#6750A4',
   themeMode: loaded?.themeMode || 'dark',
-  calendarPanePosition: loaded?.calendarPanePosition || null
+  calendarPanePosition: loaded?.calendarPanePosition || null,
+  progressMode: loaded?.progressMode || 'daily'
 };
 
 const themeSlice = createSlice({
@@ -111,9 +112,13 @@ const themeSlice = createSlice({
     setCalendarPanePosition: (state, action) => {
       state.calendarPanePosition = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setProgressMode: (state, action) => {
+      state.progressMode = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
 
-export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit, setSourceColor, setThemeMode, setCalendarPanePosition } = themeSlice.actions;
+export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit, setSourceColor, setThemeMode, setCalendarPanePosition, setProgressMode } = themeSlice.actions;
 export default themeSlice.reducer;

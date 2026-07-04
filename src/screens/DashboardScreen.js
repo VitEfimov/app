@@ -33,13 +33,41 @@ export default function DashboardScreen({ navigation }) {
   const laterTasks = tasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week']) && !task.completed);
   const missedTasks = tasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed);
 
+  const progressMode = useSelector(state => state.themeReducer.progressMode) || 'daily';
+
   const uncompletedTasks = tasks.filter(task => !task.completed);
   const totalTasks = uncompletedTasks.length;
   const completedTasks = tasks.filter(task => task.completed).length;
-  const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const currentFill = Math.max(0, Math.min(100, 100 - completionPercentage)); // dashoffset factor
   
-  const circumference = 251.2; // 2 * pi * r (where r = 40)
+  let calcTotal = 0;
+  let calcCompleted = 0;
+
+  if (progressMode === 'daily') {
+    const dueTodayAll = tasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day'));
+    calcCompleted = dueTodayAll.filter(t => t.completed).length;
+    calcTotal = dueTodayAll.length;
+  } else if (progressMode === 'active') {
+    const completedToday = tasks.filter(task => task.completed && dayjs(task.completionDate).isSame(dayjs(), 'day'));
+    calcCompleted = completedToday.length;
+    calcTotal = uncompletedTasks.length + calcCompleted;
+  } else if (progressMode === 'weekly') {
+    const startOfWeek = dayjs().startOf('week');
+    const endOfWeek = dayjs().endOf('week');
+    const dueThisWeekAll = tasks.filter(task => {
+      const d = dayjs(task.completionDate);
+      return !d.isBefore(startOfWeek, 'day') && !d.isAfter(endOfWeek, 'day');
+    });
+    calcCompleted = dueThisWeekAll.filter(t => t.completed).length;
+    calcTotal = dueThisWeekAll.length;
+  } else {
+    calcCompleted = completedTasks;
+    calcTotal = tasks.length;
+  }
+
+  const completionPercentage = calcTotal > 0 ? Math.round((calcCompleted / calcTotal) * 100) : (progressMode === 'daily' || progressMode === 'weekly' ? 100 : 0);
+  const currentFill = Math.max(0, Math.min(100, 100 - completionPercentage)); 
+  
+  const circumference = 251.2;
   const strokeDashoffset = circumference - (circumference * completionPercentage) / 100;
 
   const getGreetingText = () => {
@@ -104,7 +132,7 @@ export default function DashboardScreen({ navigation }) {
         <View style={styles.progressInfo}>
           <Text style={[styles.progressGreeting, { color: colors.textPrimary }]}>{getGreetingText()}</Text>
           <Text style={[styles.progressDetails, { color: colors.textSecondary }]}>
-            {completedTasks} of {totalTasks} tasks{"\n"}completed
+            {calcCompleted} of {calcTotal} tasks{"\n"}completed
           </Text>
           <View style={styles.tagsContainer}>
             {missedTasks.length > 0 && (
