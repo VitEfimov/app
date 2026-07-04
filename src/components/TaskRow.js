@@ -183,7 +183,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
                   ellipsizeMode="tail"
                   style={[
                     styles.title,
-                    { color: colors.textPrimary, fontSize: titleFontSize, flex: 1, minWidth: 0 },
+                    { color: colors.textPrimary, fontSize: titleFontSize },
                     task.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
                   ]}
                 >
