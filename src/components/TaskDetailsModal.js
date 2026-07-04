@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share } from 'react-native';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
@@ -86,6 +86,7 @@ const IconCheckSquare = ({ color }) => (
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
+  const latestTask = useSelector(state => state.taskReducer.tasks.find(t => t.id === task?.id)) || task;
 
   const [taskName, setTaskName] = useState('');
   const [notes, setNotes] = useState('');
@@ -109,19 +110,19 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const stripHtml = (html) => html ? html.replace(/<[^>]+>/g, '').trim() : '';
 
   useEffect(() => {
-    if (task) {
-      setTaskName(task.taskname || '');
-      setNotes(stripHtml(task.description?.text));
-      setSubtasks(task.subtasks || []);
-      setPriority(task.priority || 'none');
-      setSelectedDate(task.completionDate || '');
-      setSelectedTime(task.time || '');
+    if (latestTask) {
+      setTaskName(latestTask.taskname || '');
+      setNotes(stripHtml(latestTask.description?.text));
+      setSubtasks(latestTask.subtasks || []);
+      setPriority(latestTask.priority || 'none');
+      setSelectedDate(latestTask.completionDate || '');
+      setSelectedTime(latestTask.time || '');
       
-      setRepeatFrequency(task.repeatFrequency || 'None');
-      setRepeatStartDate(task.repeatStartDate || task.completionDate || '');
-      setRepeatEndDate(task.repeatEndDate || '');
+      setRepeatFrequency(latestTask.repeatFrequency || 'None');
+      setRepeatStartDate(latestTask.repeatStartDate || latestTask.completionDate || '');
+      setRepeatEndDate(latestTask.repeatEndDate || '');
     }
-  }, [task, isVisible]);
+  }, [latestTask, isVisible]);
 
   const formatDisplayTime = (timeStr) => {
     if (!timeStr || timeStr === '--:--') return '--:--';

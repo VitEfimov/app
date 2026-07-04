@@ -113,8 +113,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
           return;
         }
         if (isEditing) {
-          // Prevent opening modal while saving inline edit to avoid race condition
-          return;
+          submitEdit();
         }
         if (onPress) onPress(e);
       }}

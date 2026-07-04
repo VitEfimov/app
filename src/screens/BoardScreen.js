@@ -413,7 +413,7 @@ export default function BoardScreen({ route }) {
       {selectionMode.isActive && (
         <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
           <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} Selected</Text>
-          <View style={styles.actionBarButtons}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
             <TouchableOpacity onPress={handleSelectAll} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>All</Text>
             </TouchableOpacity>
@@ -429,7 +429,7 @@ export default function BoardScreen({ route }) {
             <TouchableOpacity onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
               <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>Cancel</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       )}
 
