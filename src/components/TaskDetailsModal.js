@@ -86,7 +86,6 @@ const IconCheckSquare = ({ color }) => (
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
-  const latestTask = useSelector(state => state.taskReducer.tasks.find(t => t.id === task?.id)) || task;
 
   const [taskName, setTaskName] = useState('');
   const [notes, setNotes] = useState('');
@@ -110,19 +109,19 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const stripHtml = (html) => html ? html.replace(/<[^>]+>/g, '').trim() : '';
 
   useEffect(() => {
-    if (latestTask) {
-      setTaskName(latestTask.taskname || '');
-      setNotes(stripHtml(latestTask.description?.text));
-      setSubtasks(latestTask.subtasks || []);
-      setPriority(latestTask.priority || 'none');
-      setSelectedDate(latestTask.completionDate || '');
-      setSelectedTime(latestTask.time || '');
+    if (isVisible && task) {
+      setTaskName(task.taskname || '');
+      setNotes(stripHtml(task.description?.text));
+      setSubtasks(task.subtasks || []);
+      setPriority(task.priority || 'none');
+      setSelectedDate(task.completionDate || '');
+      setSelectedTime(task.time || '');
       
-      setRepeatFrequency(latestTask.repeatFrequency || 'None');
-      setRepeatStartDate(latestTask.repeatStartDate || latestTask.completionDate || '');
-      setRepeatEndDate(latestTask.repeatEndDate || '');
+      setRepeatFrequency(task.repeatFrequency || 'None');
+      setRepeatStartDate(task.repeatStartDate || task.completionDate || '');
+      setRepeatEndDate(task.repeatEndDate || '');
     }
-  }, [latestTask, isVisible]);
+  }, [isVisible, task?.id]);
 
   const formatDisplayTime = (timeStr) => {
     if (!timeStr || timeStr === '--:--') return '--:--';
@@ -176,6 +175,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       }
     }
     
+    if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) {
+      updates.subtasks = subtasks;
+    }
+    
     if (Object.keys(updates).length > 0) {
       dispatch(updateTask({ taskId: task.id, ...updates }));
     }
@@ -208,7 +211,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const updateSubtask = (id, text) => {
     const newSubtasks = subtasks.map(s => s.id === id ? { ...s, text } : s);
     setSubtasks(newSubtasks);
-    handleUpdate({ subtasks: newSubtasks });
   };
 
   const toggleSubtask = (id) => {
@@ -294,6 +296,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       onSwipeComplete={handleClose}
       swipeDirection={['down']}
       onBackdropPress={handleClose}
+      onBackButtonPress={handleClose}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
@@ -464,7 +467,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                     onChangeText={(text) => updateSubtask(subtask.id, text)}
                     placeholder="Subtask..."
                     placeholderTextColor={colors.textSecondary}
-                    multiline={true}
+                    onSubmitEditing={addSubtask}
+                    blurOnSubmit={false}
                   />
                   <TouchableOpacity onPress={() => removeSubtask(subtask.id)} style={{ padding: 4 }}>
                     <IconClose color={colors.textSecondary} />

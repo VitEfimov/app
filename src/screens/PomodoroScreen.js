@@ -252,8 +252,8 @@ export default function PomodoroScreen() {
           <View style={[styles.toggleBtn, !localIsBreak ? styles.toggleBtnActive : null, !localIsBreak ? { backgroundColor: colors.primary } : null]}>
             <Text style={[styles.toggleText, !localIsBreak && { color: colors.textInverse }]}>Work Time</Text>
           </View>
-          <View style={[styles.toggleBtn, localIsBreak ? styles.toggleBtnActive : null, localIsBreak ? { backgroundColor: '#ff9800' } : null]}>
-            <Text style={[styles.toggleText, localIsBreak && { color: '#fff' }]}>Break Time</Text>
+          <View style={[styles.toggleBtn, localIsBreak ? styles.toggleBtnActive : null, localIsBreak ? { backgroundColor: colors.primary } : null]}>
+            <Text style={[styles.toggleText, localIsBreak && { color: colors.textInverse }]}>Break Time</Text>
           </View>
         </View>
 
