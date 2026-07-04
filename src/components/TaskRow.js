@@ -148,7 +148,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
         <View style={styles.content}>
           <View style={styles.taskNameBox}>
             {isEditing ? (
-              <View style={{ position: 'relative', flexShrink: 1 }}>
+              <View style={{ position: 'relative', flexShrink: 1, justifyContent: 'center' }}>
                 <Text
                   numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
                   style={[
@@ -177,7 +177,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
                 />
               </View>
             ) : (
-              <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0 }}>
+              <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
                 <Text
                   numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
                   ellipsizeMode="tail"
@@ -212,8 +212,8 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
               </Text>
             )}
           </View>
+          {hasNotes && <View style={styles.descIndicatorRelative} />}
         </View>
-        {hasNotes && <View style={styles.descIndicatorFixed} />}
       </View>
     </TouchableOpacity>
   );
@@ -254,7 +254,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    lineHeight: 22,
     includeFontPadding: false,
   },
   titleInput: {
@@ -269,7 +268,6 @@ const styles = StyleSheet.create({
     minHeight: 22,
     includeFontPadding: false,
     textAlignVertical: 'top',
-    lineHeight: 22,
   },
   rightColumn: {
     flexDirection: 'row',
@@ -299,15 +297,12 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     marginRight: 16,
   },
-  descIndicatorFixed: {
-    position: 'absolute',
-    right: 6,
-    top: '50%',
-    marginTop: -3,
+  descIndicatorRelative: {
     width: 5,
     height: 5,
     borderRadius: 5,
     backgroundColor: '#5e7d68',
+    marginLeft: 8,
   },
   subtaskBadge: {
     paddingHorizontal: 4,
