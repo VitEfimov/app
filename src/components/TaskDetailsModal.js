@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image } from 'react-native';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -76,6 +77,14 @@ const IconSquare = ({ color }) => (
   </Svg>
 );
 
+const IconImage = ({ color }) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </Svg>
+);
+
 const IconCheckSquare = ({ color }) => (
   <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M9 11l3 3L22 4" />
@@ -89,6 +98,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const [taskName, setTaskName] = useState('');
   const [notes, setNotes] = useState('');
+  const [noteImage, setNoteImage] = useState('');
   const [subtasks, setSubtasks] = useState([]);
   const [priority, setPriority] = useState('none');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -112,6 +122,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if (isVisible && task) {
       setTaskName(task.taskname || '');
       setNotes(stripHtml(task.description?.text));
+      setNoteImage(task.description?.img || '');
       setSubtasks(task.subtasks || []);
       setPriority(task.priority || 'none');
       setSelectedDate(task.completionDate || '');
@@ -159,7 +170,9 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const handleClose = async () => {
     let updates = {};
     if (taskName !== task.taskname) updates.name = taskName;
-    if (notes !== stripHtml(task.description?.text)) updates.description = { text: notes, img: '', url: '' };
+    if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) {
+      updates.description = { text: notes, img: noteImage, url: '' };
+    }
     if (selectedTime !== (task.time || '')) updates.time = selectedTime;
     
     if (reminder !== (task.reminder || 'None')) {
@@ -197,8 +210,23 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   };
 
   const handleNotesBlur = () => {
-    if (notes !== stripHtml(task.description?.text)) {
-      handleUpdate({ description: { text: notes, img: '', url: '' } });
+    if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) {
+      handleUpdate({ description: { text: notes, img: noteImage, url: '' } });
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.1,
+      base64: true,
+    });
+    
+    if (!result.canceled && result.assets && result.assets[0].base64) {
+      const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      setNoteImage(base64Img);
+      handleUpdate({ description: { text: notes, img: base64Img, url: '' } });
     }
   };
 
@@ -434,6 +462,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>NOTES</Text>
+              <TouchableOpacity onPress={pickImage} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <IconImage color={colors.primary} />
+                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Add Photo</Text>
+              </TouchableOpacity>
             </View>
             <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 100 }]}>
               <TextInput
@@ -446,6 +478,20 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 multiline={true}
                 textAlignVertical="top"
               />
+              {noteImage ? (
+                <View style={styles.imagePreviewContainer}>
+                  <Image source={{ uri: noteImage }} style={styles.imagePreview} />
+                  <TouchableOpacity 
+                    style={styles.imageRemoveBtn} 
+                    onPress={() => {
+                      setNoteImage('');
+                      handleUpdate({ description: { text: notes, img: '', url: '' } });
+                    }}
+                  >
+                    <IconClose color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 10 }}>
@@ -730,5 +776,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     overflow: 'hidden',
+  },
+  imagePreviewContainer: {
+    padding: 10,
+    position: 'relative',
+    alignItems: 'flex-start'
+  },
+  imagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+  },
+  imageRemoveBtn: {
+    position: 'absolute',
+    top: 5,
+    left: 90,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 15,
+    padding: 4,
   }
 });
