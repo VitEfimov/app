@@ -24,6 +24,8 @@
     "expo-keep-awake": "~13.0.2",
     "expo-notifications": "~0.28.19",
     "expo-status-bar": "~1.12.1",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
     "react-native": "0.74.5",
@@ -37,7 +39,7 @@
     "react-native-screens": "3.31.1",
     "react-native-svg": "15.2.0",
     "react-native-web": "^0.19.13",
-    "react-native-widget-extension": "^0.3.0",
+    "react-native-widget-extension": "^0.2.0",
     "react-redux": "^9.3.0",
     "reanimated-color-picker": "^5.1.1"
   },
@@ -45,7 +47,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "postinstall": "patch-package"
   },
   "private": true,
   "overrides": {
