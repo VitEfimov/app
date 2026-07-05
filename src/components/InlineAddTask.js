@@ -78,6 +78,7 @@ export default function InlineAddTask({ sectionId }) {
   if (!isEditing) {
     return (
       <TouchableOpacity 
+        testID={`inline_add_btn_${sectionId}`}
         style={[styles.addBtn, { borderBottomColor: colors.borderColor }]} 
         onPress={() => setIsEditing(true)}
       >
@@ -94,6 +95,7 @@ export default function InlineAddTask({ sectionId }) {
   return (
     <View style={[styles.editContainer, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
       <TextInput
+        testID="inline_task_input"
         style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
         placeholder="Enter task name..."
         placeholderTextColor={colors.textSecondary}
@@ -121,7 +123,7 @@ export default function InlineAddTask({ sectionId }) {
           <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
             <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleAdd} style={[styles.submitBtn, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity testID="inline_submit_btn" onPress={handleAdd} style={[styles.submitBtn, { backgroundColor: colors.primary }]}>
             <Text style={[styles.submitText, { color: colors.textInverse }]}>Add</Text>
           </TouchableOpacity>
         </View>

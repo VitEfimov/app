@@ -6,11 +6,34 @@ import { setSourceColor, resetTheme, setUserPicture } from '../features/themeSli
 import { useTheme } from '../styles/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
 
+// const PREDEFINED_COLORS = [
+//   '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
+//   '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50',
+//   '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800',
+//   '#ff5722', '#795548', '#9e9e9e', '#607d8b'
+// ];
+
 const PREDEFINED_COLORS = [
-  '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
-  '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50',
-  '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800',
-  '#ff5722', '#795548', '#9e9e9e', '#607d8b'
+  '#C62828', // Red
+  '#C2185B', // Rose
+  '#AD1457', // Soft Pink
+  '#F051A3',
+  '#8E24AA', // Purple
+  '#5E35B1', // Deep Purple
+  '#3949AB', // Indigo
+  '#1E88E5', // Blue
+  '#039BE5', // Light Blue
+  '#00897B', // Teal
+  '#2E7D32', // Dark Green
+  '#4F6F52', // Forest Green
+  '#6B8E6B', // Sage green
+  '#7CB342', // Light Green
+  '#C0CA33', // Lime
+  '#F9A825', // Yellow
+  '#FB8C00', // Orange
+  '#F4511E', // Deep Orange
+  '#8D6E63', // Brown
+  '#455A64'  // Slate
 ];
 
 export default function ThemeSettingsModal({ isVisible, onClose }) {

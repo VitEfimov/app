@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard } from 'react-native';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -8,10 +8,11 @@ import { updateTask, deleteTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
-import { Alert } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { scheduleTaskReminder, cancelNotification } from '../utils/notifications';
 import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
+import CustomDropdown from './CustomDropdown';
+import ConfirmModal from './ConfirmModal';
 
 const IconClose = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -50,12 +51,6 @@ const IconClock = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Circle cx="12" cy="12" r="10" />
     <Path d="M12 6v6l4 2" />
-  </Svg>
-);
-
-const IconChevronDown = ({ color }) => (
-  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M6 9l6 6 6-6" />
   </Svg>
 );
 
@@ -99,7 +94,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [taskName, setTaskName] = useState('');
   const [notes, setNotes] = useState('');
   const [noteImage, setNoteImage] = useState('');
-  const [subtasks, setSubtasks] = useState([]);
+  const [subtasks, setSubtasks] = useState(task ? (task.subtasks || []) : []);
   const [priority, setPriority] = useState('none');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
@@ -109,6 +104,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [repeatFrequency, setRepeatFrequency] = useState('None');
   const [repeatStartDate, setRepeatStartDate] = useState('');
   const [repeatEndDate, setRepeatEndDate] = useState('');
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
   const { generateRepeatingTasks } = useTaskRepeat();
 
   const [datePickerType, setDatePickerType] = useState(null);
@@ -253,8 +249,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     handleUpdate({ subtasks: newSubtasks });
   };
 
-
-
   const handlePrioritySelect = (level) => {
     setPriority(level);
     handleUpdate({ priority: level });
@@ -273,53 +267,31 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   };
 
   const handleDelete = () => {
-    Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => {
+    setConfirmConfig({
+      isVisible: true,
+      title: 'Delete Task',
+      message: 'Are you sure you want to delete this task?',
+      confirmText: 'Delete',
+      isDestructive: true,
+      onConfirm: () => {
         dispatch(deleteTask({ taskId: task.id }));
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
         onClose();
-      }}
-    ]);
+      }
+    });
   };
 
   const toggleComplete = () => {
-    handleUpdate({ completed: !task.completed });
-  };
-
-  const Dropdown = ({ label, value, options, onSelect }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    return (
-      <View>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
-        <TouchableOpacity 
-          style={[styles.dropdownBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
-          onPress={() => setIsOpen(true)}
-        >
-          <Text style={[styles.dropdownText, { color: colors.textPrimary }]}>{value}</Text>
-          <IconChevronDown color={colors.textSecondary} />
-        </TouchableOpacity>
-        
-        <RNModal visible={isOpen} transparent animationType="fade">
-          <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setIsOpen(false)}>
-            <View style={[styles.dropdownMenu, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-              {options.map(opt => (
-                <TouchableOpacity 
-                  key={opt} 
-                  style={styles.dropdownItem} 
-                  onPress={() => { onSelect(opt); setIsOpen(false); }}
-                >
-                  <Text style={[styles.dropdownItemText, { color: opt === value ? colors.primary : colors.textPrimary, fontWeight: opt === value ? 'bold' : 'normal' }]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </TouchableOpacity>
-        </RNModal>
-      </View>
-    );
+    const newCompletedState = !task.completed;
+    handleUpdate({ completed: newCompletedState });
+    if (newCompletedState) {
+      handleClose();
+    }
   };
 
   return (
     <Modal 
+      testID="task_details_modal"
       isVisible={isVisible} 
       onSwipeComplete={handleClose}
       swipeDirection={['down']}
@@ -338,7 +310,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               <TouchableOpacity onPress={handleShare} style={styles.headerBtn}>
                 <IconShare color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleClose} style={styles.headerBtn}>
+              <TouchableOpacity testID="task_details_close_btn" onPress={handleClose} style={styles.headerBtn}>
                 <IconClose color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -353,6 +325,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               </TouchableOpacity>
               
               <TextInput
+                testID="task_details_name_input"
                 style={[styles.input, { flex: 1, color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
                 value={taskName}
                 onChangeText={setTaskName}
@@ -395,13 +368,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={styles.threeColumnRow}>
               <View style={styles.column}>
-                <Dropdown label="PRIORITY" value={priority === 'none' ? 'None' : priority} options={['None', 'Low', 'Medium', 'High']} onSelect={handlePrioritySelect} />
+                <CustomDropdown label="PRIORITY" value={priority === 'none' ? 'None' : priority} options={['None', 'Low', 'Medium', 'High']} onSelect={handlePrioritySelect} colors={colors} />
               </View>
               <View style={styles.column}>
-                <Dropdown label="REMINDER" value={reminder} options={['None', '15 min before', '30 min before', '1 hr before', '1 day before', 'Day of']} onSelect={setReminder} />
+                <CustomDropdown label="REMINDER" value={reminder} options={['None', '15 min before', '30 min before', '1 hr before', '1 day before', 'Day of']} onSelect={setReminder} colors={colors} />
               </View>
               <View style={styles.column}>
-                <Dropdown label="REPEAT" value={repeatFrequency} options={['None', 'Daily', 'Weekly', 'Monthly']} onSelect={setRepeatFrequency} />
+                <CustomDropdown label="REPEAT" value={repeatFrequency} options={['None', 'Daily', 'Weekly', 'Monthly']} onSelect={setRepeatFrequency} colors={colors} />
               </View>
             </View>
 
@@ -523,6 +496,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             </View>
 
             <TouchableOpacity 
+              testID="task_details_delete_btn"
               onPress={handleDelete} 
               style={{ marginTop: 30, padding: 15, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 8, alignItems: 'center' }}
             >
@@ -532,6 +506,16 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           </ScrollView>
 
         </View>
+
+        <ConfirmModal
+          isVisible={confirmConfig.isVisible}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmText={confirmConfig.confirmText}
+          isDestructive={confirmConfig.isDestructive}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
+          onConfirm={confirmConfig.onConfirm}
+        />
 
         <RNModal visible={showDatePicker} transparent animationType="fade">
           <View style={styles.calendarOverlay}>
@@ -682,43 +666,7 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 15,
   },
-  dropdownBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    height: 46,
-  },
-  dropdownText: {
-    fontSize: 13,
-    flex: 1,
-  },
-  dropdownOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownMenu: {
-    width: 250,
-    borderRadius: 8,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  dropdownItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
-  },
-  dropdownItemText: {
-    fontSize: 16,
-  },
+
   twoColumnRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

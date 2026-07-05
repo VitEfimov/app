@@ -106,6 +106,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
 
   return (
     <TouchableOpacity
+      testID="task_row"
       style={[styles.container, { borderBottomColor: colors.borderColor }]}
       onPress={(e) => {
         if (isSelectionMode) {
@@ -127,6 +128,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
 
       <View style={styles.innerContainer}>
         <TouchableOpacity
+          testID="task_checkbox"
           style={styles.checkbox}
           onPress={() => {
             if (isSelectionMode) {
@@ -178,6 +180,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
             ) : (
               <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
                 <Text
+                  testID="task_name_text"
                   numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
                   ellipsizeMode="tail"
                   style={[

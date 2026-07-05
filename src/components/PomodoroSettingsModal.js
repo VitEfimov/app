@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { togglePomodoroSettings, setTime, setBreakInterval, setIntervalCount, setWorkSound, setBreakSound } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path } from 'react-native-svg';
+import CustomDropdown from './CustomDropdown';
 
 const IconClose = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -12,11 +13,7 @@ const IconClose = ({ color }) => (
   </Svg>
 );
 
-const IconChevronDown = ({ color }) => (
-  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M6 9l6 6 6-6" />
-  </Svg>
-);
+
 
 const predefinedSounds = [
   { label: 'Default', value: 'default' },
@@ -84,46 +81,7 @@ export default function PomodoroSettingsModal() {
     dispatch(togglePomodoroSettings(false));
   };
 
-  const Dropdown = ({ value, options, onSelect }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const selectedLabel = options.find(o => o.value === value)?.label || value;
-    const surfaceLighter = colors.surfaceContainerHigh;
-    
-    return (
-      <View>
-        <TouchableOpacity 
-          style={[styles.dropdownBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
-          onPress={() => setIsOpen(true)}
-        >
-          <Text style={[styles.dropdownText, { color: colors.textPrimary }]}>{selectedLabel}</Text>
-          <IconChevronDown color={colors.textSecondary} />
-        </TouchableOpacity>
-        
-        <RNModal visible={isOpen} transparent animationType="fade">
-          <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setIsOpen(false)}>
-            <View style={[styles.dropdownMenu, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-              {options.map(opt => (
-                <TouchableOpacity 
-                  key={opt.value} 
-                  style={styles.dropdownItem} 
-                  onPress={() => { onSelect(opt.value); setIsOpen(false); }}
-                >
-                  <Text style={[styles.dropdownItemText, { color: opt.value === value ? colors.primary : colors.textPrimary, fontWeight: opt.value === value ? 'bold' : 'normal' }]}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </TouchableOpacity>
-        </RNModal>
-      </View>
-    );
-  };
 
-  const SoundPicker = ({ label, selectedValue, onSelect }) => (
-    <View style={styles.settingRow}>
-      <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{label}</Text>
-      <Dropdown value={selectedValue} options={predefinedSounds} onSelect={onSelect} />
-    </View>
-  );
 
   return (
     <Modal
@@ -208,8 +166,22 @@ export default function PomodoroSettingsModal() {
             />
           </View>
 
-          <SoundPicker label="Work complete sound" selectedValue={workSound} onSelect={setWorkSoundState} />
-          <SoundPicker label="Break complete sound" selectedValue={breakSound} onSelect={setBreakSoundState} />
+          <CustomDropdown 
+            label="Work complete sound" 
+            value={workSound} 
+            options={predefinedSounds} 
+            onSelect={setWorkSoundState} 
+            colors={colors} 
+            layout="horizontal" 
+          />
+          <CustomDropdown 
+            label="Break complete sound" 
+            value={breakSound} 
+            options={predefinedSounds} 
+            onSelect={setBreakSoundState} 
+            colors={colors} 
+            layout="horizontal" 
+          />
 
           <TouchableOpacity 
             style={[styles.saveBtn, { backgroundColor: colors.primary }]}
@@ -291,44 +263,7 @@ const styles = StyleSheet.create({
     width: 80,
     textAlign: 'center',
   },
-  dropdownBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    minWidth: 150,
-  },
-  dropdownText: {
-    fontSize: 14,
-    marginRight: 10,
-  },
-  dropdownOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownMenu: {
-    width: 250,
-    borderRadius: 8,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  dropdownItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
-  },
-  dropdownItemText: {
-    fontSize: 16,
-  },
+
   saveBtn: {
     paddingVertical: 15,
     borderRadius: 12,

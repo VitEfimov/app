@@ -21,47 +21,7 @@ const IconSave = ({ color }) => (
   </Svg>
 );
 
-const SettingDropdown = ({ label, value, options, onSelect, colors }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectedLabel = options.find(o => o.value === value)?.label || value;
-  
-  return (
-    <View style={[styles.dropdownRow, { zIndex: 1 }]}>
-      <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>{label}</Text>
-      <View style={styles.dropdownWrapper}>
-        <TouchableOpacity 
-          style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} 
-          onPress={() => setIsOpen(true)}
-        >
-          <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]}>{selectedLabel}</Text>
-          <Text style={styles.dropdownBtnIcon}>▼</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <RNModal visible={isOpen} transparent animationType="fade">
-        <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setIsOpen(false)}>
-          <View style={[styles.modalMenu, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-            <Text style={[styles.modalMenuTitle, { color: colors.textSecondary }]}>{label}</Text>
-            {options.map(opt => (
-              <TouchableOpacity 
-                key={opt.value} 
-                style={[styles.modalMenuItem, { borderBottomColor: colors.borderColor }]} 
-                onPress={() => { onSelect(opt.value); setIsOpen(false); }}
-              >
-                <Text style={[styles.modalMenuItemText, { 
-                  color: opt.value === value ? colors.primary : colors.textPrimary, 
-                  fontWeight: opt.value === value ? 'bold' : 'normal' 
-                }]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </RNModal>
-    </View>
-  );
-};
+import CustomDropdown from '../components/CustomDropdown';
 
 export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
@@ -156,28 +116,31 @@ export default function SettingsScreen({ navigation }) {
         <Text style={[styles.sectionTitle, { color: colors.textSecondary, paddingTop: 20 }]}>Customization</Text>
         <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
           
-          <SettingDropdown 
+          <CustomDropdown 
             label="Text wrapping" 
             value={taskNameWrap} 
             options={wrapOptions} 
             onSelect={val => dispatch(setTaskNameWrap(val))} 
-            colors={colors} 
+            colors={colors}
+            layout="horizontal"
           />
 
-          <SettingDropdown 
+          <CustomDropdown 
             label="Font size" 
             value={fontSize} 
             options={fontOptions} 
             onSelect={val => dispatch(setFontSize(val))} 
-            colors={colors} 
+            colors={colors}
+            layout="horizontal"
           />
 
-          <SettingDropdown 
+          <CustomDropdown 
             label="Dashboard Progress" 
             value={progressMode} 
             options={progressOptions} 
             onSelect={val => dispatch(setProgressMode(val))} 
-            colors={colors} 
+            colors={colors}
+            layout="horizontal"
           />
 
           {/* Customize Theme Button */}
@@ -287,73 +250,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  dropdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-    zIndex: 1,
-  },
-  dropdownLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dropdownWrapper: {
-    width: 150,
-    position: 'relative',
-    zIndex: 100,
-  },
-  dropdownBtn: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  dropdownBtnText: {
-    fontSize: 14,
-  },
-  dropdownBtnIcon: {
-    fontSize: 10,
-    color: '#666',
-  },
-  dropdownOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalMenu: {
-    width: 250,
-    borderRadius: 15,
-    borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  modalMenuTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-    textAlign: 'center',
-  },
-  modalMenuItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-  },
-  modalMenuItemText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
+
   actionBtn: {
     backgroundColor: '#285da1',
     paddingVertical: 15,

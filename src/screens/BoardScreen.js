@@ -5,6 +5,7 @@ import { useTheme } from '../styles/ThemeContext';
 import TaskRow from '../components/TaskRow';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import PromptModal from '../components/PromptModal';
+import ConfirmModal from '../components/ConfirmModal';
 import InlineAddTask from '../components/InlineAddTask';
 import Modal from 'react-native-modal';
 import getFilters from '../utils/filters';
@@ -34,6 +35,7 @@ export default function BoardScreen({ route }) {
   const [isDetailsVisible, setDetailsVisible] = useState(false);
   
   const [promptConfig, setPromptConfig] = useState({ isVisible: false, type: null, targetBoard: null });
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
   const [sectionOptionsConfig, setSectionOptionsConfig] = useState({ isVisible: false, section: null });
   const [sortConfig, setSortConfig] = useState({});
   const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
@@ -81,20 +83,35 @@ export default function BoardScreen({ route }) {
   };
 
   const handleCompleteSelected = () => {
-    selectionMode.selectedTaskIds.forEach(id => {
-      dispatch(updateTask({ taskId: id, completed: true }));
+    setConfirmConfig({
+      isVisible: true,
+      title: 'Complete Tasks',
+      message: `Are you sure you want to complete ${selectionMode.selectedTaskIds.length} tasks?`,
+      confirmText: 'Complete',
+      isDestructive: false,
+      onConfirm: () => {
+        selectionMode.selectedTaskIds.forEach(id => {
+          dispatch(updateTask({ taskId: id, completed: true }));
+        });
+        setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+      }
     });
-    setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
   };
 
   const handleDeleteSelected = () => {
-    Alert.alert('Delete Tasks', `Are you sure you want to delete ${selectionMode.selectedTaskIds.length} tasks?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => {
+    setConfirmConfig({
+      isVisible: true,
+      title: 'Delete Tasks',
+      message: `Are you sure you want to delete ${selectionMode.selectedTaskIds.length} tasks?`,
+      confirmText: 'Delete',
+      isDestructive: true,
+      onConfirm: () => {
         selectionMode.selectedTaskIds.forEach(id => dispatch(deleteTask({ taskId: id })));
         setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
-      }}
-    ]);
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+      }
+    });
   };
 
   const handleShareSelected = async () => {
@@ -184,30 +201,60 @@ export default function BoardScreen({ route }) {
   }, [route?.params?.sectionId]);
 
   const handleCompleteSection = (section) => {
-    section.data.forEach(task => {
-      dispatch(updateTask({ taskId: task.id, completed: true }));
+    setConfirmConfig({
+      isVisible: true,
+      title: 'Complete All',
+      message: `Are you sure you want to complete all tasks in "${section.title}"?`,
+      confirmText: 'Complete',
+      isDestructive: false,
+      onConfirm: () => {
+        section.data.forEach(task => {
+          dispatch(updateTask({ taskId: task.id, completed: true }));
+        });
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+      }
     });
   };
 
   const handleMoveForward = (section) => {
-    const today = dayjs();
-    let newDate;
-    switch (section.id) {
-        case 'missed': newDate = today.toISOString(); break;
-        case 'today': newDate = today.add(1, 'day').toISOString(); break;
-        case 'tomorrow': newDate = today.endOf('isoWeek').toISOString(); break;
-        case 'on-this-week': newDate = today.add(1, 'week').startOf('isoWeek').toISOString(); break;
-        case 'on-next-week': newDate = today.add(2, 'week').startOf('isoWeek').toISOString(); break;
-        default: return;
-    }
-    section.data.forEach(task => {
-      dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
+    setConfirmConfig({
+      isVisible: true,
+      title: 'Move Forward',
+      message: `Are you sure you want to move all tasks in "${section.title}" forward?`,
+      confirmText: 'Move',
+      isDestructive: false,
+      onConfirm: () => {
+        const today = dayjs();
+        let newDate;
+        switch (section.id) {
+            case 'missed': newDate = today.toISOString(); break;
+            case 'today': newDate = today.add(1, 'day').toISOString(); break;
+            case 'tomorrow': newDate = today.endOf('isoWeek').toISOString(); break;
+            case 'on-this-week': newDate = today.add(1, 'week').startOf('isoWeek').toISOString(); break;
+            case 'on-next-week': newDate = today.add(2, 'week').startOf('isoWeek').toISOString(); break;
+            default: return;
+        }
+        section.data.forEach(task => {
+          dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
+        });
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+      }
     });
   };
 
   const handleDeleteSection = (section) => {
-    section.data.forEach(task => {
-      dispatch(deleteTask({ taskId: task.id }));
+    setConfirmConfig({
+      isVisible: true,
+      title: 'Delete All',
+      message: `Are you sure you want to delete all tasks in "${section.title}"?`,
+      confirmText: 'Delete',
+      isDestructive: true,
+      onConfirm: () => {
+        section.data.forEach(task => {
+          dispatch(deleteTask({ taskId: task.id }));
+        });
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+      }
     });
   };
 
@@ -262,7 +309,7 @@ export default function BoardScreen({ route }) {
       <View style={[styles.sectionHeader, { backgroundColor: colors.bgMain, borderBottomColor: colors.borderColor }]}>
         <TouchableOpacity style={styles.sectionHeaderLeft} onPress={() => toggleSection(section.id)}>
           <IconChevronDown color={colors.textSecondary} isCollapsed={collapsedSections.includes(section.id)} />
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{section.title}</Text>
+          <Text testID={`section_title_${section.id}`} style={[styles.sectionTitle, { color: colors.textPrimary }]}>{section.title}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.badge, { backgroundColor: `${section.color}20` }]}
@@ -271,6 +318,7 @@ export default function BoardScreen({ route }) {
           <Text style={[styles.badgeText, { color: section.color }]}>{section.count}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
+          testID={`section_menu_${section.id}`}
           style={styles.ellipsisBtn} 
           onPress={() => handleMenuPress(section)}
         >
@@ -373,14 +421,14 @@ export default function BoardScreen({ route }) {
             Options for {sectionOptionsConfig.section?.title}
           </Text>
           
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+          <TouchableOpacity testID="section_option_sort_time" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>Sort by Time</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+          <TouchableOpacity testID="section_option_sort_priority" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>Sort by Priority</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+          <TouchableOpacity testID="section_option_select_tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
             setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
             setSectionOptionsConfig({ isVisible: false, section: null }); 
           }}>
@@ -388,28 +436,28 @@ export default function BoardScreen({ route }) {
           </TouchableOpacity>
           
           {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
-            <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { handleCompleteSection(sectionOptionsConfig.section); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+            <TouchableOpacity testID="section_option_complete_all" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
               <Text style={[styles.optionText, { color: colors.textPrimary }]}>Complete all</Text>
             </TouchableOpacity>
           )}
 
           {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
-            <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { handleMoveForward(sectionOptionsConfig.section); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+            <TouchableOpacity testID="section_option_move_forward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveForward(s), 400); }}>
               <Text style={[styles.optionText, { color: colors.textPrimary }]}>Move forward</Text>
             </TouchableOpacity>
           )}
 
           {sectionOptionsConfig.section?.id === 'later' && (
-            <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { handleCompleteSection(sectionOptionsConfig.section); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+            <TouchableOpacity testID="section_option_complete_all" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
               <Text style={[styles.optionText, { color: colors.textPrimary }]}>Complete all</Text>
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { handleDeleteSection(sectionOptionsConfig.section); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+          <TouchableOpacity testID="section_option_delete_all" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleDeleteSection(s), 400); }}>
             <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>Delete all</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}>
+          <TouchableOpacity testID="section_option_cancel" style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}>
             <Text style={[styles.optionText, { color: colors.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
@@ -419,19 +467,19 @@ export default function BoardScreen({ route }) {
         <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
           <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} Selected</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
-            <TouchableOpacity onPress={handleSelectAll} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_all" onPress={handleSelectAll} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>All</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleShareSelected} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_share" onPress={handleShareSelected} style={styles.actionBtn}>
               <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>Share</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleCompleteSelected} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_complete" onPress={handleCompleteSelected} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Complete</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleDeleteSelected} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_delete" onPress={handleDeleteSelected} style={styles.actionBtn}>
               <Text style={{ color: '#f44336', fontWeight: 'bold' }}>Delete</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_cancel" onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
               <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>Cancel</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -439,6 +487,15 @@ export default function BoardScreen({ route }) {
       )}
 
       </View>
+      <ConfirmModal
+        isVisible={confirmConfig.isVisible}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        isDestructive={confirmConfig.isDestructive}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
+        onConfirm={confirmConfig.onConfirm}
+      />
     </KeyboardAvoidingView>
   );
 }
