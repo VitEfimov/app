@@ -195,23 +195,25 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
 
         <View style={styles.rightColumn}>
           <View style={styles.rightStack}>
-            {hasSubtasks && (
+            {hasSubtasks ? (
               <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard }]}>
                 <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
               </View>
-            )}
-            {(!hideDate && task.completionDate) && (
-              <Text style={[styles.date, { color: colors.textPrimary }]}>
+            ) : null}
+            {(!hideDate && task.completionDate) ? (
+              <Text style={[styles.date, { color: hasNotes ? colors.primary : colors.textPrimary }]}>
                 {dayjs(task.completionDate).format('MMM D')}
               </Text>
-            )}
+            ) : null}
             {(task.time && task.time.trim() !== '') ? (
-              <Text style={[styles.time, { color: colors.textSecondary }]}>
+              <Text style={[styles.time, { color: (hasNotes && !task.completionDate) ? colors.primary : colors.textSecondary }]}>
                 {formatDisplayTime(task.time)}
               </Text>
             ) : null}
+            {(hasNotes && !task.completionDate && (!task.time || task.time.trim() === '')) ? (
+               <View style={styles.descIndicatorRelative} />
+            ) : null}
           </View>
-          {hasNotes && <View style={styles.descIndicatorRelative} />}
         </View>
       </View>
     </TouchableOpacity>
@@ -297,14 +299,11 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   descIndicatorRelative: {
-    position: 'absolute',
-    right: -10,
-    top: '50%',
-    marginTop: -4,
     width: 5,
     height: 5,
     borderRadius: 5,
     backgroundColor: '#5e7d68',
+    marginTop: 4,
   },
   subtaskBadge: {
     paddingHorizontal: 4,
