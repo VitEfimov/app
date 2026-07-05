@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks } from '../features/taskSlice';
 import { setTaskNameWrap, setFontSize, setProgressMode } from '../features/themeSlice';
@@ -21,6 +21,48 @@ const IconSave = ({ color }) => (
   </Svg>
 );
 
+const SettingDropdown = ({ label, value, options, onSelect, colors }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedLabel = options.find(o => o.value === value)?.label || value;
+  
+  return (
+    <View style={[styles.dropdownRow, { zIndex: 1 }]}>
+      <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>{label}</Text>
+      <View style={styles.dropdownWrapper}>
+        <TouchableOpacity 
+          style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} 
+          onPress={() => setIsOpen(true)}
+        >
+          <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]}>{selectedLabel}</Text>
+          <Text style={styles.dropdownBtnIcon}>▼</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <RNModal visible={isOpen} transparent animationType="fade">
+        <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setIsOpen(false)}>
+          <View style={[styles.modalMenu, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+            <Text style={[styles.modalMenuTitle, { color: colors.textSecondary }]}>{label}</Text>
+            {options.map(opt => (
+              <TouchableOpacity 
+                key={opt.value} 
+                style={[styles.modalMenuItem, { borderBottomColor: colors.borderColor }]} 
+                onPress={() => { onSelect(opt.value); setIsOpen(false); }}
+              >
+                <Text style={[styles.modalMenuItemText, { 
+                  color: opt.value === value ? colors.primary : colors.textPrimary, 
+                  fontWeight: opt.value === value ? 'bold' : 'normal' 
+                }]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </RNModal>
+    </View>
+  );
+};
+
 export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
@@ -31,9 +73,24 @@ export default function SettingsScreen({ navigation }) {
   const progressMode = theme.progressMode || 'daily';
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
-  const [wrapDropdownOpen, setWrapDropdownOpen] = useState(false);
-  const [fontDropdownOpen, setFontDropdownOpen] = useState(false);
-  const [progressDropdownOpen, setProgressDropdownOpen] = useState(false);
+
+  const wrapOptions = [
+    { label: 'Full', value: 'wrap' },
+    { label: 'Truncate', value: 'nowrap' },
+  ];
+
+  const fontOptions = [
+    { label: 'Small', value: 'small' },
+    { label: 'Normal', value: 'normal' },
+    { label: 'Big', value: 'big' },
+  ];
+
+  const progressOptions = [
+    { label: 'Daily Goal', value: 'daily' },
+    { label: 'Active Workload', value: 'active' },
+    { label: 'Weekly Sprint', value: 'weekly' },
+    { label: 'Lifetime', value: 'lifetime' },
+  ];
 
   const handleDeleteData = () => {
     Alert.alert(
@@ -99,81 +156,29 @@ export default function SettingsScreen({ navigation }) {
         <Text style={[styles.sectionTitle, { color: colors.textSecondary, paddingTop: 20 }]}>Customization</Text>
         <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
           
-          {/* Text wrapping Dropdown */}
-          <View style={[styles.dropdownRow, { zIndex: 20 }]}>
-            <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>Text wrapping</Text>
-            <View style={styles.dropdownWrapper}>
-              <TouchableOpacity style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} onPress={() => setWrapDropdownOpen(!wrapDropdownOpen)}>
-                <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]}>{taskNameWrap === 'wrap' ? 'Full' : 'Truncate'}</Text>
-                <Text style={styles.dropdownBtnIcon}>▼</Text>
-              </TouchableOpacity>
-              {wrapDropdownOpen && (
-                <View style={[styles.dropdownList, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setTaskNameWrap('wrap')); setWrapDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Full</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setTaskNameWrap('nowrap')); setWrapDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Truncate</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
+          <SettingDropdown 
+            label="Text wrapping" 
+            value={taskNameWrap} 
+            options={wrapOptions} 
+            onSelect={val => dispatch(setTaskNameWrap(val))} 
+            colors={colors} 
+          />
 
-          {/* Font size Dropdown */}
-          <View style={[styles.dropdownRow, { zIndex: 10 }]}>
-            <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>Font size</Text>
-            <View style={styles.dropdownWrapper}>
-              <TouchableOpacity style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} onPress={() => setFontDropdownOpen(!fontDropdownOpen)}>
-                <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]}>
-                  {fontSize === 'small' ? 'Small' : fontSize === 'big' ? 'Big' : 'Normal'}
-                </Text>
-                <Text style={styles.dropdownBtnIcon}>▼</Text>
-              </TouchableOpacity>
-              {fontDropdownOpen && (
-                <View style={[styles.dropdownList, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setFontSize('small')); setFontDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Small</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setFontSize('normal')); setFontDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Normal</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setFontSize('big')); setFontDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Big</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
+          <SettingDropdown 
+            label="Font size" 
+            value={fontSize} 
+            options={fontOptions} 
+            onSelect={val => dispatch(setFontSize(val))} 
+            colors={colors} 
+          />
 
-          {/* Progress Mode Dropdown */}
-          <View style={[styles.dropdownRow, { zIndex: 5 }]}>
-            <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>Dashboard Progress</Text>
-            <View style={styles.dropdownWrapper}>
-              <TouchableOpacity style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} onPress={() => setProgressDropdownOpen(!progressDropdownOpen)}>
-                <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]}>
-                  {progressMode === 'daily' ? 'Daily Goal' : progressMode === 'active' ? 'Active Workload' : progressMode === 'weekly' ? 'Weekly Sprint' : 'Lifetime'}
-                </Text>
-                <Text style={styles.dropdownBtnIcon}>▼</Text>
-              </TouchableOpacity>
-              {progressDropdownOpen && (
-                <View style={[styles.dropdownList, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setProgressMode('daily')); setProgressDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Daily Goal</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setProgressMode('active')); setProgressDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Active Workload</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setProgressMode('weekly')); setProgressDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Weekly Sprint</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.dropdownListItem, { borderBottomColor: colors.borderColor }]} onPress={() => { dispatch(setProgressMode('lifetime')); setProgressDropdownOpen(false); }}>
-                    <Text style={{ color: colors.textPrimary }}>Lifetime</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
+          <SettingDropdown 
+            label="Dashboard Progress" 
+            value={progressMode} 
+            options={progressOptions} 
+            onSelect={val => dispatch(setProgressMode(val))} 
+            colors={colors} 
+          />
 
           {/* Customize Theme Button */}
           <TouchableOpacity style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary }]} onPress={() => setThemeModalVisible(true)}>
@@ -315,21 +320,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#666',
   },
-  dropdownList: {
-    position: 'absolute',
-    top: 45,
-    left: 0,
-    right: 0,
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalMenu: {
+    width: 250,
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    zIndex: 1000,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
     elevation: 5,
   },
-  dropdownListItem: {
-    padding: 12,
+  modalMenuTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+    textAlign: 'center',
+  },
+  modalMenuItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+  },
+  modalMenuItemText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
   actionBtn: {
     backgroundColor: '#285da1',
