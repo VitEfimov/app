@@ -75,6 +75,15 @@ export default function PomodoroSettingsModal() {
     dispatch(togglePomodoroSettings(false));
   };
 
+  const handleResetToDefault = () => {
+    dispatch(setTime(25 * 60));
+    dispatch(setBreakInterval(5 * 60));
+    dispatch(setIntervalCount(5));
+    dispatch(setWorkSound('default'));
+    dispatch(setBreakSound('default'));
+    dispatch(togglePomodoroSettings(false));
+  };
+
   const Dropdown = ({ value, options, onSelect }) => {
     const [isOpen, setIsOpen] = useState(false);
     const selectedLabel = options.find(o => o.value === value)?.label || value;
@@ -207,6 +216,13 @@ export default function PomodoroSettingsModal() {
             onPress={handleSave}
           >
             <Text style={[styles.saveBtnText, { color: colors.textInverse }]}>Save Settings</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.saveBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderColor, marginTop: 10 }]}
+            onPress={handleResetToDefault}
+          >
+            <Text style={[styles.saveBtnText, { color: colors.textPrimary }]}>Reset to Default</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

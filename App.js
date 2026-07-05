@@ -9,6 +9,7 @@ import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 
 import { hydrateUserState } from './src/features/userSlice';
 import { hydrateThemeState } from './src/features/themeSlice';
+import { hydratePomodoroState } from './src/features/pomodoroSlice';
 import { fetchTasks } from './src/features/taskSlice';
 import axios from 'axios';
 import { Platform } from 'react-native';
@@ -78,6 +79,9 @@ function InitApp() {
 
         const boardsJson = await AsyncStorage.getItem('boards');
         if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
+
+        const pomodoroJson = await AsyncStorage.getItem('pomodoro');
+        if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));
 
         // Load tasks from local storage
         await dispatch(fetchTasks()).unwrap();

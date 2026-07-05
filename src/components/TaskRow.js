@@ -297,14 +297,11 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   descIndicatorRelative: {
-    position: 'absolute',
-    right: -10,
-    top: '50%',
-    marginTop: -3,
     width: 5,
     height: 5,
     borderRadius: 5,
     backgroundColor: '#5e7d68',
+    marginLeft: 6,
   },
   subtaskBadge: {
     paddingHorizontal: 4,

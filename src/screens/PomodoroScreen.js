@@ -226,7 +226,7 @@ export default function PomodoroScreen() {
   const strokeDashoffset = circumference - (circumference * currentFill) / 100;
   
   const intervalCount = staticIntervalCountRef.current;
-  const timerColor = localIsBreak ? '#ff9800' : colors.primary;
+  const timerColor = colors.primary;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
