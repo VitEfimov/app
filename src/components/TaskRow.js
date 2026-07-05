@@ -205,11 +205,11 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
                 {dayjs(task.completionDate).format('MMM D')}
               </Text>
             )}
-            {task.time && (
+            {(task.time && task.time.trim() !== '') ? (
               <Text style={[styles.time, { color: colors.textSecondary }]}>
                 {formatDisplayTime(task.time)}
               </Text>
-            )}
+            ) : null}
           </View>
           {hasNotes && <View style={styles.descIndicatorRelative} />}
         </View>
@@ -297,11 +297,14 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   descIndicatorRelative: {
+    position: 'absolute',
+    right: -10,
+    top: '50%',
+    marginTop: -4,
     width: 5,
     height: 5,
     borderRadius: 5,
     backgroundColor: '#5e7d68',
-    marginLeft: 6,
   },
   subtaskBadge: {
     paddingHorizontal: 4,
