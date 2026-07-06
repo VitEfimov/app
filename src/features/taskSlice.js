@@ -87,6 +87,10 @@ const taskSlice = createSlice({
              const { taskId } = action.payload;
              state.tasks = state.tasks.filter(t => t.id !== taskId);
         },
+        deleteTasksByBoardSync(state, action) {
+            const { boardId } = action.payload;
+            state.tasks = state.tasks.filter(t => (t.boardId || 'main') !== boardId);
+        },
         updateTaskSync(state, action) {
             const { taskId, name, priority, completed, description, completionDate, time, subtasks } = action.payload;
             const task = state.tasks.find(task => task.id === taskId);
@@ -129,7 +133,7 @@ const taskSlice = createSlice({
     }
 });
 
-export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, updateTaskSync, clearTasks, loadGuestTasks } = taskSlice.actions;
+export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, updateTaskSync, clearTasks, loadGuestTasks } = taskSlice.actions;
 
 
 
@@ -152,6 +156,12 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
     const tasks = getState().taskReducer.tasks;
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
     // dispatch(deleteTaskAsync(payload.taskId));
+};
+
+export const deleteTasksByBoard = (boardId) => async (dispatch, getState) => {
+    dispatch(deleteTasksByBoardSync({ boardId }));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
 };
 
 export const updateTask = (payload) => async (dispatch, getState) => {

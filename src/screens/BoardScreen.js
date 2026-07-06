@@ -12,7 +12,7 @@ import getFilters from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path } from 'react-native-svg';
-import { updateTask, deleteTask } from '../features/taskSlice';
+import { updateTask, deleteTask, deleteTasksByBoard } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 
 dayjs.extend(isSameOrBefore);
@@ -282,8 +282,7 @@ export default function BoardScreen({ route }) {
           { text: 'Cancel', style: 'cancel' },
           { text: 'Delete', style: 'destructive', onPress: () => {
             dispatch(deleteBoardAsync(board.id));
-            const boardTasks = tasks.filter(t => (t.boardId || 'main') === board.id);
-            boardTasks.forEach(t => dispatch(deleteTask({ taskId: t.id })));
+            dispatch(deleteTasksByBoard(board.id));
           }}
         ]);
       }},
