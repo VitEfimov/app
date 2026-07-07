@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard } from 'react-native';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -90,6 +90,8 @@ const IconCheckSquare = ({ color }) => (
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
+  const scrollViewRef = useRef(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
 
   const [taskName, setTaskName] = useState('');
   const [notes, setNotes] = useState('');
@@ -146,7 +148,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const handleShare = async () => {
     try {
-      const message = `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
+      const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
+      const message = `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priorityStr ? `\nPriority: ${priorityStr}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${noteImage ? `Image attached:\n${noteImage}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
       await Share.share({
         message,
@@ -297,6 +300,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       swipeDirection={['down']}
       onBackdropPress={handleClose}
       onBackButtonPress={handleClose}
+      propagateSwipe={true}
+      scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
+      scrollOffset={scrollOffset}
+      scrollOffsetMax={100}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
@@ -316,7 +323,14 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             </View>
           </View>
 
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
+          <ScrollView 
+            ref={scrollViewRef}
+            onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.y)}
+            scrollEventThrottle={16}
+            style={styles.body} 
+            contentContainerStyle={styles.bodyContent} 
+            keyboardShouldPersistTaps="handled"
+          >
             
             <Text style={[styles.label, { color: colors.textSecondary }]}>TASK NAME</Text>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
@@ -731,14 +745,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start'
   },
   imagePreview: {
-    width: 100,
-    height: 100,
+    width: 200,
+    height: 200,
     borderRadius: 8,
   },
   imageRemoveBtn: {
     position: 'absolute',
     top: 5,
-    left: 90,
+    left: 190,
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 15,
     padding: 4,

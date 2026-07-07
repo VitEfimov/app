@@ -24,6 +24,9 @@ const IconChevronDown = ({ color, isCollapsed }) => (
 );
 
 export default function BoardScreen({ route }) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeAddSectionId, setActiveAddSectionId] = useState(null);
+
   const { colors } = useTheme();
   const dispatch = useDispatch();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
@@ -122,9 +125,11 @@ export default function BoardScreen({ route }) {
         const selectedDate = t.completionDate;
         const selectedTime = t.time;
         const notes = t.description?.text ? t.description.text.replace(/<[^>]+>/g, '').trim() : '';
+        const img = t.description?.img ? t.description.img : '';
         const subtasks = t.subtasks || [];
+        const priority = t.priority && t.priority !== 'none' ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : '';
 
-        return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`.trim();
+        return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priority ? `\nPriority: ${priority}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${img ? `Image attached:\n${img}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`.trim();
       }).join('\n\n------------------------\n\n');
       
       await Share.share({
@@ -147,11 +152,6 @@ export default function BoardScreen({ route }) {
   const sortTasks = (tasksArr, sectionId) => {
     const sortBy = sortConfig[sectionId] || 'time';
     return tasksArr.sort((a, b) => {
-      const dateA = a.completionDate || '9999-12-31';
-      const dateB = b.completionDate || '9999-12-31';
-      const timeA = a.time || '23:59';
-      const timeB = b.time || '23:59';
-
       if (sortBy === 'priority') {
         const pValues = { high: 3, medium: 2, low: 1, none: 0 };
         const pA = pValues[a.priority?.toLowerCase()] || 0;
@@ -159,10 +159,19 @@ export default function BoardScreen({ route }) {
         if (pA !== pB) return pB - pA; // Higher priority first
       }
 
+      const dateA = a.completionDate || '9999-12-31';
+      const dateB = b.completionDate || '9999-12-31';
       const dateCompare = dateA.localeCompare(dateB);
       if (dateCompare !== 0) return dateCompare;
       
-      return timeA.localeCompare(timeB);
+      const hasTimeA = !!a.time;
+      const hasTimeB = !!b.time;
+      
+      if (hasTimeA && !hasTimeB) return -1;
+      if (!hasTimeA && hasTimeB) return 1;
+      if (hasTimeA && hasTimeB) return a.time.localeCompare(b.time);
+      
+      return parseInt(a.id || '0') - parseInt(b.id || '0');
     });
   };
 
@@ -329,14 +338,24 @@ export default function BoardScreen({ route }) {
 
   const renderSectionFooter = ({ section }) => {
     if (section.id === 'completed' || section.id === 'missed' || collapsedSections.includes(section.id)) return null;
-    return <InlineAddTask sectionId={section.id} />;
+    return (
+      <InlineAddTask 
+        sectionId={section.id} 
+        isActive={activeAddSectionId === section.id}
+        onToggle={(active) => setActiveAddSectionId(active ? section.id : null)}
+        onAddDetails={(task) => {
+          setSelectedTask(task);
+          setDetailsVisible(true);
+        }}
+      />
+    );
   };
 
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1 }} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
     >
       <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       

@@ -20,8 +20,10 @@ const IconCalendar = ({ color }) => (
   </Svg>
 );
 
-export default function InlineAddTask({ sectionId }) {
-  const [isEditing, setIsEditing] = useState(false);
+export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDetails }) {
+  const [internalIsEditing, setInternalIsEditing] = useState(false);
+  const isEditing = isActive !== undefined ? isActive : internalIsEditing;
+  const setIsEditing = onToggle ? onToggle : setInternalIsEditing;
   const [taskName, setTaskName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [inputHeight, setInputHeight] = useState(46);
@@ -73,6 +75,14 @@ export default function InlineAddTask({ sectionId }) {
     setSelectedDate(getCompletionDate(sectionId));
     setIsEditing(false);
     Keyboard.dismiss();
+    return newTask;
+  };
+
+  const handleAddWithDetails = () => {
+    const newTask = handleAdd();
+    if (newTask && onAddDetails) {
+      onAddDetails(newTask);
+    }
   };
 
   if (!isEditing) {
@@ -109,15 +119,25 @@ export default function InlineAddTask({ sectionId }) {
         onSubmitEditing={handleAdd}
       />
       <View style={styles.actionsRow}>
-        <TouchableOpacity 
-          style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
-          onPress={() => setShowDatePicker(true)}
-        >
-          <IconCalendar color={colors.textPrimary} />
-          <Text style={[styles.dateText, { color: colors.textPrimary }]}>
-            {dayjs(selectedDate).format('MMM D')}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity 
+            style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
+            onPress={() => setShowDatePicker(true)}
+          >
+            <IconCalendar color={colors.textPrimary} />
+            <Text style={[styles.dateText, { color: colors.textPrimary }]}>
+              {dayjs(selectedDate).format('MMM D')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
+            onPress={handleAddWithDetails}
+          >
+            <Text style={[styles.dateText, { color: colors.primary }]}>
+              Add details
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.rightActions}>
           <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.cancelBtn}>

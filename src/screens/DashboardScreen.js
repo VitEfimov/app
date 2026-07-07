@@ -21,16 +21,16 @@ export default function DashboardScreen({ navigation }) {
   const todayTasks = tasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed);
   const tomorrowTasks = tasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed);
   const thisWeekTasks = tasks.filter(task =>
-    !dayjs(task.completionDate).isSameOrBefore(FILTERS.today) &&
-    !dayjs(task.completionDate).isSame(FILTERS.tomorrow) &&
-    dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week']) && !task.completed
+    !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') &&
+    !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
+    dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed
   );
   const nextWeekTasks = tasks.filter(task =>
-    !dayjs(task.completionDate).isSame(FILTERS.tomorrow) &&
-    dayjs(task.completionDate).isAfter(FILTERS['on-this-week']) &&
-    dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week']) && !task.completed
+    !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
+    dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') &&
+    dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed
   );
-  const laterTasks = tasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week']) && !task.completed);
+  const laterTasks = tasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed);
   const missedTasks = tasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed);
 
   const progressMode = useSelector(state => state.themeReducer.progressMode) || 'daily';

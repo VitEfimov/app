@@ -117,10 +117,12 @@ export default function CalendarScreen() {
       const dayTasks = marks[dateStr].tasks;
       const allCompleted = dayTasks.every(t => t.completed);
       const anyMissed = dayTasks.some(t => !t.completed && dayjs(t.completionDate).isBefore(dayjs(), 'day'));
+      const anyNotes = dayTasks.some(t => !t.completed && t.description?.text && t.description.text.trim() !== '');
 
       let dotColor = colors.primary;
       if (allCompleted) dotColor = '#ffffff';
       else if (anyMissed) dotColor = '#f44336';
+      else if (anyNotes) dotColor = '#ff9800';
 
       finalMarks[dateStr] = { marked: true, dotColor: dotColor };
     });
@@ -152,6 +154,7 @@ export default function CalendarScreen() {
           current={selectedDate}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={markedDates}
+          enableSwipeMonths={true}
           theme={{
             backgroundColor: colors.bgMain,
             calendarBackground: colors.bgMain,
@@ -215,7 +218,13 @@ export default function CalendarScreen() {
         )}
         
         <View style={{ marginBottom: 20 }}>
-          <InlineAddTask sectionId={selectedDate} />
+          <InlineAddTask 
+            sectionId={selectedDate} 
+            onAddDetails={(task) => {
+              setSelectedTask(task);
+              setDetailsVisible(true);
+            }}
+          />
         </View>
       </Animated.View>
 
