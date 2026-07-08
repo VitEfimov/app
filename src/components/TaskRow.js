@@ -6,6 +6,25 @@ import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 
+const IconNote = ({ color }) => (
+  <Svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <Path d="M14 2v6h6" />
+    <Path d="M16 13H8" />
+    <Path d="M16 17H8" />
+    <Path d="M10 9H8" />
+  </Svg>
+);
+
+const IconAlarm = ({ color }) => (
+  <Svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="13" r="8" />
+    <Path d="M12 9v4l2 2" />
+    <Path d="M5 3L2 6" />
+    <Path d="M19 3l3 3" />
+  </Svg>
+);
+
 const IconSquare = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -130,105 +149,109 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
         <View style={styles.priorityPlaceholder} />
       )}
 
-      <View style={styles.innerContainer}>
-        <TouchableOpacity
-          testID="task_checkbox"
-          accessible={true}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: isSelectionMode ? isSelected : task.completed }}
-          accessibilityLabel={isSelectionMode ? "Select task" : "Toggle task completion"}
-          style={styles.checkbox}
-          onPress={() => {
-            if (isSelectionMode) {
-              if (onToggleSelect) onToggleSelect();
-            } else {
-              handleToggleComplete();
-            }
-          }}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-        >
-          {isSelectionMode ? (
-            isSelected ? <IconCheckSquare color={colors.primary} /> : <IconSquare color={colors.textSecondary} />
-          ) : (
-            task.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />
-          )}
-        </TouchableOpacity>
+      {/* Region 2: Checkbox */}
+      <TouchableOpacity
+        testID="task_checkbox"
+        accessible={true}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: isSelectionMode ? isSelected : task.completed }}
+        accessibilityLabel={isSelectionMode ? "Select task" : "Toggle task completion"}
+        style={styles.checkbox}
+        onPress={() => {
+          if (isSelectionMode) {
+            if (onToggleSelect) onToggleSelect();
+          } else {
+            handleToggleComplete();
+          }
+        }}
+        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+      >
+        {isSelectionMode ? (
+          isSelected ? <IconCheckSquare color={colors.primary} /> : <IconSquare color={colors.textSecondary} />
+        ) : (
+          task.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />
+        )}
+      </TouchableOpacity>
 
-        <View style={styles.content}>
-          <View style={styles.taskNameBox}>
-            {isEditing ? (
-              <View style={{ position: 'relative', flexShrink: 1, justifyContent: 'center' }}>
-                <Text
-                  numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
-                  style={[
-                    styles.title,
-                    { color: 'transparent', fontSize: titleFontSize, flexShrink: 1 }
-                  ]}
-                >
-                  {editName}
-                </Text>
-                <TextInput
-                  style={[
-                    styles.title,
-                    styles.titleInput,
-                    { color: colors.textPrimary, fontSize: titleFontSize, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }
-                  ]}
-                  value={editName}
-                  onChangeText={setEditName}
-                  onBlur={submitEdit}
-                  onSubmitEditing={submitEdit}
-                  autoFocus={true}
-                  selection={cursorSelection}
-                  onSelectionChange={(e) => setCursorSelection(e.nativeEvent.selection)}
-                  multiline={true}
-                  blurOnSubmit={true}
-                  returnKeyType="done"
-                />
-              </View>
-            ) : (
-              <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-                <Text
-                  testID="task_name_text"
-                  numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
-                  ellipsizeMode="tail"
-                  style={[
-                    styles.title,
-                    { color: colors.textPrimary, fontSize: titleFontSize },
-                    task.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
-                  ]}
-                >
-                  {task.taskname}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.rightColumn}>
-          <View style={styles.rightStack}>
-            {hasSubtasks ? (
-              <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard }]}>
-                <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
-              </View>
-            ) : null}
-            {(!hideDate && task.completionDate) ? (
-              <Text style={[styles.date, { color: hasNotes ? colors.primary : colors.textPrimary }]}>
-                {dayjs(task.completionDate).format('MMM D')}
+      {/* Region 3: Content */}
+      <View style={styles.content}>
+        <View style={styles.taskNameBox}>
+          {isEditing ? (
+            <View style={{ position: 'relative', flexShrink: 1, justifyContent: 'center' }}>
+              <Text
+                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
+                style={[
+                  styles.title,
+                  { color: 'transparent', fontSize: titleFontSize, flexShrink: 1 }
+                ]}
+              >
+                {editName}
               </Text>
-            ) : null}
-            {(task.time && task.time.trim() !== '') ? (
-              <Text style={[styles.time, { color: (hasNotes && !task.completionDate) ? colors.primary : colors.textSecondary }]}>
+              <TextInput
+                style={[
+                  styles.title,
+                  styles.titleInput,
+                  { color: colors.textPrimary, fontSize: titleFontSize, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }
+                ]}
+                value={editName}
+                onChangeText={setEditName}
+                onBlur={submitEdit}
+                onSubmitEditing={submitEdit}
+                autoFocus={true}
+                selection={cursorSelection}
+                onSelectionChange={(e) => setCursorSelection(e.nativeEvent.selection)}
+                multiline={true}
+                blurOnSubmit={true}
+                returnKeyType="done"
+              />
+            </View>
+          ) : (
+            <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+              <Text
+                testID="task_name_text"
+                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
+                ellipsizeMode="tail"
+                style={[
+                  styles.title,
+                  { color: colors.textPrimary, fontSize: titleFontSize },
+                  task.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
+                ]}
+              >
+                {task.taskname}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Region 4: Metadata */}
+      <View style={styles.metadata}>
+        <View style={styles.metadataStack}>
+          {hasSubtasks ? (
+            <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard }]}>
+              <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
+            </View>
+          ) : null}
+          {(!hideDate && task.completionDate) ? (
+            <Text style={[styles.date, { color: colors.textPrimary }]}>
+              {dayjs(task.completionDate).format('MMM D')}
+            </Text>
+          ) : null}
+          {(task.time && task.time.trim() !== '') ? (
+            <View style={styles.timeRow}>
+              <IconAlarm color={colors.textSecondary} />
+              <Text style={[styles.time, { color: colors.textSecondary }]}>
                 {formatDisplayTime(task.time)}
               </Text>
-            ) : null}
-          </View>
-
+            </View>
+          ) : null}
         </View>
-
+        
+        <View style={styles.noteIconContainer}>
+          <IconNote color={hasNotes ? colors.primary : 'transparent'} />
+        </View>
       </View>
-          {hasNotes && (
-            <View style={[styles.noteBorder, { backgroundColor: colors.primary }]} />
-          )}
+
     </TouchableOpacity>
     
   );
@@ -237,16 +260,22 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
+    alignItems: 'center',
     borderBottomWidth: 1,
     width: '95%',
     alignSelf: 'center',
-  },
-  innerContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 10,
-    paddingRight: 20,
+    paddingRight: 10,
+  },
+  priorityIndicator: {
+    width: 4,
+    height: '100%',
+    marginRight: 16,
+  },
+  priorityPlaceholder: {
+    width: 4,
+    height: '100%',
+    marginRight: 16,
   },
   checkbox: {
     width: 24,
@@ -259,6 +288,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     justifyContent: 'center',
+    marginRight: 10,
   },
   taskNameBox: {
     flex: 1,
@@ -284,47 +314,30 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     textAlignVertical: 'top',
   },
-  rightColumn: {
+  metadata: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 15,
-    marginRight: 10,
-    position: 'relative',
   },
-  rightStack: {
+  metadataStack: {
     alignItems: 'flex-end',
     justifyContent: 'center',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   date: {
     fontSize: 13,
   },
   time: {
     fontSize: 11,
-    marginTop: 2,
+    marginLeft: 3,
   },
-  priorityIndicator: {
-    width: 4,
-    alignSelf: 'stretch',
-    marginRight: 16,
-  },
-  priorityPlaceholder: {
-    width: 4,
-    alignSelf: 'stretch',
-    marginRight: 16,
-  },
-  descIndicatorRelative: {
-    width: 5,
-    height: 5,
-    borderRadius: 5,
-    backgroundColor: '#5e7d68',
-    marginTop: 4,
-  },
-  noteBorder: {
-    width: 3,
-    height: 5,
-    marginLeft: 0,
-    marginTop: 30,
-    borderRadius: 3,
+  noteIconContainer: {
+    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   subtaskBadge: {
     paddingHorizontal: 4,
