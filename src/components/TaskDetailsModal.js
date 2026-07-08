@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert } from 'react-native';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import RNShare from 'react-native-share';
+import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -153,20 +154,49 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
       const message = `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priorityStr ? `\nPriority: ${priorityStr}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
-      const shareOptions = {
-        message: message,
-        title: 'Share Task'
-      };
-
       if (noteImage && noteImage.startsWith('data:image')) {
-        shareOptions.url = noteImage; // RNShare can handle base64 directly
+        const base64Data = noteImage.split(',')[1];
+        const filename = FileSystem.cacheDirectory + `task_image_${Date.now()}.jpg`;
+        await FileSystem.writeAsStringAsync(filename, base64Data, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          if (Platform.OS === 'android') {
+            await Clipboard.setStringAsync(message);
+            Alert.alert(
+              "Text Copied!",
+              "The task details (payload) have been copied to your clipboard. You can easily paste them into your message after selecting where to share the picture.",
+              [
+                {
+                  text: "Share Picture",
+                  onPress: async () => {
+                    await Sharing.shareAsync(filename, {
+                      dialogTitle: 'Share Task',
+                      mimeType: 'image/jpeg',
+                      UTI: 'public.jpeg'
+                    });
+                  }
+                }
+              ]
+            );
+          } else {
+            await Share.share({
+              message: message,
+              url: filename,
+              title: 'Share Task'
+            });
+          }
+        }
+      } else {
+        await Share.share({
+          message,
+          title: 'Share Task'
+        });
       }
-
-      await RNShare.open(shareOptions);
     } catch (error) {
-      if (error.message !== 'User did not share') {
-        console.log('Share error:', error.message);
-      }
+      console.error(error.message);
     }
   };
 
