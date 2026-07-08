@@ -154,47 +154,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
       const message = `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priorityStr ? `\nPriority: ${priorityStr}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
-      if (noteImage && noteImage.startsWith('data:image')) {
-        const base64Data = noteImage.split(',')[1];
-        const filename = FileSystem.cacheDirectory + `task_image_${Date.now()}.jpg`;
-        await FileSystem.writeAsStringAsync(filename, base64Data, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        
-        const isAvailable = await Sharing.isAvailableAsync();
-        if (isAvailable) {
-          if (Platform.OS === 'android') {
-            await Clipboard.setStringAsync(message);
-            Alert.alert(
-              "Text Copied!",
-              "The task details (payload) have been copied to your clipboard. You can easily paste them into your message after selecting where to share the picture.",
-              [
-                {
-                  text: "Share Picture",
-                  onPress: async () => {
-                    await Sharing.shareAsync(filename, {
-                      dialogTitle: 'Share Task',
-                      mimeType: 'image/jpeg',
-                      UTI: 'public.jpeg'
-                    });
-                  }
-                }
-              ]
-            );
-          } else {
-            await Share.share({
-              message: message,
-              url: filename,
-              title: 'Share Task'
-            });
-          }
-        }
-      } else {
-        await Share.share({
-          message,
-          title: 'Share Task'
-        });
-      }
+      await Share.share({
+        message,
+        title: 'Share Task'
+      });
     } catch (error) {
       console.error(error.message);
     }
@@ -435,13 +398,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={styles.threeColumnRow}>
               <View style={styles.column}>
-                <CustomDropdown label="PRIORITY" value={priority === 'none' ? 'None' : priority} options={['None', 'Low', 'Medium', 'High']} onSelect={handlePrioritySelect} colors={colors} />
+                <CustomDropdown label="PRIORITY" value={priority === 'none' ? 'None' : priority} options={['None', 'Low', 'Medium', 'High']} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
-                <CustomDropdown label="REMINDER" value={reminder} options={['None', '15 min before', '30 min before', '1 hr before', '1 day before', 'Day of']} onSelect={setReminder} colors={colors} />
+                <CustomDropdown label="REMINDER" value={reminder} options={['None', '15 min before', '30 min before', '1 hr before', '1 day before', 'Day of']} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
-                <CustomDropdown label="REPEAT" value={repeatFrequency} options={['None', 'Daily', 'Weekly', 'Monthly']} onSelect={setRepeatFrequency} colors={colors} />
+                <CustomDropdown label="REPEAT" value={repeatFrequency} options={['None', 'Daily', 'Weekly', 'Monthly']} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
             </View>
 

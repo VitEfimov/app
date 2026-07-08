@@ -145,9 +145,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
     >
       {priorityColor ? (
         <View style={[styles.priorityIndicator, { backgroundColor: priorityColor }]} />
-      ) : (
-        <View style={styles.priorityPlaceholder} />
-      )}
+      ) : null}
 
       {/* Region 2: Checkbox */}
       <TouchableOpacity
@@ -227,28 +225,37 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
       {/* Region 4: Metadata */}
       <View style={styles.metadata}>
         <View style={styles.metadataStack}>
-          {hasSubtasks ? (
-            <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard }]}>
-              <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
+          {(hasSubtasks || hasNotes) ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6, alignSelf: 'flex-end' }}>
+              {hasNotes ? <IconNote color={colors.primary} /> : null}
+              {hasSubtasks ? (
+                <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard, marginBottom: 0 }]}>
+                  <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
-          {(!hideDate && task.completionDate) ? (
-            <Text style={[styles.date, { color: colors.textPrimary }]}>
-              {dayjs(task.completionDate).format('MMM D')}
-            </Text>
-          ) : null}
-          {(task.time && task.time.trim() !== '') ? (
-            <View style={styles.timeRow}>
-              <IconAlarm color={colors.textSecondary} />
-              <Text style={[styles.time, { color: colors.textSecondary }]}>
-                {formatDisplayTime(task.time)}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-        
-        <View style={styles.noteIconContainer}>
-          <IconNote color={hasNotes ? colors.primary : 'transparent'} />
+          
+          <View style={{ alignItems: 'flex-start' }}>
+            {(!hideDate && task.completionDate) ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 14 }} />
+                <Text style={[styles.date, { color: colors.textPrimary }]}>
+                  {dayjs(task.completionDate).format('MMM D')}
+                </Text>
+              </View>
+            ) : null}
+            {(task.time && task.time.trim() !== '') ? (
+              <View style={styles.timeRow}>
+                <View style={{ width: 14, alignItems: 'center' }}>
+                  {task.reminder && task.reminder !== 'None' ? <IconAlarm color={colors.textSecondary} /> : null}
+                </View>
+                <Text style={[styles.time, { color: colors.textSecondary }]}>
+                  {formatDisplayTime(task.time)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -266,16 +273,15 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingVertical: 10,
     paddingRight: 10,
+    paddingLeft: 20,
+    position: 'relative',
   },
   priorityIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
     width: 4,
-    height: '100%',
-    marginRight: 16,
-  },
-  priorityPlaceholder: {
-    width: 4,
-    height: '100%',
-    marginRight: 16,
   },
   checkbox: {
     width: 24,
@@ -333,11 +339,6 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 11,
     marginLeft: 3,
-  },
-  noteIconContainer: {
-    marginLeft: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   subtaskBadge: {
     paddingHorizontal: 4,

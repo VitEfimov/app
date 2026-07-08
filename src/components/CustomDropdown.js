@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal as RNModal, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal as RNModal, StyleSheet, ScrollView } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 const IconChevronDown = ({ color }) => (
@@ -14,7 +14,8 @@ const CustomDropdown = ({
   options, 
   onSelect, 
   colors,
-  layout = 'vertical' // 'vertical' or 'horizontal'
+  layout = 'vertical', // 'vertical' or 'horizontal'
+  customBtnStyle = {}
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   
@@ -40,7 +41,7 @@ const CustomDropdown = ({
       <View style={isHorizontal ? styles.horizontalWrapper : styles.verticalWrapper}>
         <TouchableOpacity 
           accessible={true} accessibilityRole="button" accessibilityLabel={`${label || 'Select option'}, current value ${selectedLabel}`}
-          style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} 
+          style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }, customBtnStyle]} 
           onPress={() => setIsOpen(true)}
         >
           <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -56,21 +57,23 @@ const CustomDropdown = ({
             {label && isHorizontal && (
                <Text style={[styles.modalMenuTitle, { color: colors.textSecondary }]}>{label}</Text>
             )}
-            {normalizedOptions.map(opt => (
-              <TouchableOpacity 
-                key={opt.value} 
-                accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${opt.label}`}
-                style={[styles.modalMenuItem, { borderBottomColor: colors.borderColor }]} 
-                onPress={() => { onSelect(opt.value); setIsOpen(false); }}
-              >
-                <Text style={[styles.modalMenuItemText, { 
-                  color: opt.value === value ? colors.primary : colors.textPrimary, 
-                  fontWeight: opt.value === value ? 'bold' : 'normal' 
-                }]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <ScrollView style={{ maxHeight: 400 }}>
+              {normalizedOptions.map(opt => (
+                <TouchableOpacity 
+                  key={opt.value} 
+                  accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${opt.label}`}
+                  style={[styles.modalMenuItem, { borderBottomColor: colors.borderColor }]} 
+                  onPress={() => { onSelect(opt.value); setIsOpen(false); }}
+                >
+                  <Text style={[styles.modalMenuItemText, { 
+                    color: opt.value === value ? colors.primary : colors.textPrimary, 
+                    fontWeight: opt.value === value ? 'bold' : 'normal' 
+                  }]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </TouchableOpacity>
       </RNModal>
