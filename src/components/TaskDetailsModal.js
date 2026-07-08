@@ -149,12 +149,18 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const handleShare = async () => {
     try {
       const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
-      const message = `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priorityStr ? `\nPriority: ${priorityStr}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${noteImage ? `Image attached:\n${noteImage}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
+      const message = `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priorityStr ? `\nPriority: ${priorityStr}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
-      await Share.share({
+      const shareOptions = {
         message,
         title: 'Share Task'
-      });
+      };
+
+      if (noteImage) {
+        shareOptions.url = noteImage;
+      }
+
+      await Share.share(shareOptions);
     } catch (error) {
       console.error(error.message);
     }
@@ -314,10 +320,17 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
             <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Task Details</Text>
             <View style={{ flexDirection: 'row' }}>
-              <TouchableOpacity onPress={handleShare} style={styles.headerBtn}>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Share task"
+                onPress={handleShare} style={styles.headerBtn}
+              >
                 <IconShare color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity testID="task_details_close_btn" onPress={handleClose} style={styles.headerBtn}>
+              <TouchableOpacity 
+                testID="task_details_close_btn" 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Close task details"
+                onPress={handleClose} style={styles.headerBtn}
+              >
                 <IconClose color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -334,12 +347,16 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             
             <Text style={[styles.label, { color: colors.textSecondary }]}>TASK NAME</Text>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-              <TouchableOpacity onPress={toggleComplete} style={{ marginTop: 12 }}>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel="Toggle task completion"
+                onPress={toggleComplete} style={{ marginTop: 12 }}
+              >
                 {task.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />}
               </TouchableOpacity>
               
               <TextInput
                 testID="task_details_name_input"
+                accessible={true} accessibilityLabel="Task Name"
                 style={[styles.input, { flex: 1, color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
                 value={taskName}
                 onChangeText={setTaskName}
@@ -357,6 +374,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               <View style={styles.column}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>DUE DATE</Text>
                 <TouchableOpacity 
+                  accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : 'Not set'}`}
                   style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
                   onPress={() => { setDatePickerType('due'); setShowDatePicker(true); }}
                 >
@@ -369,6 +387,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               <View style={styles.column}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>TIME</Text>
                 <TouchableOpacity 
+                  accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
                   style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
                   onPress={() => setShowTimePicker(true)}
                 >
@@ -449,13 +468,17 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>NOTES</Text>
-              <TouchableOpacity onPress={pickImage} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
+                onPress={pickImage} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+              >
                 <IconImage color={colors.primary} />
                 <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Add Photo</Text>
               </TouchableOpacity>
             </View>
             <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 100 }]}>
               <TextInput
+                accessible={true} accessibilityLabel="Task Notes"
                 style={{ flex: 1, padding: 15, color: colors.textPrimary, fontSize: 15 }}
                 value={notes}
                 onChangeText={setNotes}
@@ -469,6 +492,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 <View style={styles.imagePreviewContainer}>
                   <Image source={{ uri: noteImage }} style={styles.imagePreview} />
                   <TouchableOpacity 
+                    accessible={true} accessibilityRole="button" accessibilityLabel="Remove Photo"
                     style={styles.imageRemoveBtn} 
                     onPress={() => {
                       setNoteImage('');
@@ -483,7 +507,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 10 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>SUBTASKS</Text>
-              <TouchableOpacity onPress={addSubtask} hitSlop={{top:10,bottom:10,left:10,right:10}}>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Add new subtask"
+                onPress={addSubtask} hitSlop={{top:10,bottom:10,left:10,right:10}}
+              >
                 <Text style={{ color: colors.primary, fontWeight: 'bold' }}>+ Add Subtask</Text>
               </TouchableOpacity>
             </View>
@@ -491,10 +518,14 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             <View style={{ gap: 8 }}>
               {subtasks.map((subtask) => (
                 <View key={subtask.id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                  <TouchableOpacity onPress={() => toggleSubtask(subtask.id)} style={{ marginTop: 2 }}>
+                  <TouchableOpacity 
+                    accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: subtask.completed }} accessibilityLabel="Toggle subtask completion"
+                    onPress={() => toggleSubtask(subtask.id)} style={{ marginTop: 2 }}
+                  >
                     {subtask.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />}
                   </TouchableOpacity>
                   <TextInput
+                    accessible={true} accessibilityLabel="Subtask text"
                     style={[{ flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 2 }, subtask.completed && { textDecorationLine: 'line-through', opacity: 0.5 }]}
                     value={subtask.text}
                     onChangeText={(text) => updateSubtask(subtask.id, text)}
@@ -502,7 +533,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                     placeholderTextColor={colors.textSecondary}
                     blurOnSubmit={true}
                   />
-                  <TouchableOpacity onPress={() => removeSubtask(subtask.id)} style={{ padding: 4 }}>
+                  <TouchableOpacity 
+                    accessible={true} accessibilityRole="button" accessibilityLabel="Delete subtask"
+                    onPress={() => removeSubtask(subtask.id)} style={{ padding: 4 }}
+                  >
                     <IconClose color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>

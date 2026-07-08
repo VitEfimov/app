@@ -89,7 +89,10 @@ export default function SettingsScreen({ navigation }) {
             <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Settings</Text>
             <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>App preferences & account</Text>
           </View>
-          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Save settings"
+            style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
+          >
             <IconSave color="#fff" />
             <Text style={styles.saveBtnText}>Save</Text>
           </TouchableOpacity>
@@ -107,7 +110,10 @@ export default function SettingsScreen({ navigation }) {
               <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>user@example.com</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteData}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"
+            style={styles.deleteBtn} onPress={handleDeleteData}
+          >
             <Text style={styles.deleteBtnText}>Delete All Data</Text>
           </TouchableOpacity>
         </View>
@@ -144,7 +150,10 @@ export default function SettingsScreen({ navigation }) {
           />
 
           {/* Customize Theme Button */}
-          <TouchableOpacity style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary }]} onPress={() => setThemeModalVisible(true)}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Customize theme"
+            style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary }]} onPress={() => setThemeModalVisible(true)}
+          >
             <Text style={styles.actionBtnText}>🎨 Customize theme</Text>
           </TouchableOpacity>
 

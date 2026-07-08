@@ -91,14 +91,14 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case 'high': return '#B3261E';
-      case 'medium': return '#A15C00';
+      case 'medium': return '#d89415';
       case 'low': return '#3F7D3F';
       default: return null;
     }
   };
 
   const priorityColor = getPriorityColor(task.priority);
-  const hasNotes = task.description?.text && task.description.text.trim() !== '';
+  const hasNotes = (task.description?.text && task.description.text.trim() !== '') || (task.description?.img && task.description.img.trim() !== '');
   const subtasks = task.subtasks || [];
   const totalSubtasksCount = subtasks.length;
   const completedSubtasksCount = subtasks.filter(s => s.completed).length;
@@ -107,6 +107,10 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
   return (
     <TouchableOpacity
       testID="task_row"
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`Task: ${task.name}. ${task.completed ? 'Completed.' : 'Uncompleted.'} ${task.completionDate ? `Due ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `Priority ${task.priority}.` : ''} Double tap to view details.`}
+      accessibilityState={{ checked: task.completed }}
       style={[styles.container, { borderBottomColor: colors.borderColor }]}
       onPress={(e) => {
         if (isSelectionMode) {
@@ -129,6 +133,10 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
       <View style={styles.innerContainer}>
         <TouchableOpacity
           testID="task_checkbox"
+          accessible={true}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: isSelectionMode ? isSelected : task.completed }}
+          accessibilityLabel={isSelectionMode ? "Select task" : "Toggle task completion"}
           style={styles.checkbox}
           onPress={() => {
             if (isSelectionMode) {
@@ -213,13 +221,16 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
                 {formatDisplayTime(task.time)}
               </Text>
             ) : null}
-            {(hasNotes && !task.completionDate && (!task.time || task.time.trim() === '')) ? (
-               <View style={styles.descIndicatorRelative} />
-            ) : null}
           </View>
+
         </View>
+
       </View>
+          {hasNotes && (
+            <View style={[styles.noteBorder, { backgroundColor: colors.primary }]} />
+          )}
     </TouchableOpacity>
+    
   );
 }
 
@@ -307,6 +318,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#5e7d68',
     marginTop: 4,
+  },
+  noteBorder: {
+    width: 3,
+    height: 5,
+    marginLeft: 0,
+    marginTop: 30,
+    borderRadius: 3,
   },
   subtaskBadge: {
     paddingHorizontal: 4,

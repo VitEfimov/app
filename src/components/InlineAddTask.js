@@ -89,6 +89,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     return (
       <TouchableOpacity 
         testID={`inline_add_btn_${sectionId}`}
+        accessible={true} accessibilityRole="button" accessibilityLabel="Create new task"
         style={[styles.addBtn, { borderBottomColor: colors.borderColor }]} 
         onPress={() => setIsEditing(true)}
       >
@@ -106,6 +107,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     <View style={[styles.editContainer, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
       <TextInput
         testID="inline_task_input"
+        accessible={true} accessibilityLabel="New task name"
         style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
         placeholder="Enter task name..."
         placeholderTextColor={colors.textSecondary}
@@ -121,6 +123,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       <View style={styles.actionsRow}>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel={`Select date, currently ${dayjs(selectedDate).format('MM/DD/YYYY')}`}
             style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
             onPress={() => setShowDatePicker(true)}
           >
@@ -130,6 +133,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Add more details"
             style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
             onPress={handleAddWithDetails}
           >
@@ -140,10 +144,17 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         </View>
 
         <View style={styles.rightActions}>
-          <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Cancel"
+            onPress={() => setIsEditing(false)} style={styles.cancelBtn}
+          >
             <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity testID="inline_submit_btn" onPress={handleAdd} style={[styles.submitBtn, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity 
+            testID="inline_submit_btn" 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Submit task"
+            onPress={handleAdd} style={[styles.submitBtn, { backgroundColor: colors.primary }]}
+          >
             <Text style={[styles.submitText, { color: colors.textInverse }]}>Add</Text>
           </TouchableOpacity>
         </View>
@@ -178,6 +189,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
               }}
             />
             <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Close calendar"
               style={[styles.closeCalBtn, { backgroundColor: colors.surfaceContainerHigh }]} 
               onPress={() => setShowDatePicker(false)}
             >

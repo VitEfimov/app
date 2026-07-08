@@ -78,6 +78,7 @@ export default function DashboardScreen({ navigation }) {
 
   const CategoryCard = ({ title, sub, num, color, sectionId }) => (
     <TouchableOpacity 
+      accessible={true} accessibilityRole="button" accessibilityLabel={`${title} category, ${sub}, ${num} tasks`}
       activeOpacity={0.8}
       onPress={() => {
         if (sectionId) {
@@ -105,8 +106,12 @@ export default function DashboardScreen({ navigation }) {
     <ScrollView style={[styles.container, { backgroundColor: colors.bgMain }]} contentContainerStyle={styles.scrollContent}>
       
       {/* Top Card */}
-      <View style={styles.progressCard}>
-        <View style={[styles.progressCircleContainer, { backgroundColor: colors.bgCard }]}>
+      <View 
+        style={styles.progressCard}
+        accessible={true} 
+        accessibilityLabel={`${completionPercentage}% completed. ${getGreetingText()} ${calcCompleted} tasks completed out of ${calcTotal}.`}
+      >
+        <View style={[styles.progressCircleContainer, { backgroundColor: colors.bgCard }]} importantForAccessibility="no-hide-descendants">
           <Svg width="100" height="100" viewBox="0 0 100 100">
             <Circle 
               cx="50" cy="50" r="40" 
@@ -129,11 +134,11 @@ export default function DashboardScreen({ navigation }) {
             <Text style={[styles.percent, { color: colors.textPrimary }]}>{completionPercentage}%</Text>
           </View>
         </View>
-        <View style={styles.progressInfo}>
-          <Text style={[styles.progressGreeting, { color: colors.textPrimary }]}>{getGreetingText()}</Text>
-          <Text style={[styles.progressDetails, { color: colors.textSecondary }]}>
-            {calcCompleted} of {calcTotal} tasks{"\n"}completed
-          </Text>
+          <View style={[styles.progressInfo, { paddingLeft: 10 }]} importantForAccessibility="no-hide-descendants">
+            <Text style={[styles.progressGreeting, { color: colors.textPrimary }]}>{getGreetingText()}</Text>
+            <Text style={[styles.progressDetails, { color: colors.textSecondary }]}>
+              {calcCompleted} tasks completed out of {calcTotal}
+            </Text>
           <View style={styles.tagsContainer}>
             {missedTasks.length > 0 && (
               <View style={[styles.tag, { backgroundColor: 'rgba(255, 51, 51, 0.2)' }]}>

@@ -81,6 +81,7 @@ export default function CustomDrawerContent(props) {
     const isActive = currentRoute === routeName;
     return (
       <TouchableOpacity 
+        accessible={true} accessibilityRole="button" accessibilityLabel={`Navigate to ${label}`} accessibilityState={{ selected: isActive }}
         style={[styles.navItem, isActive && { backgroundColor: colors.surfaceContainerHigh }]}
         onPress={() => props.navigation.navigate(routeName)}
       >
@@ -108,7 +109,11 @@ export default function CustomDrawerContent(props) {
         </View>
 
         {/* Stats Area */}
-        <View style={[styles.statsContainer, { backgroundColor: colors.surfaceContainer }]}>
+        <View 
+          style={[styles.statsContainer, { backgroundColor: colors.surfaceContainer }]}
+          accessible={true}
+          accessibilityLabel={`Today's progress: ${completedToday} out of ${totalToday} tasks completed, ${totalToday - completedToday} tasks remaining`}
+        >
           <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>Today's progress</Text>
           <View style={styles.statsCounts}>
             <Text style={[styles.statsDone, { color: colors.primary }]}>{completedToday}</Text>
@@ -134,6 +139,7 @@ export default function CustomDrawerContent(props) {
       {/* Footer / Logout */}
       <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
         <TouchableOpacity 
+          accessible={true} accessibilityRole="button" accessibilityLabel="Log Out"
           style={[styles.navItem, { opacity: isAuthenticated ? 1 : 0.5 }]} 
           onPress={handleLogout}
           disabled={!isAuthenticated}

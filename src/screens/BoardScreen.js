@@ -129,7 +129,7 @@ export default function BoardScreen({ route }) {
         const subtasks = t.subtasks || [];
         const priority = t.priority && t.priority !== 'none' ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : '';
 
-        return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priority ? `\nPriority: ${priority}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${img ? `Image attached:\n${img}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`.trim();
+        return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priority ? `\nPriority: ${priority}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${img ? `[Image Attached]\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`.trim();
       }).join('\n\n------------------------\n\n');
       
       await Share.share({
@@ -315,7 +315,10 @@ export default function BoardScreen({ route }) {
   const renderSectionHeader = ({ section }) => {
     return (
       <View style={[styles.sectionHeader, { backgroundColor: colors.bgMain, borderBottomColor: colors.borderColor }]}>
-        <TouchableOpacity style={styles.sectionHeaderLeft} onPress={() => toggleSection(section.id)}>
+        <TouchableOpacity 
+          accessible={true} accessibilityRole="button" accessibilityLabel={`${section.title} section, ${section.count} tasks`} accessibilityState={{ expanded: !collapsedSections.includes(section.id) }}
+          style={styles.sectionHeaderLeft} onPress={() => toggleSection(section.id)}
+        >
           <IconChevronDown color={colors.textSecondary} isCollapsed={collapsedSections.includes(section.id)} />
           <Text testID={`section_title_${section.id}`} style={[styles.sectionTitle, { color: colors.textPrimary }]}>{section.title}</Text>
         </TouchableOpacity>
@@ -327,6 +330,7 @@ export default function BoardScreen({ route }) {
         </TouchableOpacity>
         <TouchableOpacity 
           testID={`section_menu_${section.id}`}
+          accessible={true} accessibilityRole="button" accessibilityLabel={`Options for ${section.title} section`}
           style={styles.ellipsisBtn} 
           onPress={() => handleMenuPress(section)}
         >
@@ -365,6 +369,7 @@ export default function BoardScreen({ route }) {
           {boards.map(board => (
             <TouchableOpacity 
               key={board.id} 
+              accessible={true} accessibilityRole="tab" accessibilityLabel={`Board ${board.name}`} accessibilityState={{ selected: activeBoardId === board.id }}
               style={[
                 styles.mainTab, 
                 activeBoardId === board.id && { borderBottomColor: colors.primary }
@@ -378,8 +383,11 @@ export default function BoardScreen({ route }) {
               ]}>{board.name}</Text>
             </TouchableOpacity>
           ))}
-          {boards.length < (isAuthenticated ? 6 : 2) && (
-            <TouchableOpacity style={styles.addBoardBtn} onPress={handleAddBoard}>
+          {boards.length < 3 && (
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Add new board"
+              style={styles.addBoardBtn} onPress={handleAddBoard}
+            >
               <Text style={[styles.addBoardText, { color: colors.textSecondary }]}>+</Text>
             </TouchableOpacity>
           )}
@@ -439,14 +447,14 @@ export default function BoardScreen({ route }) {
             Options for {sectionOptionsConfig.section?.title}
           </Text>
           
-          <TouchableOpacity testID="section_option_sort_time" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+          <TouchableOpacity testID="section_option_sort_time" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Time" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>Sort by Time</Text>
           </TouchableOpacity>
-          <TouchableOpacity testID="section_option_sort_priority" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+          <TouchableOpacity testID="section_option_sort_priority" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Priority" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>Sort by Priority</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity testID="section_option_select_tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+          <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
             setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
             setSectionOptionsConfig({ isVisible: false, section: null }); 
           }}>
@@ -454,24 +462,24 @@ export default function BoardScreen({ route }) {
           </TouchableOpacity>
           
           {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
-            <TouchableOpacity testID="section_option_complete_all" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
+            <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
               <Text style={[styles.optionText, { color: colors.textPrimary }]}>Complete all</Text>
             </TouchableOpacity>
           )}
 
           {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
-            <TouchableOpacity testID="section_option_move_forward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveForward(s), 400); }}>
+            <TouchableOpacity testID="section_option_move_forward" accessible={true} accessibilityRole="button" accessibilityLabel="Move tasks forward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveForward(s), 400); }}>
               <Text style={[styles.optionText, { color: colors.textPrimary }]}>Move forward</Text>
             </TouchableOpacity>
           )}
 
           {sectionOptionsConfig.section?.id === 'later' && (
-            <TouchableOpacity testID="section_option_complete_all" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
+            <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
               <Text style={[styles.optionText, { color: colors.textPrimary }]}>Complete all</Text>
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity testID="section_option_delete_all" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleDeleteSection(s), 400); }}>
+          <TouchableOpacity testID="section_option_delete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Delete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleDeleteSection(s), 400); }}>
             <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>Delete all</Text>
           </TouchableOpacity>
 
@@ -485,19 +493,19 @@ export default function BoardScreen({ route }) {
         <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
           <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} Selected</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
-            <TouchableOpacity testID="action_bar_all" onPress={handleSelectAll} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_all" accessible={true} accessibilityRole="button" accessibilityLabel="Select all" onPress={handleSelectAll} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>All</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_share" onPress={handleShareSelected} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_share" accessible={true} accessibilityRole="button" accessibilityLabel="Share selected" onPress={handleShareSelected} style={styles.actionBtn}>
               <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>Share</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_complete" onPress={handleCompleteSelected} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_complete" accessible={true} accessibilityRole="button" accessibilityLabel="Complete selected" onPress={handleCompleteSelected} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Complete</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_delete" onPress={handleDeleteSelected} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_delete" accessible={true} accessibilityRole="button" accessibilityLabel="Delete selected" onPress={handleDeleteSelected} style={styles.actionBtn}>
               <Text style={{ color: '#f44336', fontWeight: 'bold' }}>Delete</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_cancel" onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
+            <TouchableOpacity testID="action_bar_cancel" accessible={true} accessibilityRole="button" accessibilityLabel="Cancel selection" onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
               <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>Cancel</Text>
             </TouchableOpacity>
           </ScrollView>

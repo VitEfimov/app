@@ -39,6 +39,7 @@ const CustomDropdown = ({
       
       <View style={isHorizontal ? styles.horizontalWrapper : styles.verticalWrapper}>
         <TouchableOpacity 
+          accessible={true} accessibilityRole="button" accessibilityLabel={`${label || 'Select option'}, current value ${selectedLabel}`}
           style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }]} 
           onPress={() => setIsOpen(true)}
         >
@@ -58,6 +59,7 @@ const CustomDropdown = ({
             {normalizedOptions.map(opt => (
               <TouchableOpacity 
                 key={opt.value} 
+                accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${opt.label}`}
                 style={[styles.modalMenuItem, { borderBottomColor: colors.borderColor }]} 
                 onPress={() => { onSelect(opt.value); setIsOpen(false); }}
               >

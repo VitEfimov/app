@@ -107,7 +107,10 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
           
           <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>Theme Settings</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Close theme settings"
+              onPress={onClose} style={styles.closeBtn}
+            >
               <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -122,6 +125,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
               {PREDEFINED_COLORS.map((c, i) => (
                 <TouchableOpacity 
                   key={i} 
+                  accessible={true} accessibilityRole="button" accessibilityLabel={`Select predefined color ${i + 1}`}
                   style={[styles.colorCircle, { backgroundColor: c }, tempColor === c && styles.selectedColor]} 
                   onPress={() => setTempColor(c)}
                 />
@@ -132,6 +136,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
               <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>Custom Hex:</Text>
               <View style={[styles.customColorPreview, { backgroundColor: tempColor, borderColor: colors.borderColor }]} />
               <TextInput 
+                accessible={true} accessibilityLabel="Custom hex color input"
                 style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary }]}
                 value={tempColor}
                 onChangeText={setTempColor}
@@ -140,7 +145,10 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
             </View>
 
             <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginTop: 20 }]}>Background Picture</Text>
-            <TouchableOpacity style={[styles.uploadBox, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fa' }]} onPress={handlePickImage}>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Upload background image"
+              style={[styles.uploadBox, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fa' }]} onPress={handlePickImage}
+            >
               {tempImage ? (
                 <Text style={[styles.uploadText, { color: colors.textSecondary }]}>Image selected. Tap to change.</Text>
               ) : (
@@ -156,10 +164,16 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
           </ScrollView>
 
           <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
-            <TouchableOpacity style={[styles.resetBtn, { backgroundColor: colors.error || '#c62828' }]} onPress={handleReset}>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Reset to default theme"
+              style={[styles.resetBtn, { backgroundColor: colors.error || '#c62828' }]} onPress={handleReset}
+            >
               <Text style={styles.resetText}>Reset Defaults</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.doneBtn, { backgroundColor: colors.primary }]} onPress={handleSave}>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Save theme"
+              style={[styles.doneBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
+            >
               <Text style={styles.doneText}>Done</Text>
             </TouchableOpacity>
           </View>
