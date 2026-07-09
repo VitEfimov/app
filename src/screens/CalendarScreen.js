@@ -140,9 +140,23 @@ export default function CalendarScreen() {
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
-    return tasks.filter(task => {
+    const filteredTasks = tasks.filter(task => {
       if (!task.completionDate) return false;
       return dayjs(task.completionDate).format('YYYY-MM-DD') === selectedDate;
+    });
+    
+    return filteredTasks.sort((a, b) => {
+      const hasTimeA = !!(a.time && a.time.trim() !== '');
+      const hasTimeB = !!(b.time && b.time.trim() !== '');
+      
+      if (hasTimeA && !hasTimeB) return -1;
+      if (!hasTimeA && hasTimeB) return 1;
+      if (hasTimeA && hasTimeB) {
+        const timeCompare = a.time.localeCompare(b.time);
+        if (timeCompare !== 0) return timeCompare;
+      }
+      
+      return parseInt(a.id || '0') - parseInt(b.id || '0');
     });
   }, [tasks, selectedDate]);
 

@@ -132,6 +132,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       setRepeatFrequency(task.repeatFrequency || 'None');
       setRepeatStartDate(task.repeatStartDate || task.completionDate || '');
       setRepeatEndDate(task.repeatEndDate || '');
+      setReminder(task.reminder || 'None');
     }
   }, [isVisible, task?.id]);
 
@@ -529,6 +530,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                     placeholder="Subtask..."
                     placeholderTextColor={colors.textSecondary}
                     blurOnSubmit={true}
+                    multiline={true}
                   />
                   <TouchableOpacity 
                     accessible={true} accessibilityRole="button" accessibilityLabel="Delete subtask"
