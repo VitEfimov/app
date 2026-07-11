@@ -220,44 +220,38 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
             </TouchableOpacity>
           )}
         </View>
-      </View>
 
-      {/* Region 4: Metadata */}
-      <View style={styles.metadata}>
-        <View style={styles.metadataStack}>
-          {(hasSubtasks || hasNotes) ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6, alignSelf: 'flex-end' }}>
-              {hasNotes ? <IconNote color={colors.primary} /> : null}
-              {hasSubtasks ? (
-                <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard, marginBottom: 0 }]}>
-                  <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-          
-          <View style={{ alignItems: 'flex-start' }}>
-            {(!hideDate && task.completionDate) ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 14 }} />
-                <Text style={[styles.date, { color: colors.textPrimary }]}>
-                  {dayjs(task.completionDate).format('MMM D')}
-                </Text>
-              </View>
-            ) : null}
+        {/* Indicators under task name */}
+        {(hasSubtasks || hasNotes || (task.time && task.time.trim() !== '')) ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12, paddingHorizontal: 8 }}>
             {(task.time && task.time.trim() !== '') ? (
-              <View style={styles.timeRow}>
-                <View style={{ width: 14, alignItems: 'center' }}>
-                  {task.reminder && task.reminder !== 'None' ? <IconAlarm color={colors.textSecondary} /> : null}
-                </View>
-                <Text style={[styles.time, { color: colors.textSecondary }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                {task.reminder && task.reminder !== 'None' ? <IconAlarm color={colors.textSecondary} /> : null}
+                <Text style={[styles.time, { color: colors.textSecondary, marginLeft: 0 }]}>
                   {formatDisplayTime(task.time)}
                 </Text>
               </View>
             ) : null}
+
+            {hasNotes ? <IconNote color={colors.primary} /> : null}
+
+            {hasSubtasks ? (
+              <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard, marginBottom: 0 }]}>
+                <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
+              </View>
+            ) : null}
           </View>
-        </View>
+        ) : null}
       </View>
+
+      {/* Region 4: Metadata */}
+      {(!hideDate && task.completionDate) ? (
+        <View style={styles.metadata}>
+          <Text style={[styles.date, { color: colors.textPrimary }]}>
+            {dayjs(task.completionDate).format('MMM D')}
+          </Text>
+        </View>
+      ) : null}
 
     </TouchableOpacity>
     

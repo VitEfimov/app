@@ -124,7 +124,7 @@ export default function CalendarScreen() {
       else if (anyMissed) dotColor = '#f44336';
       else if (anyNotes) dotColor = '#ff9800';
 
-      finalMarks[dateStr] = { marked: true, dotColor: dotColor };
+      finalMarks[dateStr] = { marked: true, dotColor: dotColor, textColor: dotColor === '#ffffff' ? colors.textSecondary : dotColor };
     });
 
     // Mark the currently selected date
