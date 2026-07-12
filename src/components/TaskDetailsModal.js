@@ -114,6 +114,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const [datePickerType, setDatePickerType] = useState(null);
   const [inputHeight, setInputHeight] = useState(46);
+  const [isFullscreenImageVisible, setFullscreenImageVisible] = useState(false);
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
 
@@ -488,7 +489,9 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               />
               {noteImage ? (
                 <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: noteImage }} style={styles.imagePreview} />
+                  <TouchableOpacity onPress={() => setFullscreenImageVisible(true)} activeOpacity={0.8}>
+                    <Image source={{ uri: noteImage }} style={styles.imagePreview} />
+                  </TouchableOpacity>
                   <TouchableOpacity 
                     accessible={true} accessibilityRole="button" accessibilityLabel="Remove Photo"
                     style={styles.imageRemoveBtn} 
@@ -606,6 +609,25 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>Close</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </RNModal>
+
+        <RNModal visible={isFullscreenImageVisible} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImageVisible(false)}>
+          <View style={styles.fullscreenImageOverlay}>
+            <View style={styles.fullscreenImageHeader}>
+              <TouchableOpacity 
+                style={styles.headerBtn} 
+                onPress={() => setFullscreenImageVisible(false)}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
+                <IconClose color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Image 
+              source={{ uri: noteImage }} 
+              style={styles.fullscreenImage} 
+              resizeMode="contain" 
+            />
           </View>
         </RNModal>
     </Modal>
@@ -789,5 +811,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 15,
     padding: 4,
+  },
+  fullscreenImageOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImageHeader: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '100%',
   }
 });
