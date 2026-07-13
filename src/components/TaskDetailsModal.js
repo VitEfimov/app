@@ -16,6 +16,7 @@ import { scheduleTaskReminder, cancelNotification } from '../utils/notifications
 import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
 import CustomDropdown from './CustomDropdown';
 import ConfirmModal from './ConfirmModal';
+import { useTranslation } from 'react-i18next';
 
 const IconClose = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -94,6 +95,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const scrollViewRef = useRef(null);
+  const { t } = useTranslation();
   const [scrollOffset, setScrollOffset] = useState(0);
 
   const [taskName, setTaskName] = useState('');
@@ -154,11 +156,11 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const handleShare = async () => {
     try {
       const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
-      const message = `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priorityStr ? `\nPriority: ${priorityStr}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
+      const message = `${t('Task')}: ${taskName}\n${t('Due')}: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : t('Not set')}${selectedTime ? ` ${t('at')} ${selectedTime}` : ''}${priorityStr ? `\n${t('Priority')}: ${priorityStr}` : ''}\n\n${notes ? `${t('Notes')}:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `${t('Subtasks')}:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
       await Share.share({
         message,
-        title: 'Share Task'
+        title: t('Share Task')
       });
     } catch (error) {
       console.error(error.message);
@@ -277,9 +279,9 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const handleDelete = () => {
     setConfirmConfig({
       isVisible: true,
-      title: 'Delete Task',
-      message: 'Are you sure you want to delete this task?',
-      confirmText: 'Delete',
+      title: t('Delete Task'),
+      message: t('Are you sure you want to delete this task?'),
+      confirmText: t('Delete'),
       isDestructive: true,
       onConfirm: () => {
         dispatch(deleteTask({ taskId: task.id }));
@@ -317,7 +319,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           </View>
           
           <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Task Details</Text>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('Task Details')}</Text>
             <View style={{ flexDirection: 'row' }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel="Share task"
@@ -344,7 +346,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             keyboardShouldPersistTaps="handled"
           >
             
-            <Text style={[styles.label, { color: colors.textSecondary }]}>TASK NAME</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{t('TASK NAME')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel="Toggle task completion"
@@ -361,7 +363,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 onChangeText={setTaskName}
                 onBlur={handleNameBlur}
                 onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
-                placeholder="What needs to be done?"
+                placeholder={t("What needs to be done?")}
                 placeholderTextColor={colors.textSecondary}
                 multiline={true}
                 scrollEnabled={false}
@@ -371,7 +373,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={styles.twoColumnRow}>
               <View style={styles.column}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>DUE DATE</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('DUE DATE')}</Text>
                 <TouchableOpacity 
                   accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : 'Not set'}`}
                   style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
@@ -379,12 +381,12 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 >
                   <IconCalendar color={colors.textPrimary} />
                   <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : 'Select'}
+                    {selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : t('Select')}
                   </Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.column}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>TIME</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('TIME')}</Text>
                 <TouchableOpacity 
                   accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
                   style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
@@ -400,41 +402,41 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={styles.threeColumnRow}>
               <View style={styles.column}>
-                <CustomDropdown label="PRIORITY" value={priority === 'none' ? 'None' : priority} options={['None', 'Low', 'Medium', 'High']} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown label={t("PRIORITY")} value={priority === 'none' ? 'None' : priority} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
-                <CustomDropdown label="REMINDER" value={reminder} options={['None', '15 min before', '30 min before', '1 hr before', '1 day before', 'Day of']} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown label={t("REMINDER")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
-                <CustomDropdown label="REPEAT" value={repeatFrequency} options={['None', 'Daily', 'Weekly', 'Monthly']} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown label={t("REPEAT")} value={repeatFrequency} options={[{label: t('None'), value: 'None'}, {label: t('Daily'), value: 'Daily'}, {label: t('Weekly'), value: 'Weekly'}, {label: t('Monthly'), value: 'Monthly'}]} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
             </View>
 
             {repeatFrequency !== 'None' && (
               <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}>
-                <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>REPEAT CONFIGURATION</Text>
+                <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('REPEAT CONFIGURATION')}</Text>
                 <View style={styles.twoColumnRow}>
                   <View style={styles.column}>
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>FROM</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>{t('FROM')}</Text>
                     <TouchableOpacity 
                       style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
                       onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
                     >
                       <IconCalendar color={colors.textPrimary} />
                       <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {repeatStartDate || selectedDate ? dayjs(repeatStartDate || selectedDate).format('MM/DD/YYYY') : 'Select'}
+                        {repeatStartDate || selectedDate ? dayjs(repeatStartDate || selectedDate).format('MM/DD/YYYY') : t('Select')}
                       </Text>
                     </TouchableOpacity>
                   </View>
                   <View style={styles.column}>
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>TO</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>{t('TO')}</Text>
                     <TouchableOpacity 
                       style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
                       onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
                     >
                       <IconCalendar color={colors.textPrimary} />
                       <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {repeatEndDate ? dayjs(repeatEndDate).format('MM/DD/YYYY') : 'Select'}
+                        {repeatEndDate ? dayjs(repeatEndDate).format('MM/DD/YYYY') : t('Select')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -466,13 +468,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             )}
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
-              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>NOTES</Text>
+              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('NOTES')}</Text>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
                 onPress={pickImage} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
               >
                 <IconImage color={colors.primary} />
-                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Add Photo</Text>
+                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Add Photo')}</Text>
               </TouchableOpacity>
             </View>
             <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 100 }]}>
@@ -482,7 +484,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 value={notes}
                 onChangeText={setNotes}
                 onBlur={handleNotesBlur}
-                placeholder="Add extra details or notes..."
+                placeholder={t("Add extra details or notes...")}
                 placeholderTextColor={colors.textSecondary}
                 multiline={true}
                 textAlignVertical="top"
@@ -507,12 +509,12 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 10 }}>
-              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>SUBTASKS</Text>
+              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('SUBTASKS')}</Text>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel="Add new subtask"
                 onPress={addSubtask} hitSlop={{top:10,bottom:10,left:10,right:10}}
               >
-                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>+ Add Subtask</Text>
+                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('+ Add Subtask')}</Text>
               </TouchableOpacity>
             </View>
             
@@ -530,7 +532,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                     style={[{ flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 2 }, subtask.completed && { textDecorationLine: 'line-through', opacity: 0.5 }]}
                     value={subtask.text}
                     onChangeText={(text) => updateSubtask(subtask.id, text)}
-                    placeholder="Subtask..."
+                    placeholder={t("Subtask...")}
                     placeholderTextColor={colors.textSecondary}
                     blurOnSubmit={true}
                     multiline={true}
@@ -550,7 +552,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               onPress={handleDelete} 
               style={{ marginTop: 30, padding: 15, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 8, alignItems: 'center' }}
             >
-              <Text style={{ color: '#f44336', fontWeight: 'bold', fontSize: 16 }}>Delete Task</Text>
+              <Text style={{ color: '#f44336', fontWeight: 'bold', fontSize: 16 }}>{t('Delete Task')}</Text>
             </TouchableOpacity>
             
           </ScrollView>
@@ -606,7 +608,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 style={[styles.closeCalBtn, { backgroundColor: colors.surfaceContainerHigh }]} 
                 onPress={() => setShowDatePicker(false)}
               >
-                <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>Close</Text>
+                <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>{t('Close')}</Text>
               </TouchableOpacity>
             </View>
           </View>

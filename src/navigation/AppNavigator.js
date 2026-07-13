@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { StatusBar } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import BoardScreen from '../screens/BoardScreen';
@@ -56,6 +57,7 @@ const IconPomodoro = ({ color }) => (
 
 function TabNavigator() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   return (
     <Tab.Navigator 
       initialRouteName="Dashboard"
@@ -83,11 +85,11 @@ function TabNavigator() {
         }
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Board" component={BoardScreen} />
-      <Tab.Screen name="Calendar" component={CalendarScreen} />
-      <Tab.Screen name="Pomodoro" component={PomodoroScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: t('Dashboard') }} />
+      <Tab.Screen name="Board" component={BoardScreen} options={{ tabBarLabel: t('Board') }} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: t('Calendar') }} />
+      <Tab.Screen name="Pomodoro" component={PomodoroScreen} options={{ tabBarLabel: t('Pomodoro') }} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('Settings') }} />
     </Tab.Navigator>
   );
 }

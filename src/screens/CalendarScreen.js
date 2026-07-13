@@ -7,9 +7,11 @@ import TaskRow from '../components/TaskRow';
 import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import dayjs from 'dayjs';
+import { useTranslation } from 'react-i18next';
 
 export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [selectedTask, setSelectedTask] = useState(null);
@@ -208,7 +210,7 @@ export default function CalendarScreen() {
 
           <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
             <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
-              Tasks for {dayjs(selectedDate).format('MMM D, YYYY')}
+              {t('Tasks for')} {dayjs(selectedDate).format('MMM D, YYYY')}
             </Text>
           </View>
         </View>
@@ -227,7 +229,7 @@ export default function CalendarScreen() {
           />
         ) : (
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No tasks scheduled for this day.</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('No tasks scheduled for this day.')}</Text>
           </View>
         )}
         

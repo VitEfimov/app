@@ -16,6 +16,7 @@ import {
 } from '../features/pomodoroSlice';
 import PomodoroSettingsModal from '../components/PomodoroSettingsModal';
 import { scheduleLocalNotification } from '../utils/notifications';
+import { useTranslation } from 'react-i18next';
 
 // Icons
 const IconPlay = ({ color }) => (
@@ -61,6 +62,7 @@ const SOUND_MAP = {
 export default function PomodoroScreen() {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   useKeepAwake(); // Keep screen awake during pomodoro
 
   const pomodoro = useSelector(state => state.pomodoroReducer.pomodoro[0]);
@@ -233,15 +235,15 @@ export default function PomodoroScreen() {
       
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>Pomodoro</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Stay focused, take breaks</Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Pomodoro')}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('Stay focused, take breaks')}</Text>
         </View>
         <TouchableOpacity 
           style={[styles.settingsBtn, { backgroundColor: colors.surfaceContainer }]}
           onPress={() => dispatch(togglePomodoroSettings(true))}
         >
           <IconSettings color={colors.textPrimary} />
-          <Text style={[styles.settingsText, { color: colors.textPrimary }]}>Settings</Text>
+          <Text style={[styles.settingsText, { color: colors.textPrimary }]}>{t('Settings')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -250,10 +252,10 @@ export default function PomodoroScreen() {
         {/* Work / Break Toggle */}
         <View style={styles.toggleContainer}>
           <View style={[styles.toggleBtn, !localIsBreak ? styles.toggleBtnActive : null, !localIsBreak ? { backgroundColor: colors.primary } : null]}>
-            <Text style={[styles.toggleText, !localIsBreak && { color: colors.textInverse }]}>Work Time</Text>
+            <Text style={[styles.toggleText, !localIsBreak && { color: colors.textInverse }]}>{t('Work Time')}</Text>
           </View>
           <View style={[styles.toggleBtn, localIsBreak ? styles.toggleBtnActive : null, localIsBreak ? { backgroundColor: colors.primary } : null]}>
-            <Text style={[styles.toggleText, localIsBreak && { color: colors.textInverse }]}>Break Time</Text>
+            <Text style={[styles.toggleText, localIsBreak && { color: colors.textInverse }]}>{t('Break Time')}</Text>
           </View>
         </View>
 
@@ -277,7 +279,7 @@ export default function PomodoroScreen() {
               {formatTime(localTime).min}:{formatTime(localTime).sec}
             </Text>
             <Text style={[styles.sessionLabel, { color: colors.textSecondary }]}>
-              {localIsBreak ? 'Break session' : 'Work session'}
+              {localIsBreak ? t('Break session') : t('Work session')}
             </Text>
           </View>
         </View>
@@ -311,7 +313,7 @@ export default function PomodoroScreen() {
             })}
           </View>
           <Text style={[styles.intervalsText, { color: colors.textSecondary }]}>
-            {Math.min(localCompletedIntervals + 1, intervalCount)} / {intervalCount} sessions completed
+            {Math.min(localCompletedIntervals + 1, intervalCount)} / {intervalCount} {t('sessions completed')}
           </Text>
         </View>
 

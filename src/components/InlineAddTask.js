@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import Svg, { Path } from 'react-native-svg';
 import { Calendar } from 'react-native-calendars';
 import getFilters from '../utils/filters';
+import { useTranslation } from 'react-i18next';
 
 const IconPlus = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,6 +32,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
+  const { t } = useTranslation();
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
 
@@ -97,7 +99,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
           <IconPlus color={colors.textSecondary} />
         </View>
         <View style={styles.textWrapper}>
-          <Text style={[styles.addText, { color: colors.textSecondary }]}>Add task</Text>
+          <Text style={[styles.addText, { color: colors.textSecondary }]}>{t('Add task')}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -109,7 +111,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         testID="inline_task_input"
         accessible={true} accessibilityLabel="New task name"
         style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
-        placeholder="Enter task name..."
+        placeholder={t("Enter task name...")}
         placeholderTextColor={colors.textSecondary}
         value={taskName}
         onChangeText={setTaskName}
@@ -138,7 +140,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
             onPress={handleAddWithDetails}
           >
             <Text style={[styles.dateText, { color: colors.primary }]}>
-              Add details
+              {t('Add details')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -148,14 +150,14 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
             accessible={true} accessibilityRole="button" accessibilityLabel="Cancel"
             onPress={() => setIsEditing(false)} style={styles.cancelBtn}
           >
-            <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
+            <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             testID="inline_submit_btn" 
             accessible={true} accessibilityRole="button" accessibilityLabel="Submit task"
             onPress={handleAdd} style={[styles.submitBtn, { backgroundColor: colors.primary }]}
           >
-            <Text style={[styles.submitText, { color: colors.textInverse }]}>Add</Text>
+            <Text style={[styles.submitText, { color: colors.textInverse }]}>{t('Add')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -193,7 +195,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
               style={[styles.closeCalBtn, { backgroundColor: colors.surfaceContainerHigh }]} 
               onPress={() => setShowDatePicker(false)}
             >
-              <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>Close</Text>
+              <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>{t('Close')}</Text>
             </TouchableOpacity>
           </View>
         </View>

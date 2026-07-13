@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { useTheme } from '../styles/ThemeContext';
 import { setThemeMode } from '../features/themeSlice';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 
 // Custom icons
 
@@ -40,6 +41,7 @@ export default function Header() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const { colors, mode } = useTheme();
+  const { t } = useTranslation();
   
   const themeReducer = useSelector(state => state.themeReducer || {});
   const userPicture = themeReducer.userPicture;
@@ -71,13 +73,13 @@ export default function Header() {
       <View style={styles.rightSection}>
         {(!!isPomodoroActive && !isTimeOver) ? (
           <View style={styles.pomodoroBadge}>
-            <Text style={styles.pomodoroText}>Pomodoro: {timeRemaining}s</Text>
+            <Text style={styles.pomodoroText}>{t('Pomodoro')}: {timeRemaining}s</Text>
           </View>
         ) : null}
         
         {!!isTimeOver ? (
           <View style={[styles.pomodoroBadge, { backgroundColor: colors.danger }]}>
-            <Text style={[styles.pomodoroText, { color: '#fff' }]}>Time's Up!</Text>
+            <Text style={[styles.pomodoroText, { color: '#fff' }]}>{t("Time's Up!")}</Text>
           </View>
         ) : null}
 

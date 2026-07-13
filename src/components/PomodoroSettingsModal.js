@@ -6,6 +6,7 @@ import { togglePomodoroSettings, setTime, setBreakInterval, setIntervalCount, se
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path } from 'react-native-svg';
 import CustomDropdown from './CustomDropdown';
+import { useTranslation } from 'react-i18next';
 
 const IconClose = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -26,6 +27,7 @@ const predefinedSounds = [
 export default function PomodoroSettingsModal() {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   
   const { isSettingsOpen, pomodoro } = useSelector(state => state.pomodoroReducer);
   const currentPomodoro = pomodoro[0] || {};
@@ -99,14 +101,14 @@ export default function PomodoroSettingsModal() {
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>Pomodoro Settings</Text>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Pomodoro Settings')}</Text>
             <TouchableOpacity onPress={() => dispatch(togglePomodoroSettings(false))}>
               <IconClose color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Work duration</Text>
+            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Work duration')}</Text>
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <TextInput
                 style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
@@ -131,7 +133,7 @@ export default function PomodoroSettingsModal() {
           </View>
 
           <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Break duration</Text>
+            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Break duration')}</Text>
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <TextInput
                 style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
@@ -156,7 +158,7 @@ export default function PomodoroSettingsModal() {
           </View>
 
           <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Sessions (max 10)</Text>
+            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Sessions (max 10)')}</Text>
             <TextInput
               style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
               value={sessions}
@@ -167,7 +169,7 @@ export default function PomodoroSettingsModal() {
           </View>
 
           <CustomDropdown 
-            label="Work complete sound" 
+            label={t("Work complete sound")} 
             value={workSound} 
             options={predefinedSounds} 
             onSelect={setWorkSoundState} 
@@ -175,7 +177,7 @@ export default function PomodoroSettingsModal() {
             layout="horizontal" 
           />
           <CustomDropdown 
-            label="Break complete sound" 
+            label={t("Break complete sound")} 
             value={breakSound} 
             options={predefinedSounds} 
             onSelect={setBreakSoundState} 
@@ -187,14 +189,14 @@ export default function PomodoroSettingsModal() {
             style={[styles.saveBtn, { backgroundColor: colors.primary }]}
             onPress={handleSave}
           >
-            <Text style={[styles.saveBtnText, { color: colors.textInverse }]}>Save Settings</Text>
+            <Text style={[styles.saveBtnText, { color: colors.textInverse }]}>{t('Save Settings')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.saveBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderColor, marginTop: 10 }]}
             onPress={handleResetToDefault}
           >
-            <Text style={[styles.saveBtnText, { color: colors.textPrimary }]}>Reset to Default</Text>
+            <Text style={[styles.saveBtnText, { color: colors.textPrimary }]}>{t('Reset to Default')}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

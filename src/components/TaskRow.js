@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 
 const IconNote = ({ color }) => (
   <Svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -54,6 +54,7 @@ const IconCheckCircle = ({ color }) => (
 export default function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   const theme = useSelector(state => state.themeReducer);
   const taskNameWrap = theme?.taskNameWrap || 'nowrap';
@@ -128,7 +129,7 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
       testID="task_row"
       accessible={true}
       accessibilityRole="button"
-      accessibilityLabel={`Task: ${task.name}. ${task.completed ? 'Completed.' : 'Uncompleted.'} ${task.completionDate ? `Due ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `Priority ${task.priority}.` : ''} Double tap to view details.`}
+      accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
       accessibilityState={{ checked: task.completed }}
       style={[styles.container, { borderBottomColor: colors.borderColor }]}
       onPress={(e) => {

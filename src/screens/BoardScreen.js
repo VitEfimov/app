@@ -14,6 +14,7 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path } from 'react-native-svg';
 import { updateTask, deleteTask, deleteTasksByBoard } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
+import { useTranslation } from 'react-i18next';
 
 dayjs.extend(isSameOrBefore);
 
@@ -28,6 +29,7 @@ export default function BoardScreen({ route }) {
   const [activeAddSectionId, setActiveAddSectionId] = useState(null);
 
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || [{ id: 'main', name: 'Main' }]);
@@ -192,13 +194,13 @@ export default function BoardScreen({ route }) {
   const completedTasks = boardTasks.filter(task => task.completed);
 
   const sections = [
-    ...(missedTasks.length > 0 ? [{ id: 'missed', title: 'Missed tasks', data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
-    { id: 'today', title: 'Today', data: collapsedSections.includes('today') ? [] : todayTasks, count: todayTasks.length, color: '#ff9800' },
-    { id: 'tomorrow', title: 'Tomorrow', data: collapsedSections.includes('tomorrow') ? [] : tomorrowTasks, count: tomorrowTasks.length, color: '#2196f3' },
-    { id: 'on-this-week', title: 'This week', data: collapsedSections.includes('on-this-week') ? [] : thisWeekTasks, count: thisWeekTasks.length, color: '#9c27b0' },
-    { id: 'on-next-week', title: 'Next week', data: collapsedSections.includes('on-next-week') ? [] : nextWeekTasks, count: nextWeekTasks.length, color: '#009688' },
-    { id: 'later', title: 'Upcoming', data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
-    ...(completedTasks.length > 0 ? [{ id: 'completed', title: 'Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4caf50' }] : []),
+    ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
+    { id: 'today', title: t('Today'), data: collapsedSections.includes('today') ? [] : todayTasks, count: todayTasks.length, color: '#ff9800' },
+    { id: 'tomorrow', title: t('Tomorrow'), data: collapsedSections.includes('tomorrow') ? [] : tomorrowTasks, count: tomorrowTasks.length, color: '#2196f3' },
+    { id: 'on-this-week', title: t('This week'), data: collapsedSections.includes('on-this-week') ? [] : thisWeekTasks, count: thisWeekTasks.length, color: '#9c27b0' },
+    { id: 'on-next-week', title: t('Next week'), data: collapsedSections.includes('on-next-week') ? [] : nextWeekTasks, count: nextWeekTasks.length, color: '#009688' },
+    { id: 'later', title: t('Upcoming'), data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
+    ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed'), data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4caf50' }] : []),
   ];
 
   React.useEffect(() => {
@@ -425,10 +427,10 @@ export default function BoardScreen({ route }) {
 
       <PromptModal
         isVisible={promptConfig.isVisible}
-        title={promptConfig.type === 'add' ? 'New Board' : 'Rename Board'}
-        message={promptConfig.type === 'add' ? 'Enter board name:' : 'Enter new name:'}
+        title={promptConfig.type === 'add' ? t('New Board') : t('Rename Board')}
+        message={promptConfig.type === 'add' ? t('Enter board name:') : t('Enter new name:')}
         defaultValue={promptConfig.type === 'rename' ? promptConfig.targetBoard?.name : ''}
-        submitText={promptConfig.type === 'add' ? 'Add' : 'Rename'}
+        submitText={promptConfig.type === 'add' ? t('Add') : t('Rename')}
         onCancel={() => setPromptConfig({ isVisible: false, type: null, targetBoard: null })}
         onSubmit={handlePromptSubmit}
       />
@@ -444,69 +446,69 @@ export default function BoardScreen({ route }) {
         <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
           <View style={styles.optionsModalDragHandle} />
           <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
-            Options for {sectionOptionsConfig.section?.title}
+            {t('Options for')} {sectionOptionsConfig.section?.title}
           </Text>
           
           <TouchableOpacity testID="section_option_sort_time" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Time" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>Sort by Time</Text>
+            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Time')}</Text>
           </TouchableOpacity>
           <TouchableOpacity testID="section_option_sort_priority" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Priority" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>Sort by Priority</Text>
+            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Priority')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
             setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
             setSectionOptionsConfig({ isVisible: false, section: null }); 
           }}>
-            <Text style={[styles.optionText, { color: colors.primary }]}>Select Tasks</Text>
+            <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
           </TouchableOpacity>
           
           {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
             <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
-              <Text style={[styles.optionText, { color: colors.textPrimary }]}>Complete all</Text>
+              <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
             </TouchableOpacity>
           )}
 
           {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
             <TouchableOpacity testID="section_option_move_forward" accessible={true} accessibilityRole="button" accessibilityLabel="Move tasks forward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveForward(s), 400); }}>
-              <Text style={[styles.optionText, { color: colors.textPrimary }]}>Move forward</Text>
+              <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move forward')}</Text>
             </TouchableOpacity>
           )}
 
           {sectionOptionsConfig.section?.id === 'later' && (
             <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
-              <Text style={[styles.optionText, { color: colors.textPrimary }]}>Complete all</Text>
+              <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity testID="section_option_delete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Delete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleDeleteSection(s), 400); }}>
-            <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>Delete all</Text>
+            <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete all')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity testID="section_option_cancel" style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}>
-            <Text style={[styles.optionText, { color: colors.textSecondary }]}>Cancel</Text>
+            <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
 
       {selectionMode.isActive && (
         <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
-          <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} Selected</Text>
+          <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
             <TouchableOpacity testID="action_bar_all" accessible={true} accessibilityRole="button" accessibilityLabel="Select all" onPress={handleSelectAll} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>All</Text>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="action_bar_share" accessible={true} accessibilityRole="button" accessibilityLabel="Share selected" onPress={handleShareSelected} style={styles.actionBtn}>
-              <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>Share</Text>
+              <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>{t('Share')}</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="action_bar_complete" accessible={true} accessibilityRole="button" accessibilityLabel="Complete selected" onPress={handleCompleteSelected} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Complete</Text>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Complete')}</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="action_bar_delete" accessible={true} accessibilityRole="button" accessibilityLabel="Delete selected" onPress={handleDeleteSelected} style={styles.actionBtn}>
-              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>Delete</Text>
+              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Delete')}</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="action_bar_cancel" accessible={true} accessibilityRole="button" accessibilityLabel="Cancel selection" onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
-              <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>Cancel</Text>
+              <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>{t('Cancel')}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

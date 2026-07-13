@@ -83,6 +83,10 @@ const themeSlice = createSlice({
       state.timeFormat = '12h';
       state.sourceColor = '#6750A4';
       state.themeMode = 'dark';
+      state.userPicture = null;
+      state.headerBackgroundFit = 'cover';
+      state.calendarPanePosition = null;
+      state.progressMode = 'daily';
       AsyncStorage.removeItem('customTheme');
     },
     setDefaultTaskLimit: (state, action) => {

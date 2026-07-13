@@ -5,6 +5,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setSourceColor, resetTheme, setUserPicture } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getDeviceLanguage } from '../i18n';
 
 // const PREDEFINED_COLORS = [
 //   '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
@@ -39,6 +42,7 @@ const PREDEFINED_COLORS = [
 export default function ThemeSettingsModal({ isVisible, onClose }) {
   const dispatch = useDispatch();
   const { colors, isDark } = useTheme();
+  const { t, i18n } = useTranslation();
   
   const currentSourceColor = useSelector(state => state.themeReducer.sourceColor);
   const currentUserPicture = useSelector(state => state.themeReducer.userPicture);
@@ -75,15 +79,17 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
 
   const handleReset = () => {
     Alert.alert(
-      "Reset Defaults",
-      "Are you sure you want to reset all theme settings to defaults?",
+      t("Reset Defaults"),
+      t("Are you sure you want to reset all theme settings to defaults?"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         { 
-          text: "Reset", 
+          text: t("Reset"), 
           style: "destructive",
           onPress: () => {
             dispatch(resetTheme());
+            AsyncStorage.removeItem('appLanguage');
+            i18n.changeLanguage(getDeviceLanguage());
             onClose();
           }
         }
@@ -106,7 +112,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
           </View>
           
           <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>Theme Settings</Text>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Theme Settings')}</Text>
             <TouchableOpacity 
               accessible={true} accessibilityRole="button" accessibilityLabel="Close theme settings"
               onPress={onClose} style={styles.closeBtn}
@@ -116,9 +122,9 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
           </View>
 
           <ScrollView style={styles.scrollArea}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Material You Theme</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Material You Theme')}</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Choose a source color and we'll generate a complete, accessible theme palette for you automatically.
+              {t("Choose a source color and we'll generate a complete, accessible theme palette for you automatically.")}
             </Text>
 
             <View style={styles.colorRow}>
@@ -133,7 +139,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
             </View>
 
             <View style={styles.customColorRow}>
-              <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>Custom Hex:</Text>
+              <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Custom HEX:')}</Text>
               <View style={[styles.customColorPreview, { backgroundColor: tempColor, borderColor: colors.borderColor }]} />
               <TextInput 
                 accessible={true} accessibilityLabel="Custom hex color input"
@@ -144,20 +150,20 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
               />
             </View>
 
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginTop: 20 }]}>Background Picture</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginTop: 20 }]}>{t('Background Picture')}</Text>
             <TouchableOpacity 
               accessible={true} accessibilityRole="button" accessibilityLabel="Upload background image"
               style={[styles.uploadBox, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fa' }]} onPress={handlePickImage}
             >
               {tempImage ? (
-                <Text style={[styles.uploadText, { color: colors.textSecondary }]}>Image selected. Tap to change.</Text>
+                <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('Image selected. Tap to change.')}</Text>
               ) : (
-                <Text style={[styles.uploadText, { color: colors.textSecondary }]}>📷 Tap to upload</Text>
+                <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('📷 Tap to upload')}</Text>
               )}
             </TouchableOpacity>
             {tempImage && (
               <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 5 }}>
-                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: 'bold' }}>Remove Image</Text>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: 'bold' }}>{t('Remove Image')}</Text>
               </TouchableOpacity>
             )}
 
@@ -168,13 +174,13 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
               accessible={true} accessibilityRole="button" accessibilityLabel="Reset to default theme"
               style={[styles.resetBtn, { backgroundColor: colors.error || '#c62828' }]} onPress={handleReset}
             >
-              <Text style={styles.resetText}>Reset Defaults</Text>
+              <Text style={styles.resetText}>{t('Reset Defaults')}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               accessible={true} accessibilityRole="button" accessibilityLabel="Save theme"
               style={[styles.doneBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
             >
-              <Text style={styles.doneText}>Done</Text>
+              <Text style={styles.doneText}>{t('Done')}</Text>
             </TouchableOpacity>
           </View>
 

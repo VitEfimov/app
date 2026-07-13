@@ -22,10 +22,13 @@ const IconSave = ({ color }) => (
 );
 
 import CustomDropdown from '../components/CustomDropdown';
+import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { t, i18n } = useTranslation();
   
   const theme = useSelector(state => state.themeReducer);
   const taskNameWrap = theme.taskNameWrap || 'wrap';
@@ -34,36 +37,48 @@ export default function SettingsScreen({ navigation }) {
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
 
+  const languageOptions = [
+    { label: 'English', value: 'en' },
+    { label: 'Русский', value: 'ru' },
+    { label: 'Español', value: 'es' },
+    { label: '中文', value: 'zh' },
+    { label: '日本語', value: 'ja' },
+    { label: 'हिन्दी', value: 'hi' },
+    { label: 'Français', value: 'fr' },
+    { label: 'Deutsch', value: 'de' },
+    { label: 'Italiano', value: 'it' }
+  ];
+
   const wrapOptions = [
-    { label: 'Full', value: 'wrap' },
-    { label: 'Truncate', value: 'nowrap' },
+    { label: t('Full'), value: 'wrap' },
+    { label: t('Truncate'), value: 'nowrap' },
   ];
 
   const fontOptions = [
-    { label: 'Small', value: 'small' },
-    { label: 'Normal', value: 'normal' },
-    { label: 'Big', value: 'big' },
+    { label: t('Small'), value: 'small' },
+    { label: t('Normal'), value: 'normal' },
+    { label: t('Big'), value: 'big' },
   ];
 
   const progressOptions = [
-    { label: 'Daily Goal', value: 'daily' },
-    { label: 'Active Workload', value: 'active' },
-    { label: 'Weekly Sprint', value: 'weekly' },
-    { label: 'Lifetime', value: 'lifetime' },
+    { label: t('Daily Goal'), value: 'daily' },
+    { label: t('Active Workload'), value: 'active' },
+    { label: t('Weekly Sprint'), value: 'weekly' },
+    { label: t('Lifetime'), value: 'lifetime' },
   ];
 
   const handleDeleteData = () => {
     Alert.alert(
-      "Delete All Data",
-      "Are you sure you want to clear all your tasks? This action cannot be undone.",
+      t("Delete All Data"),
+      t("Are you sure you want to clear all your tasks? This action cannot be undone."),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         { 
-          text: "Delete", 
+          text: t("Delete"), 
           style: "destructive",
           onPress: () => {
             dispatch(clearTasks());
-            Alert.alert('Deleted', 'All tasks have been cleared.');
+            Alert.alert(t('Deleted'), t('All tasks have been cleared.'));
           }
         }
       ]
@@ -71,7 +86,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleSave = () => {
-    Alert.alert('Settings Saved', 'Your preferences have been updated.');
+    Alert.alert(t('Settings Saved'), t('Your preferences have been updated.'));
     if (navigation) {
       navigation.navigate('Board');
     }
@@ -86,27 +101,27 @@ export default function SettingsScreen({ navigation }) {
         {/* Header Section */}
         <View style={styles.topHeader}>
           <View>
-            <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Settings</Text>
-            <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>App preferences & account</Text>
+            <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>{t('Settings')}</Text>
+            <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('App preferences & account')}</Text>
           </View>
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Save settings"
             style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
           >
             <IconSave color="#fff" />
-            <Text style={styles.saveBtnText}>Save</Text>
+            <Text style={styles.saveBtnText}>{t('Save')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Account Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('Account')}</Text>
         <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
           <View style={styles.profileRow}>
             <View style={styles.profileIconContainer}>
               <IconUser color="#42416b" />
             </View>
             <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, { color: colors.textPrimary }]}>User Profile</Text>
+              <Text style={[styles.profileName, { color: colors.textPrimary }]}>{t('User Profile')}</Text>
               <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>user@example.com</Text>
             </View>
           </View>
@@ -114,16 +129,16 @@ export default function SettingsScreen({ navigation }) {
             accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"
             style={styles.deleteBtn} onPress={handleDeleteData}
           >
-            <Text style={styles.deleteBtnText}>Delete All Data</Text>
+            <Text style={styles.deleteBtnText}>{t('Delete All Data')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Customization Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary, paddingTop: 20 }]}>Customization</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary, paddingTop: 20 }]}>{t('Customization')}</Text>
         <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
           
           <CustomDropdown 
-            label="Text wrapping" 
+            label={t("Text wrapping") || "Text wrapping"} 
             value={taskNameWrap} 
             options={wrapOptions} 
             onSelect={val => dispatch(setTaskNameWrap(val))} 
@@ -132,7 +147,7 @@ export default function SettingsScreen({ navigation }) {
           />
 
           <CustomDropdown 
-            label="Font size" 
+            label={t("Font size") || "Font size"} 
             value={fontSize} 
             options={fontOptions} 
             onSelect={val => dispatch(setFontSize(val))} 
@@ -141,10 +156,22 @@ export default function SettingsScreen({ navigation }) {
           />
 
           <CustomDropdown 
-            label="Dashboard Progress" 
+            label={t("Dashboard Progress") || "Dashboard Progress"} 
             value={progressMode} 
             options={progressOptions} 
             onSelect={val => dispatch(setProgressMode(val))} 
+            colors={colors}
+            layout="horizontal"
+          />
+
+          <CustomDropdown 
+            label={t('Language') || 'Language'} 
+            value={i18n.language} 
+            options={languageOptions} 
+            onSelect={val => {
+              i18n.changeLanguage(val);
+              AsyncStorage.setItem('appLanguage', val);
+            }} 
             colors={colors}
             layout="horizontal"
           />
@@ -154,7 +181,7 @@ export default function SettingsScreen({ navigation }) {
             accessible={true} accessibilityRole="button" accessibilityLabel="Customize theme"
             style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary }]} onPress={() => setThemeModalVisible(true)}
           >
-            <Text style={styles.actionBtnText}>🎨 Customize theme</Text>
+            <Text style={styles.actionBtnText}>{t('🎨 Customize theme')}</Text>
           </TouchableOpacity>
 
 

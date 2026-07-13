@@ -41,7 +41,8 @@
             "minSdkVersion": 24
           }
         }
-      ]
+      ],
+      "expo-localization"
     ]
   }
 }

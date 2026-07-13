@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
+import './src/i18n';
 import { Provider, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import store from './src/store';
@@ -14,6 +15,7 @@ import { fetchTasks } from './src/features/taskSlice';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
+import i18n from './src/i18n';
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -82,6 +84,11 @@ function InitApp() {
 
         const pomodoroJson = await AsyncStorage.getItem('pomodoro');
         if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));
+
+        const appLanguage = await AsyncStorage.getItem('appLanguage');
+        if (appLanguage) {
+          i18n.changeLanguage(appLanguage);
+        }
 
         // Load tasks from local storage
         await dispatch(fetchTasks()).unwrap();
