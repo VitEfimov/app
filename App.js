@@ -16,6 +16,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
 import i18n from './src/i18n';
+import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -119,6 +120,7 @@ function RootWrapper({ children }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgMain }}>
       {children}
+      <PomodoroSettingsModal />
     </View>
   );
 }

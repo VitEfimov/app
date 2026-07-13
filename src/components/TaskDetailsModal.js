@@ -741,15 +741,18 @@ const styles = StyleSheet.create({
   twoColumnRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: 15,
   },
   threeColumnRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: 10,
   },
   column: {
     flex: 1,
+    minWidth: '28%',
   },
   timeInputWrapper: {
     flexDirection: 'row',

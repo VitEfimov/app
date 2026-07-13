@@ -250,11 +250,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    flexWrap: 'wrap',
+    rowGap: 10,
   },
   settingLabel: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
     flex: 1,
+    marginRight: 10,
+    minWidth: '50%',
   },
   input: {
     borderWidth: 1,

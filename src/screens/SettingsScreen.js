@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks } from '../features/taskSlice';
 import { setTaskNameWrap, setFontSize, setProgressMode } from '../features/themeSlice';
+import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
@@ -100,8 +101,8 @@ export default function SettingsScreen({ navigation }) {
         
         {/* Header Section */}
         <View style={styles.topHeader}>
-          <View>
-            <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>{t('Settings')}</Text>
+          <View style={{ flex: 1, marginRight: 10 }}>
+            <Text style={[styles.pageTitle, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
             <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('App preferences & account')}</Text>
           </View>
           <TouchableOpacity 
@@ -109,7 +110,7 @@ export default function SettingsScreen({ navigation }) {
             style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
           >
             <IconSave color="#fff" />
-            <Text style={styles.saveBtnText}>{t('Save')}</Text>
+            <Text style={styles.saveBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('Save')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -224,15 +225,16 @@ const styles = StyleSheet.create({
   saveBtn: {
     flexDirection: 'row',
     backgroundColor: '#285da1',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 8,
     alignItems: 'center',
+    maxWidth: 140,
   },
   saveBtnText: {
     color: '#fff',
     fontWeight: 'bold',
-    marginLeft: 8,
+    marginLeft: 6,
     fontSize: 16,
   },
   sectionTitle: {

@@ -123,23 +123,23 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         onSubmitEditing={handleAdd}
       />
       <View style={styles.actionsRow}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 6, flex: 1 }}>
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel={`Select date, currently ${dayjs(selectedDate).format('MM/DD/YYYY')}`}
             style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
             onPress={() => setShowDatePicker(true)}
           >
             <IconCalendar color={colors.textPrimary} />
-            <Text style={[styles.dateText, { color: colors.textPrimary }]}>
+            <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>
               {dayjs(selectedDate).format('MMM D')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Add more details"
-            style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
+            style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer, flexShrink: 1 }]} 
             onPress={handleAddWithDetails}
           >
-            <Text style={[styles.dateText, { color: colors.primary }]}>
+            <Text style={[styles.dateText, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit>
               {t('Add details')}
             </Text>
           </TouchableOpacity>
@@ -150,14 +150,14 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
             accessible={true} accessibilityRole="button" accessibilityLabel="Cancel"
             onPress={() => setIsEditing(false)} style={styles.cancelBtn}
           >
-            <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
+            <Text style={[styles.cancelText, { color: colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Cancel')}</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             testID="inline_submit_btn" 
             accessible={true} accessibilityRole="button" accessibilityLabel="Submit task"
             onPress={handleAdd} style={[styles.submitBtn, { backgroundColor: colors.primary }]}
           >
-            <Text style={[styles.submitText, { color: colors.textInverse }]}>{t('Add')}</Text>
+            <Text style={[styles.submitText, { color: colors.textInverse }]} numberOfLines={1} adjustsFontSizeToFit>{t('Add')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -248,10 +248,10 @@ const styles = StyleSheet.create({
   dateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 6,
-    gap: 6,
+    gap: 4,
   },
   dateText: {
     fontSize: 13,
@@ -260,14 +260,15 @@ const styles = StyleSheet.create({
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
+    gap: 8,
+    flexShrink: 1,
   },
   cancelText: {
     fontSize: 14,
     fontWeight: '600',
   },
   submitBtn: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 6,
   },

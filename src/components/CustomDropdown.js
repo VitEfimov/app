@@ -29,9 +29,15 @@ const CustomDropdown = ({
   const isHorizontal = layout === 'horizontal';
   
   const labelComponent = label ? (
-    <Text style={[styles.label, isHorizontal ? styles.horizontalLabel : styles.verticalLabel, { color: isHorizontal ? colors.textPrimary : colors.textSecondary }]}>
-      {label}
-    </Text>
+    <View style={isHorizontal ? { flex: 1, marginRight: 10 } : null}>
+      <Text 
+        numberOfLines={isHorizontal ? undefined : 1}
+        adjustsFontSizeToFit={!isHorizontal}
+        style={[styles.label, isHorizontal ? styles.horizontalLabel : styles.verticalLabel, { color: isHorizontal ? colors.textPrimary : colors.textSecondary }]}
+      >
+        {label}
+      </Text>
+    </View>
   ) : null;
 
   return (
@@ -92,7 +98,8 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   horizontalWrapper: {
-    width: 150,
+    flex: 1.2,
+    minWidth: 140,
     position: 'relative',
   },
   verticalWrapper: {

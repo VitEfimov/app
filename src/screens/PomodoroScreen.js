@@ -14,7 +14,6 @@ import {
   completeBreakInterval,
   togglePomodoroSettings
 } from '../features/pomodoroSlice';
-import PomodoroSettingsModal from '../components/PomodoroSettingsModal';
 import { scheduleLocalNotification } from '../utils/notifications';
 import { useTranslation } from 'react-i18next';
 
@@ -234,8 +233,8 @@ export default function PomodoroScreen() {
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Pomodoro')}</Text>
+        <View style={{ flex: 1, marginRight: 10 }}>
+          <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Pomodoro')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('Stay focused, take breaks')}</Text>
         </View>
         <TouchableOpacity 
@@ -243,7 +242,7 @@ export default function PomodoroScreen() {
           onPress={() => dispatch(togglePomodoroSettings(true))}
         >
           <IconSettings color={colors.textPrimary} />
-          <Text style={[styles.settingsText, { color: colors.textPrimary }]}>{t('Settings')}</Text>
+          <Text style={[styles.settingsText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -318,8 +317,6 @@ export default function PomodoroScreen() {
         </View>
 
       </View>
-      
-      <PomodoroSettingsModal />
     </View>
   );
 }
@@ -346,10 +343,11 @@ const styles = StyleSheet.create({
   settingsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderRadius: 8,
-    gap: 5,
+    gap: 4,
+    maxWidth: 120,
   },
   settingsText: {
     fontSize: 14,

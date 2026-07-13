@@ -10,6 +10,10 @@ import 'dayjs/locale/hi';
 import 'dayjs/locale/fr';
 import 'dayjs/locale/de';
 import 'dayjs/locale/it';
+import localeData from 'dayjs/plugin/localeData';
+import { LocaleConfig } from 'react-native-calendars';
+
+dayjs.extend(localeData);
 
 import en from './locales/en.json';
 import ru from './locales/ru.json';
@@ -53,11 +57,31 @@ i18n
     }
   });
 
+const setupCalendarLocale = (langCode) => {
+  if (!LocaleConfig.locales[langCode]) {
+    // Capitalize months and days for the calendar
+    const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
+    
+    LocaleConfig.locales[langCode] = {
+      monthNames: dayjs.months().map(capitalize),
+      monthNamesShort: dayjs.monthsShort().map(capitalize),
+      dayNames: dayjs.weekdays().map(capitalize),
+      dayNamesShort: dayjs.weekdaysShort().map(capitalize),
+      today: i18n.t('Today', { lng: langCode })
+    };
+  }
+  LocaleConfig.defaultLocale = langCode;
+};
+
 const currentLang = i18n.language || getDeviceLanguage();
-dayjs.locale(currentLang === 'zh' ? 'zh-cn' : currentLang);
+const currentDayjsLang = currentLang === 'zh' ? 'zh-cn' : currentLang;
+dayjs.locale(currentDayjsLang);
+setupCalendarLocale(currentDayjsLang);
 
 i18n.on('languageChanged', (lng) => {
-  dayjs.locale(lng === 'zh' ? 'zh-cn' : lng);
+  const newLang = lng === 'zh' ? 'zh-cn' : lng;
+  dayjs.locale(newLang);
+  setupCalendarLocale(newLang);
 });
 
 export default i18n;
