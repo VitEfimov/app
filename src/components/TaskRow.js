@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { updateTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';

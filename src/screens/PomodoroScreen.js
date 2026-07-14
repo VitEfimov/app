@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     gap: 4,
-    maxWidth: 120,
+    flexShrink: 1,
   },
   settingsText: {
     fontSize: 14,

@@ -32,7 +32,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
 
@@ -166,6 +166,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         <View style={styles.modalOverlay}>
           <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
             <Calendar
+              key={i18n.language}
               current={selectedDate}
               onDayPress={(day) => {
                 setSelectedDate(day.dateString);

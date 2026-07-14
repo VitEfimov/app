@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [selectedTask, setSelectedTask] = useState(null);
@@ -166,7 +166,7 @@ export default function CalendarScreen() {
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <View onLayout={handleCalendarLayout}>
         <Calendar
-          key={`${colors.bgMain}-${isDark}`}
+          key={`${colors.bgMain}-${isDark}-${i18n.language}`}
           current={selectedDate}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={markedDates}

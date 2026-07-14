@@ -95,7 +95,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const scrollViewRef = useRef(null);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [scrollOffset, setScrollOffset] = useState(0);
 
   const [taskName, setTaskName] = useState('');
@@ -573,6 +573,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           <View style={styles.calendarOverlay}>
             <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
               <Calendar
+                key={i18n.language}
                 current={
                   datePickerType === 'due' 
                     ? (selectedDate || dayjs().format('YYYY-MM-DD'))

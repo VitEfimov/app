@@ -197,7 +197,7 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </View>
           <View style={[styles.progressInfo, { paddingLeft: 10, flex: 1 }]} importantForAccessibility="no-hide-descendants">
-            <Text style={[styles.progressGreeting, { color: colors.textPrimary }]}>{getGreetingText()}</Text>
+            <Text style={[styles.progressGreeting, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{getGreetingText()}</Text>
             <Text style={[styles.progressDetails, { color: colors.textSecondary }]}>
               {calcCompleted} / {calcTotal} {t('Completed')}
             </Text>
