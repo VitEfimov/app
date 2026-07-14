@@ -98,8 +98,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   horizontalWrapper: {
-    flex: 1.2,
-    minWidth: 140,
+    width: '45%',
     position: 'relative',
   },
   verticalWrapper: {

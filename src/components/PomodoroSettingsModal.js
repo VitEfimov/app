@@ -38,7 +38,9 @@ export default function PomodoroSettingsModal() {
   const [breakSec, setBreakSec] = useState('0');
   const [sessions, setSessions] = useState('5');
   const [workSound, setWorkSoundState] = useState('default');
-  const [breakSound, setBreakSoundState] = useState('default');
+  const [breakSound, setBreakSoundState] = useState('none');
+
+  const localizedSounds = predefinedSounds.map(s => ({ ...s, label: t(s.label) }));
 
   useEffect(() => {
     if (isSettingsOpen) {
@@ -171,7 +173,7 @@ export default function PomodoroSettingsModal() {
           <CustomDropdown 
             label={t("Work complete sound")} 
             value={workSound} 
-            options={predefinedSounds} 
+            options={localizedSounds} 
             onSelect={setWorkSoundState} 
             colors={colors} 
             layout="horizontal" 
@@ -179,7 +181,7 @@ export default function PomodoroSettingsModal() {
           <CustomDropdown 
             label={t("Break complete sound")} 
             value={breakSound} 
-            options={predefinedSounds} 
+            options={localizedSounds} 
             onSelect={setBreakSoundState} 
             colors={colors} 
             layout="horizontal" 
@@ -279,5 +281,6 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 16,
     fontWeight: 'bold',
+    textAlign: 'center',
   }
 });

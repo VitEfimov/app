@@ -1,19 +1,33 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useSelector } from 'react-redux';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, PanResponder } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
+import { setProgressMode } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import getFilters from '../utils/filters';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import { useTranslation } from 'react-i18next';
+
+const IconLeft = ({ color }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M15 18l-6-6 6-6" />
+  </Svg>
+);
+
+const IconRight = ({ color }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M9 18l6-6-6-6" />
+  </Svg>
+);
 
 dayjs.extend(isSameOrBefore);
 
 export default function DashboardScreen({ navigation }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const dispatch = useDispatch();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
@@ -36,6 +50,39 @@ export default function DashboardScreen({ navigation }) {
   const missedTasks = tasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed);
 
   const progressMode = useSelector(state => state.themeReducer.progressMode) || 'daily';
+  
+  const modes = ['daily', 'active', 'weekly', 'lifetime'];
+  const handleNextMode = () => {
+    const nextIdx = (modes.indexOf(progressMode) + 1) % modes.length;
+    dispatch(setProgressMode(modes[nextIdx]));
+  };
+  const handlePrevMode = () => {
+    const prevIdx = (modes.indexOf(progressMode) - 1 + modes.length) % modes.length;
+    dispatch(setProgressMode(modes[prevIdx]));
+  };
+
+  const getModeTitle = () => {
+    switch (progressMode) {
+      case 'daily': return t('Daily Goal');
+      case 'active': return t('Active Workload');
+      case 'weekly': return t('Weekly Sprint');
+      case 'lifetime': return t('Lifetime');
+      default: return t('Progress');
+    }
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderEnd: (e, gestureState) => {
+        if (gestureState.dx > 50) {
+          handlePrevMode();
+        } else if (gestureState.dx < -50) {
+          handleNextMode();
+        }
+      },
+    })
+  ).current;
 
   const uncompletedTasks = tasks.filter(task => !task.completed);
   const totalTasks = uncompletedTasks.length;
@@ -110,10 +157,23 @@ export default function DashboardScreen({ navigation }) {
       {/* Top Card */}
       <View 
         style={styles.progressCard}
-        accessible={true} 
-        accessibilityLabel={`${completionPercentage}% completed. ${getGreetingText()} ${calcCompleted} tasks completed out of ${calcTotal}.`}
+        accessibilityRole="progressbar"
+        accessibilityLabel={`${completionPercentage}% completed. ${getGreetingText()} ${calcCompleted} / ${calcTotal} tasks completed.`}
       >
-        <View style={[styles.progressCircleContainer, { backgroundColor: colors.bgCard }]} importantForAccessibility="no-hide-descendants">
+        {/* Navigation Header Title */}
+        <View style={{ alignItems: 'center', marginBottom: 15 }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: 'bold', fontSize: 16 }}>
+            {getModeTitle()}
+          </Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={handlePrevMode} hitSlop={{top:20, bottom:20, left:20, right:20}} style={{ marginRight: 10 }}>
+            <IconLeft color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View {...panResponder.panHandlers} style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[styles.progressCircleContainer, { backgroundColor: colors.bgCard }]} importantForAccessibility="no-hide-descendants">
           <Svg width="100" height="100" viewBox="0 0 100 100">
             <Circle 
               cx="50" cy="50" r="40" 
@@ -136,10 +196,10 @@ export default function DashboardScreen({ navigation }) {
             <Text style={[styles.percent, { color: colors.textPrimary }]}>{completionPercentage}%</Text>
           </View>
         </View>
-          <View style={[styles.progressInfo, { paddingLeft: 10 }]} importantForAccessibility="no-hide-descendants">
+          <View style={[styles.progressInfo, { paddingLeft: 10, flex: 1 }]} importantForAccessibility="no-hide-descendants">
             <Text style={[styles.progressGreeting, { color: colors.textPrimary }]}>{getGreetingText()}</Text>
             <Text style={[styles.progressDetails, { color: colors.textSecondary }]}>
-              {calcCompleted} {t('Tasks').toLowerCase()} {t('Completed').toLowerCase()} {t('out of')} {calcTotal}
+              {calcCompleted} / {calcTotal} {t('Completed')}
             </Text>
           <View style={styles.tagsContainer}>
             {missedTasks.length > 0 && (
@@ -153,6 +213,11 @@ export default function DashboardScreen({ navigation }) {
               </View>
             )}
           </View>
+            </View>
+          </View>
+          <TouchableOpacity onPress={handleNextMode} hitSlop={{top:20, bottom:20, left:20, right:20}} style={{ marginLeft: 10 }}>
+            <IconRight color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -189,10 +254,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   progressCard: {
-    flexDirection: 'row',
     paddingVertical: 10,
     marginBottom: 30,
-    alignItems: 'center',
   },
   progressCircleContainer: {
     width: 100,

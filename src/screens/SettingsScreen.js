@@ -157,15 +157,6 @@ export default function SettingsScreen({ navigation }) {
           />
 
           <CustomDropdown 
-            label={t("Dashboard Progress") || "Dashboard Progress"} 
-            value={progressMode} 
-            options={progressOptions} 
-            onSelect={val => dispatch(setProgressMode(val))} 
-            colors={colors}
-            layout="horizontal"
-          />
-
-          <CustomDropdown 
             label={t('Language') || 'Language'} 
             value={i18n.language} 
             options={languageOptions} 

@@ -59,14 +59,17 @@ i18n
 
 const setupCalendarLocale = (langCode) => {
   if (!LocaleConfig.locales[langCode]) {
-    // Capitalize months and days for the calendar
     const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
     
+    // Explicitly format a dayjs object to bypass cached array bugs
+    const getMonths = (formatStr) => Array.from({length: 12}, (_, i) => capitalize(dayjs().month(i).locale(langCode).format(formatStr)));
+    const getDays = (formatStr) => Array.from({length: 7}, (_, i) => capitalize(dayjs().day(i).locale(langCode).format(formatStr)));
+
     LocaleConfig.locales[langCode] = {
-      monthNames: dayjs.months().map(capitalize),
-      monthNamesShort: dayjs.monthsShort().map(capitalize),
-      dayNames: dayjs.weekdays().map(capitalize),
-      dayNamesShort: dayjs.weekdaysShort().map(capitalize),
+      monthNames: getMonths('MMMM'),
+      monthNamesShort: getMonths('MMM'),
+      dayNames: getDays('dddd'),
+      dayNamesShort: getDays('ddd'),
       today: i18n.t('Today', { lng: langCode })
     };
   }

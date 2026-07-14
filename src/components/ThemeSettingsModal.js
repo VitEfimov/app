@@ -319,6 +319,7 @@ const styles = StyleSheet.create({
   resetText: {
     color: '#fff',
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   doneBtn: {
     backgroundColor: '#285da1',
@@ -331,5 +332,6 @@ const styles = StyleSheet.create({
   doneText: {
     color: '#fff',
     fontWeight: 'bold',
+    textAlign: 'center',
   }
 });
