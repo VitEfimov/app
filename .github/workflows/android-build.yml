@@ -37,6 +37,9 @@ jobs:
       - name: 🚀 Prebuild Android
         run: npx expo prebuild --platform android --clean
 
+      - name: 🔧 Fix Gradle Version for SDK 51 Compatibility
+        run: sed -i 's/gradle-8.8-all.zip/gradle-8.6-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+
       - name: 🔨 Build APK
         working-directory: ./android
         run: ./gradlew assembleRelease
