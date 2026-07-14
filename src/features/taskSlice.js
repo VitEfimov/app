@@ -102,6 +102,9 @@ const taskSlice = createSlice({
                 task.time = time !== undefined ? time : task.time;
                 task.reminder = action.payload.reminder !== undefined ? action.payload.reminder : task.reminder;
                 task.notificationId = action.payload.notificationId !== undefined ? action.payload.notificationId : task.notificationId;
+                if (action.payload.repeatFrequency !== undefined) task.repeatFrequency = action.payload.repeatFrequency;
+                if (action.payload.repeatStartDate !== undefined) task.repeatStartDate = action.payload.repeatStartDate;
+                if (action.payload.repeatEndDate !== undefined) task.repeatEndDate = action.payload.repeatEndDate;
                 if (description) {
                     task.description = {
                         text: description.text || '',

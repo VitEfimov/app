@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -106,8 +106,17 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   }
 
   return (
-    <View style={[styles.editContainer, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
-      <TextInput
+    <React.Fragment>
+    <Modal visible={true} transparent={true} animationType="fade" onRequestClose={() => setIsEditing(false)}>
+      <KeyboardAvoidingView 
+        style={styles.modalOverlayInline} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsEditing(false)}>
+          <View style={{ flex: 1 }} />
+        </TouchableWithoutFeedback>
+        <View style={[styles.editContainer, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor, borderTopLeftRadius: 12, borderTopRightRadius: 12 }]}>
+          <TextInput
         testID="inline_task_input"
         accessible={true} accessibilityLabel="New task name"
         style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
@@ -162,6 +171,10 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         </View>
       </View>
 
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+
       <Modal visible={showDatePicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
@@ -201,7 +214,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
           </View>
         </View>
       </Modal>
-    </View>
+    </React.Fragment>
   );
 }
 
@@ -282,6 +295,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     padding: 20,
+  },
+  modalOverlayInline: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   calendarContainer: {
     borderRadius: 12,

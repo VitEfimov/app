@@ -182,6 +182,11 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) return true;
     if (selectedTime !== (task.time || '')) return true;
     if (reminder !== (task.reminder || 'None')) return true;
+    if (priority !== (task.priority || 'none')) return true;
+    if (selectedDate !== (task.completionDate || '')) return true;
+    if (repeatFrequency !== (task.repeatFrequency || 'None')) return true;
+    if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) return true;
+    if (repeatEndDate !== (task.repeatEndDate || '')) return true;
     if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) return true;
     return false;
   };
@@ -193,6 +198,11 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       updates.description = { text: notes, img: noteImage, url: '' };
     }
     if (selectedTime !== (task.time || '')) updates.time = selectedTime;
+    if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
+    if (priority !== (task.priority || 'none')) updates.priority = priority;
+    if (repeatFrequency !== (task.repeatFrequency || 'None')) updates.repeatFrequency = repeatFrequency;
+    if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) updates.repeatStartDate = repeatStartDate;
+    if (repeatEndDate !== (task.repeatEndDate || '')) updates.repeatEndDate = repeatEndDate;
     
     if (reminder !== (task.reminder || 'None')) {
       updates.reminder = reminder;
@@ -339,10 +349,11 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           
           <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
             <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Save task"
-              onPress={handleSave} style={[styles.headerBtn, { paddingHorizontal: 12, backgroundColor: colors.primary, borderRadius: 6 }]}
+              testID="task_details_delete_btn_header"
+              accessible={true} accessibilityRole="button" accessibilityLabel="Delete task"
+              onPress={handleDelete} style={[styles.headerBtn, { paddingHorizontal: 12, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 6 }]}
             >
-              <Text style={{ color: colors.textInverse, fontWeight: 'bold' }}>{t('Save')}</Text>
+              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Delete')}</Text>
             </TouchableOpacity>
             
             <View style={{ flexDirection: 'row' }}>
@@ -432,7 +443,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 <CustomDropdown label={t("PRIORITY")} value={priority === 'none' ? 'None' : priority} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
-                <CustomDropdown label={t("REMINDER")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown label={t("REMINDER / ALARM")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
                 <CustomDropdown label={t("REPEAT")} value={repeatFrequency} options={[{label: t('None'), value: 'None'}, {label: t('Daily'), value: 'Daily'}, {label: t('Weekly'), value: 'Weekly'}, {label: t('Monthly'), value: 'Monthly'}]} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
@@ -575,11 +586,11 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             </View>
 
             <TouchableOpacity 
-              testID="task_details_delete_btn"
-              onPress={handleDelete} 
-              style={{ marginTop: 30, padding: 15, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 8, alignItems: 'center' }}
+              testID="task_details_save_btn_bottom"
+              onPress={handleSave} 
+              style={{ marginTop: 30, padding: 15, backgroundColor: colors.primary, borderRadius: 8, alignItems: 'center' }}
             >
-              <Text style={{ color: '#f44336', fontWeight: 'bold', fontSize: 16 }}>{t('Delete Task')}</Text>
+              <Text style={{ color: colors.textInverse, fontWeight: 'bold', fontSize: 16 }}>{t('Save Changes')}</Text>
             </TouchableOpacity>
             
           </ScrollView>
