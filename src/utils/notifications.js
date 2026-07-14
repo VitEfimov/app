@@ -23,22 +23,15 @@ export async function registerForPushNotificationsAsync() {
     });
   }
 
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
-      return;
-    }
-    // token = (await Notifications.getExpoPushTokenAsync()).data;
-    // We don't strictly need a push token if we only do LOCAL notifications,
-    // but requesting permissions is required.
-  } else {
-    console.log('Must use physical device for Push Notifications');
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== 'granted') {
+    console.log('Failed to get push token for push notification!');
+    // Even if denied, we don't return early because we still want to register categories
   }
 
   await Notifications.setNotificationCategoryAsync('task_reminder', [

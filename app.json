@@ -3,6 +3,7 @@
     "name": "TD",
     "slug": "app",
     "version": "1.0.0",
+    "scheme": "taskmanager",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -25,7 +26,8 @@
       "package": "com.vitvalef.app",
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
-        "USE_EXACT_ALARM"
+        "USE_EXACT_ALARM",
+        "POST_NOTIFICATIONS"
       ]
     },
     "web": {
