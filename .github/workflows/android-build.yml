@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Build Android APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     
     steps:
       - name: 🏗 Setup repository
@@ -33,12 +33,6 @@ jobs:
 
       - name: 📦 Fix Expo Dependencies
         run: npx expo install --fix
-
-      - name: 🔧 Fix Android SDK Tools Bug on Runner
-        run: |
-          rm -rf /usr/local/lib/android/sdk/build-tools/35.0.0
-          rm -rf /usr/local/lib/android/sdk/platforms/android-35
-          rm -rf /usr/local/lib/android/sdk/cmdline-tools/latest
 
       - name: 🚀 Prebuild Android
         run: npx expo prebuild --platform android --clean
