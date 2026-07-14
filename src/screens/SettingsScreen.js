@@ -47,7 +47,8 @@ export default function SettingsScreen({ navigation }) {
     { label: 'हिन्दी', value: 'hi' },
     { label: 'Français', value: 'fr' },
     { label: 'Deutsch', value: 'de' },
-    { label: 'Italiano', value: 'it' }
+    { label: 'Italiano', value: 'it' },
+    { label: '한국어', value: 'ko' }
   ];
 
   const wrapOptions = [

@@ -99,6 +99,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [scrollOffset, setScrollOffset] = useState(0);
 
   const [taskName, setTaskName] = useState('');
+  const [scrollViewHeight, setScrollViewHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const [notes, setNotes] = useState('');
   const [noteImage, setNoteImage] = useState('');
   const [subtasks, setSubtasks] = useState(task ? (task.subtasks || []) : []);
@@ -170,10 +172,21 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   if (!task) return null;
 
   const handleUpdate = (updates) => {
+    // Only used for immediate local updates like priority or subtask check
     dispatch(updateTask({ taskId: task.id, ...updates }));
   };
 
-  const handleClose = async () => {
+  const hasUnsavedChanges = () => {
+    if (!task) return false;
+    if (taskName !== task.taskname) return true;
+    if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) return true;
+    if (selectedTime !== (task.time || '')) return true;
+    if (reminder !== (task.reminder || 'None')) return true;
+    if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) return true;
+    return false;
+  };
+
+  const handleSave = async () => {
     let updates = {};
     if (taskName !== task.taskname) updates.name = taskName;
     if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) {
@@ -189,7 +202,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
         updates.notificationId = null;
       }
       if (reminder !== 'None') {
-        const notifId = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), task.time);
+        const notifId = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), task.time, task.id);
         if (notifId) updates.notificationId = notifId;
       }
     }
@@ -209,16 +222,27 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     onClose();
   };
 
-  const handleNameBlur = () => {
-    if (taskName !== task.taskname) {
-      handleUpdate({ name: taskName });
+  const handleClose = () => {
+    if (hasUnsavedChanges()) {
+      Alert.alert(
+        t('Unsaved Changes'),
+        t('You have unsaved changes. Are you sure you want to discard them?'),
+        [
+          { text: t('Cancel'), style: 'cancel' },
+          { text: t('Discard'), style: 'destructive', onPress: onClose }
+        ]
+      );
+    } else {
+      onClose();
     }
   };
 
+  const handleNameBlur = () => {
+    // Removed auto-save
+  };
+
   const handleNotesBlur = () => {
-    if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) {
-      handleUpdate({ description: { text: notes, img: noteImage, url: '' } });
-    }
+    // Removed auto-save
   };
 
   const pickImage = async () => {
@@ -232,14 +256,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if (!result.canceled && result.assets && result.assets[0].base64) {
       const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
       setNoteImage(base64Img);
-      handleUpdate({ description: { text: notes, img: base64Img, url: '' } });
+      // Wait for user to save
     }
   };
 
   const addSubtask = () => {
     const newSubtasks = [...subtasks, { id: Date.now().toString(), text: '', completed: false }];
     setSubtasks(newSubtasks);
-    handleUpdate({ subtasks: newSubtasks });
   };
 
   const updateSubtask = (id, text) => {
@@ -250,24 +273,20 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const toggleSubtask = (id) => {
     const newSubtasks = subtasks.map(s => s.id === id ? { ...s, completed: !s.completed } : s);
     setSubtasks(newSubtasks);
-    handleUpdate({ subtasks: newSubtasks });
   };
 
   const removeSubtask = (id) => {
     const newSubtasks = subtasks.filter(s => s.id !== id);
     setSubtasks(newSubtasks);
-    handleUpdate({ subtasks: newSubtasks });
   };
 
   const handlePrioritySelect = (level) => {
     setPriority(level);
-    handleUpdate({ priority: level });
   };
 
   const handleDateSelect = (dateStr) => {
     if (datePickerType === 'due') {
       setSelectedDate(dateStr);
-      handleUpdate({ completionDate: dayjs(dateStr).toISOString() });
     } else if (datePickerType === 'repeatStart') {
       setRepeatStartDate(dateStr);
     } else if (datePickerType === 'repeatEnd') {
@@ -295,7 +314,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     const newCompletedState = !task.completed;
     handleUpdate({ completed: newCompletedState });
     if (newCompletedState) {
-      handleClose();
+      onClose();
     }
   };
 
@@ -310,7 +329,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       propagateSwipe={true}
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
-      scrollOffsetMax={100}
+      scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
@@ -319,7 +338,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           </View>
           
           <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('Task Details')}</Text>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Save task"
+              onPress={handleSave} style={[styles.headerBtn, { paddingHorizontal: 12, backgroundColor: colors.primary, borderRadius: 6 }]}
+            >
+              <Text style={{ color: colors.textInverse, fontWeight: 'bold' }}>{t('Save')}</Text>
+            </TouchableOpacity>
+            
             <View style={{ flexDirection: 'row' }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel="Share task"
@@ -340,6 +365,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           <ScrollView 
             ref={scrollViewRef}
             onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.y)}
+            onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
+            onContentSizeChange={(_, h) => setScrollContentHeight(h)}
             scrollEventThrottle={16}
             style={styles.body} 
             contentContainerStyle={styles.bodyContent} 

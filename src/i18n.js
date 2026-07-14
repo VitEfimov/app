@@ -10,6 +10,7 @@ import 'dayjs/locale/hi';
 import 'dayjs/locale/fr';
 import 'dayjs/locale/de';
 import 'dayjs/locale/it';
+import 'dayjs/locale/ko';
 import localeData from 'dayjs/plugin/localeData';
 import { LocaleConfig } from 'react-native-calendars';
 
@@ -24,6 +25,7 @@ import hi from './locales/hi.json';
 import fr from './locales/fr.json';
 import de from './locales/de.json';
 import it from './locales/it.json';
+import ko from './locales/ko.json';
 
 const resources = {
   en: { translation: en },
@@ -34,7 +36,8 @@ const resources = {
   hi: { translation: hi },
   fr: { translation: fr },
   de: { translation: de },
-  it: { translation: it }
+  it: { translation: it },
+  ko: { translation: ko }
 };
 
 export const getDeviceLanguage = () => {

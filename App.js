@@ -17,6 +17,11 @@ import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
 import i18n from './src/i18n';
 import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
+import { useShareIntent } from 'expo-share-intent';
+import { addTask, updateTask } from './src/features/taskSlice';
+import * as Notifications from 'expo-notifications';
+import { scheduleTaskReminder } from './src/utils/notifications';
+import dayjs from 'dayjs';
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -73,6 +78,33 @@ class ErrorBoundary extends React.Component {
 function InitApp() {
   const dispatch = useDispatch();
   const [ready, setReady] = useState(false);
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+
+  useEffect(() => {
+    if (hasShareIntent && shareIntent.value && ready) {
+      const text = shareIntent.value;
+      let taskname = text;
+      let notes = '';
+
+      const lines = text.split('\n');
+      if (lines.length > 1) {
+        taskname = lines[0].replace(/^(Task|Name|Title):\s*/i, '').trim();
+        notes = text; 
+      }
+
+      dispatch(addTask({
+        task: {
+          id: Date.now().toString(),
+          taskname: taskname.slice(0, 100), // Limit title length
+          description: { text: notes, img: '', url: '' },
+          completed: false,
+          priority: 'none',
+          completionDate: null
+        }
+      }));
+      resetShareIntent();
+    }
+  }, [hasShareIntent, shareIntent, ready]);
 
   useEffect(() => {
     const loadStorage = async () => {
@@ -102,6 +134,38 @@ function InitApp() {
       }
     };
     loadStorage();
+  }, [dispatch]);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(async response => {
+      const actionIdentifier = response.actionIdentifier;
+      const taskId = response.notification.request.content.data?.taskId;
+      
+      if (taskId && actionIdentifier.startsWith('snooze_')) {
+        const tasks = store.getState().taskReducer.tasks;
+        const task = tasks.find(t => t.id === taskId);
+        
+        if (task) {
+          let newTime = dayjs();
+          if (actionIdentifier === 'snooze_30_min') newTime = newTime.add(30, 'minute');
+          else if (actionIdentifier === 'snooze_1_hr') newTime = newTime.add(1, 'hour');
+          else if (actionIdentifier === 'snooze_1_day') newTime = newTime.add(1, 'day');
+
+          const newTimeStr = newTime.format('h:mm A');
+          const newDateStr = newTime.format('YYYY-MM-DD');
+
+          const notifId = await scheduleTaskReminder(task.taskname, task.reminder || 'At time of event', newDateStr, newTimeStr, task.id);
+          
+          dispatch(updateTask({
+            taskId,
+            time: newTimeStr,
+            completionDate: newTime.toISOString(),
+            notificationId: notifId
+          }));
+        }
+      }
+    });
+    return () => subscription.remove();
   }, [dispatch]);
 
   if (!ready) {

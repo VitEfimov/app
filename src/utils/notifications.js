@@ -41,12 +41,30 @@ export async function registerForPushNotificationsAsync() {
     console.log('Must use physical device for Push Notifications');
   }
 
+  await Notifications.setNotificationCategoryAsync('task_reminder', [
+    {
+      identifier: 'snooze_30_min',
+      buttonTitle: 'Snooze 30 Min',
+      options: { opensAppToForeground: false }
+    },
+    {
+      identifier: 'snooze_1_hr',
+      buttonTitle: 'Snooze 1 Hr',
+      options: { opensAppToForeground: false }
+    },
+    {
+      identifier: 'snooze_1_day',
+      buttonTitle: 'Next Day',
+      options: { opensAppToForeground: false }
+    }
+  ]);
+
   return token;
 }
 
 import dayjs from 'dayjs';
 
-export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr) {
+export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null) {
   if (!reminderValue || reminderValue === 'None') return null;
   if (!completionDateStr) return null;
 
@@ -80,6 +98,9 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
         title: 'Task Reminder',
         body: taskName,
         sound: true,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        data: { taskId },
+        categoryId: 'task_reminder'
       },
       trigger: targetDate.toDate(),
     });
@@ -97,6 +118,7 @@ export async function scheduleLocalNotification(title, body, triggerTimeOrDelay)
         title: title,
         body: body,
         sound: true,
+        priority: Notifications.AndroidNotificationPriority.MAX,
       },
       trigger: triggerTimeOrDelay,
     });

@@ -80,6 +80,7 @@ function TabNavigator() {
           paddingBottom: 20,
           paddingTop: 10,
         },
+        tabBarHideOnKeyboard: true,
         headerStyle: {
           backgroundColor: colors.bgHeader
         }
