@@ -388,7 +388,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             keyboardShouldPersistTaps="handled"
           >
             
-            <Text style={[styles.label, { color: colors.textSecondary }]}>{t('TASK NAME')}</Text>
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0 }]}>{t('TASK NAME')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel="Toggle task completion"
@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   dragHandleContainer: {
-    paddingBottom: 10,
+    paddingBottom: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -725,7 +725,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
   },
   headerTitle: {

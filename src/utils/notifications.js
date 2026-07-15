@@ -108,7 +108,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       },
       trigger: Platform.OS === 'android' ? {
         type: 'date',
-        timestamp: targetDate.valueOf() / 1000,
+        timestamp: targetDate.valueOf(),
         channelId: isAlarm ? 'alarm' : 'default'
       } : targetDate.toDate(),
     });
