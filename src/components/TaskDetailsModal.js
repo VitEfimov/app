@@ -358,14 +358,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           
-          <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-            <TouchableOpacity 
-              testID="task_details_delete_btn_header"
-              accessible={true} accessibilityRole="button" accessibilityLabel="Delete task"
-              onPress={handleDelete} style={[styles.headerBtn, { paddingHorizontal: 12, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 6 }]}
-            >
-              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Delete')}</Text>
-            </TouchableOpacity>
+          <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', justifyContent: 'flex-end' }]}>
             
             <View style={{ flexDirection: 'row' }}>
               <TouchableOpacity 
@@ -603,13 +596,24 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               ))}
             </View>
 
-            <TouchableOpacity 
-              testID="task_details_save_btn_bottom"
-              onPress={handleSave} 
-              style={{ marginTop: 30, padding: 15, backgroundColor: colors.primary, borderRadius: 8, alignItems: 'center' }}
-            >
-              <Text style={{ color: colors.textInverse, fontWeight: 'bold', fontSize: 16 }}>{t('Save Changes')}</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 30 }}>
+              <TouchableOpacity 
+                testID="task_details_delete_btn_bottom"
+                accessible={true} accessibilityRole="button" accessibilityLabel="Delete task"
+                onPress={handleDelete} 
+                style={{ flex: 1, padding: 15, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 8, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#f44336', fontWeight: 'bold', fontSize: 16 }}>{t('Delete')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                testID="task_details_save_btn_bottom"
+                onPress={handleSave} 
+                style={{ flex: 1, padding: 15, backgroundColor: colors.primary, borderRadius: 8, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.textInverse, fontWeight: 'bold', fontSize: 16 }}>{t('Save Changes')}</Text>
+              </TouchableOpacity>
+            </View>
             
           </ScrollView>
 
