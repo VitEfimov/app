@@ -116,7 +116,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       onShow={() => {
         setTimeout(() => {
           inputRef.current?.focus();
-        }, 100);
+        }, 300);
       }}
     >
       <KeyboardAvoidingView 
@@ -137,7 +137,6 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         value={taskName}
         onChangeText={setTaskName}
         onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
-        autoFocus
         multiline={true}
         scrollEnabled={false}
         blurOnSubmit={true}

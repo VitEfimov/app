@@ -204,12 +204,12 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.tagsContainer}>
             {missedTasks.length > 0 && (
               <View style={[styles.tag, { backgroundColor: 'rgba(255, 51, 51, 0.2)' }]}>
-                <Text style={{ color: '#ff3333', fontSize: 12, fontWeight: 'bold' }}>{missedTasks.length} {t('Missed').toLowerCase()}</Text>
+                <Text style={{ color: '#ff3333', fontSize: 12, fontWeight: 'bold' }}>{t('Missed').toLowerCase()}: {missedTasks.length}</Text>
               </View>
             )}
             {todayTasks.length > 0 && (
               <View style={[styles.tag, { backgroundColor: 'rgba(255, 170, 0, 0.2)' }]}>
-                <Text style={{ color: '#ffaa00', fontSize: 12, fontWeight: 'bold' }}>{todayTasks.length} {t('Today').toLowerCase()}</Text>
+                <Text style={{ color: '#ffaa00', fontSize: 12, fontWeight: 'bold' }}>{t('Today').toLowerCase()}: {todayTasks.length}</Text>
               </View>
             )}
           </View>

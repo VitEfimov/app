@@ -115,8 +115,8 @@ export default function PomodoroSettingsModal() {
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.settingRow, { flexDirection: 'column', alignItems: 'flex-start', rowGap: 15 }]}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Work duration')}</Text>
+          <View style={[styles.settingRow, { flexDirection: 'column', alignItems: 'center', rowGap: 15 }]}>
+            <Text style={[styles.settingLabel, { color: colors.textPrimary, alignSelf: 'flex-start' }]}>{t('Work duration')}</Text>
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <TextInput
                 style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
@@ -150,8 +150,8 @@ export default function PomodoroSettingsModal() {
             </View>
           </View>
 
-          <View style={[styles.settingRow, { flexDirection: 'column', alignItems: 'flex-start', rowGap: 15 }]}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Break duration')}</Text>
+          <View style={[styles.settingRow, { flexDirection: 'column', alignItems: 'center', rowGap: 15 }]}>
+            <Text style={[styles.settingLabel, { color: colors.textPrimary, alignSelf: 'flex-start' }]}>{t('Break duration')}</Text>
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <TextInput
                 style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}

@@ -21,6 +21,17 @@ export async function registerForPushNotificationsAsync() {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
     });
+    
+    await Notifications.setNotificationChannelAsync('alarm', {
+      name: 'Alarm',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 500, 500, 500, 500, 500],
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.ALARM,
+        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+      },
+      sound: 'default', // uses default alarm sound if available
+    });
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -57,7 +68,7 @@ export async function registerForPushNotificationsAsync() {
 
 import dayjs from 'dayjs';
 
-export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null) {
+export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false) {
   if (!reminderValue || reminderValue === 'None') return null;
   if (!completionDateStr) return null;
 
@@ -95,7 +106,11 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
         data: { taskId },
         categoryId: 'task_reminder'
       },
-      trigger: targetDate.toDate(),
+      trigger: Platform.OS === 'android' ? {
+        type: 'date',
+        timestamp: targetDate.valueOf() / 1000,
+        channelId: isAlarm ? 'alarm' : 'default'
+      } : targetDate.toDate(),
     });
     return id;
   } catch (error) {

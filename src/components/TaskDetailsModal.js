@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch } from 'react-native';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -110,6 +110,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [selectedTime, setSelectedTime] = useState('');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [reminder, setReminder] = useState('None');
+  const [isAlarm, setIsAlarm] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState('None');
   const [repeatStartDate, setRepeatStartDate] = useState('');
   const [repeatEndDate, setRepeatEndDate] = useState('');
@@ -138,6 +139,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       setRepeatStartDate(task.repeatStartDate || task.completionDate || '');
       setRepeatEndDate(task.repeatEndDate || '');
       setReminder(task.reminder || 'None');
+      setIsAlarm(task.isAlarm || false);
     }
   }, [isVisible, task?.id]);
 
@@ -182,6 +184,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) return true;
     if (selectedTime !== (task.time || '')) return true;
     if (reminder !== (task.reminder || 'None')) return true;
+    if (isAlarm !== (task.isAlarm || false)) return true;
     if (priority !== (task.priority || 'none')) return true;
     if (selectedDate !== (task.completionDate || '')) return true;
     if (repeatFrequency !== (task.repeatFrequency || 'None')) return true;
@@ -204,15 +207,23 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) updates.repeatStartDate = repeatStartDate;
     if (repeatEndDate !== (task.repeatEndDate || '')) updates.repeatEndDate = repeatEndDate;
     
-    if (reminder !== (task.reminder || 'None')) {
-      updates.reminder = reminder;
+    const timeChanged = selectedTime !== (task.time || '');
+    const dateChanged = selectedDate !== (task.completionDate || '');
+    const reminderChanged = reminder !== (task.reminder || 'None');
+    const isAlarmChanged = isAlarm !== (task.isAlarm || false);
+    const nameChanged = taskName !== task.taskname;
+
+    if (isAlarmChanged) updates.isAlarm = isAlarm;
+
+    if (timeChanged || dateChanged || reminderChanged || isAlarmChanged || nameChanged) {
+      if (reminder !== (task.reminder || 'None')) updates.reminder = reminder;
       // Schedule new reminder
       if (task.notificationId) {
         await cancelNotification(task.notificationId);
         updates.notificationId = null;
       }
       if (reminder !== 'None') {
-        const notifId = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), task.time, task.id);
+        const notifId = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), selectedTime, task.id, isAlarm);
         if (notifId) updates.notificationId = notifId;
       }
     }
@@ -449,6 +460,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 <CustomDropdown label={t("REPEAT")} value={repeatFrequency} options={[{label: t('None'), value: 'None'}, {label: t('Daily'), value: 'Daily'}, {label: t('Weekly'), value: 'Weekly'}, {label: t('Monthly'), value: 'Monthly'}]} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
             </View>
+
+            {reminder !== 'None' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 15 }}>
+                <Switch value={isAlarm} onValueChange={setIsAlarm} trackColor={{ true: colors.primary }} />
+                <Text style={{ color: colors.textPrimary, marginLeft: 8, fontWeight: 'bold' }}>{t('Play Reminder as Alarm')}</Text>
+              </View>
+            )}
 
             {repeatFrequency !== 'None' && (
               <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}>
