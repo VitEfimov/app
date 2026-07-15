@@ -67,29 +67,49 @@ export async function registerForPushNotificationsAsync() {
 }
 
 import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 
+dayjs.extend(customParseFormat);
 export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false) {
   if (!reminderValue || reminderValue === 'None') return null;
   if (!completionDateStr) return null;
 
   let targetDate = dayjs(completionDateStr);
-  
+  if (!targetDate.isValid()) return null;
+
   if (timeStr) {
-    const [hoursStr, minutesStr] = timeStr.split(':');
-    let hours = parseInt(hoursStr, 10);
-    const minutes = parseInt(minutesStr.replace(/[^0-9]/g, ''), 10);
-    if (timeStr.toLowerCase().includes('pm') && hours !== 12) hours += 12;
-    if (timeStr.toLowerCase().includes('am') && hours === 12) hours = 0;
-    targetDate = targetDate.hour(hours).minute(minutes).second(0);
+    const parsedTime = dayjs(`${completionDateStr} ${timeStr}`, ["YYYY-MM-DD HH:mm", "YYYY-MM-DD h:mm A", "YYYY-MM-DD hh:mm A"], true);
+    if (parsedTime.isValid()) {
+      targetDate = parsedTime;
+    } else {
+      const [hoursStr, minutesStr] = timeStr.split(':');
+      let hours = parseInt(hoursStr, 10);
+      const minutes = parseInt(minutesStr.replace(/[^0-9]/g, ''), 10);
+      if (timeStr.toLowerCase().includes('pm') && hours !== 12) hours += 12;
+      if (timeStr.toLowerCase().includes('am') && hours === 12) hours = 0;
+      targetDate = targetDate.hour(hours).minute(minutes).second(0);
+    }
   } else {
     targetDate = targetDate.hour(9).minute(0).second(0); // Default to 9 AM
   }
 
-  if (reminderValue === '15 min before') targetDate = targetDate.subtract(15, 'minute');
-  else if (reminderValue === '30 min before') targetDate = targetDate.subtract(30, 'minute');
-  else if (reminderValue === '1 hr before') targetDate = targetDate.subtract(1, 'hour');
-  else if (reminderValue === '1 day before') targetDate = targetDate.subtract(1, 'day');
-  // If 'Day of (All Day)', just use 9 AM of that day
+  const offsets = {
+    "15 min before": { amount: 15, unit: "minute" },
+    "30 min before": { amount: 30, unit: "minute" },
+    "1 hr before": { amount: 1, unit: "hour" },
+    "1 day before": { amount: 1, unit: "day" }
+  };
+  
+  const offset = offsets[reminderValue];
+  if (offset) {
+    targetDate = targetDate.subtract(offset.amount, offset.unit);
+  }
+
+  return scheduleExactTaskReminder(taskName, targetDate.toDate(), taskId, isAlarm);
+}
+
+export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId = null, isAlarm = false) {
+  const targetDate = dayjs(targetDateObj);
 
   if (targetDate.isBefore(dayjs())) {
     console.log('Cannot schedule a notification in the past');
@@ -100,7 +120,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Task Reminder',
-        body: taskName,
+        body: `Reminder: ${taskName}`,
         sound: true,
         priority: Notifications.AndroidNotificationPriority.MAX,
         data: { taskId },

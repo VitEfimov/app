@@ -20,7 +20,7 @@ import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
 import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
-import { scheduleTaskReminder } from './src/utils/notifications';
+import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification } from './src/utils/notifications';
 import dayjs from 'dayjs';
 
 // Polyfill for Hermes / Reanimated warnings
@@ -199,22 +199,29 @@ function InitApp() {
         const task = tasks.find(t => t.id === taskId);
         
         if (task) {
-          let newTime = dayjs();
-          if (actionIdentifier === 'snooze_30_min') newTime = newTime.add(30, 'minute');
-          else if (actionIdentifier === 'snooze_1_hr') newTime = newTime.add(1, 'hour');
-          else if (actionIdentifier === 'snooze_1_day') newTime = newTime.add(1, 'day');
+          if (task.notificationId) {
+            await cancelNotification(task.notificationId);
+          }
 
-          const newTimeStr = newTime.format('h:mm A');
-          const newDateStr = newTime.format('YYYY-MM-DD');
+          const snoozeMap = {
+            snooze_30_min: { value: 30, unit: 'minute' },
+            snooze_1_hr: { value: 1, unit: 'hour' },
+            snooze_1_day: { value: 1, unit: 'day' },
+          };
 
-          const notifId = await scheduleTaskReminder(task.taskname, task.reminder || 'At time of event', newDateStr, newTimeStr, task.id);
+          const snooze = snoozeMap[actionIdentifier];
+          if (!snooze) return;
+
+          const newTime = dayjs().add(snooze.value, snooze.unit);
           
-          dispatch(updateTask({
-            taskId,
-            time: newTimeStr,
-            completionDate: newTime.toISOString(),
-            notificationId: notifId
-          }));
+          const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false);
+          
+          if (notifId) {
+            dispatch(updateTask({
+              taskId,
+              notificationId: notifId
+            }));
+          }
         }
       }
     });
