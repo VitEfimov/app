@@ -195,8 +195,16 @@ function InitApp() {
       const taskId = response.notification.request.content.data?.taskId;
       
       if (taskId && actionIdentifier.startsWith('snooze_')) {
-        const tasks = store.getState().taskReducer.tasks;
-        const task = tasks.find(t => t.id === taskId);
+        let tasks = store.getState().taskReducer.tasks;
+        let task = tasks.find(t => t.id === taskId);
+        
+        if (!task) {
+          const tasksJson = await AsyncStorage.getItem('tasks');
+          if (tasksJson) {
+            const parsedTasks = JSON.parse(tasksJson);
+            task = parsedTasks.find(t => t.id === taskId);
+          }
+        }
         
         if (task) {
           if (task.notificationId) {
@@ -213,14 +221,27 @@ function InitApp() {
           if (!snooze) return;
 
           const newTime = dayjs().add(snooze.value, snooze.unit);
+          const newTimeStr = newTime.format('h:mm A');
+          const newDateStr = newTime.format('YYYY-MM-DD');
           
           const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false);
           
           if (notifId) {
             dispatch(updateTask({
               taskId,
+              time: newTimeStr,
+              completionDate: newTime.toISOString(),
               notificationId: notifId
             }));
+
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: 'Task Snoozed',
+                body: `Snoozed '${task.taskname}' for ${snooze.value} ${snooze.unit}(s)`,
+                sound: false,
+              },
+              trigger: null,
+            });
           }
         }
       }

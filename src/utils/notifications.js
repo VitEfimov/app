@@ -30,7 +30,7 @@ export async function registerForPushNotificationsAsync() {
         usage: Notifications.AndroidAudioUsage.ALARM,
         contentType: Notifications.AndroidAudioContentType.SONIFICATION,
       },
-      sound: 'notification.wav',
+      sound: 'notification',
     });
   }
 
