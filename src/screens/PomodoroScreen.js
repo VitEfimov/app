@@ -214,9 +214,11 @@ export default function PomodoroScreen() {
   };
 
   const formatTime = (timeInSeconds) => {
-    const minutes = Math.floor(timeInSeconds / 60);
+    const hours = Math.floor(timeInSeconds / 3600);
+    const minutes = Math.floor((timeInSeconds % 3600) / 60);
     const seconds = timeInSeconds % 60;
     return {
+      hrs: hours > 0 ? String(hours) : null,
       min: String(minutes).padStart(2, '0'),
       sec: String(seconds).padStart(2, '0')
     };
@@ -274,8 +276,8 @@ export default function PomodoroScreen() {
             />
           </Svg>
           <View style={styles.circleTextContainer}>
-            <Text style={[styles.timeText, { color: colors.textPrimary }]}>
-              {formatTime(localTime).min}:{formatTime(localTime).sec}
+            <Text style={[styles.timeText, { color: colors.textPrimary }, formatTime(localTime).hrs && { fontSize: 48 }]}>
+              {formatTime(localTime).hrs ? `${formatTime(localTime).hrs}:` : ''}{formatTime(localTime).min}:{formatTime(localTime).sec}
             </Text>
             <Text style={[styles.sessionLabel, { color: colors.textSecondary }]}>
               {localIsBreak ? t('Break session') : t('Work session')}

@@ -32,8 +32,10 @@ export default function PomodoroSettingsModal() {
   const { isSettingsOpen, pomodoro } = useSelector(state => state.pomodoroReducer);
   const currentPomodoro = pomodoro[0] || {};
 
+  const [workHrs, setWorkHrs] = useState('0');
   const [workMin, setWorkMin] = useState('25');
   const [workSec, setWorkSec] = useState('0');
+  const [breakHrs, setBreakHrs] = useState('0');
   const [breakMin, setBreakMin] = useState('5');
   const [breakSec, setBreakSec] = useState('0');
   const [sessions, setSessions] = useState('5');
@@ -44,9 +46,11 @@ export default function PomodoroSettingsModal() {
 
   useEffect(() => {
     if (isSettingsOpen) {
-      setWorkMin(String(Math.floor((currentPomodoro.initialTime || 1500) / 60)));
+      setWorkHrs(String(Math.floor((currentPomodoro.initialTime || 1500) / 3600)));
+      setWorkMin(String(Math.floor(((currentPomodoro.initialTime || 1500) % 3600) / 60)));
       setWorkSec(String((currentPomodoro.initialTime || 1500) % 60));
-      setBreakMin(String(Math.floor((currentPomodoro.breakInterval || 300) / 60)));
+      setBreakHrs(String(Math.floor((currentPomodoro.breakInterval || 300) / 3600)));
+      setBreakMin(String(Math.floor(((currentPomodoro.breakInterval || 300) % 3600) / 60)));
       setBreakSec(String((currentPomodoro.breakInterval || 300) % 60));
       setSessions(String(typeof currentPomodoro.intervalCount === 'object' ? currentPomodoro.intervalCount.count : 5));
       setWorkSoundState(currentPomodoro.workSound || 'default');
@@ -55,16 +59,18 @@ export default function PomodoroSettingsModal() {
   }, [isSettingsOpen, currentPomodoro]);
 
   const handleSave = () => {
+    const wHrs = parseInt(workHrs) || 0;
     const wMin = parseInt(workMin) || 0;
     const wSec = parseInt(workSec) || 0;
+    const bHrs = parseInt(breakHrs) || 0;
     const bMin = parseInt(breakMin) || 0;
     const bSec = parseInt(breakSec) || 0;
     const sCount = parseInt(sessions) || 5;
 
-    let workTime = wMin * 60 + wSec;
+    let workTime = wHrs * 3600 + wMin * 60 + wSec;
     if (workTime === 0) workTime = 25 * 60;
 
-    let breakTime = bMin * 60 + bSec;
+    let breakTime = bHrs * 3600 + bMin * 60 + bSec;
     if (breakTime === 0) breakTime = 5 * 60;
 
     dispatch(setTime(workTime));
@@ -109,9 +115,19 @@ export default function PomodoroSettingsModal() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, { flexDirection: 'column', alignItems: 'flex-start', rowGap: 15 }]}>
             <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Work duration')}</Text>
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={workHrs}
+                onChangeText={setWorkHrs}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="Hrs"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={{ color: colors.textPrimary }}>:</Text>
               <TextInput
                 style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={workMin}
@@ -134,9 +150,19 @@ export default function PomodoroSettingsModal() {
             </View>
           </View>
 
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, { flexDirection: 'column', alignItems: 'flex-start', rowGap: 15 }]}>
             <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Break duration')}</Text>
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={breakHrs}
+                onChangeText={setBreakHrs}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="Hrs"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={{ color: colors.textPrimary }}>:</Text>
               <TextInput
                 style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={breakMin}
@@ -265,10 +291,10 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
-    width: 80,
+    width: 70,
     textAlign: 'center',
   },
 

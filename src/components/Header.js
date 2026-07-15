@@ -52,6 +52,15 @@ export default function Header() {
   const timeRemaining = pomodoroState?.time;
   const isTimeOver = isPomodoroActive && timeRemaining === 0;
 
+  const formatBadgeTime = (timeInSeconds) => {
+    if (typeof timeInSeconds !== 'number') return '00:00';
+    const hrs = Math.floor(timeInSeconds / 3600);
+    const mins = Math.floor((timeInSeconds % 3600) / 60);
+    const secs = timeInSeconds % 60;
+    if (hrs > 0) return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
   const handleToggleTheme = () => {
     let newTheme = 'light';
     if (mode === 'light') newTheme = 'dark';
@@ -73,7 +82,7 @@ export default function Header() {
       <View style={styles.rightSection}>
         {(!!isPomodoroActive && !isTimeOver) ? (
           <View style={styles.pomodoroBadge}>
-            <Text style={styles.pomodoroText}>{t('Pomodoro')}: {timeRemaining}s</Text>
+            <Text style={styles.pomodoroText}>{t('Pomodoro')}: {formatBadgeTime(timeRemaining)}</Text>
           </View>
         ) : null}
         

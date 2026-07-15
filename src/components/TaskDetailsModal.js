@@ -333,7 +333,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       testID="task_details_modal"
       isVisible={isVisible} 
       onSwipeComplete={handleClose}
-      swipeDirection={['down']}
+      swipeDirection={scrollOffset > 0 ? undefined : ['down']}
       onBackdropPress={handleClose}
       onBackButtonPress={handleClose}
       propagateSwipe={true}
@@ -443,7 +443,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 <CustomDropdown label={t("PRIORITY")} value={priority === 'none' ? 'None' : priority} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
-                <CustomDropdown label={t("REMINDER / ALARM")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown label={t("REMINDER")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
                 <CustomDropdown label={t("REPEAT")} value={repeatFrequency} options={[{label: t('None'), value: 'None'}, {label: t('Daily'), value: 'Daily'}, {label: t('Weekly'), value: 'Weekly'}, {label: t('Monthly'), value: 'Monthly'}]} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />

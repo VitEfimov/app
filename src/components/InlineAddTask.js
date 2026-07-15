@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask } from '../features/taskSlice';
@@ -28,6 +28,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   const [taskName, setTaskName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [inputHeight, setInputHeight] = useState(46);
+  const inputRef = useRef(null);
   
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
@@ -107,7 +108,17 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
 
   return (
     <React.Fragment>
-    <Modal visible={true} transparent={true} animationType="fade" onRequestClose={() => setIsEditing(false)}>
+    <Modal 
+      visible={true} 
+      transparent={true} 
+      animationType="fade" 
+      onRequestClose={() => setIsEditing(false)}
+      onShow={() => {
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 100);
+      }}
+    >
       <KeyboardAvoidingView 
         style={styles.modalOverlayInline} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -117,6 +128,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         </TouchableWithoutFeedback>
         <View style={[styles.editContainer, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor, borderTopLeftRadius: 12, borderTopRightRadius: 12 }]}>
           <TextInput
+        ref={inputRef}
         testID="inline_task_input"
         accessible={true} accessibilityLabel="New task name"
         style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}

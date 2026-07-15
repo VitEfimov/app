@@ -371,7 +371,7 @@ export default function BoardScreen({ route }) {
           {boards.map(board => (
             <TouchableOpacity 
               key={board.id} 
-              accessible={true} accessibilityRole="tab" accessibilityLabel={`Board ${board.name}`} accessibilityState={{ selected: activeBoardId === board.id }}
+              accessible={true} accessibilityRole="tab" accessibilityLabel={`Board ${board.name === 'Main' ? t('Main') : board.name}`} accessibilityState={{ selected: activeBoardId === board.id }}
               style={[
                 styles.mainTab, 
                 activeBoardId === board.id && { borderBottomColor: colors.primary }
@@ -382,7 +382,7 @@ export default function BoardScreen({ route }) {
               <Text style={[
                 styles.mainTabText, 
                 { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
-              ]}>{board.name}</Text>
+              ]}>{board.name === 'Main' ? t('Main') : board.name}</Text>
             </TouchableOpacity>
           ))}
           {boards.length < 3 && (
