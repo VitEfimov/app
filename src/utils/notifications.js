@@ -25,12 +25,12 @@ export async function registerForPushNotificationsAsync() {
     await Notifications.setNotificationChannelAsync('alarm', {
       name: 'Alarm',
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 500, 500, 500, 500, 500],
+      vibrationPattern: [0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000],
       audioAttributes: {
         usage: Notifications.AndroidAudioUsage.ALARM,
         contentType: Notifications.AndroidAudioContentType.SONIFICATION,
       },
-      sound: 'default', // uses default alarm sound if available
+      sound: 'notification.wav',
     });
   }
 
@@ -124,7 +124,7 @@ export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId 
         sound: true,
         priority: Notifications.AndroidNotificationPriority.MAX,
         data: { taskId },
-        categoryId: 'task_reminder'
+        categoryIdentifier: 'task_reminder'
       },
       trigger: Platform.OS === 'android' ? {
         date: targetDate.toDate(),

@@ -48,6 +48,14 @@
           }
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/audio/notification.wav"
+          ]
+        }
+      ],
       "expo-localization",
       [
         "expo-share-intent",
