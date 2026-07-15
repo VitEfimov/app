@@ -194,6 +194,11 @@ function InitApp() {
       const actionIdentifier = response.actionIdentifier;
       const taskId = response.notification.request.content.data?.taskId;
       
+      // Dismiss the notification from the system tray since Android doesn't always do this automatically for background actions
+      if (response.notification?.request?.identifier) {
+        await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+      }
+
       if (taskId && actionIdentifier.startsWith('snooze_')) {
         let tasks = store.getState().taskReducer.tasks;
         let task = tasks.find(t => t.id === taskId);
@@ -238,9 +243,9 @@ function InitApp() {
               content: {
                 title: 'Task Snoozed',
                 body: `Snoozed '${task.taskname}' for ${snooze.value} ${snooze.unit}(s)`,
-                sound: false,
+                priority: Notifications.AndroidNotificationPriority.MAX,
               },
-              trigger: null,
+              trigger: Platform.OS === 'android' ? { channelId: 'default' } : null,
             });
           }
         }

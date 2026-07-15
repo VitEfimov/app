@@ -22,8 +22,8 @@ export async function registerForPushNotificationsAsync() {
       lightColor: '#FF231F7C',
     });
     
-    await Notifications.setNotificationChannelAsync('alarm', {
-      name: 'Alarm',
+    await Notifications.setNotificationChannelAsync('alarm_v2', {
+      name: 'Alarm Sound',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000],
       audioAttributes: {
@@ -128,7 +128,7 @@ export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId 
       },
       trigger: Platform.OS === 'android' ? {
         date: targetDate.toDate(),
-        channelId: isAlarm ? 'alarm' : 'default'
+        channelId: isAlarm ? 'alarm_v2' : 'default'
       } : targetDate.toDate(),
     });
     return id;
