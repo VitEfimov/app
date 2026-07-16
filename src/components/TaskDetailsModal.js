@@ -627,51 +627,28 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           onConfirm={confirmConfig.onConfirm}
         />
 
-        <RNModal visible={showDatePicker} transparent animationType="fade">
-          <View style={styles.calendarOverlay}>
-            <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
-              <Calendar
-                key={i18n.language}
-                current={
-                  datePickerType === 'due' 
-                    ? (selectedDate || dayjs().format('YYYY-MM-DD'))
-                    : datePickerType === 'repeatStart'
-                    ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-                    : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-                }
-                onDayPress={(day) => handleDateSelect(day.dateString)}
-                markedDates={
-                  datePickerType === 'due' 
-                    ? (selectedDate ? { [selectedDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
-                    : datePickerType === 'repeatStart'
-                    ? (repeatStartDate ? { [repeatStartDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
-                    : (repeatEndDate ? { [repeatEndDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
-                }
-                theme={{
-                  backgroundColor: colors.bgCard,
-                  calendarBackground: colors.bgCard,
-                  textSectionTitleColor: colors.textSecondary,
-                  selectedDayBackgroundColor: colors.primary,
-                  selectedDayTextColor: colors.textInverse,
-                  todayTextColor: colors.primary,
-                  dayTextColor: colors.textPrimary,
-                  textDisabledColor: colors.surfaceContainerHigh,
-                  dotColor: colors.primary,
-                  selectedDotColor: colors.textInverse,
-                  arrowColor: colors.primary,
-                  monthTextColor: colors.textPrimary,
-                  indicatorColor: colors.primary,
-                }}
-              />
-              <TouchableOpacity 
-                style={[styles.closeCalBtn, { backgroundColor: colors.surfaceContainerHigh }]} 
-                onPress={() => setShowDatePicker(false)}
-              >
-                <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>{t('Close')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </RNModal>
+        {showDatePicker && (
+          <DateTimePicker
+            value={(() => {
+              let dStr = datePickerType === 'due' ? selectedDate : (datePickerType === 'repeatStart' ? (repeatStartDate || selectedDate) : (repeatEndDate || repeatStartDate || selectedDate));
+              if (!dStr) return new Date();
+              const d = dayjs(dStr);
+              return d.isValid() ? d.toDate() : new Date();
+            })()}
+            mode="date"
+            display="default"
+            themeVariant={isDark ? 'dark' : 'light'}
+            onChange={(event, date) => {
+              if (Platform.OS !== 'ios') {
+                setShowDatePicker(false);
+              }
+              if (event.type === 'set' && date) {
+                const formattedDate = dayjs(date).format('YYYY-MM-DD');
+                handleDateSelect(formattedDate);
+              }
+            }}
+          />
+        )}
 
         <RNModal visible={isFullscreenImageVisible} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImageVisible(false)}>
           <View style={styles.fullscreenImageOverlay}>

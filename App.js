@@ -82,83 +82,102 @@ function InitApp() {
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
 
   useEffect(() => {
-    if (hasShareIntent && shareIntent.value && ready) {
-      const text = shareIntent.value;
+    if (hasShareIntent && shareIntent && ready) {
       let taskname = '';
       let notes = [];
       let subtasks = [];
-      let completionDate = dayjs().toISOString(); 
+      let completionDate = dayjs().format('YYYY-MM-DD'); 
       let priority = 'none';
+      let imgUri = '';
 
-      const lines = text.split('\n');
-      let hasFoundSubtasks = false;
-      let firstLineFound = false;
-
-      for (let line of lines) {
-          let trimmed = line.trim();
-          if (!trimmed) continue;
-          
-          const priorityMatch = trimmed.match(/Priority:\s*(low|medium|high)/i);
-          if (priorityMatch) {
-              priority = priorityMatch[1].toLowerCase();
-              trimmed = trimmed.replace(priorityMatch[0], '').trim();
-              if (!trimmed) continue;
-          }
-
-          const dateMatch = trimmed.match(/(?:Due|date\(due\)|Date):\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|Today|Tomorrow)/i);
-          if (dateMatch) {
-              const dateStr = dateMatch[1];
-              if (dateStr.toLowerCase() === 'today') {
-                  completionDate = dayjs().toISOString();
-              } else if (dateStr.toLowerCase() === 'tomorrow') {
-                  completionDate = dayjs().add(1, 'day').toISOString();
-              } else {
-                  const parsedDate = dayjs(dateStr);
-                  if (parsedDate.isValid()) {
-                      completionDate = parsedDate.toISOString();
-                  }
-              }
-              trimmed = trimmed.replace(dateMatch[0], '').trim();
-              if (!trimmed) continue;
-          }
-
-          const subtaskMatch = trimmed.match(/^(\[ \]|\[x\]|-|\*|\d+\.)\s+(.+)/i);
-          if (subtaskMatch) {
-              hasFoundSubtasks = true;
-              subtasks.push({
-                  id: Date.now().toString() + Math.random().toString(),
-                  text: subtaskMatch[2].trim(),
-                  completed: subtaskMatch[1].toLowerCase() === '[x]'
-              });
-              continue;
-          }
-
-          if (!firstLineFound && !hasFoundSubtasks) {
-              taskname = trimmed;
-              firstLineFound = true;
+      if (shareIntent.type === 'media' || shareIntent.type === 'file' || Array.isArray(shareIntent.value)) {
+        // Shared a file/image
+        const files = Array.isArray(shareIntent.value) ? shareIntent.value : [shareIntent.value];
+        if (files.length > 0) {
+          const file = files[0];
+          taskname = file.fileName || 'Shared File';
+          if (file.mimeType?.startsWith('image/')) {
+            imgUri = file.contentUri || file.path || '';
           } else {
-              notes.push(trimmed);
+            notes.push(`File: ${file.path || file.contentUri}`);
           }
+        }
+      } else if (typeof shareIntent.value === 'string') {
+        const text = shareIntent.value || '';
+        const lines = text.split('\n');
+        let hasFoundSubtasks = false;
+        let firstLineFound = false;
+
+        for (let line of lines) {
+            let trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            const priorityMatch = trimmed.match(/Priority:\s*(low|medium|high)/i);
+            if (priorityMatch) {
+                priority = priorityMatch[1].toLowerCase();
+                trimmed = trimmed.replace(priorityMatch[0], '').trim();
+                if (!trimmed) continue;
+            }
+
+            const dateMatch = trimmed.match(/(?:Due|date\(due\)|Date):\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|Today|Tomorrow)/i);
+            if (dateMatch) {
+                const dateStr = dateMatch[1];
+                if (dateStr.toLowerCase() === 'today') {
+                    completionDate = dayjs().format('YYYY-MM-DD');
+                } else if (dateStr.toLowerCase() === 'tomorrow') {
+                    completionDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
+                } else {
+                    const parsedDate = dayjs(dateStr);
+                    if (parsedDate.isValid()) {
+                        completionDate = parsedDate.format('YYYY-MM-DD');
+                    }
+                }
+                trimmed = trimmed.replace(dateMatch[0], '').trim();
+                if (!trimmed) continue;
+            }
+
+            const subtaskMatch = trimmed.match(/^(\[ \]|\[x\]|-|\*|\d+\.)\s+(.+)/i);
+            if (subtaskMatch) {
+                hasFoundSubtasks = true;
+                subtasks.push({
+                    id: Date.now().toString() + Math.random().toString(),
+                    text: subtaskMatch[2].trim(),
+                    completed: subtaskMatch[1].toLowerCase() === '[x]'
+                });
+                continue;
+            }
+
+            if (!firstLineFound && !hasFoundSubtasks) {
+                taskname = trimmed;
+                firstLineFound = true;
+            } else {
+                notes.push(trimmed);
+            }
+        }
       }
 
       if (!taskname && notes.length > 0) {
           taskname = notes.shift();
+      }
+      
+      if (!taskname) {
+          taskname = 'Shared Task';
       }
 
       dispatch(addTask({
         task: {
           id: Date.now().toString(),
           taskname: taskname.slice(0, 100), // Limit title length
-          description: { text: notes.join('\n'), img: '', url: '' },
+          description: { text: notes.join('\n'), img: imgUri, url: '' },
           subtasks: subtasks,
           completed: false,
           priority: priority,
-          completionDate: completionDate
+          completionDate: dayjs(completionDate).toISOString()
         }
       }));
       resetShareIntent();
     }
-  }, [hasShareIntent, shareIntent, ready]);
+  }, [hasShareIntent, shareIntent, ready, dispatch, resetShareIntent]);
 
   useEffect(() => {
     const loadStorage = async () => {
