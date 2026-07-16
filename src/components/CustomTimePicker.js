@@ -181,27 +181,43 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
     }
 
     const currentValue = dialMode === 'hour' ? hour : minute;
-    const selectedItem = items.find(i => parseInt(i.value, 10) === parseInt(currentValue, 10)) || items[0];
+    const currentValInt = parseInt(currentValue, 10) || 0;
+
+    let arrowAngle = 0;
+    let arrowRadius = radius * 0.8;
+
+    if (dialMode === 'hour') {
+      let displayI = currentValInt;
+      if (is24Hour) {
+        const isOuter = (currentValInt >= 1 && currentValInt <= 12);
+        arrowRadius = isOuter ? radius * 0.8 : radius * 0.5;
+        displayI = (currentValInt === 0 || currentValInt === 12) ? 0 : (currentValInt % 12);
+      } else {
+        if (displayI === 12) displayI = 0;
+      }
+      arrowAngle = (displayI * 30 - 90) * (Math.PI / 180);
+    } else {
+      arrowAngle = (currentValInt * 6 - 90) * (Math.PI / 180);
+    }
+
+    const arrowX = center.x + arrowRadius * Math.cos(arrowAngle);
+    const arrowY = center.y + arrowRadius * Math.sin(arrowAngle);
 
     return (
       <View style={styles.dialContainer}>
         <View style={[styles.dialCircle, { backgroundColor: colors.surfaceContainerHigh }]}>
           <Svg width="250" height="250" style={{ position: 'absolute', top: 0, left: 0 }} pointerEvents="none">
             <Circle cx={center.x} cy={center.y} r="4" fill={colors.primary} />
-            {selectedItem && (
-              <Line 
-                x1={center.x} y1={center.y} 
-                x2={selectedItem.x} y2={selectedItem.y} 
-                stroke={colors.primary} strokeWidth="2" 
-              />
-            )}
-            {selectedItem && (
-              <Circle cx={selectedItem.x} cy={selectedItem.y} r="16" fill={colors.primary} />
-            )}
+            <Line 
+              x1={center.x} y1={center.y} 
+              x2={arrowX} y2={arrowY} 
+              stroke={colors.primary} strokeWidth="2" 
+            />
+            <Circle cx={arrowX} cy={arrowY} r="16" fill={colors.primary} />
           </Svg>
           
           {items.map((item, index) => {
-            const isSelected = selectedItem && item.value === selectedItem.value;
+            const isSelected = parseInt(item.value, 10) === currentValInt;
             return (
               <View
                 key={index}
@@ -229,6 +245,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
             onResponderGrant={(evt) => handleDialTouch(evt, false)}
             onResponderMove={(evt) => handleDialTouch(evt, false)}
             onResponderRelease={(evt) => handleDialTouch(evt, true)}
+            onResponderTerminate={(evt) => handleDialTouch(evt, true)}
           />
         </View>
       </View>

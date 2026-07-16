@@ -22,7 +22,7 @@ export async function registerForPushNotificationsAsync() {
       lightColor: '#FF231F7C',
     });
     
-    await Notifications.setNotificationChannelAsync('alarm_v2', {
+    await Notifications.setNotificationChannelAsync('alarm_v3', {
       name: 'Alarm Sound',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000],
@@ -30,7 +30,7 @@ export async function registerForPushNotificationsAsync() {
         usage: Notifications.AndroidAudioUsage.ALARM,
         contentType: Notifications.AndroidAudioContentType.SONIFICATION,
       },
-      sound: 'notification',
+      sound: true,
     });
   }
 
@@ -149,7 +149,7 @@ export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId 
       },
       trigger: Platform.OS === 'android' ? {
         date: targetDate.toDate(),
-        channelId: isAlarm ? 'alarm_v2' : 'default'
+        channelId: isAlarm ? 'alarm_v3' : 'default'
       } : targetDate.toDate(),
     });
     return id;
