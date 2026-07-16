@@ -242,20 +242,16 @@ function InitApp() {
              const themeState = store.getState().themeReducer;
              const snoozeMins = themeState.defaultSnoozeTime || 30;
 
-             if (task.notificationId) {
-               await cancelNotification(task.notificationId);
-             }
-
              const newTime = dayjs().add(snoozeMins, 'minute');
-             const newTimeStr = newTime.format('HH:mm');
              
-             const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false);
+             // Schedule new reminder without changing the actual task's time
+             const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false, 'task_reminder');
              if (notifId) {
+               // Append the new snoozed notification ID so it can be cleaned up if task is deleted
+               const updatedNotifIds = [...(task.notificationId || []), notifId];
                dispatch(updateTask({
                  taskId,
-                 time: newTimeStr,
-                 completionDate: newTime.toISOString(),
-                 notificationId: [notifId]
+                 notificationId: updatedNotifIds
                }));
 
                await Notifications.scheduleNotificationAsync({

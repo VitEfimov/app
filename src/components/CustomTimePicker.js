@@ -185,14 +185,8 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
 
     return (
       <View style={styles.dialContainer}>
-        <View 
-          style={[styles.dialCircle, { backgroundColor: colors.surfaceContainerHigh }]}
-          onStartShouldSetResponder={() => true}
-          onResponderGrant={(evt) => handleDialTouch(evt, false)}
-          onResponderMove={(evt) => handleDialTouch(evt, false)}
-          onResponderRelease={(evt) => handleDialTouch(evt, true)}
-        >
-          <Svg width="250" height="250" style={{ position: 'absolute', top: 0, left: 0 }}>
+        <View style={[styles.dialCircle, { backgroundColor: colors.surfaceContainerHigh }]}>
+          <Svg width="250" height="250" style={{ position: 'absolute', top: 0, left: 0 }} pointerEvents="none">
             <Circle cx={center.x} cy={center.y} r="4" fill={colors.primary} />
             {selectedItem && (
               <Line 
@@ -227,6 +221,15 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
               </View>
             );
           })}
+          
+          <View 
+            style={{ position: 'absolute', top: 0, left: 0, width: 250, height: 250, backgroundColor: 'transparent' }}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={(evt) => handleDialTouch(evt, false)}
+            onResponderMove={(evt) => handleDialTouch(evt, false)}
+            onResponderRelease={(evt) => handleDialTouch(evt, true)}
+          />
         </View>
       </View>
     );

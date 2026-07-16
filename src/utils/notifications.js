@@ -63,6 +63,19 @@ export async function registerForPushNotificationsAsync() {
     }
   ]);
 
+  await Notifications.setNotificationCategoryAsync('task_regular', [
+    {
+      identifier: 'complete_task',
+      buttonTitle: 'Complete Task',
+      options: { opensAppToForeground: false }
+    },
+    {
+      identifier: 'reschedule',
+      buttonTitle: 'Reschedule',
+      options: { opensAppToForeground: true }
+    }
+  ]);
+
   return token;
 }
 
@@ -90,8 +103,8 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       targetDate = targetDate.hour(hours).minute(minutes).second(0);
     }
     
-    // Schedule exact time notification
-    const timeId = await scheduleExactTaskReminder(`It's time: ${taskName}`, targetDate.toDate(), taskId, isAlarm);
+    // Schedule exact time notification (Always standard sound, no snooze)
+    const timeId = await scheduleExactTaskReminder(`It's time: ${taskName}`, targetDate.toDate(), taskId, false, 'task_regular');
     if (timeId) ids.push(timeId);
   } else {
     targetDate = targetDate.hour(9).minute(0).second(0); // Default to 9 AM
@@ -108,7 +121,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     const offset = offsets[reminderValue];
     if (offset) {
       let reminderDate = targetDate.subtract(offset.amount, offset.unit);
-      const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm);
+      const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm, 'task_reminder');
       if (remId) ids.push(remId);
     }
   }
@@ -116,7 +129,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
   return ids;
 }
 
-export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId = null, isAlarm = false) {
+export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId = null, isAlarm = false, category = 'task_reminder') {
   const targetDate = dayjs(targetDateObj);
 
   if (targetDate.isBefore(dayjs())) {
@@ -131,8 +144,8 @@ export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId 
         body: `Reminder: ${taskName}`,
         sound: true,
         priority: Notifications.AndroidNotificationPriority.MAX,
-        data: { taskId },
-        categoryIdentifier: 'task_reminder'
+        data: { taskId, isAlarm },
+        categoryIdentifier: category
       },
       trigger: Platform.OS === 'android' ? {
         date: targetDate.toDate(),
