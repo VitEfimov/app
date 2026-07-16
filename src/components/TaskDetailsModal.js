@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch } from 'react-native';
 import Modal from 'react-native-modal';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -492,24 +492,16 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             )}
 
             {showTimePicker && (
-              <DateTimePicker
-                value={(() => {
-                  if (!selectedTime || selectedTime === '--:--') return new Date();
-                  const d = dayjs(`2000-01-01T${selectedTime}`);
-                  return d.isValid() ? d.toDate() : new Date();
-                })()}
-                mode="time"
-                display="default"
-                themeVariant={isDark ? 'dark' : 'light'}
-                onChange={(event, date) => {
-                  if (Platform.OS !== 'ios') {
-                    setShowTimePicker(false);
-                  }
-                  if (event.type === 'set' && date) {
-                    const formattedTime = dayjs(date).format('HH:mm');
-                    setSelectedTime(formattedTime);
-                    handleUpdate({ time: formattedTime });
-                  }
+              <CustomTimePicker
+                visible={showTimePicker}
+                value={selectedTime}
+                colors={colors}
+                isDark={isDark}
+                onClose={() => setShowTimePicker(false)}
+                onSave={(timeStr) => {
+                  setSelectedTime(timeStr);
+                  handleUpdate({ time: timeStr });
+                  setShowTimePicker(false);
                 }}
               />
             )}
@@ -627,28 +619,69 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           onConfirm={confirmConfig.onConfirm}
         />
 
-        {showDatePicker && (
-          <DateTimePicker
-            value={(() => {
-              let dStr = datePickerType === 'due' ? selectedDate : (datePickerType === 'repeatStart' ? (repeatStartDate || selectedDate) : (repeatEndDate || repeatStartDate || selectedDate));
-              if (!dStr) return new Date();
-              const d = dayjs(dStr);
-              return d.isValid() ? d.toDate() : new Date();
-            })()}
-            mode="date"
-            display="default"
-            themeVariant={isDark ? 'dark' : 'light'}
-            onChange={(event, date) => {
-              if (Platform.OS !== 'ios') {
-                setShowDatePicker(false);
-              }
-              if (event.type === 'set' && date) {
-                const formattedDate = dayjs(date).format('YYYY-MM-DD');
-                handleDateSelect(formattedDate);
-              }
-            }}
-          />
-        )}
+        <RNModal visible={showDatePicker} transparent animationType="fade">
+          <View style={styles.calendarOverlay}>
+            <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
+              <Calendar
+                key={i18n.language}
+                current={
+                  datePickerType === 'due' 
+                    ? (selectedDate || dayjs().format('YYYY-MM-DD'))
+                    : datePickerType === 'repeatStart'
+                    ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+                    : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+                }
+                onDayPress={(day) => handleDateSelect(day.dateString)}
+                markedDates={
+                  datePickerType === 'due' 
+                    ? (selectedDate ? { [selectedDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
+                    : datePickerType === 'repeatStart'
+                    ? (repeatStartDate ? { [repeatStartDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
+                    : (repeatEndDate ? { [repeatEndDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
+                }
+                theme={{
+                  backgroundColor: colors.bgCard,
+                  calendarBackground: colors.bgCard,
+                  textSectionTitleColor: colors.textSecondary,
+                  selectedDayBackgroundColor: colors.primary,
+                  selectedDayTextColor: colors.textInverse,
+                  todayTextColor: colors.primary,
+                  dayTextColor: colors.textPrimary,
+                  textDisabledColor: colors.surfaceContainerHigh,
+                  dotColor: colors.primary,
+                  selectedDotColor: colors.textInverse,
+                  arrowColor: colors.textPrimary,
+                  monthTextColor: colors.textPrimary,
+                  indicatorColor: colors.primary,
+                  textDayFontWeight: '500',
+                  textMonthFontWeight: 'bold',
+                  textDayHeaderFontWeight: '500',
+                  textDayFontSize: 14,
+                  textMonthFontSize: 16,
+                  textDayHeaderFontSize: 12,
+                  'stylesheet.calendar.header': {
+                    header: {
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      paddingLeft: 10,
+                      paddingRight: 10,
+                      marginTop: 6,
+                      alignItems: 'center'
+                    }
+                  }
+                }}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 15, paddingRight: 10 }}>
+                <TouchableOpacity 
+                  style={{ padding: 10, paddingHorizontal: 20 }} 
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Cancel')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </RNModal>
 
         <RNModal visible={isFullscreenImageVisible} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImageVisible(false)}>
           <View style={styles.fullscreenImageOverlay}>
@@ -829,11 +862,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
   },
   calendarContainer: {
-    borderRadius: 12,
-    padding: 10,
+    width: 320,
+    borderRadius: 24,
+    padding: 16,
     overflow: 'hidden',
   },
   imagePreviewContainer: {
