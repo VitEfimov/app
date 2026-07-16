@@ -24,7 +24,7 @@ const IconChevronDown = ({ color, isCollapsed }) => (
   </Svg>
 );
 
-export default function BoardScreen({ route }) {
+export default function BoardScreen({ route, navigation }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeAddSectionId, setActiveAddSectionId] = useState(null);
 
@@ -59,6 +59,17 @@ export default function BoardScreen({ route }) {
       setCollapsedSections(allSectionIds.filter(id => id !== route.params.sectionId));
     }
   }, [route?.params?.sectionId]);
+
+  useEffect(() => {
+    if (route?.params?.editTaskId) {
+      const t = tasks.find(tsk => tsk.id === route.params.editTaskId);
+      if (t) {
+         setSelectedTask(t);
+         setDetailsVisible(true);
+      }
+      navigation.setParams({ editTaskId: undefined });
+    }
+  }, [route?.params?.editTaskId, tasks, navigation]);
 
   const toggleSection = (sectionId) => {
     if (collapsedSections.includes(sectionId)) {
@@ -161,9 +172,9 @@ export default function BoardScreen({ route }) {
         if (pA !== pB) return pB - pA; // Higher priority first
       }
 
-      const dateA = a.completionDate || '9999-12-31';
-      const dateB = b.completionDate || '9999-12-31';
-      const dateCompare = dateA.localeCompare(dateB);
+      const dayA = a.completionDate ? dayjs(a.completionDate).format('YYYY-MM-DD') : '9999-12-31';
+      const dayB = b.completionDate ? dayjs(b.completionDate).format('YYYY-MM-DD') : '9999-12-31';
+      const dateCompare = dayA.localeCompare(dayB);
       if (dateCompare !== 0) return dateCompare;
       
       const hasTimeA = !!a.time;

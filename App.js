@@ -22,6 +22,7 @@ import { addTask, updateTask } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
 import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification } from './src/utils/notifications';
 import dayjs from 'dayjs';
+import { navigationRef } from './src/navigation/AppNavigator';
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -199,7 +200,7 @@ function InitApp() {
         await Notifications.dismissNotificationAsync(response.notification.request.identifier);
       }
 
-      if (taskId && actionIdentifier.startsWith('snooze_')) {
+      if (taskId) {
         let tasks = store.getState().taskReducer.tasks;
         let task = tasks.find(t => t.id === taskId);
         
@@ -212,41 +213,41 @@ function InitApp() {
         }
         
         if (task) {
-          if (task.notificationId) {
-            await cancelNotification(task.notificationId);
-          }
+          if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER || actionIdentifier === 'reschedule') {
+            if (navigationRef.isReady()) {
+              navigationRef.navigate('Board', { editTaskId: taskId });
+            }
+          } else if (actionIdentifier === 'complete_task') {
+             dispatch(updateTask({ taskId, completed: true }));
+          } else if (actionIdentifier === 'snooze') {
+             const themeState = store.getState().themeReducer;
+             const snoozeMins = themeState.defaultSnoozeTime || 30;
 
-          const snoozeMap = {
-            snooze_30_min: { value: 30, unit: 'minute' },
-            snooze_1_hr: { value: 1, unit: 'hour' },
-            snooze_1_day: { value: 1, unit: 'day' },
-          };
+             if (task.notificationId) {
+               await cancelNotification(task.notificationId);
+             }
 
-          const snooze = snoozeMap[actionIdentifier];
-          if (!snooze) return;
+             const newTime = dayjs().add(snoozeMins, 'minute');
+             const newTimeStr = newTime.format('HH:mm');
+             
+             const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false);
+             if (notifId) {
+               dispatch(updateTask({
+                 taskId,
+                 time: newTimeStr,
+                 completionDate: newTime.toISOString(),
+                 notificationId: [notifId]
+               }));
 
-          const newTime = dayjs().add(snooze.value, snooze.unit);
-          const newTimeStr = newTime.format('h:mm A');
-          const newDateStr = newTime.format('YYYY-MM-DD');
-          
-          const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false);
-          
-          if (notifId) {
-            dispatch(updateTask({
-              taskId,
-              time: newTimeStr,
-              completionDate: newTime.toISOString(),
-              notificationId: notifId
-            }));
-
-            await Notifications.scheduleNotificationAsync({
-              content: {
-                title: 'Task Snoozed',
-                body: `Snoozed '${task.taskname}' for ${snooze.value} ${snooze.unit}(s)`,
-                priority: Notifications.AndroidNotificationPriority.MAX,
-              },
-              trigger: Platform.OS === 'android' ? { channelId: 'default' } : null,
-            });
+               await Notifications.scheduleNotificationAsync({
+                 content: {
+                   title: 'Task Snoozed',
+                   body: `Snoozed '${task.taskname}' for ${snoozeMins} minute(s)`,
+                   priority: Notifications.AndroidNotificationPriority.MAX,
+                 },
+                 trigger: Platform.OS === 'android' ? { channelId: 'default' } : null,
+               });
+             }
           }
         }
       }

@@ -47,19 +47,19 @@ export async function registerForPushNotificationsAsync() {
 
   await Notifications.setNotificationCategoryAsync('task_reminder', [
     {
-      identifier: 'snooze_30_min',
-      buttonTitle: 'Snooze 30 Min',
+      identifier: 'complete_task',
+      buttonTitle: 'Complete Task',
       options: { opensAppToForeground: false }
     },
     {
-      identifier: 'snooze_1_hr',
-      buttonTitle: 'Snooze 1 Hr',
+      identifier: 'snooze',
+      buttonTitle: 'Snooze',
       options: { opensAppToForeground: false }
     },
     {
-      identifier: 'snooze_1_day',
-      buttonTitle: 'Next Day',
-      options: { opensAppToForeground: false }
+      identifier: 'reschedule',
+      buttonTitle: 'Reschedule',
+      options: { opensAppToForeground: true }
     }
   ]);
 
@@ -71,11 +71,11 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 dayjs.extend(customParseFormat);
 export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false) {
-  if (!reminderValue || reminderValue === 'None') return null;
-  if (!completionDateStr) return null;
+  if (!completionDateStr) return [];
+  const ids = [];
 
   let targetDate = dayjs(completionDateStr);
-  if (!targetDate.isValid()) return null;
+  if (!targetDate.isValid()) return [];
 
   if (timeStr) {
     const parsedTime = dayjs(`${completionDateStr} ${timeStr}`, ["YYYY-MM-DD HH:mm", "YYYY-MM-DD h:mm A", "YYYY-MM-DD hh:mm A"], true);
@@ -89,23 +89,31 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       if (timeStr.toLowerCase().includes('am') && hours === 12) hours = 0;
       targetDate = targetDate.hour(hours).minute(minutes).second(0);
     }
+    
+    // Schedule exact time notification
+    const timeId = await scheduleExactTaskReminder(`It's time: ${taskName}`, targetDate.toDate(), taskId, isAlarm);
+    if (timeId) ids.push(timeId);
   } else {
     targetDate = targetDate.hour(9).minute(0).second(0); // Default to 9 AM
   }
 
-  const offsets = {
-    "15 min before": { amount: 15, unit: "minute" },
-    "30 min before": { amount: 30, unit: "minute" },
-    "1 hr before": { amount: 1, unit: "hour" },
-    "1 day before": { amount: 1, unit: "day" }
-  };
-  
-  const offset = offsets[reminderValue];
-  if (offset) {
-    targetDate = targetDate.subtract(offset.amount, offset.unit);
+  if (reminderValue && reminderValue !== 'None') {
+    const offsets = {
+      "15 min before": { amount: 15, unit: "minute" },
+      "30 min before": { amount: 30, unit: "minute" },
+      "1 hr before": { amount: 1, unit: "hour" },
+      "1 day before": { amount: 1, unit: "day" }
+    };
+    
+    const offset = offsets[reminderValue];
+    if (offset) {
+      let reminderDate = targetDate.subtract(offset.amount, offset.unit);
+      const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm);
+      if (remId) ids.push(remId);
+    }
   }
 
-  return scheduleExactTaskReminder(taskName, targetDate.toDate(), taskId, isAlarm);
+  return ids;
 }
 
 export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId = null, isAlarm = false) {
@@ -156,8 +164,13 @@ export async function scheduleLocalNotification(title, body, triggerTimeOrDelay)
   }
 }
 
-export async function cancelNotification(notificationId) {
-  if (notificationId) {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
+export async function cancelNotification(notificationIds) {
+  if (notificationIds) {
+    const ids = Array.isArray(notificationIds) ? notificationIds : [notificationIds];
+    for (const id of ids) {
+      if (id) {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      }
+    }
   }
 }

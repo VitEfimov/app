@@ -217,15 +217,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
     if (timeChanged || dateChanged || reminderChanged || isAlarmChanged || nameChanged) {
       if (reminder !== (task.reminder || 'None')) updates.reminder = reminder;
-      // Schedule new reminder
+      // Schedule new notifications
       if (task.notificationId) {
         await cancelNotification(task.notificationId);
         updates.notificationId = null;
       }
-      if (reminder !== 'None') {
-        const notifId = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), selectedTime, task.id, isAlarm);
-        if (notifId) updates.notificationId = notifId;
-      }
+      const notifIds = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), selectedTime, task.id, isAlarm);
+      if (notifIds && notifIds.length > 0) updates.notificationId = notifIds;
     }
     
     if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) {

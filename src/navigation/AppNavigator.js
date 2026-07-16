@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+export const navigationRef = createNavigationContainerRef();
 import { useSelector } from 'react-redux';
 import { StatusBar } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -112,7 +113,7 @@ export default function AppNavigator() {
   };
 
   return (
-    <NavigationContainer theme={MyTheme}>
+    <NavigationContainer ref={navigationRef} theme={MyTheme}>
       <StatusBar 
         backgroundColor={colors.bgHeader} 
         barStyle={isDark ? 'light-content' : 'dark-content'} 

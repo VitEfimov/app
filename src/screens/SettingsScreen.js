@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks } from '../features/taskSlice';
-import { setTaskNameWrap, setFontSize, setProgressMode } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -35,6 +35,7 @@ export default function SettingsScreen({ navigation }) {
   const taskNameWrap = theme.taskNameWrap || 'wrap';
   const fontSize = theme.fontSize || 'normal';
   const progressMode = theme.progressMode || 'daily';
+  const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
 
@@ -67,6 +68,14 @@ export default function SettingsScreen({ navigation }) {
     { label: t('Active Workload'), value: 'active' },
     { label: t('Weekly Sprint'), value: 'weekly' },
     { label: t('Lifetime'), value: 'lifetime' },
+  ];
+
+  const snoozeOptions = [
+    { label: t('5 min'), value: 5 },
+    { label: t('10 min'), value: 10 },
+    { label: t('15 min'), value: 15 },
+    { label: t('30 min'), value: 30 },
+    { label: t('1 hour'), value: 60 },
   ];
 
   const handleDeleteData = () => {
@@ -153,6 +162,15 @@ export default function SettingsScreen({ navigation }) {
             value={fontSize} 
             options={fontOptions} 
             onSelect={val => dispatch(setFontSize(val))} 
+            colors={colors}
+            layout="horizontal"
+          />
+
+          <CustomDropdown 
+            label={t("Default Snooze")} 
+            value={defaultSnoozeTime} 
+            options={snoozeOptions} 
+            onSelect={val => dispatch(setDefaultSnoozeTime(val))} 
             colors={colors}
             layout="horizontal"
           />
