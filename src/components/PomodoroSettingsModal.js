@@ -99,6 +99,7 @@ export default function PomodoroSettingsModal() {
       onSwipeComplete={() => dispatch(togglePomodoroSettings(false))}
       swipeDirection={['down']}
       onBackdropPress={() => dispatch(togglePomodoroSettings(false))}
+      onBackButtonPress={() => dispatch(togglePomodoroSettings(false))}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <KeyboardAvoidingView 

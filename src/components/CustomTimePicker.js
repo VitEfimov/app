@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, PanResponder } from 'react-native';
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
@@ -103,6 +103,11 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
     setMinute(m.toString().padStart(2, '0'));
   };
 
+  const stateRef = useRef({ dialMode, is24Hour, hour, minute });
+  useEffect(() => {
+    stateRef.current = { dialMode, is24Hour, hour, minute };
+  }, [dialMode, is24Hour, hour, minute]);
+
   const handleDialTouch = (evt, isRelease = false) => {
     const { locationX, locationY } = evt.nativeEvent;
     const dx = locationX - 125;
@@ -111,11 +116,14 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
     angle = angle + 90;
     if (angle < 0) angle += 360;
 
-    if (dialMode === 'hour') {
+    const currentDialMode = stateRef.current.dialMode;
+    const currentIs24Hour = stateRef.current.is24Hour;
+
+    if (currentDialMode === 'hour') {
       let h = Math.round(angle / 30);
       if (h === 12) h = 0; 
       
-      if (!is24Hour) {
+      if (!currentIs24Hour) {
         h = h === 0 ? 12 : h;
         setHour(h.toString());
       } else {
@@ -136,6 +144,17 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
       setMinute(m.toString().padStart(2, '0'));
     }
   };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => handleDialTouch(evt, false),
+      onPanResponderMove: (evt) => handleDialTouch(evt, false),
+      onPanResponderRelease: (evt) => handleDialTouch(evt, true),
+      onPanResponderTerminate: (evt) => handleDialTouch(evt, true),
+    })
+  ).current;
 
   const ClockDial = () => {
     const radius = 100;
@@ -240,12 +259,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
           
           <View 
             style={{ position: 'absolute', top: 0, left: 0, width: 250, height: 250, backgroundColor: 'transparent' }}
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={() => true}
-            onResponderGrant={(evt) => handleDialTouch(evt, false)}
-            onResponderMove={(evt) => handleDialTouch(evt, false)}
-            onResponderRelease={(evt) => handleDialTouch(evt, true)}
-            onResponderTerminate={(evt) => handleDialTouch(evt, true)}
+            {...panResponder.panHandlers}
           />
         </View>
       </View>

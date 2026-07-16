@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share } from 'react-native';
+import { View, StyleSheet, FlatList, SectionList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
 import { useTheme } from '../styles/ThemeContext';
@@ -16,6 +16,7 @@ export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
   const { t, i18n } = useTranslation();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
+  const boards = useSelector(state => state.userReducer.boards || []);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
@@ -302,6 +303,25 @@ export default function CalendarScreen() {
     });
   }, [tasks, selectedDate, sortConfig]);
 
+  const groupedTasks = useMemo(() => {
+    if (!selectedTasks.length) return [];
+    if (boards.length < 2) return [{ title: '', data: selectedTasks }];
+    
+    const groups = {};
+    groups['main'] = { title: 'Main', data: [] };
+    
+    selectedTasks.forEach(task => {
+       const bId = task.boardId || 'main';
+       if (!groups[bId]) {
+          const boardName = boards.find(b => b.id === bId)?.name || 'Board';
+          groups[bId] = { title: boardName, data: [] };
+       }
+       groups[bId].data.push(task);
+    });
+    
+    return Object.values(groups).filter(g => g.data.length > 0);
+  }, [selectedTasks, boards]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <View onLayout={handleCalendarLayout}>
@@ -366,10 +386,10 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        {selectedTasks.length > 0 ? (
-          <FlatList
+        {groupedTasks.length > 0 ? (
+          <SectionList
             style={{ flex: 1 }}
-            data={selectedTasks}
+            sections={groupedTasks}
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item }) => (
               <TaskRow 
@@ -382,11 +402,16 @@ export default function CalendarScreen() {
                 onToggleSelect={() => toggleTaskSelection(item.id)}
               />
             )}
+            renderSectionHeader={({ section: { title } }) => (
+              title ? (
+                <View style={[styles.sectionHeader, { backgroundColor: colors.bgCard }]}>
+                  <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>{title}</Text>
+                </View>
+              ) : null
+            )}
             contentContainerStyle={styles.listContent}
             initialNumToRender={10}
-            maxToRenderPerBatch={5}
-            windowSize={3}
-            removeClippedSubviews={Platform.OS === 'ios'}
+            stickySectionHeadersEnabled={false}
           />
         ) : (
           <View style={styles.emptyContainer}>
@@ -574,6 +599,20 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     marginBottom: 20,
     opacity: 0.5,
+  },
+  sectionHeader: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    marginTop: 10,
+    marginBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)'
+  },
+  sectionHeaderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   optionsModalTitle: {
     fontSize: 18,

@@ -104,6 +104,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
       swipeDirection={['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
+      onBackButtonPress={onClose}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
