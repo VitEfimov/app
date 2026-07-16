@@ -103,6 +103,40 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
     setMinute(m.toString().padStart(2, '0'));
   };
 
+  const handleDialTouch = (evt, isRelease = false) => {
+    const { locationX, locationY } = evt.nativeEvent;
+    const dx = locationX - 125;
+    const dy = locationY - 125;
+    let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    angle = angle + 90;
+    if (angle < 0) angle += 360;
+
+    if (dialMode === 'hour') {
+      let h = Math.round(angle / 30);
+      if (h === 12) h = 0; 
+      
+      if (!is24Hour) {
+        h = h === 0 ? 12 : h;
+        setHour(h.toString());
+      } else {
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 75) {
+          h = h === 0 ? 12 : h;
+        } else {
+          h = h === 0 ? 0 : h + 12;
+        }
+        setHour(h.toString());
+      }
+      if (isRelease) {
+        setDialMode('minute');
+      }
+    } else {
+      let m = Math.round(angle / 6);
+      if (m === 60) m = 0;
+      setMinute(m.toString().padStart(2, '0'));
+    }
+  };
+
   const ClockDial = () => {
     const radius = 100;
     const center = { x: 125, y: 125 };
@@ -121,8 +155,8 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
         }
       } else {
         for (let i = 0; i <= 23; i++) {
-          const isOuter = i === 0 || i > 12;
-          const displayI = i === 0 ? 0 : i;
+          const isOuter = (i >= 1 && i <= 12);
+          const displayI = (i === 0 || i === 12) ? 0 : (i % 12);
           const r = isOuter ? radius * 0.8 : radius * 0.5;
           const angle = (displayI * 30 - 90) * (Math.PI / 180);
           items.push({
@@ -151,8 +185,14 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
 
     return (
       <View style={styles.dialContainer}>
-        <View style={[styles.dialCircle, { backgroundColor: colors.surfaceContainerHigh }]}>
-          <Svg width="250" height="250">
+        <View 
+          style={[styles.dialCircle, { backgroundColor: colors.surfaceContainerHigh }]}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={(evt) => handleDialTouch(evt, false)}
+          onResponderMove={(evt) => handleDialTouch(evt, false)}
+          onResponderRelease={(evt) => handleDialTouch(evt, true)}
+        >
+          <Svg width="250" height="250" style={{ position: 'absolute', top: 0, left: 0 }}>
             <Circle cx={center.x} cy={center.y} r="4" fill={colors.primary} />
             {selectedItem && (
               <Line 
@@ -169,20 +209,13 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
           {items.map((item, index) => {
             const isSelected = selectedItem && item.value === selectedItem.value;
             return (
-              <TouchableOpacity
+              <View
                 key={index}
                 style={[
                   styles.dialNumberBtn,
                   { left: item.x - 16, top: item.y - 16 }
                 ]}
-                onPress={() => {
-                  if (dialMode === 'hour') {
-                    setHour(item.value);
-                    setDialMode('minute');
-                  } else {
-                    setMinute(item.value);
-                  }
-                }}
+                pointerEvents="none"
               >
                 <Text style={[
                   styles.dialNumberText,
@@ -191,7 +224,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
                 ]}>
                   {item.label}
                 </Text>
-              </TouchableOpacity>
+              </View>
             );
           })}
         </View>
