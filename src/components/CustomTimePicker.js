@@ -103,47 +103,62 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
     setMinute(m.toString().padStart(2, '0'));
   };
 
-  const stateRef = useRef({ dialMode, is24Hour, hour, minute });
-  useEffect(() => {
-    stateRef.current = { dialMode, is24Hour, hour, minute };
-  }, [dialMode, is24Hour, hour, minute]);
+  const stateRef = useRef();
+  stateRef.current = {
+    dialMode,
+    is24Hour,
+    hour,
+    minute
+  };
 
+  const dialRef = useRef(null);
   const clockCenterGlobal = useRef({ x: 0, y: 0 });
 
-  const handleDialMove = (globalX, globalY, isRelease = false) => {
+  const angleToHour = (angle, dist, is24Hour) => {
+    let h = Math.round(angle / 30);
+    if (h === 12) h = 0;
+
+    if (!is24Hour) {
+      return h === 0 ? 12 : h;
+    } else {
+      const outerThreshold = 100 * 0.65;
+      if (dist > outerThreshold) {
+        return h === 0 ? 12 : h;
+      } else {
+        return h === 0 ? 0 : h + 12;
+      }
+    }
+  };
+
+  const angleToMinute = (angle) => {
+    const step = 6;
+    let m = Math.round(angle / step);
+    if (m === 60) m = 0;
+    return m;
+  };
+
+  const handleDialMove = (globalX, globalY, isRelease = false, gestureState = null) => {
     if (!clockCenterGlobal.current.x) return;
 
     const dx = globalX - clockCenterGlobal.current.x;
     const dy = globalY - clockCenterGlobal.current.y;
-    let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI);
     angle = angle + 90;
     if (angle < 0) angle += 360;
 
+    const dist = Math.sqrt(dx * dx + dy * dy);
     const currentDialMode = stateRef.current.dialMode;
     const currentIs24Hour = stateRef.current.is24Hour;
 
     if (currentDialMode === 'hour') {
-      let h = Math.round(angle / 30);
-      if (h === 12) h = 0; 
+      const h = angleToHour(angle, dist, currentIs24Hour);
+      setHour(h.toString());
       
-      if (!currentIs24Hour) {
-        h = h === 0 ? 12 : h;
-        setHour(h.toString());
-      } else {
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > 75) {
-          h = h === 0 ? 12 : h;
-        } else {
-          h = h === 0 ? 0 : h + 12;
-        }
-        setHour(h.toString());
-      }
       if (isRelease) {
         setDialMode('minute');
       }
     } else {
-      let m = Math.round(angle / 6);
-      if (m === 60) m = 0;
+      const m = angleToMinute(angle);
       setMinute(m.toString().padStart(2, '0'));
     }
   };
@@ -151,27 +166,31 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderGrant: (evt, gestureState) => {
-        const { pageX, pageY, locationX, locationY } = evt.nativeEvent;
-        if (locationX !== undefined && pageX !== undefined) {
-          clockCenterGlobal.current = {
-            x: pageX - locationX + 125,
-            y: pageY - locationY + 125,
-          };
+        if (dialRef.current) {
+          dialRef.current.measureInWindow((x, y, width, height) => {
+            clockCenterGlobal.current = {
+              x: x + width / 2,
+              y: y + height / 2,
+            };
+
+            handleDialMove(
+              gestureState.x0,
+              gestureState.y0,
+              false
+            );
+          });
         }
-        handleDialMove(gestureState.x0, gestureState.y0, false);
       },
       onPanResponderMove: (evt, gestureState) => {
         handleDialMove(gestureState.moveX, gestureState.moveY, false);
       },
       onPanResponderRelease: (evt, gestureState) => {
-        handleDialMove(gestureState.moveX, gestureState.moveY, true);
+        handleDialMove(gestureState.moveX, gestureState.moveY, true, gestureState);
       },
       onPanResponderTerminate: (evt, gestureState) => {
-        handleDialMove(gestureState.moveX, gestureState.moveY, true);
+        handleDialMove(gestureState.moveX, gestureState.moveY, true, gestureState);
       }
     })
   ).current;
@@ -194,12 +213,12 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
         }
       } else {
         for (let i = 0; i <= 23; i++) {
-          const isOuter = (i >= 1 && i <= 12);
+          const isOuter = (i >= 1 && i <= 11) || i === 12;
           const displayI = (i === 0 || i === 12) ? 0 : (i % 12);
           const r = isOuter ? radius * 0.8 : radius * 0.5;
           const angle = (displayI * 30 - 90) * (Math.PI / 180);
           items.push({
-            label: i.toString().padStart(2, '0'),
+            label: i === 0 ? '00' : i.toString(),
             x: center.x + r * Math.cos(angle),
             y: center.y + r * Math.sin(angle),
             value: i.toString(),
@@ -278,6 +297,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
           })}
           
           <View 
+            ref={dialRef}
             style={{ position: 'absolute', top: 0, left: 0, width: 250, height: 250, backgroundColor: 'transparent' }}
             {...panResponder.panHandlers}
           />
