@@ -27,6 +27,8 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
   const [is24Hour, setIs24Hour] = useState(false);
   const [panResponderActive, setPanResponderActive] = useState(false);
 
+  const dragging = useRef(false);
+
   useEffect(() => {
     const uses24Hour = Localization.getCalendars()[0]?.uses24hourClock ?? false;
     setIs24Hour(uses24Hour);
@@ -113,16 +115,22 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
   };
 
   const dialRef = useRef(null);
-  const arrowRef = useRef({
-    angle: 0,
-    radius: 80
-  });
+  // const arrowRef = useRef({
+  //   angle: 0,
+  //   radius: 80
+  // });
 
-  const [, forceUpdate] = useState(0);
+  const [arrow,setArrow]=useState({
+    angle:0,
+    radius:80
+});
+
+  // const [, forceUpdate] = useState(0);
   const clockCenterGlobal = useRef({ x: 0, y: 0 });
 
   const angleToHour = (angle, dist, is24Hour) => {
-    let h = Math.round(angle / 30);
+    // let h = Math.round(angle / 30);
+    let h = Math.floor((angle+15)/30)
     if (h === 12) h = 0;
 
     if (!is24Hour) {
@@ -139,7 +147,8 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
 
   const angleToMinute = (angle) => {
     const step = 6;
-    let m = Math.round(angle / step);
+    // let m = Math.round(angle / step);
+    let m = Math.floor((angle+3)/6)
     if (m === 60) m = 0;
     return m;
   };
@@ -159,62 +168,170 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
 
     if (currentDialMode === 'hour') {
 
-      arrowRef.current = {
-        angle,
-        radius: currentIs24Hour && dist < 65 ? 50 : 80
-      };
-
-      const h = angleToHour(
-        angle,
-        dist,
-        currentIs24Hour
-      );
-
-      setHour(h.toString());
-
-      forceUpdate(v => v + 1);
-
-      if (isRelease) {
-        setDialMode('minute');
-      }
-    } else {
-      const m = angleToMinute(angle);
-      setMinute(m.toString().padStart(2, '0'));
-    }
+  arrowRef.current = {
+    angle,
+    radius: currentIs24Hour && dist < 65 ? 50 : 80
   };
+
+  const h = angleToHour(
+    angle,
+    dist,
+    currentIs24Hour
+  );
+
+  const value = h.toString();
+
+  if (value !== stateRef.current.hour) {
+    setHour(value);
+  }
+
+  forceUpdate(v => v + 1);
+
+  if (isRelease) {
+    setDialMode('minute');
+  }
+
+} else {
+
+  const m = angleToMinute(angle);
+  const value = m.toString().padStart(2, '0');
+
+  if (value !== stateRef.current.minute) {
+    setMinute(value);
+  }
+}
+
+//     if (currentDialMode === 'hour') {
+
+//       // arrowRef.current = {
+//       //   angle,
+//       //   radius: currentIs24Hour && dist < 65 ? 50 : 80
+//       // };
+
+//       setArrow({
+//     angle,
+//     radius: currentIs24Hour && dist < 65 ? 50 : 80
+// });
+
+//       const h = angleToHour(
+//         angle,
+//         dist,
+//         currentIs24Hour
+//       );
+
+//       setHour(h.toString());
+
+//       // forceUpdate(v => v + 1);
+
+//       if (isRelease) {
+//         setDialMode('minute');
+//       }
+//     } else {
+//       const m = angleToMinute(angle);
+//       setMinute(m.toString().padStart(2, '0'));
+//     }
+  };
+
+  //   const panResponder = useRef(
+  //     PanResponder.create({
+  //       onStartShouldSetPanResponder: () => true,
+  //       onMoveShouldSetPanResponder: () => true,
+  //       // onPanResponderGrant: (evt, gestureState) => {
+  //       //   setPanResponderActive(true);
+  //       //   if (dialRef.current) {
+  //       //     dialRef.current.measureInWindow((x, y, width, height) => {
+  //       //       clockCenterGlobal.current = {
+  //       //         x: x + width / 2,
+  //       //         y: y + height / 2,
+  //       //       };
+
+  //       //       handleDialMove(
+  //       //         gestureState.x0,
+  //       //         gestureState.y0,
+  //       //         false
+  //       //       );
+  //       //     });
+  //       //   }
+  //       // },
+  //       onPanResponderGrant: (evt, gestureState) => {
+
+  //     dragging.current = true;
+
+  //     handleDialMove(
+  //         gestureState.x0,
+  //         gestureState.y0,
+  //         false
+  //     );
+
+  // },
+  //       onPanResponderMove: (evt, gestureState) => {
+  //         handleDialMove(gestureState.moveX, gestureState.moveY, false);
+  //       },
+  //       onPanResponderRelease: (evt, gestureState) => {
+  //         // setPanResponderActive(false);
+  //         dragging.current = false;
+  //         handleDialMove(gestureState.moveX, gestureState.moveY, true, gestureState);
+  //       },
+  //       onPanResponderTerminate: (evt, gestureState) => {
+  //         // setPanResponderActive(false);
+  //         dragging.current = false;
+  //         handleDialMove(gestureState.moveX, gestureState.moveY, true, gestureState);
+  //       }
+  //     })
+  //   ).current;
+
 
   const panResponder = useRef(
     PanResponder.create({
+
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt, gestureState) => {
-        setPanResponderActive(true);
-        if (dialRef.current) {
-          dialRef.current.measureInWindow((x, y, width, height) => {
-            clockCenterGlobal.current = {
-              x: x + width / 2,
-              y: y + height / 2,
-            };
 
-            handleDialMove(
-              gestureState.x0,
-              gestureState.y0,
-              false
-            );
-          });
-        }
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+
+      onPanResponderTerminationRequest: () => false,
+
+      onShouldBlockNativeResponder: () => true,
+
+      onPanResponderGrant: (evt, gestureState) => {
+
+        dragging.current = true;
+
+        handleDialMove(
+          gestureState.x0,
+          gestureState.y0
+        );
+
       },
+
       onPanResponderMove: (evt, gestureState) => {
-        handleDialMove(gestureState.moveX, gestureState.moveY, false);
+
+        handleDialMove(
+          gestureState.moveX,
+          gestureState.moveY
+        );
+
       },
+
       onPanResponderRelease: (evt, gestureState) => {
-        setPanResponderActive(false);
-        handleDialMove(gestureState.moveX, gestureState.moveY, true, gestureState);
+
+        dragging.current = false;
+
+        handleDialMove(
+          gestureState.moveX,
+          gestureState.moveY,
+          true
+        );
+
       },
-      onPanResponderTerminate: (evt, gestureState) => {
-        setPanResponderActive(false);
-        handleDialMove(gestureState.moveX, gestureState.moveY, true, gestureState);
+
+      onPanResponderTerminate: () => {
+
+        dragging.current = false;
+
       }
+
     })
   ).current;
 
@@ -276,18 +393,23 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
       } else {
         if (displayI === 12) displayI = 0;
       }
-      if (dialMode === 'hour' && panResponderActive) {
-         arrowAngle =
-            (arrowRef.current.angle - 90) *
-            (Math.PI / 180);
+      // if (dialMode === 'hour' && panResponderActive) {
+      if (dialMode === 'hour' && dragging.current) {
+        // arrowAngle =
+        //   (arrowRef.current.angle - 90) *
+        //   (Math.PI / 180);
 
-         arrowRadius =
-            arrowRef.current.radius;
+        // arrowRadius =
+        //   arrowRef.current.radius;
+
+          arrowAngle=(arrow.angle-90)*(Math.PI/180);
+
+arrowRadius=arrow.radius;
       }
       else {
-         arrowAngle =
-            (displayI * 30 - 90) *
-            (Math.PI / 180);
+        arrowAngle =
+          (displayI * 30 - 90) *
+          (Math.PI / 180);
       }
     } else {
       arrowAngle = (currentValInt * 6 - 90) * (Math.PI / 180);
@@ -295,6 +417,19 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
 
     const arrowX = center.x + arrowRadius * Math.cos(arrowAngle);
     const arrowY = center.y + arrowRadius * Math.sin(arrowAngle);
+
+    const updateClockCenter = () => {
+      if (!dialRef.current) return;
+
+      dialRef.current.measureInWindow((x, y, width, height) => {
+
+        clockCenterGlobal.current = {
+          x: x + width / 2,
+          y: y + height / 2,
+        };
+
+      });
+    };
 
     return (
       <View style={styles.dialContainer}>
@@ -333,7 +468,22 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
 
           <View
             ref={dialRef}
-            style={{ position: 'absolute', top: 0, left: 0, width: 250, height: 250, backgroundColor: 'transparent' }}
+            style={{
+              // position: 'absolute',
+              // top: 0,
+              // left: 0,
+              // width: 250,
+              // height: 250,
+              position:'absolute',
+              top:-20,
+              left:-20,
+              width:290,
+              height:290,
+              backgroundColor: 'transparent'
+            }}
+            collapsable={false}
+            onLayout={updateClockCenter}
+            // style={StyleSheet.absoluteFill}
             {...panResponder.panHandlers}
           />
         </View>
@@ -343,7 +493,9 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      {/* <TouchableWithoutFeedback onPress={Keyboard.dismiss}> */}
+      <View
+    pointerEvents="box-none">
         <View style={styles.overlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'position'} style={{ width: '100%', alignItems: 'center' }}>
             <View style={[styles.container, { backgroundColor: colors.bgCard }]}>
@@ -436,7 +588,8 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
             </View>
           </KeyboardAvoidingView>
         </View>
-      </TouchableWithoutFeedback>
+        </View>
+      {/* </TouchableWithoutFeedback> */}
     </Modal>
   );
 }
