@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, PanResponder } from 'react-native';
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
@@ -108,14 +108,13 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
     stateRef.current = { dialMode, is24Hour, hour, minute };
   }, [dialMode, is24Hour, hour, minute]);
 
-  const handleDialTouch = (evt, isRelease = false) => {
-    const { locationX, locationY } = evt.nativeEvent;
-    
-    // Safety check for Android event bugs
-    if (locationX === undefined || locationY === undefined) return;
-    
-    const dx = locationX - 125;
-    const dy = locationY - 125;
+  const clockCenterGlobal = useRef({ x: 0, y: 0 });
+
+  const handleDialMove = (globalX, globalY, isRelease = false) => {
+    if (!clockCenterGlobal.current.x) return;
+
+    const dx = globalX - clockCenterGlobal.current.x;
+    const dy = globalY - clockCenterGlobal.current.y;
     let angle = Math.atan2(dy, dx) * 180 / Math.PI;
     angle = angle + 90;
     if (angle < 0) angle += 360;
@@ -148,6 +147,34 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
       setMinute(m.toString().padStart(2, '0'));
     }
   };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: (evt, gestureState) => {
+        const { pageX, pageY, locationX, locationY } = evt.nativeEvent;
+        if (locationX !== undefined && pageX !== undefined) {
+          clockCenterGlobal.current = {
+            x: pageX - locationX + 125,
+            y: pageY - locationY + 125,
+          };
+        }
+        handleDialMove(gestureState.x0, gestureState.y0, false);
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        handleDialMove(gestureState.moveX, gestureState.moveY, false);
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        handleDialMove(gestureState.moveX, gestureState.moveY, true);
+      },
+      onPanResponderTerminate: (evt, gestureState) => {
+        handleDialMove(gestureState.moveX, gestureState.moveY, true);
+      }
+    })
+  ).current;
 
   const ClockDial = () => {
     const radius = 100;
@@ -252,15 +279,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
           
           <View 
             style={{ position: 'absolute', top: 0, left: 0, width: 250, height: 250, backgroundColor: 'transparent' }}
-            onStartShouldSetResponder={() => true}
-            onStartShouldSetResponderCapture={() => true}
-            onMoveShouldSetResponder={() => true}
-            onMoveShouldSetResponderCapture={() => true}
-            onResponderTerminationRequest={() => false}
-            onResponderGrant={(evt) => handleDialTouch(evt, false)}
-            onResponderMove={(evt) => handleDialTouch(evt, false)}
-            onResponderRelease={(evt) => handleDialTouch(evt, true)}
-            onResponderTerminate={(evt) => handleDialTouch(evt, true)}
+            {...panResponder.panHandlers}
           />
         </View>
       </View>

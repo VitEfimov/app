@@ -252,11 +252,11 @@ export default function PomodoroScreen() {
         
         {/* Work / Break Toggle */}
         <View style={styles.toggleContainer}>
-          <View style={[styles.toggleBtn, !localIsBreak ? styles.toggleBtnActive : null, !localIsBreak ? { backgroundColor: colors.primary } : null]}>
-            <Text style={[styles.toggleText, !localIsBreak && { color: colors.textInverse }]}>{t('Work Time')}</Text>
+          <View style={[styles.toggleBtn, !localIsBreak ? styles.toggleBtnActive : null]}>
+            <Text style={[styles.toggleText, !localIsBreak && { color: colors.primary }]}>{t('Work Time')}</Text>
           </View>
-          <View style={[styles.toggleBtn, localIsBreak ? styles.toggleBtnActive : null, localIsBreak ? { backgroundColor: colors.primary } : null]}>
-            <Text style={[styles.toggleText, localIsBreak && { color: colors.textInverse }]}>{t('Break Time')}</Text>
+          <View style={[styles.toggleBtn, localIsBreak ? styles.toggleBtnActive : null]}>
+            <Text style={[styles.toggleText, localIsBreak && { color: colors.primary }]}>{t('Break Time')}</Text>
           </View>
         </View>
 
@@ -378,8 +378,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   toggleBtnActive: {
-    // Android has a bug where elevation + dynamic background color breaks border radius
-    // So we remove the shadow to ensure the pill shape renders perfectly
+    backgroundColor: 'transparent', // removed background to fix android border bug
   },
   toggleText: {
     fontWeight: 'bold',
