@@ -25,6 +25,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
   const [inputMode, setInputMode] = useState('dial');
   const [dialMode, setDialMode] = useState('hour');
   const [is24Hour, setIs24Hour] = useState(false);
+  const [panResponderActive, setPanResponderActive] = useState(false);
 
   useEffect(() => {
     const uses24Hour = Localization.getCalendars()[0]?.uses24hourClock ?? false;
@@ -63,7 +64,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
   const handleSave = () => {
     let h = parseInt(hour, 10) || 0;
     const m = parseInt(minute, 10) || 0;
-    
+
     if (!is24Hour) {
       if (h < 1 || h > 12) h = 12;
       if (isPM && h !== 12) h += 12;
@@ -112,6 +113,12 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
   };
 
   const dialRef = useRef(null);
+  const arrowRef = useRef({
+    angle: 0,
+    radius: 80
+  });
+
+  const [, forceUpdate] = useState(0);
   const clockCenterGlobal = useRef({ x: 0, y: 0 });
 
   const angleToHour = (angle, dist, is24Hour) => {
@@ -151,9 +158,22 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
     const currentIs24Hour = stateRef.current.is24Hour;
 
     if (currentDialMode === 'hour') {
-      const h = angleToHour(angle, dist, currentIs24Hour);
+
+      arrowRef.current = {
+        angle,
+        radius: currentIs24Hour && dist < 65 ? 50 : 80
+      };
+
+      const h = angleToHour(
+        angle,
+        dist,
+        currentIs24Hour
+      );
+
       setHour(h.toString());
-      
+
+      forceUpdate(v => v + 1);
+
       if (isRelease) {
         setDialMode('minute');
       }
@@ -168,6 +188,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt, gestureState) => {
+        setPanResponderActive(true);
         if (dialRef.current) {
           dialRef.current.measureInWindow((x, y, width, height) => {
             clockCenterGlobal.current = {
@@ -187,9 +208,11 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
         handleDialMove(gestureState.moveX, gestureState.moveY, false);
       },
       onPanResponderRelease: (evt, gestureState) => {
+        setPanResponderActive(false);
         handleDialMove(gestureState.moveX, gestureState.moveY, true, gestureState);
       },
       onPanResponderTerminate: (evt, gestureState) => {
+        setPanResponderActive(false);
         handleDialMove(gestureState.moveX, gestureState.moveY, true, gestureState);
       }
     })
@@ -198,7 +221,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
   const ClockDial = () => {
     const radius = 100;
     const center = { x: 125, y: 125 };
-    
+
     const items = [];
     if (dialMode === 'hour') {
       if (!is24Hour) {
@@ -253,7 +276,19 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
       } else {
         if (displayI === 12) displayI = 0;
       }
-      arrowAngle = (displayI * 30 - 90) * (Math.PI / 180);
+      if (dialMode === 'hour' && panResponderActive) {
+         arrowAngle =
+            (arrowRef.current.angle - 90) *
+            (Math.PI / 180);
+
+         arrowRadius =
+            arrowRef.current.radius;
+      }
+      else {
+         arrowAngle =
+            (displayI * 30 - 90) *
+            (Math.PI / 180);
+      }
     } else {
       arrowAngle = (currentValInt * 6 - 90) * (Math.PI / 180);
     }
@@ -266,14 +301,14 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
         <View style={[styles.dialCircle, { backgroundColor: colors.surfaceContainerHigh }]}>
           <Svg width="250" height="250" style={{ position: 'absolute', top: 0, left: 0 }} pointerEvents="none">
             <Circle cx={center.x} cy={center.y} r="4" fill={colors.primary} />
-            <Line 
-              x1={center.x} y1={center.y} 
-              x2={arrowX} y2={arrowY} 
-              stroke={colors.primary} strokeWidth="2" 
+            <Line
+              x1={center.x} y1={center.y}
+              x2={arrowX} y2={arrowY}
+              stroke={colors.primary} strokeWidth="2"
             />
             <Circle cx={arrowX} cy={arrowY} r="16" fill={colors.primary} />
           </Svg>
-          
+
           {items.map((item, index) => {
             const isSelected = parseInt(item.value, 10) === currentValInt;
             return (
@@ -295,8 +330,8 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
               </View>
             );
           })}
-          
-          <View 
+
+          <View
             ref={dialRef}
             style={{ position: 'absolute', top: 0, left: 0, width: 250, height: 250, backgroundColor: 'transparent' }}
             {...panResponder.panHandlers}
@@ -312,41 +347,41 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
         <View style={styles.overlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'position'} style={{ width: '100%', alignItems: 'center' }}>
             <View style={[styles.container, { backgroundColor: colors.bgCard }]}>
-              
+
               <Text style={[styles.title, { color: colors.textSecondary }]}>
                 {inputMode === 'dial' ? 'Select time' : 'Enter time'}
               </Text>
-              
-              <View style={styles.headerSelection}>
-                 <TouchableOpacity onPress={() => setDialMode('hour')} style={[styles.timeDisplayBtn, dialMode === 'hour' && { backgroundColor: colors.surfaceContainerHigh }]}>
-                   <Text style={[styles.timeDisplayText, { color: dialMode === 'hour' ? colors.primary : colors.textPrimary }]}>
-                     {hour.padStart(2, '0')}
-                   </Text>
-                 </TouchableOpacity>
-                 <Text style={[styles.separator, { color: colors.textPrimary }]}>:</Text>
-                 <TouchableOpacity onPress={() => setDialMode('minute')} style={[styles.timeDisplayBtn, dialMode === 'minute' && { backgroundColor: colors.surfaceContainerHigh }]}>
-                   <Text style={[styles.timeDisplayText, { color: dialMode === 'minute' ? colors.primary : colors.textPrimary }]}>
-                     {minute.padStart(2, '0')}
-                   </Text>
-                 </TouchableOpacity>
 
-                 {!is24Hour && (
-                    <View style={[styles.ampmContainer, { borderColor: colors.borderColor }]}>
-                      <TouchableOpacity
-                        style={[styles.ampmBtn, !isPM && { backgroundColor: colors.primaryContainer }]}
-                        onPress={() => setIsPM(false)}
-                      >
-                        <Text style={[styles.ampmText, { color: !isPM ? colors.textInverse : colors.textSecondary }, !isPM && { color: colors.primary, fontWeight: 'bold' }]}>AM</Text>
-                      </TouchableOpacity>
-                      <View style={[styles.ampmDivider, { backgroundColor: colors.borderColor }]} />
-                      <TouchableOpacity
-                        style={[styles.ampmBtn, isPM && { backgroundColor: colors.primaryContainer }]}
-                        onPress={() => setIsPM(true)}
-                      >
-                        <Text style={[styles.ampmText, { color: isPM ? colors.textInverse : colors.textSecondary }, isPM && { color: colors.primary, fontWeight: 'bold' }]}>PM</Text>
-                      </TouchableOpacity>
-                    </View>
-                 )}
+              <View style={styles.headerSelection}>
+                <TouchableOpacity onPress={() => setDialMode('hour')} style={[styles.timeDisplayBtn, dialMode === 'hour' && { backgroundColor: colors.surfaceContainerHigh }]}>
+                  <Text style={[styles.timeDisplayText, { color: dialMode === 'hour' ? colors.primary : colors.textPrimary }]}>
+                    {hour.padStart(2, '0')}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={[styles.separator, { color: colors.textPrimary }]}>:</Text>
+                <TouchableOpacity onPress={() => setDialMode('minute')} style={[styles.timeDisplayBtn, dialMode === 'minute' && { backgroundColor: colors.surfaceContainerHigh }]}>
+                  <Text style={[styles.timeDisplayText, { color: dialMode === 'minute' ? colors.primary : colors.textPrimary }]}>
+                    {minute.padStart(2, '0')}
+                  </Text>
+                </TouchableOpacity>
+
+                {!is24Hour && (
+                  <View style={[styles.ampmContainer, { borderColor: colors.borderColor }]}>
+                    <TouchableOpacity
+                      style={[styles.ampmBtn, !isPM && { backgroundColor: colors.primaryContainer }]}
+                      onPress={() => setIsPM(false)}
+                    >
+                      <Text style={[styles.ampmText, { color: !isPM ? colors.textInverse : colors.textSecondary }, !isPM && { color: colors.primary, fontWeight: 'bold' }]}>AM</Text>
+                    </TouchableOpacity>
+                    <View style={[styles.ampmDivider, { backgroundColor: colors.borderColor }]} />
+                    <TouchableOpacity
+                      style={[styles.ampmBtn, isPM && { backgroundColor: colors.primaryContainer }]}
+                      onPress={() => setIsPM(true)}
+                    >
+                      <Text style={[styles.ampmText, { color: isPM ? colors.textInverse : colors.textSecondary }, isPM && { color: colors.primary, fontWeight: 'bold' }]}>PM</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               {inputMode === 'keyboard' ? (
@@ -387,7 +422,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
                 <TouchableOpacity onPress={() => setInputMode(inputMode === 'dial' ? 'keyboard' : 'dial')} style={styles.toggleBtn}>
                   {inputMode === 'dial' ? <IconKeyboard color={colors.textSecondary} /> : <IconClock color={colors.textSecondary} />}
                 </TouchableOpacity>
-                
+
                 <View style={styles.actions}>
                   <TouchableOpacity onPress={onClose} style={styles.actionBtn}>
                     <Text style={[styles.actionText, { color: colors.textSecondary }]}>Cancel</Text>
@@ -397,7 +432,7 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
                   </TouchableOpacity>
                 </View>
               </View>
-              
+
             </View>
           </KeyboardAvoidingView>
         </View>
