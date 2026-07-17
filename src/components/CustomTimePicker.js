@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
@@ -110,6 +110,10 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
 
   const handleDialTouch = (evt, isRelease = false) => {
     const { locationX, locationY } = evt.nativeEvent;
+    
+    // Safety check for Android event bugs
+    if (locationX === undefined || locationY === undefined) return;
+    
     const dx = locationX - 125;
     const dy = locationY - 125;
     let angle = Math.atan2(dy, dx) * 180 / Math.PI;
@@ -144,17 +148,6 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
       setMinute(m.toString().padStart(2, '0'));
     }
   };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => handleDialTouch(evt, false),
-      onPanResponderMove: (evt) => handleDialTouch(evt, false),
-      onPanResponderRelease: (evt) => handleDialTouch(evt, true),
-      onPanResponderTerminate: (evt) => handleDialTouch(evt, true),
-    })
-  ).current;
 
   const ClockDial = () => {
     const radius = 100;
@@ -259,7 +252,15 @@ export default function CustomTimePicker({ visible, value, onClose, onSave, colo
           
           <View 
             style={{ position: 'absolute', top: 0, left: 0, width: 250, height: 250, backgroundColor: 'transparent' }}
-            {...panResponder.panHandlers}
+            onStartShouldSetResponder={() => true}
+            onStartShouldSetResponderCapture={() => true}
+            onMoveShouldSetResponder={() => true}
+            onMoveShouldSetResponderCapture={() => true}
+            onResponderTerminationRequest={() => false}
+            onResponderGrant={(evt) => handleDialTouch(evt, false)}
+            onResponderMove={(evt) => handleDialTouch(evt, false)}
+            onResponderRelease={(evt) => handleDialTouch(evt, true)}
+            onResponderTerminate={(evt) => handleDialTouch(evt, true)}
           />
         </View>
       </View>
