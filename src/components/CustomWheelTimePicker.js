@@ -13,6 +13,7 @@ import Animated, {
   useAnimatedReaction,
   scrollTo,
   withSpring,
+  withTiming,
   runOnUI
 } from 'react-native-reanimated';
 
@@ -93,13 +94,14 @@ const InfiniteWheel = ({ data, selectedValue, onValueChange, colors, infinite = 
         if (Math.abs(y - targetOffset) > 1) {
           isAutoScrolling.value = true;
           runOnUI(() => {
-            scrollY.value = withSpring(targetOffset, { damping: 20, stiffness: 90 }, (finished) => {
+            // Instant rigid hook
+            scrollY.value = withTiming(targetOffset, { duration: 80 }, (finished) => {
               if (finished) isAutoScrolling.value = false;
             });
           })();
         }
       }
-    }, 250);
+    }, 50); // extremely short delay
   }, [renderData, onValueChange]);
 
   useAnimatedReaction(
@@ -133,7 +135,7 @@ const InfiniteWheel = ({ data, selectedValue, onValueChange, colors, infinite = 
               const targetOffset = index * ITEM_HEIGHT;
               isAutoScrolling.value = true;
               runOnUI(() => {
-                scrollY.value = withSpring(targetOffset, { damping: 20, stiffness: 90 }, (finished) => {
+                scrollY.value = withTiming(targetOffset, { duration: 80 }, (finished) => {
                   if (finished) isAutoScrolling.value = false;
                 });
               })();
@@ -166,6 +168,7 @@ export default function CustomWheelTimePicker({ visible, value, onClose, onSave,
   const [minute, setMinute] = useState('00');
   const [isPM, setIsPM] = useState(false);
   const [is24Hour, setIs24Hour] = useState(false);
+  const [internalVisible, setInternalVisible] = useState(false);
 
   useEffect(() => {
     const uses24Hour = Localization.getCalendars()[0]?.uses24hourClock ?? false;
@@ -197,6 +200,10 @@ export default function CustomWheelTimePicker({ visible, value, onClose, onSave,
         setHour(h.toString());
         setMinute(now.format('mm'));
       }
+      // Ensure the wheels don't mount until the state is fully updated
+      setInternalVisible(true);
+    } else {
+      setInternalVisible(false);
     }
   }, [visible, value, is24Hour]);
 
@@ -254,45 +261,48 @@ export default function CustomWheelTimePicker({ visible, value, onClose, onSave,
               
               <Text style={[styles.title, { color: colors.textSecondary }]}>Select time</Text>
 
-              {/* By keying this container to `visible`, we force the FlatLists to fully unmount and remount when the modal opens. 
-                  This ensures `initialScrollIndex` calculates fresh based on the newly passed `hour` and `minute`. */}
-              <View key={visible ? 'visible' : 'hidden'} style={styles.pickerContainer}>
-                
-                {/* Horizontal Highlights overlay */}
-                <View style={[styles.highlightArea, { borderColor: colors.primary }]} pointerEvents="none" />
+              {/* Only mount the picker once the state has fully parsed the incoming `value` */}
+              {internalVisible ? (
+                <View style={styles.pickerContainer}>
+                  
+                  {/* Horizontal Highlights overlay */}
+                  <View style={[styles.highlightArea, { borderColor: colors.primary }]} pointerEvents="none" />
 
-                <InfiniteWheel 
-                  data={hourData} 
-                  selectedValue={hour} 
-                  onValueChange={setHour} 
-                  colors={colors} 
-                  infinite={true} 
-                />
-                
-                <Text style={[styles.separator, { color: colors.textPrimary }]}>:</Text>
-                
-                <InfiniteWheel 
-                  data={minuteData} 
-                  selectedValue={minute.padStart(2, '0')} 
-                  onValueChange={setMinute} 
-                  colors={colors} 
-                  infinite={true} 
-                />
+                  <InfiniteWheel 
+                    data={hourData} 
+                    selectedValue={hour} 
+                    onValueChange={setHour} 
+                    colors={colors} 
+                    infinite={true} 
+                  />
+                  
+                  <Text style={[styles.separator, { color: colors.textPrimary }]}>:</Text>
+                  
+                  <InfiniteWheel 
+                    data={minuteData} 
+                    selectedValue={minute.padStart(2, '0')} 
+                    onValueChange={setMinute} 
+                    colors={colors} 
+                    infinite={true} 
+                  />
 
-                {!is24Hour && (
-                  <>
-                    <View style={{ width: 10 }} />
-                    <InfiniteWheel 
-                      data={amPmData} 
-                      selectedValue={isPM ? 'PM' : 'AM'} 
-                      onValueChange={(val) => setIsPM(val === 'PM')} 
-                      colors={colors} 
-                      infinite={false} 
-                    />
-                  </>
-                )}
+                  {!is24Hour && (
+                    <>
+                      <View style={{ width: 10 }} />
+                      <InfiniteWheel 
+                        data={amPmData} 
+                        selectedValue={isPM ? 'PM' : 'AM'} 
+                        onValueChange={(val) => setIsPM(val === 'PM')} 
+                        colors={colors} 
+                        infinite={false} 
+                      />
+                    </>
+                  )}
 
-              </View>
+                </View>
+              ) : (
+                <View style={styles.pickerContainer} />
+              )}
 
               <View style={styles.actions}>
                 <TouchableOpacity onPress={onClose} style={styles.actionBtn}>

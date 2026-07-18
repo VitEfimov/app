@@ -27,7 +27,19 @@ const initialState = {
   themeMode: loaded?.themeMode || 'dark',
   calendarPanePosition: loaded?.calendarPanePosition || null,
   progressMode: loaded?.progressMode || 'daily',
-  defaultSnoozeTime: loaded?.defaultSnoozeTime || 30
+  defaultSnoozeTime: loaded?.defaultSnoozeTime || 30,
+  
+  // Auto-Manage settings
+  autoTransferMode: loaded?.autoTransferMode || 'none', // 'none', 'today', 'tomorrow', 'next_workday'
+  increasePriorityWhenOverdue: loaded?.increasePriorityWhenOverdue || false,
+  increasePriorityDailyOverdue: loaded?.increasePriorityDailyOverdue || false,
+  removePriorityWhenCompleted: loaded?.removePriorityWhenCompleted || false,
+  autoDeleteOverdueDays: loaded?.autoDeleteOverdueDays !== undefined ? loaded.autoDeleteOverdueDays : 0,
+  autoDeleteCompletedDays: loaded?.autoDeleteCompletedDays !== undefined ? loaded.autoDeleteCompletedDays : 0,
+  confirmBeforeDeletion: loaded?.confirmBeforeDeletion !== undefined ? loaded.confirmBeforeDeletion : true,
+  dailySummaryOverdue: loaded?.dailySummaryOverdue || false,
+  morningReminderToday: loaded?.morningReminderToday || false,
+  eveningReminderUnfinished: loaded?.eveningReminderUnfinished || false
 };
 
 const themeSlice = createSlice({
@@ -89,6 +101,19 @@ const themeSlice = createSlice({
       state.calendarPanePosition = null;
       state.progressMode = 'daily';
       state.defaultSnoozeTime = 30;
+      
+      // Reset auto-manage settings
+      state.autoTransferMode = 'none';
+      state.increasePriorityWhenOverdue = false;
+      state.increasePriorityDailyOverdue = false;
+      state.removePriorityWhenCompleted = false;
+      state.autoDeleteOverdueDays = 0;
+      state.autoDeleteCompletedDays = 0;
+      state.confirmBeforeDeletion = true;
+      state.dailySummaryOverdue = false;
+      state.morningReminderToday = false;
+      state.eveningReminderUnfinished = false;
+
       AsyncStorage.removeItem('customTheme');
     },
     setDefaultTaskLimit: (state, action) => {
@@ -126,9 +151,15 @@ const themeSlice = createSlice({
     setDefaultSnoozeTime: (state, action) => {
       state.defaultSnoozeTime = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setAutoManageSettings: (state, action) => {
+      Object.keys(action.payload).forEach(key => {
+        state[key] = action.payload[key];
+      });
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
 
-export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit, setSourceColor, setThemeMode, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime } = themeSlice.actions;
+export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit, setSourceColor, setThemeMode, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoManageSettings } = themeSlice.actions;
 export default themeSlice.reducer;

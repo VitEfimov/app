@@ -199,6 +199,10 @@ function InitApp() {
         // Load tasks from local storage
         await dispatch(fetchTasks()).unwrap();
 
+        // Process any automatic task transfers / deletions based on settings
+        const { processAutoManageTasks } = require('./src/features/taskSlice');
+        await dispatch(processAutoManageTasks());
+
         await registerForPushNotificationsAsync();
       } catch (e) {
         console.error(e);

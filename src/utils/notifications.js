@@ -187,3 +187,51 @@ export async function cancelNotification(notificationIds) {
     }
   }
 }
+
+export async function updateRecurringAutomations(themeState) {
+    const { dailySummaryOverdue, morningReminderToday, eveningReminderUnfinished } = themeState;
+    
+    // Cancel existing automations
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notif of scheduled) {
+        if (notif.content.data?.isAutomation) {
+            await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+        }
+    }
+    
+    if (morningReminderToday) {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: 'Good Morning!',
+                body: "Check your tasks for today.",
+                sound: true,
+                data: { isAutomation: true },
+            },
+            trigger: { hour: 8, minute: 0, repeats: true }
+        });
+    }
+
+    if (dailySummaryOverdue) {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: 'Daily Summary',
+                body: "You might have some overdue tasks waiting.",
+                sound: true,
+                data: { isAutomation: true },
+            },
+            trigger: { hour: 9, minute: 0, repeats: true }
+        });
+    }
+
+    if (eveningReminderUnfinished) {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: 'Evening Review',
+                body: "Wrap up any unfinished tasks before the day ends.",
+                sound: true,
+                data: { isAutomation: true },
+            },
+            trigger: { hour: 20, minute: 0, repeats: true }
+        });
+    }
+}

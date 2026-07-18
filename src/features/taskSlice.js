@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 
@@ -173,6 +173,116 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     const tasks = getState().taskReducer.tasks;
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
     // dispatch(updateTaskAsync(payload));
+};
+
+export const processAutoManageTasks = () => async (dispatch, getState) => {
+    const state = getState();
+    const tasks = state.taskReducer.tasks;
+    const themeState = state.themeReducer;
+    
+    const {
+        autoTransferMode,
+        increasePriorityWhenOverdue,
+        increasePriorityDailyOverdue,
+        removePriorityWhenCompleted,
+        autoDeleteOverdueDays,
+        autoDeleteCompletedDays,
+        confirmBeforeDeletion
+    } = themeState;
+    
+    const today = dayjs().startOf('day');
+    let hasChanges = false;
+    let newTasks = [...tasks];
+    let tasksToDelete = [];
+    
+    newTasks = newTasks.map(task => {
+        let updatedTask = { ...task };
+        let taskChanged = false;
+        const taskDate = dayjs(task.completionDate).startOf('day');
+        
+        if (updatedTask.completed) {
+            if (removePriorityWhenCompleted && updatedTask.priority !== 'none') {
+                updatedTask.priority = 'none';
+                taskChanged = true;
+            }
+            if (autoDeleteCompletedDays > 0) {
+                const daysOld = today.diff(taskDate, 'day');
+                if (daysOld >= autoDeleteCompletedDays) {
+                    tasksToDelete.push(updatedTask.id);
+                }
+            }
+        } 
+        else if (taskDate.isBefore(today)) {
+            const daysOverdue = today.diff(taskDate, 'day');
+            if (autoDeleteOverdueDays > 0 && daysOverdue >= autoDeleteOverdueDays) {
+                tasksToDelete.push(updatedTask.id);
+            } 
+            else {
+                if (increasePriorityDailyOverdue) {
+                    if (daysOverdue >= 2 && updatedTask.priority !== 'high') {
+                        updatedTask.priority = 'high';
+                        taskChanged = true;
+                    } else if (daysOverdue === 1 && (updatedTask.priority === 'none' || updatedTask.priority === 'low')) {
+                        updatedTask.priority = 'medium';
+                        taskChanged = true;
+                    }
+                } else if (increasePriorityWhenOverdue) {
+                    if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
+                        updatedTask.priority = 'medium';
+                        taskChanged = true;
+                    }
+                }
+                
+                if (autoTransferMode && autoTransferMode !== 'none') {
+                    let targetDate = today;
+                    if (autoTransferMode === 'tomorrow') {
+                        targetDate = targetDate.add(1, 'day');
+                    } else if (autoTransferMode === 'next_workday') {
+                        targetDate = targetDate.add(1, 'day');
+                        if (targetDate.day() === 6) targetDate = targetDate.add(2, 'day'); 
+                        if (targetDate.day() === 0) targetDate = targetDate.add(1, 'day'); 
+                    }
+                    updatedTask.completionDate = targetDate.toISOString();
+                    taskChanged = true;
+                }
+            }
+        }
+        
+        if (taskChanged) {
+            hasChanges = true;
+            return updatedTask;
+        }
+        return task;
+    });
+
+    if (tasksToDelete.length > 0 && !confirmBeforeDeletion) {
+        newTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
+        hasChanges = true;
+    }
+
+    if (hasChanges) {
+        dispatch(hydrateTaskState(newTasks));
+        await AsyncStorage.setItem('tasks', JSON.stringify(newTasks));
+    }
+
+    if (tasksToDelete.length > 0 && confirmBeforeDeletion) {
+        Alert.alert(
+            "Automatic Cleanup",
+            `You have ${tasksToDelete.length} old task(s) scheduled for automatic deletion based on your settings. Do you want to delete them?`,
+            [
+                { text: "Keep Them", style: "cancel" },
+                { 
+                    text: "Delete", 
+                    style: "destructive", 
+                    onPress: async () => {
+                        const finalTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
+                        dispatch(hydrateTaskState(finalTasks));
+                        await AsyncStorage.setItem('tasks', JSON.stringify(finalTasks));
+                    }
+                }
+            ]
+        );
+    }
 };
 
 export default taskSlice.reducer;

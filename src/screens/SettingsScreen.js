@@ -7,6 +7,7 @@ import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
+import AutoManageSettings from '../components/AutoManageSettings';
 
 const IconUser = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill={color}>
@@ -38,6 +39,7 @@ export default function SettingsScreen({ navigation }) {
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
+  const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
 
   const languageOptions = [
     { label: 'English', value: 'en' },
@@ -144,8 +146,16 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Customization Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary, paddingTop: 20 }]}>{t('Customization')}</Text>
+        {/* Auto Manage Button */}
+        <TouchableOpacity 
+          accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
+          style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary, marginBottom: 15 }]} onPress={() => setAutoManageModalVisible(true)}
+        >
+          <Text style={styles.actionBtnText}>{t('⚙️ Task Automations')}</Text>
+        </TouchableOpacity>
+
+        {/* General Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary, paddingTop: 10 }]}>{t('General')}</Text>
         <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
           
           <CustomDropdown 
@@ -201,10 +211,14 @@ export default function SettingsScreen({ navigation }) {
 
       </ScrollView>
 
-      {/* Modal */}
+      {/* Modals */}
       <ThemeSettingsModal 
         isVisible={isThemeModalVisible} 
         onClose={() => setThemeModalVisible(false)} 
+      />
+      <AutoManageSettings 
+        isVisible={isAutoManageModalVisible}
+        onClose={() => setAutoManageModalVisible(false)}
       />
     </View>
   );
