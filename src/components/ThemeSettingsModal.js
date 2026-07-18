@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
-import { setSourceColor, resetTheme, setUserPicture } from '../features/themeSlice';
+import { setSourceColor, resetTheme, setUserPicture, setThemeMode } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
@@ -46,9 +46,11 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   
   const currentSourceColor = useSelector(state => state.themeReducer.sourceColor);
   const currentUserPicture = useSelector(state => state.themeReducer.userPicture);
+  const currentThemeMode = useSelector(state => state.themeReducer.themeMode);
 
   const [tempColor, setTempColor] = useState(currentSourceColor);
   const [tempImage, setTempImage] = useState(currentUserPicture);
+  const [tempThemeMode, setTempThemeMode] = useState(currentThemeMode || 'system');
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -73,6 +75,9 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
     dispatch(setSourceColor(finalColor));
     if (tempImage !== currentUserPicture) {
       dispatch(setUserPicture(tempImage));
+    }
+    if (tempThemeMode !== currentThemeMode) {
+      dispatch(setThemeMode(tempThemeMode));
     }
     onClose();
   };
@@ -123,7 +128,41 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
           </View>
 
           <ScrollView style={styles.scrollArea}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Material You Theme')}</Text>
+            
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Appearance Mode')}</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {t("Choose between light, dark, high contrast, or follow your device settings.")}
+            </Text>
+
+            <View style={styles.themeModeRow}>
+              {[
+                { label: t('System'), value: 'system' },
+                { label: t('Light'), value: 'light' },
+                { label: t('Dark'), value: 'dark' },
+                { label: t('Contrast'), value: 'contrast' }
+              ].map((modeOption) => (
+                <TouchableOpacity
+                  key={modeOption.value}
+                  accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${modeOption.label} mode`}
+                  style={[
+                    styles.themeModeBtn, 
+                    { borderColor: colors.borderColor },
+                    tempThemeMode === modeOption.value && { backgroundColor: colors.primary, borderColor: colors.primary }
+                  ]}
+                  onPress={() => setTempThemeMode(modeOption.value)}
+                >
+                  <Text style={[
+                    styles.themeModeText, 
+                    { color: colors.textPrimary },
+                    tempThemeMode === modeOption.value && { color: colors.textInverse, fontWeight: 'bold' }
+                  ]}>
+                    {modeOption.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginTop: 20 }]}>{t('Material You Theme')}</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {t("Choose a source color and we'll generate a complete, accessible theme palette for you automatically.")}
             </Text>
@@ -247,6 +286,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 15,
+  },
+  themeModeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 10,
+  },
+  themeModeBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  themeModeText: {
+    fontSize: 14,
   },
   colorRow: {
     flexDirection: 'row',

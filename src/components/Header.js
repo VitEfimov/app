@@ -40,7 +40,7 @@ const IconContrast = ({ color }) => (
 export default function Header() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const { colors, mode } = useTheme();
+  const { colors, mode, isDark } = useTheme();
   const { t } = useTranslation();
   
   const themeReducer = useSelector(state => state.themeReducer || {});
@@ -72,7 +72,7 @@ export default function Header() {
 
   const getThemeIcon = () => {
     if (mode === 'contrast') return <IconContrast color={colors.textPrimary} />;
-    if (mode === 'dark') return <IconDarkMode color={colors.textPrimary} />;
+    if (mode === 'dark' || (mode === 'system' && isDark)) return <IconDarkMode color={colors.textPrimary} />;
     return <IconLightMode color={colors.textPrimary} />;
   };
 
