@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
+import CustomWheelTimePicker from './CustomWheelTimePicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -492,7 +493,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             )}
 
             {showTimePicker && (
-              <CustomTimePicker
+              <CustomWheelTimePicker
                 visible={showTimePicker}
                 value={selectedTime}
                 colors={colors}
