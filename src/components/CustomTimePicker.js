@@ -330,6 +330,7 @@ export default function CustomTimePicker({
   const isDragging = useSharedValue(false);
   const sharedAngle = useSharedValue(0);
   const sharedRadius = useSharedValue(80);
+  const lastValue = useSharedValue(-1);
 
   const is24HourSV = useSharedValue(false);
   const isHourMode = useSharedValue(true);
@@ -421,13 +422,15 @@ export default function CustomTimePicker({
     }
 
     sharedAngle.value = withSpring(targetAngle, {
-      damping: 20,
-      stiffness: 200,
+      damping: 12,
+      stiffness: 420,
+      mass: 0.4,
     });
 
     sharedRadius.value = withSpring(targetRadius, {
-      damping: 20,
-      stiffness: 200,
+      damping: 12,
+      stiffness: 420,
+      mass: 0.4,
     });
   }, [hour, minute, dialMode, is24Hour]);
 
@@ -539,16 +542,18 @@ const panGesture = Gesture.Pan()
     const dy = e.absoluteY - clockCenterY.value;
 
     const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 450) % 360;
-    const snappedAngle = isHourMode.value
-      ? Math.round(angle / 30) * 30
-      : Math.round(angle / 6) * 6;
 
-    sharedAngle.value = snappedAngle;
+    sharedAngle.value = angle;
 
-    runOnJS(updateTimeFromAngle)(
-      angle,
-      Math.sqrt(dx * dx + dy * dy)
-    );
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const value = isHourMode.value
+      ? angleToHour(angle, dist, is24HourSV.value)
+      : angleToMinute(angle);
+
+    if (value !== lastValue.value) {
+      lastValue.value = value;
+      runOnJS(updateTimeFromAngle)(angle, dist);
+    }
   })
   .onUpdate((e) => {
     'worklet';
@@ -557,25 +562,38 @@ const panGesture = Gesture.Pan()
     const dy = e.absoluteY - clockCenterY.value;
 
     const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 450) % 360;
-    const snappedAngle = isHourMode.value
-      ? Math.round(angle / 30) * 30
-      : Math.round(angle / 6) * 6;
-
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    sharedAngle.value = snappedAngle;
+    sharedAngle.value = angle;
 
     sharedRadius.value =
       isHourMode.value && is24HourSV.value
         ? (dist < 65 ? 50 : 80)
         : 80;
 
-    runOnJS(updateTimeFromAngle)(angle, dist);
+    const value = isHourMode.value
+      ? angleToHour(angle, dist, is24HourSV.value)
+      : angleToMinute(angle);
+
+    if (value !== lastValue.value) {
+      lastValue.value = value;
+      runOnJS(updateTimeFromAngle)(angle, dist);
+    }
   })
   .onEnd(() => {
     'worklet';
 
     isDragging.value = false;
+
+    const snapped = isHourMode.value
+      ? Math.round(sharedAngle.value / 30) * 30
+      : Math.round(sharedAngle.value / 6) * 6;
+
+    sharedAngle.value = withSpring(snapped, {
+      damping: 12,
+      stiffness: 420,
+      mass: 0.4,
+    });
 
     if (isHourMode.value) {
       runOnJS(setDialMode)('minute');
