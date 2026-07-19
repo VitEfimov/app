@@ -2381,19 +2381,20 @@ const WheelItem = React.memo(
             scrollY.value - itemOffset
           );
 
-        const opacity = interpolate(
-          distanceFromCenter,
-          [
-            0,
-            ITEM_HEIGHT,
-            ITEM_HEIGHT * 2,
-          ],
-          [1, 0.5, 0.2],
-          Extrapolation.CLAMP
-        );
+        // Remove opacity fading for wheel items so they fully represent their color
+        // const opacity = interpolate(
+        //   distanceFromCenter,
+        //   [
+        //     0,
+        //     ITEM_HEIGHT,
+        //     ITEM_HEIGHT * 2,
+        //   ],
+        //   [1, 0.5, 0.2],
+        //   Extrapolation.CLAMP
+        // );
 
         return {
-          opacity,
+          opacity: 1,
         };
       });
 
@@ -2496,26 +2497,20 @@ const InfiniteWheel = ({
    * Calculate only once for this mounted wheel.
    * Do not recalculate whenever selectedValue changes.
    */
-  const initialIndexRef = useRef(null);
+  // We compute the initial index on every render to avoid the cache bug
+  // where it stays stuck at the first opened time (e.g., 6:29 AM).
+  let initialIndex = data.findIndex(
+    (item) => String(item.value) === String(selectedValue)
+  );
 
-  if (initialIndexRef.current === null) {
-    let index = data.findIndex(
-      (item) => String(item.value) === String(selectedValue)
-    );
-
-    if (index < 0) {
-      index = 0;
-    }
-
-    if (infinite && originalLength > 0) {
-      index += Math.floor(loops / 2) * originalLength;
-    }
-
-    initialIndexRef.current = index;
-    lastSelectedIndexRef.current = index;
+  if (initialIndex < 0) {
+    initialIndex = 0;
   }
 
-  const initialIndex = initialIndexRef.current;
+  if (infinite && originalLength > 0) {
+    initialIndex += Math.floor(loops / 2) * originalLength;
+  }
+
   const initialOffset = initialIndex * ITEM_HEIGHT;
 
   const scrollY = useSharedValue(initialOffset);

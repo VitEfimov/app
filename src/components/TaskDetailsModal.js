@@ -109,6 +109,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState(null);
+  const [timePickerType, setTimePickerType] = useState('wheel'); // 'wheel' or 'dial'
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [reminder, setReminder] = useState('None');
   const [isAlarm, setIsAlarm] = useState(false);
@@ -460,7 +461,17 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 </TouchableOpacity>
               </View>
               <View style={styles.column}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('TIME')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('TIME')}</Text>
+                  <TouchableOpacity
+                    onPress={() => setTimePickerType(prev => prev === 'wheel' ? 'dial' : 'wheel')}
+                    style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: surfaceLighter, borderRadius: 4, borderWidth: 1, borderColor: colors.borderColor }}
+                  >
+                    <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
+                      {timePickerType === 'wheel' ? 'WHEEL' : 'DIAL'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 <TouchableOpacity 
                   accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
                   style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
@@ -540,39 +551,41 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               />
             )} */}
 
-            {showTimePicker && (
-  // <CustomWheelTimePicker
-  //   visible={showTimePicker}
-  //   value={selectedTime}
-  //   colors={colors}
-  //   isDark={isDark}
-  //   onClose={() => {
-  //     setShowTimePicker(false);
-  //   }}
-  //   onSave={(newTime) => {
-  //     setSelectedTime(newTime);
-  //     setShowTimePicker(false);
-  //   }}
-  // />
+            {showTimePicker && timePickerType === 'wheel' && (
+              <CustomWheelTimePicker
+                visible={showTimePicker}
+                value={selectedTime}
+                colors={colors}
+                isDark={isDark}
+                onClose={() => setShowTimePicker(false)}
+                onSave={(newTime) => {
+                  setSelectedTime(newTime);
+                  handleUpdate({
+                    time: newTime,
+                    hasUserSelectedTime: true,
+                  });
+                  setShowTimePicker(false);
+                }}
+              />
+            )}
 
-  <CustomWheelTimePicker
-  visible={showTimePicker}
-  value={selectedTime}
-  colors={colors}
-  isDark={isDark}
-  onClose={() => setShowTimePicker(false)}
-  onSave={(newTime) => {
-    setSelectedTime(newTime);
-
-    handleUpdate({
-      time: newTime,
-      hasUserSelectedTime: true,
-    });
-
-    setShowTimePicker(false);
-  }}
-/>
-)}
+            {showTimePicker && timePickerType === 'dial' && (
+              <CustomTimePicker
+                visible={showTimePicker}
+                value={selectedTime}
+                colors={colors}
+                isDark={isDark}
+                onClose={() => setShowTimePicker(false)}
+                onSave={(newTime) => {
+                  setSelectedTime(newTime);
+                  handleUpdate({
+                    time: newTime,
+                    hasUserSelectedTime: true,
+                  });
+                  setShowTimePicker(false);
+                }}
+              />
+            )}
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('NOTES')}</Text>
