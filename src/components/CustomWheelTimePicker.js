@@ -2,60 +2,69 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedScrollHandler, 
-  useAnimatedStyle, 
-  interpolate, 
-  Extrapolation, 
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  interpolate,
+  interpolateColor,
+  Extrapolation,
   runOnJS,
   useAnimatedRef,
-  useAnimatedReaction,
   scrollTo,
-  withSpring,
-  withTiming,
-  runOnUI
 } from 'react-native-reanimated';
 
 const ITEM_HEIGHT = 60;
 const VISIBLE_ITEMS = 5;
 
+const AnimatedText = Animated.createAnimatedComponent(Text);
+
 const WheelItem = React.memo(({ index, item, scrollY, colors }) => {
   const animatedStyle = useAnimatedStyle(() => {
     const itemOffset = index * ITEM_HEIGHT;
     const distanceFromCenter = Math.abs(scrollY.value - itemOffset);
-    
-    const scale = interpolate(
-      distanceFromCenter,
-      [0, ITEM_HEIGHT, ITEM_HEIGHT * 2],
-      [1.1, 0.8, 0.6],
-      Extrapolation.CLAMP
-    );
 
     const opacity = interpolate(
       distanceFromCenter,
       [0, ITEM_HEIGHT, ITEM_HEIGHT * 2],
-      [1, 0.4, 0.15],
+      [1, 0.5, 0.2],
       Extrapolation.CLAMP
     );
 
-    return {
-      transform: [{ scale }],
-      opacity,
-    };
+    return { opacity };
+  });
+
+  const animatedTextStyle = useAnimatedStyle(() => {
+    const itemOffset = index * ITEM_HEIGHT;
+    const distanceFromCenter = Math.abs(scrollY.value - itemOffset);
+
+    const color = interpolateColor(
+      distanceFromCenter,
+      [0, ITEM_HEIGHT / 2, ITEM_HEIGHT],
+      [colors.primary, colors.textSecondary, colors.textSecondary]
+    );
+
+    const fontSize = interpolate(
+      distanceFromCenter,
+      [0, ITEM_HEIGHT],
+      [32, 26],
+      Extrapolation.CLAMP
+    );
+
+    return { color, fontSize };
   });
 
   return (
     <Animated.View style={[{ height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center' }, animatedStyle]}>
-      <Text style={{ fontSize: 32, color: colors.textPrimary, fontWeight: '500' }}>{item.label}</Text>
+      <AnimatedText style={[{ fontWeight: '400' }, animatedTextStyle]}>{item.label}</AnimatedText>
     </Animated.View>
   );
 });
 
 const InfiniteWheel = ({ data, selectedValue, onValueChange, colors, infinite = true }) => {
   const originalLength = data.length;
-  const loops = infinite ? 200 : 1;
-  
+  const loops = infinite ? 20 : 1;
+
   const renderData = useMemo(() => {
     if (!infinite) return data;
     const list = [];
@@ -75,70 +84,53 @@ const InfiniteWheel = ({ data, selectedValue, onValueChange, colors, infinite = 
       idx = middleLoop * originalLength + idx;
     }
     return idx;
-  }, []); 
+  }, []);
 
-  const flatListRef = React.useRef(null);
-  const animatedRef = useAnimatedRef();
-  const timeoutRef = React.useRef(null);
-
+  const flatListRef = useAnimatedRef();
   const scrollY = useSharedValue(initialIndex * ITEM_HEIGHT);
-  const isAutoScrolling = useSharedValue(false);
+  const currentIndex = useSharedValue(initialIndex);
 
-  const handleScrollRest = React.useCallback((y) => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      const index = Math.round(y / ITEM_HEIGHT);
-      if (renderData[index]) {
-        onValueChange(renderData[index].value);
-        const targetOffset = index * ITEM_HEIGHT;
-        if (Math.abs(y - targetOffset) > 1) {
-          isAutoScrolling.value = true;
-          runOnUI(() => {
-            // Instant rigid hook
-            scrollY.value = withTiming(targetOffset, { duration: 80 }, (finished) => {
-              if (finished) isAutoScrolling.value = false;
-            });
-          })();
-        }
-      }
-    }, 50); // extremely short delay
+  const handleIndexChange = React.useCallback((index) => {
+    if (!renderData[index]) return;
+    onValueChange(renderData[index].value);
   }, [renderData, onValueChange]);
-
-  useAnimatedReaction(
-    () => scrollY.value,
-    (val) => {
-      if (isAutoScrolling.value) {
-        scrollTo(animatedRef, 0, val, false);
-      }
-    }
-  );
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
-      if (!isAutoScrolling.value) {
-        scrollY.value = event.contentOffset.y;
+      scrollY.value = event.contentOffset.y;
+      const index = Math.round(event.contentOffset.y / ITEM_HEIGHT);
+      if (currentIndex.value !== index) {
+        currentIndex.value = index;
+        runOnJS(handleIndexChange)(index);
       }
-      runOnJS(handleScrollRest)(event.contentOffset.y);
-    }
+    },
+    onEndDrag: (event) => {
+      if (Math.abs(event.velocity?.y || 0) < 0.2) {
+        const targetIndex = Math.round(event.contentOffset.y / ITEM_HEIGHT);
+        scrollTo(flatListRef, 0, targetIndex * ITEM_HEIGHT, true);
+      }
+    },
+    onMomentumEnd: (event) => {
+      const targetIndex = Math.round(event.contentOffset.y / ITEM_HEIGHT);
+      scrollTo(flatListRef, 0, targetIndex * ITEM_HEIGHT, true);
+    },
   });
 
   return (
     <View style={{ height: ITEM_HEIGHT * VISIBLE_ITEMS, width: 80, overflow: 'hidden' }}>
       <Animated.FlatList
-        ref={animatedRef}
+        ref={flatListRef}
         data={renderData}
         keyExtractor={(_, index) => index.toString()}
         renderItem={({ item, index }) => (
-          <TouchableOpacity 
-            activeOpacity={1} 
+          <TouchableOpacity
+            activeOpacity={1}
             onPress={() => {
               const targetOffset = index * ITEM_HEIGHT;
-              isAutoScrolling.value = true;
-              runOnUI(() => {
-                scrollY.value = withTiming(targetOffset, { duration: 80 }, (finished) => {
-                  if (finished) isAutoScrolling.value = false;
-                });
-              })();
+              flatListRef.current?.scrollToOffset({
+                offset: targetOffset,
+                animated: true,
+              });
               onValueChange(item.value);
             }}
           >
@@ -146,8 +138,7 @@ const InfiniteWheel = ({ data, selectedValue, onValueChange, colors, infinite = 
           </TouchableOpacity>
         )}
         showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
+        decelerationRate={0.9}
         onScroll={onScroll}
         scrollEventThrottle={16}
         getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
@@ -200,7 +191,6 @@ export default function CustomWheelTimePicker({ visible, value, onClose, onSave,
         setHour(h.toString());
         setMinute(now.format('mm'));
       }
-      // Ensure the wheels don't mount until the state is fully updated
       setInternalVisible(true);
     } else {
       setInternalVisible(false);
@@ -252,49 +242,50 @@ export default function CustomWheelTimePicker({ visible, value, onClose, onSave,
     { label: 'PM', value: 'PM' }
   ], []);
 
+  const dividerColor = isDark ? '#333333' : '#e0e0e0';
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View pointerEvents="box-none" style={{ flex: 1, width: '100%' }}>
         <View style={styles.overlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'position'} style={{ width: '100%', alignItems: 'center' }}>
             <View style={[styles.container, { backgroundColor: colors.bgCard }]}>
-              
-              <Text style={[styles.title, { color: colors.textSecondary }]}>Select time</Text>
 
-              {/* Only mount the picker once the state has fully parsed the incoming `value` */}
+              {/* Only rendering title if needed, left out in mockup but good for context, we can keep it hidden or styled subtly */}
+              {/* <Text style={[styles.title, { color: colors.textSecondary }]}>Select time</Text> */}
+
               {internalVisible ? (
                 <View style={styles.pickerContainer}>
-                  
-                  {/* Horizontal Highlights overlay */}
+
                   <View style={[styles.highlightArea, { borderColor: colors.primary }]} pointerEvents="none" />
 
-                  <InfiniteWheel 
-                    data={hourData} 
-                    selectedValue={hour} 
-                    onValueChange={setHour} 
-                    colors={colors} 
-                    infinite={true} 
+                  <InfiniteWheel
+                    data={hourData}
+                    selectedValue={hour}
+                    onValueChange={setHour}
+                    colors={colors}
+                    infinite={true}
                   />
-                  
-                  <Text style={[styles.separator, { color: colors.textPrimary }]}>:</Text>
-                  
-                  <InfiniteWheel 
-                    data={minuteData} 
-                    selectedValue={minute.padStart(2, '0')} 
-                    onValueChange={setMinute} 
-                    colors={colors} 
-                    infinite={true} 
+
+                  <Text style={[styles.separator, { color: colors.primary }]}>:</Text>
+
+                  <InfiniteWheel
+                    data={minuteData}
+                    selectedValue={minute.padStart(2, '0')}
+                    onValueChange={setMinute}
+                    colors={colors}
+                    infinite={true}
                   />
 
                   {!is24Hour && (
                     <>
                       <View style={{ width: 10 }} />
-                      <InfiniteWheel 
-                        data={amPmData} 
-                        selectedValue={isPM ? 'PM' : 'AM'} 
-                        onValueChange={(val) => setIsPM(val === 'PM')} 
-                        colors={colors} 
-                        infinite={false} 
+                      <InfiniteWheel
+                        data={amPmData}
+                        selectedValue={isPM ? 'PM' : 'AM'}
+                        onValueChange={(val) => setIsPM(val === 'PM')}
+                        colors={colors}
+                        infinite={false}
                       />
                     </>
                   )}
@@ -304,12 +295,14 @@ export default function CustomWheelTimePicker({ visible, value, onClose, onSave,
                 <View style={styles.pickerContainer} />
               )}
 
+              <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
               <View style={styles.actions}>
-                <TouchableOpacity onPress={onClose} style={styles.actionBtn}>
-                  <Text style={[styles.actionText, { color: colors.textSecondary }]}>Cancel</Text>
+                <TouchableOpacity onPress={onClose} style={[styles.actionBtn, { borderRightWidth: 1, borderColor: dividerColor }]}>
+                  <Text style={[styles.actionText, { color: colors.textPrimary, fontWeight: '600' }]}>CANCEL</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleSave} style={styles.actionBtn}>
-                  <Text style={[styles.actionText, { color: colors.primary, fontWeight: 'bold' }]}>OK</Text>
+                  <Text style={[styles.actionText, { color: colors.primary, fontWeight: '600' }]}>SAVE</Text>
                 </TouchableOpacity>
               </View>
 
@@ -329,48 +322,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   container: {
-    width: 340,
-    borderRadius: 24,
-    padding: 24,
+    width: 320,
+    borderRadius: 16,
+    paddingTop: 30,
+    overflow: 'hidden',
   },
   title: {
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 20,
-    marginLeft: 4,
+    marginLeft: 24,
   },
   pickerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     height: ITEM_HEIGHT * 5,
-    marginBottom: 30,
+    marginBottom: 20,
     position: 'relative'
   },
   separator: {
     fontSize: 40,
     marginHorizontal: 10,
-    fontWeight: '300'
+    fontWeight: '400',
+    paddingBottom: 4,
   },
   highlightArea: {
     position: 'absolute',
-    top: ITEM_HEIGHT * 2, // Centered (5 items tall, so middle is at index 2)
-    left: 10,
-    right: 10,
+    top: ITEM_HEIGHT * 2,
+    left: 20,
+    right: 20,
     height: ITEM_HEIGHT,
     borderTopWidth: 1,
     borderBottomWidth: 1,
   },
+  divider: {
+    height: 1,
+    width: '100%',
+  },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
+    height: 55,
   },
   actionBtn: {
-    marginLeft: 20,
-    padding: 10,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   actionText: {
     fontSize: 16,
+    letterSpacing: 0.5,
   }
 });
