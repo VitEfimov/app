@@ -149,7 +149,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   useEffect(() => {
   if (isVisible && task) {
     setTaskName(task.taskname || '');
-    setNotes(stripHtml(task.description?.text));
+    setNotes(stripHtml(task.description?.text) || '');
     setNoteImage(task.description?.img || '');
     setSubtasks(task.subtasks || []);
     setPriority(task.priority || 'none');
@@ -216,8 +216,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const hasUnsavedChanges = () => {
     if (!task) return false;
     if (taskName !== task.taskname) return true;
-    if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) return true;
-    if (selectedTime !== (task.time || '')) return true;
+    if (notes !== (stripHtml(task.description?.text) || '') || noteImage !== (task.description?.img || '')) return true;
+    if ((selectedTime || '') !== (task.time || '')) return true;
     if (reminder !== (task.reminder || 'None')) return true;
     if (isAlarm !== (task.isAlarm || false)) return true;
     if (priority !== (task.priority || 'none')) return true;

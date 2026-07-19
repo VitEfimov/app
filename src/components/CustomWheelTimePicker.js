@@ -2497,19 +2497,26 @@ const InfiniteWheel = ({
    * Calculate only once for this mounted wheel.
    * Do not recalculate whenever selectedValue changes.
    */
-  // We compute the initial index on every render to avoid the cache bug
-  // where it stays stuck at the first opened time (e.g., 6:29 AM).
-  let initialIndex = data.findIndex(
-    (item) => String(item.value) === String(selectedValue)
-  );
+  const initialIndexRef = useRef(null);
 
-  if (initialIndex < 0) {
-    initialIndex = 0;
+  if (initialIndexRef.current === null) {
+    let index = data.findIndex(
+      (item) => String(item.value) === String(selectedValue)
+    );
+
+    if (index < 0) {
+      index = 0;
+    }
+
+    if (infinite && originalLength > 0) {
+      index += Math.floor(loops / 2) * originalLength;
+    }
+
+    initialIndexRef.current = index;
+    lastSelectedIndexRef.current = index;
   }
 
-  if (infinite && originalLength > 0) {
-    initialIndex += Math.floor(loops / 2) * originalLength;
-  }
+  const initialIndex = initialIndexRef.current;
 
   const initialOffset = initialIndex * ITEM_HEIGHT;
 
@@ -2685,7 +2692,7 @@ const handleScrollEndDrag = useCallback(
         }}
         snapToInterval={ITEM_HEIGHT}
         snapToAlignment="start"
-        decelerationRate={0.998}
+        decelerationRate={0.1}
         scrollEventThrottle={16}
         onScroll={
           Platform.OS === 'web'
@@ -2792,7 +2799,6 @@ export default function CustomWheelTimePicker({
 // }, [visible]);
 useEffect(() => {
   if (!visible) {
-    setInternalVisible(false);
     return undefined;
   }
 

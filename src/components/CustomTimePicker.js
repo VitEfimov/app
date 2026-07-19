@@ -5,6 +5,7 @@
 // import Svg, { Path, Circle, Line } from 'react-native-svg';
 // import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 // import Animated, { useSharedValue, useAnimatedProps, runOnJS, withSpring, useAnimatedStyle } from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 
 
@@ -2727,34 +2728,33 @@ export default function CustomTimePicker({
 
   return (
     <Modal
-      visible={visible}
       transparent
       animationType="fade"
+      visible={visible}
       statusBarTranslucent
-      onRequestClose={
-        onClose
-      }
+      onRequestClose={onClose}
     >
-      <View
-        style={[
-          styles.overlay,
-          {
-            backgroundColor:
-              scheme.scrim,
-          },
-        ]}
-      >
-        <KeyboardAvoidingView
-          behavior={
-            Platform.OS ===
-            'ios'
-              ? 'padding'
-              : undefined
-          }
-          style={
-            styles.keyboardAvoidingView
-          }
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View
+          style={[
+            styles.overlay,
+            {
+              backgroundColor:
+                scheme.scrim,
+            },
+          ]}
         >
+          <KeyboardAvoidingView
+            behavior={
+              Platform.OS ===
+              'ios'
+                ? 'padding'
+                : undefined
+            }
+            style={
+              styles.keyboardAvoidingView
+            }
+          >
           <View
             style={[
               styles.container,
@@ -3168,6 +3168,7 @@ export default function CustomTimePicker({
           </View>
         </KeyboardAvoidingView>
       </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
