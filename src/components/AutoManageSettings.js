@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import Modal from 'react-native-modal';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../styles/ThemeContext';
 import { setAutoManageSettings } from '../features/themeSlice';
+import { processAutoManageTasks } from '../features/taskSlice';
 import { updateRecurringAutomations } from '../utils/notifications';
 
 export default function AutoManageSettings({ isVisible, onClose }) {
@@ -13,7 +14,47 @@ export default function AutoManageSettings({ isVisible, onClose }) {
   const dispatch = useDispatch();
   const themeState = useSelector(state => state.themeReducer);
 
-  // Destructure settings with fallbacks
+  const scrollViewRef = useRef(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [scrollViewHeight, setScrollViewHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
+
+  const defaultSettings = {
+    autoTransferMode: 'none',
+    increasePriorityWhenOverdue: false,
+    increasePriorityDailyOverdue: false,
+    removePriorityWhenCompleted: false,
+    autoDeleteOverdueDays: 0,
+    autoDeleteCompletedDays: 0,
+    confirmBeforeDeletion: true,
+    dailySummaryOverdue: false,
+    morningReminderToday: false,
+    eveningReminderUnfinished: false
+  };
+
+  const [localSettings, setLocalSettings] = useState(defaultSettings);
+
+  useEffect(() => {
+    if (isVisible) {
+      setLocalSettings(themeState || defaultSettings);
+    }
+  }, [isVisible, themeState]);
+
+  const handleUpdate = (updates) => {
+    setLocalSettings(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleSave = () => {
+    dispatch(setAutoManageSettings(localSettings));
+    updateRecurringAutomations(localSettings);
+    dispatch(processAutoManageTasks());
+    onClose();
+  };
+
+  const handleReset = () => {
+    setLocalSettings(defaultSettings);
+  };
+
   const {
     autoTransferMode = 'none',
     increasePriorityWhenOverdue = false,
@@ -25,13 +66,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
     dailySummaryOverdue = false,
     morningReminderToday = false,
     eveningReminderUnfinished = false
-  } = themeState || {};
-
-  const handleUpdate = (updates) => {
-    dispatch(setAutoManageSettings(updates));
-    // Trigger notification scheduler with the new merged state
-    updateRecurringAutomations({ ...themeState, ...updates });
-  };
+  } = localSettings;
 
   const SettingToggle = ({ label, value, onValueChange }) => (
     <View style={styles.toggleRow}>
@@ -49,10 +84,13 @@ export default function AutoManageSettings({ isVisible, onClose }) {
     <Modal
       isVisible={isVisible}
       onSwipeComplete={onClose}
-      swipeDirection={['down']}
+      swipeDirection={scrollOffset > 0 ? undefined : ['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
       onBackButtonPress={onClose}
+      scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
+      scrollOffset={scrollOffset}
+      scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
@@ -67,7 +105,14 @@ export default function AutoManageSettings({ isVisible, onClose }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.scrollArea}>
+        <ScrollView 
+          ref={scrollViewRef}
+          onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.y)}
+          onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
+          onContentSizeChange={(_, h) => setScrollContentHeight(h)}
+          scrollEventThrottle={16}
+          style={styles.scrollArea}
+        >
           <Text style={[styles.groupHeader, { color: colors.textSecondary }]}>{t('Task Scheduling')}</Text>
           <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer }]}>
             <SettingToggle 
@@ -143,6 +188,16 @@ export default function AutoManageSettings({ isVisible, onClose }) {
               onValueChange={(val) => handleUpdate({ eveningReminderUnfinished: val })} 
             />
           </View>
+          <View style={{ height: 30 }} />
+          
+          <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
+            <TouchableOpacity onPress={handleReset} style={[styles.actionBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderColor }]}>
+              <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>{t('Reset')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleSave} style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
+              <Text style={{ color: colors.textInverse, fontWeight: 'bold' }}>{t('Save')}</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
     </Modal>
@@ -212,5 +267,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     marginRight: 10,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    padding: 15,
+    paddingBottom: 25,
+    borderTopWidth: 1,
+    gap: 15,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   }
 });

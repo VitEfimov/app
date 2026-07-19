@@ -28,6 +28,7 @@ const initialState = {
   calendarPanePosition: loaded?.calendarPanePosition || null,
   progressMode: loaded?.progressMode || 'daily',
   defaultSnoozeTime: loaded?.defaultSnoozeTime || 30,
+  isBoardsCollapsed: loaded?.isBoardsCollapsed || false,
   
   // Auto-Manage settings
   autoTransferMode: loaded?.autoTransferMode || 'none', // 'none', 'today', 'tomorrow', 'next_workday'
@@ -101,6 +102,7 @@ const themeSlice = createSlice({
       state.calendarPanePosition = null;
       state.progressMode = 'daily';
       state.defaultSnoozeTime = 30;
+      state.isBoardsCollapsed = false;
       
       // Reset auto-manage settings
       state.autoTransferMode = 'none';
@@ -157,9 +159,13 @@ const themeSlice = createSlice({
         state[key] = action.payload[key];
       });
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setBoardsCollapsed: (state, action) => {
+      state.isBoardsCollapsed = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
 
-export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit, setSourceColor, setThemeMode, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoManageSettings } = themeSlice.actions;
+export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit, setSourceColor, setThemeMode, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoManageSettings, setBoardsCollapsed } = themeSlice.actions;
 export default themeSlice.reducer;

@@ -108,7 +108,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [priority, setPriority] = useState('none');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
+  const [selectedTime, setSelectedTime] = useState(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [reminder, setReminder] = useState('None');
   const [isAlarm, setIsAlarm] = useState(false);
@@ -126,23 +126,56 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const stripHtml = (html) => html ? html.replace(/<[^>]+>/g, '').trim() : '';
 
-  useEffect(() => {
-    if (isVisible && task) {
-      setTaskName(task.taskname || '');
-      setNotes(stripHtml(task.description?.text));
-      setNoteImage(task.description?.img || '');
-      setSubtasks(task.subtasks || []);
-      setPriority(task.priority || 'none');
-      setSelectedDate(task.completionDate || '');
-      setSelectedTime(task.time || '');
+  // useEffect(() => {
+  //   if (isVisible && task) {
+  //     setTaskName(task.taskname || '');
+  //     setNotes(stripHtml(task.description?.text));
+  //     setNoteImage(task.description?.img || '');
+  //     setSubtasks(task.subtasks || []);
+  //     setPriority(task.priority || 'none');
+  //     setSelectedDate(task.completionDate || '');
+  //     setSelectedTime(task.time || null);
       
-      setRepeatFrequency(task.repeatFrequency || 'None');
-      setRepeatStartDate(task.repeatStartDate || task.completionDate || '');
-      setRepeatEndDate(task.repeatEndDate || '');
-      setReminder(task.reminder || 'None');
-      setIsAlarm(task.isAlarm || false);
-    }
-  }, [isVisible, task?.id]);
+  //     setRepeatFrequency(task.repeatFrequency || 'None');
+  //     setRepeatStartDate(task.repeatStartDate || task.completionDate || '');
+  //     setRepeatEndDate(task.repeatEndDate || '');
+  //     setReminder(task.reminder || 'None');
+  //     setIsAlarm(task.isAlarm || false);
+  //   }
+  // }, [isVisible, task?.id]);
+
+
+  useEffect(() => {
+  if (isVisible && task) {
+    setTaskName(task.taskname || '');
+    setNotes(stripHtml(task.description?.text));
+    setNoteImage(task.description?.img || '');
+    setSubtasks(task.subtasks || []);
+    setPriority(task.priority || 'none');
+    setSelectedDate(task.completionDate || '');
+
+    // Saved user time or null.
+    setSelectedTime(task.time || null);
+
+    setRepeatFrequency(
+      task.repeatFrequency || 'None'
+    );
+
+    setRepeatStartDate(
+      task.repeatStartDate ||
+      task.completionDate ||
+      ''
+    );
+
+    setRepeatEndDate(
+      task.repeatEndDate || ''
+    );
+
+    setReminder(task.reminder || 'None');
+    setIsAlarm(task.isAlarm || false);
+  }
+}, [isVisible, task?.id]);
+
 
   const formatDisplayTime = (timeStr) => {
     if (!timeStr || timeStr === '--:--') return '--:--';
@@ -491,7 +524,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 </View>
               </View>
             )}
-
+{/* 
             {showTimePicker && (
               <CustomWheelTimePicker
                 visible={showTimePicker}
@@ -505,7 +538,41 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                   setShowTimePicker(false);
                 }}
               />
-            )}
+            )} */}
+
+            {showTimePicker && (
+  // <CustomWheelTimePicker
+  //   visible={showTimePicker}
+  //   value={selectedTime}
+  //   colors={colors}
+  //   isDark={isDark}
+  //   onClose={() => {
+  //     setShowTimePicker(false);
+  //   }}
+  //   onSave={(newTime) => {
+  //     setSelectedTime(newTime);
+  //     setShowTimePicker(false);
+  //   }}
+  // />
+
+  <CustomWheelTimePicker
+  visible={showTimePicker}
+  value={selectedTime}
+  colors={colors}
+  isDark={isDark}
+  onClose={() => setShowTimePicker(false)}
+  onSave={(newTime) => {
+    setSelectedTime(newTime);
+
+    handleUpdate({
+      time: newTime,
+      hasUserSelectedTime: true,
+    });
+
+    setShowTimePicker(false);
+  }}
+/>
+)}
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('NOTES')}</Text>

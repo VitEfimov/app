@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share } from 'react-native';
+import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import TaskRow from '../components/TaskRow';
@@ -14,6 +15,7 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path } from 'react-native-svg';
 import { updateTask, deleteTask, deleteTasksByBoard } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
+import { setBoardsCollapsed } from '../features/themeSlice';
 import { useTranslation } from 'react-i18next';
 
 dayjs.extend(isSameOrBefore);
@@ -27,6 +29,12 @@ const IconChevronDown = ({ color, isCollapsed }) => (
 export default function BoardScreen({ route, navigation }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeAddSectionId, setActiveAddSectionId] = useState(null);
+  
+  const isBoardsCollapsed = useSelector(state => state.themeReducer.isBoardsCollapsed);
+
+  const toggleBoardsCollapsed = () => {
+    dispatch(setBoardsCollapsed(!isBoardsCollapsed));
+  };
 
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -377,35 +385,72 @@ export default function BoardScreen({ route, navigation }) {
       <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       
       {/* Top Tabs */}
-      <View style={[styles.topBar, { borderBottomColor: colors.borderColor }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.boardsScroll}>
-          {boards.map(board => (
-            <TouchableOpacity 
-              key={board.id} 
-              accessible={true} accessibilityRole="tab" accessibilityLabel={`Board ${board.name === 'Main' ? t('Main') : board.name}`} accessibilityState={{ selected: activeBoardId === board.id }}
-              style={[
-                styles.mainTab, 
-                activeBoardId === board.id && { borderBottomColor: colors.primary }
-              ]}
-              onPress={() => dispatch(setActiveBoardId(board.id))}
-              onLongPress={() => handleBoardOptions(board)}
-            >
-              <Text style={[
-                styles.mainTabText, 
-                { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
-              ]}>{board.name === 'Main' ? t('Main') : board.name}</Text>
+      <Animated.View layout={LinearTransition.duration(300)} style={[styles.topBar, { borderBottomColor: colors.borderColor, paddingTop: isBoardsCollapsed ? 0 : 10, alignItems: 'center' }]}>
+        <View style={{ flex: 1, overflow: 'hidden' }}>
+          {isBoardsCollapsed ? (
+            <TouchableOpacity onPress={toggleBoardsCollapsed} activeOpacity={0.8} style={{ flex: 1, justifyContent: 'center' }}>
+              <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.miniBoardsContainer}>
+                {boards.map(board => (
+                  <View 
+                    key={board.id} 
+                    style={[
+                      styles.miniBoardLine, 
+                      { 
+                        backgroundColor: activeBoardId === board.id ? colors.primary : colors.textSecondary,
+                        flex: activeBoardId === board.id ? 2 : 1, 
+                      }
+                    ]} 
+                  />
+                ))}
+              </Animated.View>
             </TouchableOpacity>
-          ))}
-          {boards.length < 3 && (
-            <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Add new board"
-              style={styles.addBoardBtn} onPress={handleAddBoard}
-            >
-              <Text style={[styles.addBoardText, { color: colors.textSecondary }]}>+</Text>
-            </TouchableOpacity>
+          ) : (
+            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.boardsScroll}>
+                {boards.map(board => (
+                  <TouchableOpacity 
+                    key={board.id} 
+                    accessible={true} accessibilityRole="tab" accessibilityLabel={`Board ${board.name === 'Main' ? t('Main') : board.name}`} accessibilityState={{ selected: activeBoardId === board.id }}
+                    style={[
+                      styles.mainTab, 
+                      activeBoardId === board.id && { borderBottomColor: colors.primary }
+                    ]}
+                    onPress={() => dispatch(setActiveBoardId(board.id))}
+                    onLongPress={() => handleBoardOptions(board)}
+                  >
+                    <Text style={[
+                      styles.mainTabText, 
+                      { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
+                    ]}>{board.name === 'Main' ? t('Main') : board.name}</Text>
+                  </TouchableOpacity>
+                ))}
+                {boards.length < 3 && (
+                  <TouchableOpacity 
+                    accessible={true} accessibilityRole="button" accessibilityLabel="Add new board"
+                    style={styles.addBoardBtn} onPress={handleAddBoard}
+                  >
+                    <Text style={[styles.addBoardText, { color: colors.textSecondary }]}>+</Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            </Animated.View>
           )}
-        </ScrollView>
-      </View>
+        </View>
+        <TouchableOpacity 
+          onPress={toggleBoardsCollapsed} 
+          style={{ 
+            padding: isBoardsCollapsed ? 5 : 10, 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            position: isBoardsCollapsed ? 'absolute' : 'relative',
+            right: 0,
+            top: isBoardsCollapsed ? -10 : 1,
+            zIndex: 999
+          }}
+        >
+          <IconChevronDown color={colors.primary} isCollapsed={isBoardsCollapsed} />
+        </TouchableOpacity>
+      </Animated.View>
 
       <SectionList
         sections={sections}
@@ -545,8 +590,19 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: 'row',
-    paddingTop: 10,
     borderBottomWidth: 1,
+    minHeight: 1, // Prevents total collapse
+  },
+  miniBoardsContainer: {
+    flexDirection: 'row',
+    height: 1,
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 1,
+  },
+  miniBoardLine: {
+    height: '10%',
+    borderRadius: 2,
   },
   boardsScroll: {
     paddingHorizontal: 15,
