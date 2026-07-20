@@ -2706,6 +2706,13 @@ const handleScrollEndDrag = useCallback(
           offset: ITEM_HEIGHT * index,
           index,
         })}
+        initialScrollIndex={initialIndex}
+        onScrollToIndexFailed={(info) => {
+          flatListRef.current?.scrollToOffset({
+            offset: info.averageItemLength * info.index,
+            animated: false,
+          });
+        }}
         initialNumToRender={30}
         maxToRenderPerBatch={30}
         windowSize={9}

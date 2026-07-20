@@ -102,57 +102,133 @@ function InitApp() {
             notes.push(`File: ${file.path || file.contentUri}`);
           }
         }
-      } else if (typeof shareIntent.value === 'string') {
-        const text = shareIntent.value || '';
-        const lines = text.split('\n');
-        let hasFoundSubtasks = false;
-        let firstLineFound = false;
+      } else {
+        const text = shareIntent.value || shareIntent.text || shareIntent.description || '';
+        if (typeof text === 'string' && text.trim().length > 0) {
+          const lines = text.split('\n');
+          let hasFoundSubtasks = false;
+          let remainingLines = [];
+          let taskTime = null;
 
-        for (let line of lines) {
-            let trimmed = line.trim();
-            if (!trimmed) continue;
-            
-            const priorityMatch = trimmed.match(/Priority:\s*(low|medium|high)/i);
-            if (priorityMatch) {
-                priority = priorityMatch[1].toLowerCase();
-                trimmed = trimmed.replace(priorityMatch[0], '').trim();
-                if (!trimmed) continue;
-            }
+          for (let line of lines) {
+              let trimmed = line.trim();
+              if (!trimmed) continue;
+              
+              const priorityMatch = trimmed.match(/Priority:\s*(low|medium|high)/i);
+              if (priorityMatch) {
+                  priority = priorityMatch[1].toLowerCase();
+                  trimmed = trimmed.replace(priorityMatch[0], '').trim();
+                  if (!trimmed) continue;
+              }
 
-            const dateMatch = trimmed.match(/(?:Due|date\(due\)|Date):\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|Today|Tomorrow)/i);
-            if (dateMatch) {
-                const dateStr = dateMatch[1];
-                if (dateStr.toLowerCase() === 'today') {
-                    completionDate = dayjs().format('YYYY-MM-DD');
-                } else if (dateStr.toLowerCase() === 'tomorrow') {
-                    completionDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
-                } else {
-                    const parsedDate = dayjs(dateStr);
-                    if (parsedDate.isValid()) {
-                        completionDate = parsedDate.format('YYYY-MM-DD');
-                    }
-                }
-                trimmed = trimmed.replace(dateMatch[0], '').trim();
-                if (!trimmed) continue;
-            }
+              const dRegex = /\b(today|tomorrow|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)\b/i;
+              const tRegex = /\b(\d{1,2}:\d{2}(?:\s*[aA][pP][mM])?|\d{1,2}\s*[aA][pP][mM])\b/i;
+              const keywordRegex = /\b(due time|due|deadline at|deadline|date\(due\)|date)\b/i;
+              
+              if (keywordRegex.test(trimmed)) {
+                  let foundAny = false;
+                  
+                  const dMatch = trimmed.match(dRegex);
+                  if (dMatch) {
+                      const dateStr = dMatch[1];
+                      if (dateStr.toLowerCase() === 'today') {
+                          completionDate = dayjs().format('YYYY-MM-DD');
+                      } else if (dateStr.toLowerCase() === 'tomorrow') {
+                          completionDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
+                      } else {
+                          let cleanDateStr = dateStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
+                          if (/[a-z]+\s+\d{1,2}$/i.test(cleanDateStr)) {
+                              cleanDateStr += `, ${dayjs().year()}`;
+                          }
+                          const parsedDate = dayjs(cleanDateStr);
+                          if (parsedDate.isValid()) {
+                              completionDate = parsedDate.format('YYYY-MM-DD');
+                          }
+                      }
+                      trimmed = trimmed.replace(dMatch[0], '');
+                      foundAny = true;
+                  }
+                  
+                  const tMatch = trimmed.match(tRegex);
+                  if (tMatch) {
+                      const timeStr = tMatch[1];
+                      let t = timeStr.trim();
+                      const pm = /pm/i.test(t);
+                      const am = /am/i.test(t);
+                      t = t.replace(/[aA][pP][mM]/i, '').trim();
+                      
+                      let [h, m] = t.split(':');
+                      h = parseInt(h, 10);
+                      m = m ? parseInt(m, 10) : 0;
+                      
+                      if (pm && h < 12) h += 12;
+                      if (am && h === 12) h = 0;
+                      
+                      taskTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                      trimmed = trimmed.replace(tMatch[0], '');
+                      foundAny = true;
+                  }
+                  
+                  if (foundAny) {
+                      trimmed = trimmed.replace(keywordRegex, '').replace(/\bat\b/i, '').replace(/:\s*$/, '').replace(/^\s*:\s*/, '').trim();
+                  }
+                  
+                  if (!trimmed) continue;
+              }
 
-            const subtaskMatch = trimmed.match(/^(\[ \]|\[x\]|-|\*|\d+\.)\s+(.+)/i);
-            if (subtaskMatch) {
-                hasFoundSubtasks = true;
-                subtasks.push({
-                    id: Date.now().toString() + Math.random().toString(),
-                    text: subtaskMatch[2].trim(),
-                    completed: subtaskMatch[1].toLowerCase() === '[x]'
-                });
-                continue;
-            }
+              const subtaskMatch = trimmed.match(/^(\[ \]|\[x\]|-|\*|\d+\.)\s+(.+)/i);
+              if (subtaskMatch) {
+                  hasFoundSubtasks = true;
+                  subtasks.push({
+                      id: Date.now().toString() + Math.random().toString(),
+                      text: subtaskMatch[2].trim(),
+                      completed: subtaskMatch[1].toLowerCase() === '[x]'
+                  });
+                  continue;
+              }
 
-            if (!firstLineFound && !hasFoundSubtasks) {
-                taskname = trimmed;
-                firstLineFound = true;
-            } else {
-                notes.push(trimmed);
-            }
+              if (!hasFoundSubtasks) {
+                  remainingLines.push(trimmed);
+              } else {
+                  notes.push(trimmed);
+              }
+          }
+
+          let preText = remainingLines.join('\n');
+          let extraNotes = [];
+
+          if (preText) {
+              const words = preText.split(/\s+/);
+              if (words.length > 5) {
+                  taskname = words.slice(0, 5).join(' ') + '...';
+                  let wordCount = 0;
+                  let splitIndex = 0;
+                  let inWord = false;
+                  for (let i = 0; i < preText.length; i++) {
+                      if (/\s/.test(preText[i])) {
+                          inWord = false;
+                      } else {
+                          if (!inWord) {
+                              wordCount++;
+                              inWord = true;
+                          }
+                      }
+                      if (wordCount === 6) {
+                          splitIndex = i;
+                          break;
+                      }
+                  }
+                  if (splitIndex > 0) {
+                      extraNotes.push(preText.substring(splitIndex).trim());
+                  } else {
+                      extraNotes.push(words.slice(5).join(' '));
+                  }
+              } else {
+                  taskname = preText;
+              }
+          }
+
+          notes = [...extraNotes, ...notes];
         }
       }
 
@@ -172,7 +248,8 @@ function InitApp() {
           subtasks: subtasks,
           completed: false,
           priority: priority,
-          completionDate: dayjs(completionDate).toISOString()
+          completionDate: dayjs(completionDate).toISOString(),
+          time: taskTime
         }
       }));
       resetShareIntent();

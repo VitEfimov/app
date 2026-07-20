@@ -378,7 +378,7 @@ export default function BoardScreen({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
+      style={{ flex: 1, backgroundColor: colors.bgMain }} 
       behavior="padding"
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
     >
@@ -413,7 +413,8 @@ export default function BoardScreen({ route, navigation }) {
                     accessible={true} accessibilityRole="tab" accessibilityLabel={`Board ${board.name === 'Main' ? t('Main') : board.name}`} accessibilityState={{ selected: activeBoardId === board.id }}
                     style={[
                       styles.mainTab, 
-                      activeBoardId === board.id && { borderBottomColor: colors.primary }
+                      activeBoardId === board.id && { borderBottomColor: colors.primary },
+                      { flexDirection: 'row', alignItems: 'center' }
                     ]}
                     onPress={() => dispatch(setActiveBoardId(board.id))}
                     onLongPress={() => handleBoardOptions(board)}
@@ -422,6 +423,27 @@ export default function BoardScreen({ route, navigation }) {
                       styles.mainTabText, 
                       { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
                     ]}>{board.name === 'Main' ? t('Main') : board.name}</Text>
+                    {(() => {
+                      const count = tasks.filter(t => (t.boardId || 'main') === board.id && !t.completed).length;
+                      if (count > 0) {
+                        return (
+                          <View style={{
+                            backgroundColor: activeBoardId === board.id ? `${colors.primary}20` : `${colors.textSecondary}20`,
+                            borderRadius: 10,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            marginLeft: 6
+                          }}>
+                            <Text style={{
+                              color: activeBoardId === board.id ? colors.primary : colors.textSecondary,
+                              fontSize: 10,
+                              fontWeight: 'bold'
+                            }}>{count}</Text>
+                          </View>
+                        );
+                      }
+                      return null;
+                    })()}
                   </TouchableOpacity>
                 ))}
                 {boards.length < 3 && (
