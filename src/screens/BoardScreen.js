@@ -210,7 +210,7 @@ export default function BoardScreen({ route, navigation }) {
   ), 'on-next-week');
   const laterTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed), 'later');
   const missedTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed), 'missed');
-  const completedTasks = boardTasks.filter(task => task.completed);
+  const completedTasks = sortTasks(boardTasks.filter(task => task.completed), 'completed');
 
   const sections = [
     ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),

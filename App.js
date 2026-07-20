@@ -89,6 +89,7 @@ function InitApp() {
       let completionDate = dayjs().format('YYYY-MM-DD'); 
       let priority = 'none';
       let imgUri = '';
+      let taskTime = null;
 
       if (shareIntent.type === 'media' || shareIntent.type === 'file' || Array.isArray(shareIntent.value)) {
         // Shared a file/image
@@ -108,7 +109,6 @@ function InitApp() {
           const lines = text.split('\n');
           let hasFoundSubtasks = false;
           let remainingLines = [];
-          let taskTime = null;
 
           for (let line of lines) {
               let trimmed = line.trim();
