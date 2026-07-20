@@ -126,9 +126,85 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
+        {/* Appearance Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Appearance')}</Text>
+        <View style={styles.sectionGroup}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Customize theme"
+            style={[styles.rowItem, { borderBottomColor: colors.borderColor }]} 
+            onPress={() => setThemeModalVisible(true)}
+          >
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Customize theme')}</Text>
+            <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownRow}>
+            <CustomDropdown 
+              label={t("Text wrapping") || "Text wrapping"} 
+              value={taskNameWrap} 
+              options={wrapOptions} 
+              onSelect={val => dispatch(setTaskNameWrap(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+          <View style={styles.dropdownRow}>
+            <CustomDropdown 
+              label={t("Font size") || "Font size"} 
+              value={fontSize} 
+              options={fontOptions} 
+              onSelect={val => dispatch(setFontSize(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+            <CustomDropdown 
+              label={t('Language') || 'Language'} 
+              value={i18n.language} 
+              options={languageOptions} 
+              onSelect={val => {
+                i18n.changeLanguage(val);
+                AsyncStorage.setItem('appLanguage', val);
+              }} 
+              colors={colors}
+              layout="horizontal"
+              searchable={true}
+              searchPlaceholder={t('Search language...')}
+            />
+          </View>
+        </View>
+
+        {/* Notifications Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Notifications')}</Text>
+        <View style={styles.sectionGroup}>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 0, paddingBottom: 0, paddingTop: 15 }]}>
+            <CustomDropdown 
+              label={t("Default Snooze")} 
+              value={defaultSnoozeTime} 
+              options={snoozeOptions} 
+              onSelect={val => dispatch(setDefaultSnoozeTime(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+        </View>
+
+        {/* Automation Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
+        <View style={styles.sectionGroup}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
+            style={[styles.rowItem, { borderBottomWidth: 0 }]} 
+            onPress={() => setAutoManageModalVisible(true)}
+          >
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
+            <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Account Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('Account')}</Text>
-        <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Account')}</Text>
+        <View style={styles.sectionGroup}>
           <View style={styles.profileRow}>
             <View style={styles.profileIconContainer}>
               <IconUser color="#42416b" />
@@ -146,68 +222,6 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Auto Manage Button */}
-        <TouchableOpacity 
-          accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
-          style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary, marginBottom: 15 }]} onPress={() => setAutoManageModalVisible(true)}
-        >
-          <Text style={styles.actionBtnText}>{t('⚙️ Task Automations')}</Text>
-        </TouchableOpacity>
-
-        {/* General Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary, paddingTop: 10 }]}>{t('General')}</Text>
-        <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
-          
-          <CustomDropdown 
-            label={t("Text wrapping") || "Text wrapping"} 
-            value={taskNameWrap} 
-            options={wrapOptions} 
-            onSelect={val => dispatch(setTaskNameWrap(val))} 
-            colors={colors}
-            layout="horizontal"
-          />
-
-          <CustomDropdown 
-            label={t("Font size") || "Font size"} 
-            value={fontSize} 
-            options={fontOptions} 
-            onSelect={val => dispatch(setFontSize(val))} 
-            colors={colors}
-            layout="horizontal"
-          />
-
-          <CustomDropdown 
-            label={t("Default Snooze")} 
-            value={defaultSnoozeTime} 
-            options={snoozeOptions} 
-            onSelect={val => dispatch(setDefaultSnoozeTime(val))} 
-            colors={colors}
-            layout="horizontal"
-          />
-
-          <CustomDropdown 
-            label={t('Language') || 'Language'} 
-            value={i18n.language} 
-            options={languageOptions} 
-            onSelect={val => {
-              i18n.changeLanguage(val);
-              AsyncStorage.setItem('appLanguage', val);
-            }} 
-            colors={colors}
-            layout="horizontal"
-          />
-
-          {/* Customize Theme Button */}
-          <TouchableOpacity 
-            accessible={true} accessibilityRole="button" accessibilityLabel="Customize theme"
-            style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary }]} onPress={() => setThemeModalVisible(true)}
-          >
-            <Text style={styles.actionBtnText}>{t('🎨 Customize theme')}</Text>
-          </TouchableOpacity>
-
-
-
-        </View>
 
       </ScrollView>
 
@@ -267,20 +281,33 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingTop: 5,
   },
-  card: {
-    borderRadius: 20,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+  sectionGroup: {
+    marginBottom: 25,
+  },
+  rowItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+  },
+  rowLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  rowArrow: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dropdownRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
   },
   profileIconContainer: {
     width: 50,
@@ -303,24 +330,11 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     backgroundColor: '#c62828',
-    paddingVertical: 15,
+    paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
   },
   deleteBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-
-  actionBtn: {
-    backgroundColor: '#285da1',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  actionBtnText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,

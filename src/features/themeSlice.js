@@ -33,14 +33,18 @@ const initialState = {
   // Auto-Manage settings
   autoTransferMode: loaded?.autoTransferMode || 'none', // 'none', 'today', 'tomorrow', 'next_workday'
   increasePriorityWhenOverdue: loaded?.increasePriorityWhenOverdue || false,
-  increasePriorityDailyOverdue: loaded?.increasePriorityDailyOverdue || false,
+  priorityFrequency: loaded?.priorityFrequency || 'never', // 'daily', 'weekly', 'never'
   removePriorityWhenCompleted: loaded?.removePriorityWhenCompleted || false,
   autoDeleteOverdueDays: loaded?.autoDeleteOverdueDays !== undefined ? loaded.autoDeleteOverdueDays : 0,
-  autoDeleteCompletedDays: loaded?.autoDeleteCompletedDays !== undefined ? loaded.autoDeleteCompletedDays : 0,
   confirmBeforeDeletion: loaded?.confirmBeforeDeletion !== undefined ? loaded.confirmBeforeDeletion : true,
-  dailySummaryOverdue: loaded?.dailySummaryOverdue || false,
-  morningReminderToday: loaded?.morningReminderToday || false,
-  eveningReminderUnfinished: loaded?.eveningReminderUnfinished || false
+  
+  // Reminders
+  morningReminder: loaded?.morningReminder || false,
+  morningReminderTime: loaded?.morningReminderTime || '08:00',
+  eveningReminder: loaded?.eveningReminder || false,
+  eveningReminderTime: loaded?.eveningReminderTime || '20:00',
+  summaryReminder: loaded?.summaryReminder || false,
+  summaryReminderTime: loaded?.summaryReminderTime || '09:00'
 };
 
 const themeSlice = createSlice({
@@ -107,14 +111,16 @@ const themeSlice = createSlice({
       // Reset auto-manage settings
       state.autoTransferMode = 'none';
       state.increasePriorityWhenOverdue = false;
-      state.increasePriorityDailyOverdue = false;
+      state.priorityFrequency = 'never';
       state.removePriorityWhenCompleted = false;
       state.autoDeleteOverdueDays = 0;
-      state.autoDeleteCompletedDays = 0;
       state.confirmBeforeDeletion = true;
-      state.dailySummaryOverdue = false;
-      state.morningReminderToday = false;
-      state.eveningReminderUnfinished = false;
+      state.morningReminder = false;
+      state.morningReminderTime = '08:00';
+      state.eveningReminder = false;
+      state.eveningReminderTime = '20:00';
+      state.summaryReminder = false;
+      state.summaryReminderTime = '09:00';
 
       AsyncStorage.removeItem('customTheme');
     },

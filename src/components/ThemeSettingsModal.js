@@ -18,24 +18,16 @@ import { getDeviceLanguage } from '../i18n';
 
 const PREDEFINED_COLORS = [
   '#C62828', // Red
-  '#C2185B', // Rose
-  '#AD1457', // Soft Pink
-  '#F051A3',
+  '#AD1457', // Pink
   '#8E24AA', // Purple
   '#5E35B1', // Deep Purple
-  '#3949AB', // Indigo
   '#1E88E5', // Blue
-  '#039BE5', // Light Blue
   '#00897B', // Teal
   '#2E7D32', // Dark Green
-  '#4F6F52', // Forest Green
-  '#6B8E6B', // Sage green
-  '#7CB342', // Light Green
+  '#6B8E6B', // Sage
   '#C0CA33', // Lime
   '#F9A825', // Yellow
   '#FB8C00', // Orange
-  '#F4511E', // Deep Orange
-  '#8D6E63', // Brown
   '#455A64'  // Slate
 ];
 
@@ -129,84 +121,83 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
 
           <ScrollView style={styles.scrollArea}>
             
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Appearance Mode')}</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {t("Choose between light, dark, high contrast, or follow your device settings.")}
-            </Text>
-
-            <View style={styles.themeModeRow}>
-              {[
-                { label: t('System'), value: 'system' },
-                { label: t('Light'), value: 'light' },
-                { label: t('Dark'), value: 'dark' },
-                { label: t('Contrast'), value: 'contrast' }
-              ].map((modeOption) => (
-                <TouchableOpacity
-                  key={modeOption.value}
-                  accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${modeOption.label} mode`}
-                  style={[
-                    styles.themeModeBtn, 
-                    { borderColor: colors.borderColor },
-                    tempThemeMode === modeOption.value && { backgroundColor: colors.primary, borderColor: colors.primary }
-                  ]}
-                  onPress={() => setTempThemeMode(modeOption.value)}
-                >
-                  <Text style={[
-                    styles.themeModeText, 
-                    { color: colors.textPrimary },
-                    tempThemeMode === modeOption.value && { color: colors.textInverse, fontWeight: 'bold' }
-                  ]}>
-                    {modeOption.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Appearance Mode')}</Text>
+              
+              <View style={styles.themeModeRow}>
+                {[
+                  { label: t('System'), value: 'system' },
+                  { label: t('Light'), value: 'light' },
+                  { label: t('Dark'), value: 'dark' },
+                  { label: t('Contrast'), value: 'contrast' }
+                ].map((modeOption) => (
+                  <TouchableOpacity
+                    key={modeOption.value}
+                    accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${modeOption.label} mode`}
+                    style={[
+                      styles.themeModeBtn, 
+                      { borderColor: colors.borderColor },
+                      tempThemeMode === modeOption.value && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                    onPress={() => setTempThemeMode(modeOption.value)}
+                  >
+                    <Text style={[
+                      styles.themeModeText, 
+                      { color: colors.textPrimary },
+                      tempThemeMode === modeOption.value && { color: colors.textInverse, fontWeight: 'bold' }
+                    ]}>
+                      {modeOption.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginTop: 20 }]}>{t('Material You Theme')}</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {t("Choose a source color and we'll generate a complete, accessible theme palette for you automatically.")}
-            </Text>
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Material You Theme')}</Text>
+              
+              <View style={styles.colorRow}>
+                {PREDEFINED_COLORS.map((c, i) => (
+                  <TouchableOpacity 
+                    key={i} 
+                    accessible={true} accessibilityRole="button" accessibilityLabel={`Select predefined color ${i + 1}`}
+                    style={[styles.colorCircle, { backgroundColor: c }, tempColor === c && styles.selectedColor]} 
+                    onPress={() => setTempColor(c)}
+                  />
+                ))}
+              </View>
 
-            <View style={styles.colorRow}>
-              {PREDEFINED_COLORS.map((c, i) => (
-                <TouchableOpacity 
-                  key={i} 
-                  accessible={true} accessibilityRole="button" accessibilityLabel={`Select predefined color ${i + 1}`}
-                  style={[styles.colorCircle, { backgroundColor: c }, tempColor === c && styles.selectedColor]} 
-                  onPress={() => setTempColor(c)}
+              <View style={styles.customColorRow}>
+                <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Accent Color')}</Text>
+                <TextInput 
+                  accessible={true} accessibilityLabel="Custom hex color input"
+                  style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary }]}
+                  value={tempColor}
+                  onChangeText={setTempColor}
+                  autoCapitalize="none"
                 />
-              ))}
+              </View>
             </View>
 
-            <View style={styles.customColorRow}>
-              <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Custom HEX:')}</Text>
-              <View style={[styles.customColorPreview, { backgroundColor: tempColor, borderColor: colors.borderColor }]} />
-              <TextInput 
-                accessible={true} accessibilityLabel="Custom hex color input"
-                style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary }]}
-                value={tempColor}
-                onChangeText={setTempColor}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginTop: 20 }]}>{t('Background Picture')}</Text>
-            <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Upload background image"
-              style={[styles.uploadBox, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fa' }]} onPress={handlePickImage}
-            >
-              {tempImage ? (
-                <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('Image selected. Tap to change.')}</Text>
-              ) : (
-                <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('📷 Tap to upload')}</Text>
-              )}
-            </TouchableOpacity>
-            {tempImage && (
-              <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 5 }}>
-                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: 'bold' }}>{t('Remove Image')}</Text>
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Background Picture')}</Text>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Upload background image"
+                style={[styles.uploadBox, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fa' }]} onPress={handlePickImage}
+              >
+                {tempImage ? (
+                  <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('Image selected. Tap to change.')}</Text>
+                ) : (
+                  <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('📷 Tap to upload')}</Text>
+                )}
               </TouchableOpacity>
-            )}
-
+              {tempImage && (
+                <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 10, alignSelf: 'center' }}>
+                  <Text style={{ color: colors.error || '#c62828', fontSize: 13, fontWeight: 'bold' }}>{t('Remove Image')}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={{ height: 20 }} />
           </ScrollView>
 
           <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
@@ -276,22 +267,21 @@ const styles = StyleSheet.create({
   scrollArea: {
     padding: 20,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#666',
+  card: {
+    borderRadius: 12,
+    padding: 15,
     marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
   },
   themeModeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginBottom: 10,
   },
   themeModeBtn: {
     paddingVertical: 8,
@@ -307,7 +297,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 15,
     marginBottom: 20,
-    justifyContent: 'center'
+    justifyContent: 'flex-start'
   },
   colorCircle: {
     width: 40,
@@ -323,18 +313,11 @@ const styles = StyleSheet.create({
   customColorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'space-between'
   },
   customColorLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    marginRight: 15,
-  },
-  customColorPreview: {
-    width: 40,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#333',
     marginRight: 10,
   },
   colorInput: {
@@ -343,6 +326,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     fontSize: 14,
+    maxWidth: 150,
   },
   uploadBox: {
     borderWidth: 1,

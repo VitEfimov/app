@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 dayjs.extend(isSameOrBefore);
 
 const IconChevronDown = ({ color, isCollapsed }) => (
-  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: [{ rotate: isCollapsed ? '-90deg' : '0deg' }] }}>
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: [{ rotate: isCollapsed ? '-90deg' : '0deg' }] }}>
     <Path d="M6 9l6 6 6-6" />
   </Svg>
 );
@@ -334,14 +334,14 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const renderSectionHeader = ({ section }) => {
+    const isCollapsed = collapsedSections.includes(section.id);
     return (
-      <View style={[styles.sectionHeader, { backgroundColor: colors.bgMain, borderBottomColor: colors.borderColor }]}>
+      <View style={[styles.sectionHeader, { backgroundColor: colors.bgMain, borderBottomColor: `${section.color}33` }]}>
         <TouchableOpacity 
-          accessible={true} accessibilityRole="button" accessibilityLabel={`${section.title} section, ${section.count} tasks`} accessibilityState={{ expanded: !collapsedSections.includes(section.id) }}
+          accessible={true} accessibilityRole="button" accessibilityLabel={`${section.title} section, ${section.count} tasks`} accessibilityState={{ expanded: !isCollapsed }}
           style={styles.sectionHeaderLeft} onPress={() => toggleSection(section.id)}
         >
-          <IconChevronDown color={colors.textSecondary} isCollapsed={collapsedSections.includes(section.id)} />
-          <Text testID={`section_title_${section.id}`} style={[styles.sectionTitle, { color: colors.textPrimary }]}>{section.title}</Text>
+          <Text testID={`section_title_${section.id}`} style={[styles.sectionTitle, { color: colors.textPrimary, marginLeft: 0 }]}>{section.title}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.badge, { backgroundColor: `${section.color}20` }]}
@@ -349,6 +349,14 @@ export default function BoardScreen({ route, navigation }) {
         >
           <Text style={[styles.badgeText, { color: section.color }]}>{section.count}</Text>
         </TouchableOpacity>
+        
+        <TouchableOpacity 
+          accessible={true} accessibilityRole="button" accessibilityLabel={`Toggle ${section.title} section`}
+          onPress={() => toggleSection(section.id)} style={{ padding: 5, marginLeft: 10 }}
+        >
+          <IconChevronDown color={isCollapsed ? section.color : colors.textSecondary} isCollapsed={isCollapsed} />
+        </TouchableOpacity>
+
         <TouchableOpacity 
           testID={`section_menu_${section.id}`}
           accessible={true} accessibilityRole="button" accessibilityLabel={`Options for ${section.title} section`}

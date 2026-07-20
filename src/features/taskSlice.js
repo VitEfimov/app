@@ -183,10 +183,9 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
     const {
         autoTransferMode,
         increasePriorityWhenOverdue,
-        increasePriorityDailyOverdue,
+        priorityFrequency,
         removePriorityWhenCompleted,
         autoDeleteOverdueDays,
-        autoDeleteCompletedDays,
         confirmBeforeDeletion
     } = themeState;
     
@@ -205,9 +204,9 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                 updatedTask.priority = 'none';
                 taskChanged = true;
             }
-            if (autoDeleteCompletedDays > 0) {
+            if (autoDeleteOverdueDays > 0) {
                 const daysOld = today.diff(taskDate, 'day');
-                if (daysOld >= autoDeleteCompletedDays) {
+                if (daysOld >= autoDeleteOverdueDays) {
                     tasksToDelete.push(updatedTask.id);
                 }
             }
@@ -218,18 +217,28 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                 tasksToDelete.push(updatedTask.id);
             } 
             else {
-                if (increasePriorityDailyOverdue) {
-                    if (daysOverdue >= 2 && updatedTask.priority !== 'high') {
-                        updatedTask.priority = 'high';
-                        taskChanged = true;
-                    } else if (daysOverdue === 1 && (updatedTask.priority === 'none' || updatedTask.priority === 'low')) {
-                        updatedTask.priority = 'medium';
-                        taskChanged = true;
-                    }
-                } else if (increasePriorityWhenOverdue) {
-                    if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
-                        updatedTask.priority = 'medium';
-                        taskChanged = true;
+                if (increasePriorityWhenOverdue) {
+                    if (priorityFrequency === 'daily') {
+                        if (daysOverdue >= 2 && updatedTask.priority !== 'high') {
+                            updatedTask.priority = 'high';
+                            taskChanged = true;
+                        } else if (daysOverdue === 1 && (updatedTask.priority === 'none' || updatedTask.priority === 'low')) {
+                            updatedTask.priority = 'medium';
+                            taskChanged = true;
+                        }
+                    } else if (priorityFrequency === 'weekly') {
+                        if (daysOverdue >= 14 && updatedTask.priority !== 'high') {
+                            updatedTask.priority = 'high';
+                            taskChanged = true;
+                        } else if (daysOverdue >= 7 && (updatedTask.priority === 'none' || updatedTask.priority === 'low')) {
+                            updatedTask.priority = 'medium';
+                            taskChanged = true;
+                        }
+                    } else if (priorityFrequency === 'never' || !priorityFrequency) {
+                        if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
+                            updatedTask.priority = 'medium';
+                            taskChanged = true;
+                        }
                     }
                 }
                 

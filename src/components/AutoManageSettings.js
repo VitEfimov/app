@@ -7,6 +7,7 @@ import { useTheme } from '../styles/ThemeContext';
 import { setAutoManageSettings } from '../features/themeSlice';
 import { processAutoManageTasks } from '../features/taskSlice';
 import { updateRecurringAutomations } from '../utils/notifications';
+import CustomDropdown from './CustomDropdown';
 
 export default function AutoManageSettings({ isVisible, onClose }) {
   const { t } = useTranslation();
@@ -22,14 +23,16 @@ export default function AutoManageSettings({ isVisible, onClose }) {
   const defaultSettings = {
     autoTransferMode: 'none',
     increasePriorityWhenOverdue: false,
-    increasePriorityDailyOverdue: false,
+    priorityFrequency: 'never',
     removePriorityWhenCompleted: false,
     autoDeleteOverdueDays: 0,
-    autoDeleteCompletedDays: 0,
     confirmBeforeDeletion: true,
-    dailySummaryOverdue: false,
-    morningReminderToday: false,
-    eveningReminderUnfinished: false
+    morningReminder: false,
+    morningReminderTime: '08:00',
+    eveningReminder: false,
+    eveningReminderTime: '20:00',
+    summaryReminder: false,
+    summaryReminderTime: '09:00'
   };
 
   const [localSettings, setLocalSettings] = useState(defaultSettings);
@@ -58,14 +61,16 @@ export default function AutoManageSettings({ isVisible, onClose }) {
   const {
     autoTransferMode = 'none',
     increasePriorityWhenOverdue = false,
-    increasePriorityDailyOverdue = false,
+    priorityFrequency = 'never',
     removePriorityWhenCompleted = false,
     autoDeleteOverdueDays = 0,
-    autoDeleteCompletedDays = 0,
     confirmBeforeDeletion = true,
-    dailySummaryOverdue = false,
-    morningReminderToday = false,
-    eveningReminderUnfinished = false
+    morningReminder = false,
+    morningReminderTime = '08:00',
+    eveningReminder = false,
+    eveningReminderTime = '20:00',
+    summaryReminder = false,
+    summaryReminderTime = '09:00'
   } = localSettings;
 
   const SettingToggle = ({ label, value, onValueChange }) => (
@@ -79,6 +84,26 @@ export default function AutoManageSettings({ isVisible, onClose }) {
       />
     </View>
   );
+
+  const RadioButton = ({ label, selected, onPress }) => (
+    <TouchableOpacity style={styles.radioRow} onPress={onPress}>
+      <View style={[styles.radioCircle, { borderColor: selected ? colors.primary : colors.textSecondary }]}>
+        {selected && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
+      </View>
+      <Text style={[styles.radioLabel, { color: colors.textPrimary }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  const timeOptions = [
+    { label: '07:00', value: '07:00' },
+    { label: '08:00', value: '08:00' },
+    { label: '09:00', value: '09:00' },
+    { label: '10:00', value: '10:00' },
+    { label: '18:00', value: '18:00' },
+    { label: '19:00', value: '19:00' },
+    { label: '20:00', value: '20:00' },
+    { label: '21:00', value: '21:00' }
+  ];
 
   return (
     <Modal
@@ -114,36 +139,37 @@ export default function AutoManageSettings({ isVisible, onClose }) {
           style={styles.scrollArea}
         >
           <Text style={[styles.groupHeader, { color: colors.textSecondary }]}>{t('Task Scheduling')}</Text>
-          <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer }]}>
-            <SettingToggle 
-              label={t('Move missed tasks to Today')} 
-              value={autoTransferMode === 'today'} 
-              onValueChange={(val) => handleUpdate({ autoTransferMode: val ? 'today' : 'none' })} 
-            />
-            <SettingToggle 
-              label={t('Move missed tasks to Tomorrow')} 
-              value={autoTransferMode === 'tomorrow'} 
-              onValueChange={(val) => handleUpdate({ autoTransferMode: val ? 'tomorrow' : 'none' })} 
-            />
-            <SettingToggle 
-              label={t('Move missed to next Workday')} 
-              value={autoTransferMode === 'next_workday'} 
-              onValueChange={(val) => handleUpdate({ autoTransferMode: val ? 'next_workday' : 'none' })} 
-            />
+          <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer, padding: 10 }]}>
+            <Text style={[styles.subText, { color: colors.textSecondary, marginBottom: 5 }]}>{t('When overdue')}</Text>
+            <RadioButton label={t('Today')} selected={autoTransferMode === 'today'} onPress={() => handleUpdate({ autoTransferMode: 'today' })} />
+            <RadioButton label={t('Tomorrow')} selected={autoTransferMode === 'tomorrow'} onPress={() => handleUpdate({ autoTransferMode: 'tomorrow' })} />
+            <RadioButton label={t('Next Workday')} selected={autoTransferMode === 'next_workday'} onPress={() => handleUpdate({ autoTransferMode: 'next_workday' })} />
+            <RadioButton label={t('Never')} selected={autoTransferMode === 'none'} onPress={() => handleUpdate({ autoTransferMode: 'none' })} />
           </View>
           
           <Text style={[styles.groupHeader, { color: colors.textSecondary, marginTop: 15 }]}>{t('Priority Automation')}</Text>
           <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer }]}>
             <SettingToggle 
-              label={t('Increase priority when overdue')} 
+              label={t('Increase when overdue')} 
               value={increasePriorityWhenOverdue} 
               onValueChange={(val) => handleUpdate({ increasePriorityWhenOverdue: val })} 
             />
-            <SettingToggle 
-              label={t('Increase priority daily if overdue')} 
-              value={increasePriorityDailyOverdue} 
-              onValueChange={(val) => handleUpdate({ increasePriorityDailyOverdue: val })} 
-            />
+            {increasePriorityWhenOverdue && (
+              <View style={{ paddingHorizontal: 15, paddingBottom: 15 }}>
+                <CustomDropdown
+                  label={t('Frequency')}
+                  value={priorityFrequency}
+                  options={[
+                    { label: t('Daily'), value: 'daily' },
+                    { label: t('Weekly'), value: 'weekly' },
+                    { label: t('Never'), value: 'never' },
+                  ]}
+                  onSelect={(val) => handleUpdate({ priorityFrequency: val })}
+                  colors={colors}
+                  layout="horizontal"
+                />
+              </View>
+            )}
             <SettingToggle 
               label={t('Remove priority when completed')} 
               value={removePriorityWhenCompleted} 
@@ -152,16 +178,19 @@ export default function AutoManageSettings({ isVisible, onClose }) {
           </View>
 
           <Text style={[styles.groupHeader, { color: colors.textSecondary, marginTop: 15 }]}>{t('Cleanup Automation')}</Text>
-          <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer }]}>
-            <SettingToggle 
-              label={t('Delete 3-day overdue tasks')} 
-              value={autoDeleteOverdueDays === 3} 
-              onValueChange={(val) => handleUpdate({ autoDeleteOverdueDays: val ? 3 : 0 })} 
-            />
-            <SettingToggle 
-              label={t('Delete 7-day completed tasks')} 
-              value={autoDeleteCompletedDays === 7} 
-              onValueChange={(val) => handleUpdate({ autoDeleteCompletedDays: val ? 7 : 0 })} 
+          <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer, padding: 15 }]}>
+            <CustomDropdown
+              label={t('Delete overdue after')}
+              value={autoDeleteOverdueDays}
+              options={[
+                { label: t('Never'), value: 0 },
+                { label: t('3 days'), value: 3 },
+                { label: t('7 days'), value: 7 },
+                { label: t('30 days'), value: 30 },
+              ]}
+              onSelect={(val) => handleUpdate({ autoDeleteOverdueDays: val })}
+              colors={colors}
+              layout="horizontal"
             />
             <SettingToggle 
               label={t('Confirm before automatic deletion')} 
@@ -172,21 +201,61 @@ export default function AutoManageSettings({ isVisible, onClose }) {
 
           <Text style={[styles.groupHeader, { color: colors.textSecondary, marginTop: 15 }]}>{t('Recurring Reminders')}</Text>
           <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer }]}>
+            
             <SettingToggle 
-              label={t('Daily summary of overdue tasks (9 AM)')} 
-              value={dailySummaryOverdue} 
-              onValueChange={(val) => handleUpdate({ dailySummaryOverdue: val })} 
+              label={t("Morning reminder")} 
+              value={morningReminder} 
+              onValueChange={(val) => handleUpdate({ morningReminder: val })} 
             />
+            {morningReminder && (
+              <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
+                <CustomDropdown
+                  value={morningReminderTime}
+                  options={timeOptions}
+                  onSelect={(val) => handleUpdate({ morningReminderTime: val })}
+                  colors={colors}
+                  layout="horizontal"
+                  customBtnStyle={{ paddingVertical: 5 }}
+                />
+              </View>
+            )}
+
             <SettingToggle 
-              label={t("Morning reminder of today's tasks (8 AM)")} 
-              value={morningReminderToday} 
-              onValueChange={(val) => handleUpdate({ morningReminderToday: val })} 
+              label={t("Evening reminder")} 
+              value={eveningReminder} 
+              onValueChange={(val) => handleUpdate({ eveningReminder: val })} 
             />
+            {eveningReminder && (
+              <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
+                <CustomDropdown
+                  value={eveningReminderTime}
+                  options={timeOptions}
+                  onSelect={(val) => handleUpdate({ eveningReminderTime: val })}
+                  colors={colors}
+                  layout="horizontal"
+                  customBtnStyle={{ paddingVertical: 5 }}
+                />
+              </View>
+            )}
+
             <SettingToggle 
-              label={t("Evening reminder of unfinished tasks (8 PM)")} 
-              value={eveningReminderUnfinished} 
-              onValueChange={(val) => handleUpdate({ eveningReminderUnfinished: val })} 
+              label={t('Summary')} 
+              value={summaryReminder} 
+              onValueChange={(val) => handleUpdate({ summaryReminder: val })} 
             />
+            {summaryReminder && (
+              <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
+                <CustomDropdown
+                  value={summaryReminderTime}
+                  options={timeOptions}
+                  onSelect={(val) => handleUpdate({ summaryReminderTime: val })}
+                  colors={colors}
+                  layout="horizontal"
+                  customBtnStyle={{ paddingVertical: 5 }}
+                />
+              </View>
+            )}
+            
           </View>
           <View style={{ height: 30 }} />
           
@@ -282,5 +351,33 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  radioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  radioLabel: {
+    fontSize: 14,
+  },
+  subText: {
+    fontSize: 12,
+    paddingHorizontal: 10,
+    marginBottom: 5,
   }
 });

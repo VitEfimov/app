@@ -189,7 +189,11 @@ export async function cancelNotification(notificationIds) {
 }
 
 export async function updateRecurringAutomations(themeState) {
-    const { dailySummaryOverdue, morningReminderToday, eveningReminderUnfinished } = themeState;
+    const { 
+        morningReminder, morningReminderTime, 
+        eveningReminder, eveningReminderTime, 
+        summaryReminder, summaryReminderTime 
+    } = themeState;
     
     // Cancel existing automations
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -199,7 +203,8 @@ export async function updateRecurringAutomations(themeState) {
         }
     }
     
-    if (morningReminderToday) {
+    if (morningReminder && morningReminderTime) {
+        const [hour, minute] = morningReminderTime.split(':').map(Number);
         await Notifications.scheduleNotificationAsync({
             content: {
                 title: 'Good Morning!',
@@ -207,11 +212,12 @@ export async function updateRecurringAutomations(themeState) {
                 sound: true,
                 data: { isAutomation: true },
             },
-            trigger: { hour: 8, minute: 0, repeats: true }
+            trigger: { hour, minute, repeats: true }
         });
     }
 
-    if (dailySummaryOverdue) {
+    if (summaryReminder && summaryReminderTime) {
+        const [hour, minute] = summaryReminderTime.split(':').map(Number);
         await Notifications.scheduleNotificationAsync({
             content: {
                 title: 'Daily Summary',
@@ -219,11 +225,12 @@ export async function updateRecurringAutomations(themeState) {
                 sound: true,
                 data: { isAutomation: true },
             },
-            trigger: { hour: 9, minute: 0, repeats: true }
+            trigger: { hour, minute, repeats: true }
         });
     }
 
-    if (eveningReminderUnfinished) {
+    if (eveningReminder && eveningReminderTime) {
+        const [hour, minute] = eveningReminderTime.split(':').map(Number);
         await Notifications.scheduleNotificationAsync({
             content: {
                 title: 'Evening Review',
@@ -231,7 +238,7 @@ export async function updateRecurringAutomations(themeState) {
                 sound: true,
                 data: { isAutomation: true },
             },
-            trigger: { hour: 20, minute: 0, repeats: true }
+            trigger: { hour, minute, repeats: true }
         });
     }
 }
