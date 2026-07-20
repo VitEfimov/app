@@ -466,20 +466,7 @@ export default function BoardScreen({ route, navigation }) {
             </Animated.View>
           )}
         </View>
-        <TouchableOpacity 
-          onPress={toggleBoardsCollapsed} 
-          style={{ 
-            padding: isBoardsCollapsed ? 5 : 10, 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            position: isBoardsCollapsed ? 'absolute' : 'relative',
-            right: 0,
-            top: isBoardsCollapsed ? -10 : 1,
-            zIndex: 999
-          }}
-        >
-          <IconChevronDown color={colors.primary} isCollapsed={isBoardsCollapsed} />
-        </TouchableOpacity>
+
       </Animated.View>
 
       <SectionList
@@ -519,6 +506,7 @@ export default function BoardScreen({ route, navigation }) {
         submitText={promptConfig.type === 'add' ? t('Add') : t('Rename')}
         onCancel={() => setPromptConfig({ isVisible: false, type: null, targetBoard: null })}
         onSubmit={handlePromptSubmit}
+        maxLength={20}
       />
 
       <Modal 

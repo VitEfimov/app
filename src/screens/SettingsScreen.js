@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks } from '../features/taskSlice';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -24,6 +24,7 @@ const IconSave = ({ color }) => (
 );
 
 import CustomDropdown from '../components/CustomDropdown';
+import PromptModal from '../components/PromptModal';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -37,9 +38,13 @@ export default function SettingsScreen({ navigation }) {
   const fontSize = theme.fontSize || 'normal';
   const progressMode = theme.progressMode || 'daily';
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
+  const alarmSound = theme.alarmSound || 'alarm_urgent_loop.wav';
+  const notificationSound = theme.notificationSound || 'notification_soft.wav';
+  const vibrationEnabled = theme.vibrationEnabled !== undefined ? theme.vibrationEnabled : true;
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
+  const [pinPromptVisible, setPinPromptVisible] = useState(false);
 
   const languageOptions = [
     { label: 'English', value: 'en' },
@@ -73,12 +78,39 @@ export default function SettingsScreen({ navigation }) {
   ];
 
   const snoozeOptions = [
-    { label: t('5 min'), value: 5 },
-    { label: t('10 min'), value: 10 },
-    { label: t('15 min'), value: 15 },
-    { label: t('30 min'), value: 30 },
+    { label: t('5 mins'), value: 5 },
+    { label: t('10 mins'), value: 10 },
+    { label: t('15 mins'), value: 15 },
+    { label: t('30 mins'), value: 30 },
     { label: t('1 hour'), value: 60 },
   ];
+
+  const notificationSoundOptions = [
+    { label: t('Soft'), value: 'notification_soft.wav' },
+    { label: t('Priority'), value: 'notification_priority.wav' },
+  ];
+
+  const alarmSoundOptions = [
+    { label: t('Urgent Loop'), value: 'alarm_urgent_loop.wav' },
+    { label: t('Gentle Loop'), value: 'alarm_gentle_loop.wav' },
+  ];
+
+  const handleTogglePin = (value) => {
+    if (value) {
+      setPinPromptVisible(true);
+    } else {
+      dispatch(setAppPin(null));
+    }
+  };
+
+  const handleSetPin = (pin) => {
+    if (pin && pin.length >= 4) {
+      dispatch(setAppPin(pin));
+      setPinPromptVisible(false);
+    } else {
+      Alert.alert('Invalid PIN', 'Please enter at least 4 digits.');
+    }
+  };
 
   const handleDeleteData = () => {
     Alert.alert(
@@ -177,6 +209,34 @@ export default function SettingsScreen({ navigation }) {
         {/* Notifications Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Notifications')}</Text>
         <View style={styles.sectionGroup}>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+            <CustomDropdown 
+              label={t("Notification Sound")} 
+              value={notificationSound} 
+              options={notificationSoundOptions} 
+              onSelect={val => dispatch(setNotificationSound(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+            <CustomDropdown 
+              label={t("Alarm Sound")} 
+              value={alarmSound} 
+              options={alarmSoundOptions} 
+              onSelect={val => dispatch(setAlarmSound(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+          <View style={[styles.rowItem, { borderBottomWidth: 1 }]}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Vibration')}</Text>
+            <Switch
+              value={vibrationEnabled}
+              onValueChange={val => dispatch(setVibrationEnabled(val))}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
+            />
+          </View>
           <View style={[styles.dropdownRow, { borderBottomWidth: 0, paddingBottom: 0, paddingTop: 15 }]}>
             <CustomDropdown 
               label={t("Default Snooze")} 
@@ -214,6 +274,14 @@ export default function SettingsScreen({ navigation }) {
               <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>user@example.com</Text>
             </View>
           </View>
+          <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 15 }]}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('App PIN Lock')}</Text>
+            <Switch
+              value={!!theme.appPin}
+              onValueChange={handleTogglePin}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
+            />
+          </View>
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"
             style={styles.deleteBtn} onPress={handleDeleteData}
@@ -233,6 +301,15 @@ export default function SettingsScreen({ navigation }) {
       <AutoManageSettings 
         isVisible={isAutoManageModalVisible}
         onClose={() => setAutoManageModalVisible(false)}
+      />
+      <PromptModal
+        isVisible={pinPromptVisible}
+        title={t('Set PIN')}
+        message={t('Enter a 4-digit PIN')}
+        onCancel={() => setPinPromptVisible(false)}
+        onSubmit={handleSetPin}
+        maxLength={4}
+        keyboardType="numeric"
       />
     </View>
   );

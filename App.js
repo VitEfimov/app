@@ -20,9 +20,10 @@ import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
 import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
-import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification } from './src/utils/notifications';
+import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, DEFAULT_APP_CHANNEL } from './src/utils/notifications';
 import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
+import PinLockScreen from './src/screens/PinLockScreen';
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -79,7 +80,9 @@ class ErrorBoundary extends React.Component {
 function InitApp() {
   const dispatch = useDispatch();
   const [ready, setReady] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+  const themeReducer = useSelector(state => state.themeReducer);
 
   useEffect(() => {
     if (hasShareIntent && shareIntent && ready) {
@@ -341,7 +344,7 @@ function InitApp() {
                    body: `Snoozed '${task.taskname}' for ${snoozeMins} minute(s)`,
                    priority: Notifications.AndroidNotificationPriority.MAX,
                  },
-                 trigger: Platform.OS === 'android' ? { channelId: 'default' } : null,
+                 trigger: Platform.OS === 'android' ? { channelId: DEFAULT_APP_CHANNEL } : null,
                });
              }
           }
@@ -357,6 +360,10 @@ function InitApp() {
         <ActivityIndicator size="large" />
       </View>
     );
+  }
+
+  if (themeReducer.appPin && !isUnlocked) {
+    return <PinLockScreen correctPin={themeReducer.appPin} onUnlock={() => setIsUnlocked(true)} />;
   }
 
   return <AppNavigator />;

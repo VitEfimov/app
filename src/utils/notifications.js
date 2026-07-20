@@ -5,78 +5,152 @@ import { Platform } from 'react-native';
 // Set how notifications should be handled when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
 
-export async function registerForPushNotificationsAsync() {
-  let token;
+const DEFAULT_CHANNEL_ID = 'task_default_v2';
+export const ALARM_CHANNEL_ID = 'task_alarm_v5';
+const ALARM_SOUND = 'alarm_urgent_loop.wav';
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
+async function configureAndroidNotificationChannels() {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+
+  await Notifications.setNotificationChannelAsync(
+    DEFAULT_CHANNEL_ID,
+    {
+      name: 'Task reminders',
+      description: 'Standard task reminder notifications',
+      importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-    
-    await Notifications.setNotificationChannelAsync('alarm_v3', {
-      name: 'Alarm Sound',
+      enableVibrate: true,
+      sound: 'default',
+      lockscreenVisibility:
+        Notifications.AndroidNotificationVisibility.PUBLIC,
+    }
+  );
+
+  await Notifications.setNotificationChannelAsync(
+    ALARM_CHANNEL_ID,
+    {
+      name: 'Task alarms',
+      description: 'Urgent task alarms with sound and vibration',
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000],
+
+      sound: ALARM_SOUND,
+
+      enableVibrate: true,
+      vibrationPattern: [
+        0,
+        900,
+        350,
+        900,
+        350,
+        1200,
+      ],
+
       audioAttributes: {
         usage: Notifications.AndroidAudioUsage.ALARM,
-        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        contentType:
+          Notifications.AndroidAudioContentType.SONIFICATION,
       },
-      sound: true,
-    });
+
+      lockscreenVisibility:
+        Notifications.AndroidNotificationVisibility.PUBLIC,
+
+      bypassDnd: true,
+    }
+  );
+}
+
+export const DEFAULT_APP_CHANNEL = DEFAULT_CHANNEL_ID;
+
+export async function registerForPushNotificationsAsync() {
+  if (Platform.OS === 'web') {
+    return null;
   }
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
+  await configureAndroidNotificationChannels();
+
+  const permission =
+    await Notifications.getPermissionsAsync();
+
+  let finalStatus = permission.status;
+
   if (finalStatus !== 'granted') {
-    console.log('Failed to get push token for push notification!');
-    // Even if denied, we don't return early because we still want to register categories
+    const requested =
+      await Notifications.requestPermissionsAsync();
+
+    finalStatus = requested.status;
   }
 
-  await Notifications.setNotificationCategoryAsync('task_reminder', [
-    {
-      identifier: 'complete_task',
-      buttonTitle: 'Complete Task',
-      options: { opensAppToForeground: false }
-    },
-    {
-      identifier: 'snooze',
-      buttonTitle: 'Snooze',
-      options: { opensAppToForeground: false }
-    },
-    {
-      identifier: 'reschedule',
-      buttonTitle: 'Reschedule',
-      options: { opensAppToForeground: true }
-    }
-  ]);
+  if (finalStatus !== 'granted') {
+    console.warn(
+      'Notification permission was not granted.'
+    );
+  }
 
-  await Notifications.setNotificationCategoryAsync('task_regular', [
-    {
-      identifier: 'complete_task',
-      buttonTitle: 'Complete Task',
-      options: { opensAppToForeground: false }
-    },
-    {
-      identifier: 'reschedule',
-      buttonTitle: 'Reschedule',
-      options: { opensAppToForeground: true }
-    }
-  ]);
+  await Notifications.setNotificationCategoryAsync(
+    'task_reminder',
+    [
+      {
+        identifier: 'complete_task',
+        buttonTitle: 'Complete Task',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: 'snooze',
+        buttonTitle: 'Snooze',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: 'reschedule',
+        buttonTitle: 'Reschedule',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+    ]
+  );
 
-  return token;
+  await Notifications.setNotificationCategoryAsync(
+    'task_regular',
+    [
+      {
+        identifier: 'complete_task',
+        buttonTitle: 'Complete Task',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: 'reschedule',
+        buttonTitle: 'Reschedule',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+    ]
+  );
+
+  /*
+   * You do not need a push token for local notifications.
+   * Obtain one only when you intend to receive remote push messages.
+   */
+  if (!Device.isDevice) {
+    return null;
+  }
+
+  return null;
 }
 
 import dayjs from 'dayjs';
@@ -91,20 +165,36 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
   if (!targetDate.isValid()) return [];
 
   if (timeStr) {
-    const parsedTime = dayjs(`${completionDateStr} ${timeStr}`, ["YYYY-MM-DD HH:mm", "YYYY-MM-DD h:mm A", "YYYY-MM-DD hh:mm A"], true);
+    const parsedTime = dayjs(
+      `${completionDateStr} ${timeStr}`,
+      [
+        'YYYY-MM-DD HH:mm',
+        'YYYY-MM-DD H:mm',
+        'YYYY-MM-DD h:mm A',
+        'YYYY-MM-DD hh:mm A',
+      ],
+      true
+    );
+
     if (parsedTime.isValid()) {
       targetDate = parsedTime;
     } else {
-      const [hoursStr, minutesStr] = timeStr.split(':');
-      let hours = parseInt(hoursStr, 10);
-      const minutes = parseInt(minutesStr.replace(/[^0-9]/g, ''), 10);
-      if (timeStr.toLowerCase().includes('pm') && hours !== 12) hours += 12;
-      if (timeStr.toLowerCase().includes('am') && hours === 12) hours = 0;
-      targetDate = targetDate.hour(hours).minute(minutes).second(0);
+      console.warn(
+        'Invalid task time:',
+        timeStr
+      );
+
+      return [];
     }
-    
-    // Schedule exact time notification (Always standard sound, no snooze)
-    const timeId = await scheduleExactTaskReminder(`It's time: ${taskName}`, targetDate.toDate(), taskId, false, 'task_regular');
+
+    // Schedule exact time notification
+    const timeId = await scheduleExactTaskReminder(
+      taskName,
+      targetDate.toDate(),
+      taskId,
+      isAlarm,
+      isAlarm ? 'task_reminder' : 'task_regular'
+    );
     if (timeId) ids.push(timeId);
   } else {
     targetDate = targetDate.hour(9).minute(0).second(0); // Default to 9 AM
@@ -117,7 +207,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       "1 hr before": { amount: 1, unit: "hour" },
       "1 day before": { amount: 1, unit: "day" }
     };
-    
+
     const offset = offsets[reminderValue];
     if (offset) {
       let reminderDate = targetDate.subtract(offset.amount, offset.unit);
@@ -129,32 +219,89 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
   return ids;
 }
 
-export async function scheduleExactTaskReminder(taskName, targetDateObj, taskId = null, isAlarm = false, category = 'task_reminder') {
+export async function scheduleExactTaskReminder(
+  taskName,
+  targetDateObj,
+  taskId = null,
+  isAlarm = false,
+  category = 'task_reminder'
+) {
   const targetDate = dayjs(targetDateObj);
 
-  if (targetDate.isBefore(dayjs())) {
-    console.log('Cannot schedule a notification in the past');
+  if (
+    !targetDate.isValid() ||
+    !targetDate.isAfter(dayjs())
+  ) {
+    console.warn(
+      'Cannot schedule notification in the past.'
+    );
+
     return null;
   }
 
+  const channelId = isAlarm
+    ? ALARM_CHANNEL_ID
+    : DEFAULT_CHANNEL_ID;
+
+  const sound = isAlarm
+    ? ALARM_SOUND
+    : 'default';
+
   try {
-    const id = await Notifications.scheduleNotificationAsync({
+    return await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Task Reminder',
-        body: `Reminder: ${taskName}`,
-        sound: true,
-        priority: Notifications.AndroidNotificationPriority.MAX,
-        data: { taskId, isAlarm },
-        categoryIdentifier: category
+        title: isAlarm
+          ? 'Task Alarm'
+          : 'Task Reminder',
+
+        body: isAlarm
+          ? `${taskName} is due now`
+          : `Reminder: ${taskName}`,
+
+        sound,
+
+        priority:
+          Notifications.AndroidNotificationPriority.MAX,
+
+        categoryIdentifier: category,
+
+        data: {
+          taskId,
+          isAlarm,
+        },
+
+        /*
+         * Makes the Android notification harder to dismiss,
+         * but it still does not create a real alarm screen.
+         */
+        sticky: isAlarm,
+        autoDismiss: !isAlarm,
       },
-      trigger: Platform.OS === 'android' ? {
-        date: targetDate.toDate(),
-        channelId: isAlarm ? 'alarm_v3' : 'default'
-      } : targetDate.toDate(),
+
+      trigger:
+        Platform.OS === 'android'
+          ? {
+              type:
+                Notifications
+                  .SchedulableTriggerInputTypes.DATE,
+
+              date: targetDate.toDate(),
+              channelId,
+            }
+          : {
+              type:
+                Notifications
+                  .SchedulableTriggerInputTypes.DATE,
+
+              date: targetDate.toDate(),
+            },
     });
-    return id;
   } catch (error) {
-    console.log('Error scheduling task reminder:', error);
+    console.error(
+      'Error scheduling task reminder:',
+      error
+    );
+
     return null;
   }
 }
@@ -189,56 +336,56 @@ export async function cancelNotification(notificationIds) {
 }
 
 export async function updateRecurringAutomations(themeState) {
-    const { 
-        morningReminder, morningReminderTime, 
-        eveningReminder, eveningReminderTime, 
-        summaryReminder, summaryReminderTime 
-    } = themeState;
-    
-    // Cancel existing automations
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    for (const notif of scheduled) {
-        if (notif.content.data?.isAutomation) {
-            await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-        }
-    }
-    
-    if (morningReminder && morningReminderTime) {
-        const [hour, minute] = morningReminderTime.split(':').map(Number);
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: 'Good Morning!',
-                body: "Check your tasks for today.",
-                sound: true,
-                data: { isAutomation: true },
-            },
-            trigger: { hour, minute, repeats: true }
-        });
-    }
+  const {
+    morningReminder, morningReminderTime,
+    eveningReminder, eveningReminderTime,
+    summaryReminder, summaryReminderTime
+  } = themeState;
 
-    if (summaryReminder && summaryReminderTime) {
-        const [hour, minute] = summaryReminderTime.split(':').map(Number);
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: 'Daily Summary',
-                body: "You might have some overdue tasks waiting.",
-                sound: true,
-                data: { isAutomation: true },
-            },
-            trigger: { hour, minute, repeats: true }
-        });
+  // Cancel existing automations
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const notif of scheduled) {
+    if (notif.content.data?.isAutomation) {
+      await Notifications.cancelScheduledNotificationAsync(notif.identifier);
     }
+  }
 
-    if (eveningReminder && eveningReminderTime) {
-        const [hour, minute] = eveningReminderTime.split(':').map(Number);
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: 'Evening Review',
-                body: "Wrap up any unfinished tasks before the day ends.",
-                sound: true,
-                data: { isAutomation: true },
-            },
-            trigger: { hour, minute, repeats: true }
-        });
-    }
+  if (morningReminder && morningReminderTime) {
+    const [hour, minute] = morningReminderTime.split(':').map(Number);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Good Morning!',
+        body: "Check your tasks for today.",
+        sound: true,
+        data: { isAutomation: true },
+      },
+      trigger: { hour, minute, repeats: true }
+    });
+  }
+
+  if (summaryReminder && summaryReminderTime) {
+    const [hour, minute] = summaryReminderTime.split(':').map(Number);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Daily Summary',
+        body: "You might have some overdue tasks waiting.",
+        sound: true,
+        data: { isAutomation: true },
+      },
+      trigger: { hour, minute, repeats: true }
+    });
+  }
+
+  if (eveningReminder && eveningReminderTime) {
+    const [hour, minute] = eveningReminderTime.split(':').map(Number);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Evening Review',
+        body: "Wrap up any unfinished tasks before the day ends.",
+        sound: true,
+        data: { isAutomation: true },
+      },
+      trigger: { hour, minute, repeats: true }
+    });
+  }
 }

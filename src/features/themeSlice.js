@@ -44,7 +44,15 @@ const initialState = {
   eveningReminder: loaded?.eveningReminder || false,
   eveningReminderTime: loaded?.eveningReminderTime || '20:00',
   summaryReminder: loaded?.summaryReminder || false,
-  summaryReminderTime: loaded?.summaryReminderTime || '09:00'
+  summaryReminderTime: loaded?.summaryReminderTime || '09:00',
+  
+  // Notification Settings
+  alarmSound: loaded?.alarmSound || 'alarm_urgent_loop.wav',
+  notificationSound: loaded?.notificationSound || 'notification_soft.wav',
+  vibrationEnabled: loaded?.vibrationEnabled !== undefined ? loaded.vibrationEnabled : true,
+  
+  // Security
+  appPin: loaded?.appPin || null
 };
 
 const themeSlice = createSlice({
@@ -82,6 +90,22 @@ const themeSlice = createSlice({
       } else {
         state.isSettingsOpen = !state.isSettingsOpen;
       }
+    },
+    setAppPin: (state, action) => {
+      state.appPin = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setAlarmSound: (state, action) => {
+      state.alarmSound = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setNotificationSound: (state, action) => {
+      state.notificationSound = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setVibrationEnabled: (state, action) => {
+      state.vibrationEnabled = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     resetTheme: (state) => {
       state.colors = {
@@ -173,5 +197,11 @@ const themeSlice = createSlice({
   }
 });
 
-export const { hydrateThemeState, setThemeColor, setFontSize, setColumnWidth, toggleSettingsOpen, resetTheme, setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setUserPicture, setHeaderBackgroundFit, setSourceColor, setThemeMode, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoManageSettings, setBoardsCollapsed } = themeSlice.actions;
+export const {
+  hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
+  setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime,
+  setAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
+  setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat
+} = themeSlice.actions;
+
 export default themeSlice.reducer;
