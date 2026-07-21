@@ -93,8 +93,8 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
     return null;
   }
 
-  const notifSound = themeState.notificationSound || '01_notification_air_32f.wav';
-  const alrmSound = themeState.alarmSound || '10_alarm_urgent_32f.wav';
+  const notifSound = themeState.notificationSound || 'notification_air_32f.wav';
+  const alrmSound = themeState.alarmSound || 'alarm_urgent_32f.wav';
   const vibEnabled = themeState.vibrationEnabled !== false;
 
   await configureAndroidNotificationChannels(notifSound, alrmSound, vibEnabled);
@@ -263,8 +263,8 @@ export async function scheduleExactTaskReminder(
     return null;
   }
 
-  const notificationSound = themeState.notificationSound || '01_notification_air_32f.wav';
-  const alarmSound = themeState.alarmSound || '10_alarm_urgent_32f.wav';
+  const notificationSound = themeState.notificationSound || 'notification_air_32f.wav';
+  const alarmSound = themeState.alarmSound || 'alarm_urgent_32f.wav';
   const vibrationEnabled = themeState.vibrationEnabled !== false;
 
   const channelId = getChannelId(isAlarm, isAlarm ? alarmSound : notificationSound, vibrationEnabled);

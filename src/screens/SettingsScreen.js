@@ -38,9 +38,9 @@ export default function SettingsScreen({ navigation }) {
   const fontSize = theme.fontSize || 'normal';
   const progressMode = theme.progressMode || 'daily';
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
-  const alarmSound = theme.alarmSound || '10_alarm_urgent_32f.wav';
-  const notificationSound = theme.notificationSound || '01_notification_air_32f.wav';
-  const taskCompleteSound = theme.taskCompleteSound || '05_success_bloom_32f.wav';
+  const alarmSound = theme.alarmSound || 'alarm_urgent_32f.wav';
+  const notificationSound = theme.notificationSound || 'notification_air_32f.wav';
+  const taskCompleteSound = theme.taskCompleteSound || 'success_bloom_32f.wav';
   const vibrationEnabled = theme.vibrationEnabled !== undefined ? theme.vibrationEnabled : true;
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
@@ -87,16 +87,16 @@ export default function SettingsScreen({ navigation }) {
   ];
 
   const soundOptions = [
-    { label: t('Notification Air'), value: '01_notification_air_32f.wav' },
-    { label: t('Notification Focus'), value: '02_notification_focus_32f.wav' },
-    { label: t('Reminder Soft'), value: '03_reminder_soft_32f.wav' },
-    { label: t('Task Complete'), value: '04_task_complete_32f.wav' },
-    { label: t('Success Bloom'), value: '05_success_bloom_32f.wav' },
-    { label: t('Warning Gentle'), value: '06_warning_gentle_32f.wav' },
-    { label: t('Overdue Nudge'), value: '07_overdue_nudge_32f.wav' },
-    { label: t('Morning Glass'), value: '08_morning_glass_32f.wav' },
-    { label: t('Alarm Gentle'), value: '09_alarm_gentle_32f.wav' },
-    { label: t('Alarm Urgent'), value: '10_alarm_urgent_32f.wav' },
+    { label: t('Notification Air'), value: 'notification_air_32f.wav' },
+    { label: t('Notification Focus'), value: 'notification_focus_32f.wav' },
+    { label: t('Reminder Soft'), value: 'reminder_soft_32f.wav' },
+    { label: t('Task Complete'), value: 'task_complete_32f.wav' },
+    { label: t('Success Bloom'), value: 'success_bloom_32f.wav' },
+    { label: t('Warning Gentle'), value: 'warning_gentle_32f.wav' },
+    { label: t('Overdue Nudge'), value: 'overdue_nudge_32f.wav' },
+    { label: t('Morning Glass'), value: 'morning_glass_32f.wav' },
+    { label: t('Alarm Gentle'), value: 'alarm_gentle_32f.wav' },
+    { label: t('Alarm Urgent'), value: 'alarm_urgent_32f.wav' },
   ];
 
   const handleTogglePin = (value) => {

@@ -52,16 +52,16 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/audio/01_notification_air_32f.wav",
-            "./assets/audio/02_notification_focus_32f.wav",
-            "./assets/audio/03_reminder_soft_32f.wav",
-            "./assets/audio/04_task_complete_32f.wav",
-            "./assets/audio/05_success_bloom_32f.wav",
-            "./assets/audio/06_warning_gentle_32f.wav",
-            "./assets/audio/07_overdue_nudge_32f.wav",
-            "./assets/audio/08_morning_glass_32f.wav",
-            "./assets/audio/09_alarm_gentle_32f.wav",
-            "./assets/audio/10_alarm_urgent_32f.wav"
+            "./assets/audio/notification_air_32f.wav",
+            "./assets/audio/notification_focus_32f.wav",
+            "./assets/audio/reminder_soft_32f.wav",
+            "./assets/audio/task_complete_32f.wav",
+            "./assets/audio/success_bloom_32f.wav",
+            "./assets/audio/warning_gentle_32f.wav",
+            "./assets/audio/overdue_nudge_32f.wav",
+            "./assets/audio/morning_glass_32f.wav",
+            "./assets/audio/alarm_gentle_32f.wav",
+            "./assets/audio/alarm_urgent_32f.wav"
           ]
         }
       ],
