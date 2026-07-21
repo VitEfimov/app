@@ -36,9 +36,9 @@ export function getChannelId(isAlarm, sound, vibrationEnabled) {
   const base = isAlarm ? 'alarm' : 'default';
   const soundName = sound ? sound.replace(/\.(wav|mp3)$/i, '') : 'default';
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
-  // Appending _v10 ensures Android creates a completely fresh channel,
+  // Appending _v11 ensures Android creates a completely fresh channel,
   // bypassing any broken channels that may have been restored from cloud backups.
-  return `task_${base}_${soundName}_${vib}_v10`;
+  return `task_${base}_${soundName}_${vib}_v11`;
 }
 
 export async function configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled) {
@@ -95,8 +95,8 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
     return null;
   }
 
-  const notifSound = 'default';
-  const alrmSound = 'default';
+  const notifSound = themeState.notificationSound || 'default';
+  const alrmSound = themeState.alarmSound || 'default';
   const vibEnabled = themeState.vibrationEnabled !== false;
 
   await configureAndroidNotificationChannels(notifSound, alrmSound, vibEnabled);
@@ -265,8 +265,8 @@ export async function scheduleExactTaskReminder(
     return null;
   }
 
-  const notificationSound = 'default';
-  const alarmSound = 'default';
+  const notificationSound = themeState.notificationSound || 'default';
+  const alarmSound = themeState.alarmSound || 'default';
   const vibrationEnabled = themeState.vibrationEnabled !== false;
 
   const channelId = getChannelId(isAlarm, isAlarm ? alarmSound : notificationSound, vibrationEnabled);
@@ -341,7 +341,7 @@ export async function scheduleLocalNotification(
 ) {
   try {
     if (Platform.OS === 'android') {
-      const channelId = 'task_default_system_sound_v10';
+      const channelId = 'task_default_system_sound_v11';
 
       await Notifications.setNotificationChannelAsync(channelId, {
         name: 'Task notifications',
@@ -498,7 +498,7 @@ export async function testAndroidDefaultNotification() {
   }
 
   // Use a brand-new ID every time you significantly change the channel.
-  const channelId = 'android_default_sound_test_v10';
+  const channelId = 'android_default_sound_test_v11';
 
   // Remove the test channel first so Android cannot reuse old silent settings.
   try {
