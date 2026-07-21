@@ -36,9 +36,9 @@ export function getChannelId(isAlarm, sound, vibrationEnabled) {
   const base = isAlarm ? 'alarm' : 'default';
   const soundName = sound ? sound.replace(/\.(wav|mp3)$/i, '') : 'default';
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
-  // Appending _test_default ensures Android creates a completely fresh channel,
+  // Appending _v10 ensures Android creates a completely fresh channel,
   // bypassing any broken channels that may have been restored from cloud backups.
-  return `task_${base}_${soundName}_${vib}_test_default`;
+  return `task_${base}_${soundName}_${vib}_v10`;
 }
 
 export async function configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled) {
@@ -55,8 +55,7 @@ export async function configureAndroidNotificationChannels(notificationSound, al
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.reminder : undefined,
       enableVibrate: vibrationEnabled,
-      // TEMPORARY TEST: Force default system sound to verify scheduling/channels
-      sound: 'default',
+      sound: notificationSound || 'default',
       lockscreenVisibility:
         Notifications.AndroidNotificationVisibility.PUBLIC,
     }
@@ -70,8 +69,7 @@ export async function configureAndroidNotificationChannels(notificationSound, al
       description: 'Urgent task alarms with sound and vibration',
       importance: Notifications.AndroidImportance.MAX,
 
-      // TEMPORARY TEST: Force default system sound
-      sound: 'default',
+      sound: alarmSound || 'alarm_urgent_loop.wav',
 
       enableVibrate: vibrationEnabled,
       vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.alarm : undefined,
@@ -97,8 +95,8 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
     return null;
   }
 
-  const notifSound = themeState.notificationSound || 'notification_air_32f.wav';
-  const alrmSound = themeState.alarmSound || 'alarm_urgent_32f.wav';
+  const notifSound = 'default';
+  const alrmSound = 'default';
   const vibEnabled = themeState.vibrationEnabled !== false;
 
   await configureAndroidNotificationChannels(notifSound, alrmSound, vibEnabled);
@@ -267,8 +265,8 @@ export async function scheduleExactTaskReminder(
     return null;
   }
 
-  const notificationSound = themeState.notificationSound || 'notification_air_32f.wav';
-  const alarmSound = themeState.alarmSound || 'alarm_urgent_32f.wav';
+  const notificationSound = 'default';
+  const alarmSound = 'default';
   const vibrationEnabled = themeState.vibrationEnabled !== false;
 
   const channelId = getChannelId(isAlarm, isAlarm ? alarmSound : notificationSound, vibrationEnabled);
@@ -314,10 +312,14 @@ export async function scheduleExactTaskReminder(
       trigger:
         Platform.OS === 'android'
           ? {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
               date: targetDate.toDate(),
               channelId,
             }
-          : targetDate.toDate(),
+          : {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: targetDate.toDate(),
+            },
     });
   } catch (error) {
     console.error(
@@ -332,20 +334,81 @@ export async function scheduleExactTaskReminder(
   }
 }
 
-export async function scheduleLocalNotification(title, body, triggerTimeOrDelay) {
+export async function scheduleLocalNotification(
+  title,
+  body,
+  seconds = 3
+) {
   try {
-    const id = await Notifications.scheduleNotificationAsync({
+    if (Platform.OS === 'android') {
+      const channelId = 'task_default_system_sound_v10';
+
+      await Notifications.setNotificationChannelAsync(channelId, {
+        name: 'Task notifications',
+        description: 'Task notifications with system sound',
+
+        importance:
+          Notifications.AndroidImportance.MAX,
+
+        sound: 'default',
+
+        enableVibrate: true,
+        vibrationPattern:
+          VIBRATION_PRESETS.newTask,
+
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+
+      return await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: 'default',
+
+          priority:
+            Notifications.AndroidNotificationPriority.MAX,
+        },
+
+        trigger: {
+          type:
+            Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+
+          seconds,
+          repeats: false,
+          channelId,
+        },
+      });
+    }
+
+    return await Notifications.scheduleNotificationAsync({
       content: {
-        title: title,
-        body: body,
-        sound: true,
-        priority: Notifications.AndroidNotificationPriority.MAX,
+        title,
+        body,
+        sound: 'default',
       },
-      trigger: triggerTimeOrDelay,
+
+      trigger: {
+        type:
+          Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+
+        seconds,
+        repeats: false,
+      },
     });
-    return id;
   } catch (error) {
-    console.log('Error scheduling notification:', error);
+    console.error(
+      'Error scheduling local notification:',
+      error
+    );
+
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(
+        `Notification error: ${error.message}`,
+        ToastAndroid.LONG
+      );
+    }
+
     return null;
   }
 }
@@ -414,4 +477,88 @@ export async function updateRecurringAutomations(themeState) {
       trigger: { hour, minute, repeats: true }
     });
   }
+}
+
+export async function testAndroidDefaultNotification() {
+  if (Platform.OS !== 'android') {
+    return null;
+  }
+
+  const permission = await Notifications.requestPermissionsAsync();
+
+  console.log('Notification permission:', permission);
+
+  if (permission.status !== 'granted') {
+    ToastAndroid.show(
+      'Notification permission is not granted',
+      ToastAndroid.LONG
+    );
+
+    return null;
+  }
+
+  // Use a brand-new ID every time you significantly change the channel.
+  const channelId = 'android_default_sound_test_v10';
+
+  // Remove the test channel first so Android cannot reuse old silent settings.
+  try {
+    await Notifications.deleteNotificationChannelAsync(channelId);
+  } catch (error) {
+    console.log('Channel did not previously exist:', error);
+  }
+
+  await Notifications.setNotificationChannelAsync(channelId, {
+    name: 'Default Sound Test V10',
+    description: 'Tests the Android system notification sound',
+    importance: Notifications.AndroidImportance.MAX,
+    sound: 'default',
+    enableVibrate: true,
+    vibrationPattern: [0, 250, 150, 250],
+    lockscreenVisibility:
+      Notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+
+  const channel =
+    await Notifications.getNotificationChannelAsync(channelId);
+
+  console.log('CREATED CHANNEL:', channel);
+
+  const notificationId =
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Default sound test',
+        body: 'This notification should play the Android default sound.',
+
+        // Android mainly uses the channel sound.
+        // Keeping this set is still appropriate.
+        sound: 'default',
+
+        priority:
+          Notifications.AndroidNotificationPriority.MAX,
+
+        data: {
+          test: true,
+        },
+      },
+
+      trigger: {
+        type:
+          Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+
+        seconds: 3,
+        repeats: false,
+
+        // Critical: explicitly connect the notification to the channel.
+        channelId,
+      },
+    });
+
+  console.log('Scheduled test notification:', notificationId);
+
+  ToastAndroid.show(
+    'Default notification scheduled in 3 seconds',
+    ToastAndroid.SHORT
+  );
+
+  return notificationId;
 }
