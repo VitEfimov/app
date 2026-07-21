@@ -36,9 +36,9 @@ export function getChannelId(isAlarm, sound, vibrationEnabled) {
   const base = isAlarm ? 'alarm' : 'default';
   const soundName = sound ? sound.replace(/\.(wav|mp3)$/i, '') : 'default';
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
-  // Appending _v2 ensures Android creates a completely fresh channel,
+  // Appending _test_default ensures Android creates a completely fresh channel,
   // bypassing any broken channels that may have been restored from cloud backups.
-  return `task_${base}_${soundName}_${vib}_v2`;
+  return `task_${base}_${soundName}_${vib}_test_default`;
 }
 
 export async function configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled) {
@@ -55,7 +55,8 @@ export async function configureAndroidNotificationChannels(notificationSound, al
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.reminder : undefined,
       enableVibrate: vibrationEnabled,
-      sound: notificationSound || 'default',
+      // TEMPORARY TEST: Force default system sound to verify scheduling/channels
+      sound: 'default',
       lockscreenVisibility:
         Notifications.AndroidNotificationVisibility.PUBLIC,
     }
@@ -69,7 +70,8 @@ export async function configureAndroidNotificationChannels(notificationSound, al
       description: 'Urgent task alarms with sound and vibration',
       importance: Notifications.AndroidImportance.MAX,
 
-      sound: alarmSound || 'alarm_urgent_loop.wav',
+      // TEMPORARY TEST: Force default system sound
+      sound: 'default',
 
       enableVibrate: vibrationEnabled,
       vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.alarm : undefined,
