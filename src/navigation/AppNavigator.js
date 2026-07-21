@@ -13,6 +13,7 @@ import CalendarScreen from '../screens/CalendarScreen';
 import PomodoroScreen from '../screens/PomodoroScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
+import DevLogsScreen from '../screens/DevLogsScreen';
 import Header from '../components/Header';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
@@ -56,6 +57,12 @@ const IconPomodoro = ({ color }) => (
   </Svg>
 );
 
+const IconDevLogs = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 17l6-6-6-6M12 19h8" />
+  </Svg>
+);
+
 function TabNavigator() {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -71,6 +78,7 @@ function TabNavigator() {
           if (route.name === 'Calendar') return <IconCalendar color={color} />;
           if (route.name === 'Pomodoro') return <IconPomodoro color={color} />;
           if (route.name === 'Settings') return <IconSettings color={color} />;
+          if (route.name === 'DevLogs') return <IconDevLogs color={color} />;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
@@ -92,6 +100,7 @@ function TabNavigator() {
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: t('Calendar') }} />
       <Tab.Screen name="Pomodoro" component={PomodoroScreen} options={{ tabBarLabel: t('Pomodoro') }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('Settings') }} />
+      <Tab.Screen name="DevLogs" component={DevLogsScreen} options={{ tabBarLabel: 'Dev Logs' }} />
     </Tab.Navigator>
   );
 }

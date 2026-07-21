@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, ToastAndroid } from 'react-native';
+import { DevLogger } from './logger';
 
 // Set how notifications should be handled when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -46,8 +47,12 @@ export async function configureAndroidNotificationChannels(notificationSound, al
     return;
   }
 
-  const defaultChannelId = getChannelId(false, notificationSound, vibrationEnabled);
-  await Notifications.setNotificationChannelAsync(
+  DevLogger.info('Configuring Android Notification Channels', { notificationSound, alarmSound, vibrationEnabled });
+
+  try {
+    const defaultChannelId = getChannelId(false, notificationSound, vibrationEnabled);
+    DevLogger.info(`Setting up default channel ID: ${defaultChannelId}`);
+    await Notifications.setNotificationChannelAsync(
     defaultChannelId,
     {
       name: 'Task reminders',
@@ -62,6 +67,7 @@ export async function configureAndroidNotificationChannels(notificationSound, al
   );
 
   const alarmChannelId = getChannelId(true, alarmSound, vibrationEnabled);
+  DevLogger.info(`Setting up alarm channel ID: ${alarmChannelId}`);
   await Notifications.setNotificationChannelAsync(
     alarmChannelId,
     {
@@ -86,6 +92,10 @@ export async function configureAndroidNotificationChannels(notificationSound, al
       bypassDnd: true,
     }
   );
+    DevLogger.success('Android Notification Channels configured successfully');
+  } catch (error) {
+    DevLogger.error('Failed to configure Android Notification Channels', error.message);
+  }
 }
 
 
@@ -117,6 +127,9 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
     console.warn(
       'Notification permission was not granted.'
     );
+    DevLogger.warn('Notification permission was not granted.');
+  } else {
+    DevLogger.success('Notification permission granted.');
   }
 
   await Notifications.setNotificationCategoryAsync(
@@ -182,7 +195,11 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 dayjs.extend(customParseFormat);
 export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false, themeState = {}) {
-  if (!completionDateStr) return [];
+  DevLogger.info(`scheduleTaskReminder called for task: ${taskName}`, { reminderValue, completionDateStr, timeStr, isAlarm });
+  if (!completionDateStr) {
+    DevLogger.warn(`scheduleTaskReminder: No completionDateStr provided, aborting`);
+    return [];
+  }
   const ids = [];
 
   let targetDate = dayjs(completionDateStr);
@@ -253,6 +270,7 @@ export async function scheduleExactTaskReminder(
   themeState = {}
 ) {
   const targetDate = dayjs(targetDateObj);
+  DevLogger.info(`scheduleExactTaskReminder for: ${taskName}`, { targetDate: targetDate.format(), isAlarm, category });
 
   if (
     !targetDate.isValid() ||
@@ -261,6 +279,7 @@ export async function scheduleExactTaskReminder(
     console.warn(
       'Cannot schedule notification in the past.'
     );
+    DevLogger.warn(`Cannot schedule notification in the past. Date: ${targetDate.format()}`);
 
     return null;
   }
@@ -279,7 +298,7 @@ export async function scheduleExactTaskReminder(
     // Ensure channels exist before scheduling
     await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
 
-    return await Notifications.scheduleNotificationAsync({
+    const scheduledId = await Notifications.scheduleNotificationAsync({
       content: {
         title: isAlarm
           ? 'Task Alarm'
@@ -321,7 +340,11 @@ export async function scheduleExactTaskReminder(
               date: targetDate.toDate(),
             },
     });
+    
+    DevLogger.success(`Successfully scheduled exact notification`, { scheduledId, channelId, sound, taskName });
+    return scheduledId;
   } catch (error) {
+    DevLogger.error(`Error scheduling task reminder`, error.message);
     console.error(
       'Error scheduling task reminder:',
       error

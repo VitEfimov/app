@@ -283,7 +283,8 @@ function InitApp() {
         const { processAutoManageTasks } = require('./src/features/taskSlice');
         await dispatch(processAutoManageTasks());
 
-        await registerForPushNotificationsAsync();
+        const currentThemeState = store.getState().themeReducer;
+        await registerForPushNotificationsAsync(currentThemeState);
       } catch (e) {
         console.error(e);
       } finally {
