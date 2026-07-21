@@ -61,7 +61,20 @@
             "./assets/audio/overdue_nudge_32f.wav",
             "./assets/audio/morning_glass_32f.wav",
             "./assets/audio/alarm_gentle_32f.wav",
-            "./assets/audio/alarm_urgent_32f.wav"
+            "./assets/audio/alarm_urgent_32f.wav",
+            "./assets/audio/alarm_02.mp3",
+            "./assets/audio/alarn_03.mp3",
+            "./assets/audio/bamboo.mp3",
+            "./assets/audio/bell.mp3",
+            "./assets/audio/bell01.mp3",
+            "./assets/audio/fireworks.mp3",
+            "./assets/audio/konb.mp3",
+            "./assets/audio/konob.mp3",
+            "./assets/audio/kot.mp3",
+            "./assets/audio/koto.mp3",
+            "./assets/audio/sakura.mp3",
+            "./assets/audio/shrine_bell.mp3",
+            "./assets/audio/start_sound.mp3"
           ]
         }
       ],

@@ -8,6 +8,33 @@ import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
 import AutoManageSettings from '../components/AutoManageSettings';
+import { Audio } from 'expo-av';
+
+const SOUND_ASSETS = {
+  'notification_air_32f.wav': require('../../assets/audio/notification_air_32f.wav'),
+  'notification_focus_32f.wav': require('../../assets/audio/notification_focus_32f.wav'),
+  'reminder_soft_32f.wav': require('../../assets/audio/reminder_soft_32f.wav'),
+  'task_complete_32f.wav': require('../../assets/audio/task_complete_32f.wav'),
+  'success_bloom_32f.wav': require('../../assets/audio/success_bloom_32f.wav'),
+  'warning_gentle_32f.wav': require('../../assets/audio/warning_gentle_32f.wav'),
+  'overdue_nudge_32f.wav': require('../../assets/audio/overdue_nudge_32f.wav'),
+  'morning_glass_32f.wav': require('../../assets/audio/morning_glass_32f.wav'),
+  'alarm_gentle_32f.wav': require('../../assets/audio/alarm_gentle_32f.wav'),
+  'alarm_urgent_32f.wav': require('../../assets/audio/alarm_urgent_32f.wav'),
+  'alarm_02.mp3': require('../../assets/audio/alarm_02.mp3'),
+  'alarn_03.mp3': require('../../assets/audio/alarn_03.mp3'),
+  'bamboo.mp3': require('../../assets/audio/bamboo.mp3'),
+  'bell.mp3': require('../../assets/audio/bell.mp3'),
+  'bell01.mp3': require('../../assets/audio/bell01.mp3'),
+  'fireworks.mp3': require('../../assets/audio/fireworks.mp3'),
+  'konb.mp3': require('../../assets/audio/konb.mp3'),
+  'konob.mp3': require('../../assets/audio/konob.mp3'),
+  'kot.mp3': require('../../assets/audio/kot.mp3'),
+  'koto.mp3': require('../../assets/audio/koto.mp3'),
+  'sakura.mp3': require('../../assets/audio/sakura.mp3'),
+  'shrine_bell.mp3': require('../../assets/audio/shrine_bell.mp3'),
+  'start_sound.mp3': require('../../assets/audio/start_sound.mp3'),
+};
 
 const IconUser = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill={color}>
@@ -97,6 +124,19 @@ export default function SettingsScreen({ navigation }) {
     { label: t('Morning Glass'), value: 'morning_glass_32f.wav' },
     { label: t('Alarm Gentle'), value: 'alarm_gentle_32f.wav' },
     { label: t('Alarm Urgent'), value: 'alarm_urgent_32f.wav' },
+    { label: t('Alarm 02'), value: 'alarm_02.mp3' },
+    { label: t('Alarm 03'), value: 'alarn_03.mp3' },
+    { label: t('Bamboo'), value: 'bamboo.mp3' },
+    { label: t('Bell'), value: 'bell.mp3' },
+    { label: t('Bell 01'), value: 'bell01.mp3' },
+    { label: t('Fireworks'), value: 'fireworks.mp3' },
+    { label: t('Konb'), value: 'konb.mp3' },
+    { label: t('Konob'), value: 'konob.mp3' },
+    { label: t('Kot'), value: 'kot.mp3' },
+    { label: t('Koto'), value: 'koto.mp3' },
+    { label: t('Sakura'), value: 'sakura.mp3' },
+    { label: t('Shrine Bell'), value: 'shrine_bell.mp3' },
+    { label: t('Start Sound'), value: 'start_sound.mp3' },
   ];
 
   const handleTogglePin = (value) => {
@@ -104,6 +144,24 @@ export default function SettingsScreen({ navigation }) {
       setPinPromptVisible(true);
     } else {
       dispatch(setAppPin(null));
+    }
+  };
+
+  const playSoundPreview = async (soundFilename) => {
+    try {
+      const asset = SOUND_ASSETS[soundFilename];
+      if (asset) {
+        const { sound } = await Audio.Sound.createAsync(asset);
+        await sound.playAsync();
+        // optionally unload sound after playing
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.didJustFinish) {
+            sound.unloadAsync();
+          }
+        });
+      }
+    } catch (error) {
+      console.log('Error playing sound preview:', error);
     }
   };
 
@@ -218,7 +276,10 @@ export default function SettingsScreen({ navigation }) {
               label={t("Notification Sound")} 
               value={notificationSound} 
               options={soundOptions} 
-              onSelect={val => dispatch(setNotificationSound(val))} 
+              onSelect={val => {
+                dispatch(setNotificationSound(val));
+                playSoundPreview(val);
+              }} 
               colors={colors}
               layout="horizontal"
             />
@@ -228,7 +289,10 @@ export default function SettingsScreen({ navigation }) {
               label={t("Alarm Sound")} 
               value={alarmSound} 
               options={soundOptions} 
-              onSelect={val => dispatch(setAlarmSound(val))} 
+              onSelect={val => {
+                dispatch(setAlarmSound(val));
+                playSoundPreview(val);
+              }} 
               colors={colors}
               layout="horizontal"
             />
@@ -238,7 +302,10 @@ export default function SettingsScreen({ navigation }) {
               label={t("Completion Sound")} 
               value={taskCompleteSound} 
               options={soundOptions} 
-              onSelect={val => dispatch(setTaskCompleteSound(val))} 
+              onSelect={val => {
+                dispatch(setTaskCompleteSound(val));
+                playSoundPreview(val);
+              }} 
               colors={colors}
               layout="horizontal"
             />
