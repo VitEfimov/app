@@ -95,6 +95,7 @@ const IconCheckSquare = ({ color }) => (
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
+  const themeState = useSelector(state => state.themeReducer);
   const scrollViewRef = useRef(null);
   const { t, i18n } = useTranslation();
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -257,7 +258,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
         await cancelNotification(task.notificationId);
         updates.notificationId = null;
       }
-      const notifIds = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), selectedTime, task.id, isAlarm);
+      const notifIds = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), selectedTime, task.id, isAlarm, themeState);
       if (notifIds && notifIds.length > 0) updates.notificationId = notifIds;
     }
     

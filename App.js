@@ -20,7 +20,7 @@ import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
 import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
-import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, DEFAULT_APP_CHANNEL } from './src/utils/notifications';
+import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId } from './src/utils/notifications';
 import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
 import PinLockScreen from './src/screens/PinLockScreen';
@@ -329,7 +329,7 @@ function InitApp() {
              const newTime = dayjs().add(snoozeMins, 'minute');
              
              // Schedule new reminder without changing the actual task's time
-             const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false, 'task_reminder');
+             const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false, 'task_reminder', themeState);
              if (notifId) {
                // Append the new snoozed notification ID so it can be cleaned up if task is deleted
                const updatedNotifIds = [...(task.notificationId || []), notifId];
@@ -338,13 +338,15 @@ function InitApp() {
                  notificationId: updatedNotifIds
                }));
 
+               const channelId = getChannelId(false, themeState.notificationSound, themeState.vibrationEnabled);
+
                await Notifications.scheduleNotificationAsync({
                  content: {
                    title: 'Task Snoozed',
                    body: `Snoozed '${task.taskname}' for ${snoozeMins} minute(s)`,
                    priority: Notifications.AndroidNotificationPriority.MAX,
                  },
-                 trigger: Platform.OS === 'android' ? { channelId: DEFAULT_APP_CHANNEL } : null,
+                 trigger: Platform.OS === 'android' ? { channelId } : null,
                });
              }
           }

@@ -47,8 +47,9 @@ const initialState = {
   summaryReminderTime: loaded?.summaryReminderTime || '09:00',
   
   // Notification Settings
-  alarmSound: loaded?.alarmSound || 'alarm_urgent_loop.wav',
-  notificationSound: loaded?.notificationSound || 'notification_soft.wav',
+  alarmSound: loaded?.alarmSound || '10_alarm_urgent_32f.wav',
+  notificationSound: loaded?.notificationSound || '01_notification_air_32f.wav',
+  taskCompleteSound: loaded?.taskCompleteSound || '05_success_bloom_32f.wav',
   vibrationEnabled: loaded?.vibrationEnabled !== undefined ? loaded.vibrationEnabled : true,
   
   // Security
@@ -101,6 +102,10 @@ const themeSlice = createSlice({
     },
     setNotificationSound: (state, action) => {
       state.notificationSound = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setTaskCompleteSound: (state, action) => {
+      state.taskCompleteSound = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setVibrationEnabled: (state, action) => {
@@ -200,7 +205,7 @@ const themeSlice = createSlice({
 export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime,
-  setAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
+  setAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setTaskCompleteSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat
 } = themeSlice.actions;
 

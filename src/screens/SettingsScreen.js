@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks } from '../features/taskSlice';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setTaskCompleteSound, setVibrationEnabled } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -38,8 +38,9 @@ export default function SettingsScreen({ navigation }) {
   const fontSize = theme.fontSize || 'normal';
   const progressMode = theme.progressMode || 'daily';
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
-  const alarmSound = theme.alarmSound || 'alarm_urgent_loop.wav';
-  const notificationSound = theme.notificationSound || 'notification_soft.wav';
+  const alarmSound = theme.alarmSound || '10_alarm_urgent_32f.wav';
+  const notificationSound = theme.notificationSound || '01_notification_air_32f.wav';
+  const taskCompleteSound = theme.taskCompleteSound || '05_success_bloom_32f.wav';
   const vibrationEnabled = theme.vibrationEnabled !== undefined ? theme.vibrationEnabled : true;
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
@@ -85,14 +86,17 @@ export default function SettingsScreen({ navigation }) {
     { label: t('1 hour'), value: 60 },
   ];
 
-  const notificationSoundOptions = [
-    { label: t('Soft'), value: 'notification_soft.wav' },
-    { label: t('Priority'), value: 'notification_priority.wav' },
-  ];
-
-  const alarmSoundOptions = [
-    { label: t('Urgent Loop'), value: 'alarm_urgent_loop.wav' },
-    { label: t('Gentle Loop'), value: 'alarm_gentle_loop.wav' },
+  const soundOptions = [
+    { label: t('Notification Air'), value: '01_notification_air_32f.wav' },
+    { label: t('Notification Focus'), value: '02_notification_focus_32f.wav' },
+    { label: t('Reminder Soft'), value: '03_reminder_soft_32f.wav' },
+    { label: t('Task Complete'), value: '04_task_complete_32f.wav' },
+    { label: t('Success Bloom'), value: '05_success_bloom_32f.wav' },
+    { label: t('Warning Gentle'), value: '06_warning_gentle_32f.wav' },
+    { label: t('Overdue Nudge'), value: '07_overdue_nudge_32f.wav' },
+    { label: t('Morning Glass'), value: '08_morning_glass_32f.wav' },
+    { label: t('Alarm Gentle'), value: '09_alarm_gentle_32f.wav' },
+    { label: t('Alarm Urgent'), value: '10_alarm_urgent_32f.wav' },
   ];
 
   const handleTogglePin = (value) => {
@@ -213,7 +217,7 @@ export default function SettingsScreen({ navigation }) {
             <CustomDropdown 
               label={t("Notification Sound")} 
               value={notificationSound} 
-              options={notificationSoundOptions} 
+              options={soundOptions} 
               onSelect={val => dispatch(setNotificationSound(val))} 
               colors={colors}
               layout="horizontal"
@@ -223,8 +227,18 @@ export default function SettingsScreen({ navigation }) {
             <CustomDropdown 
               label={t("Alarm Sound")} 
               value={alarmSound} 
-              options={alarmSoundOptions} 
+              options={soundOptions} 
               onSelect={val => dispatch(setAlarmSound(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+            <CustomDropdown 
+              label={t("Completion Sound")} 
+              value={taskCompleteSound} 
+              options={soundOptions} 
+              onSelect={val => dispatch(setTaskCompleteSound(val))} 
               colors={colors}
               layout="horizontal"
             />

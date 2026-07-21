@@ -12,47 +12,65 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const DEFAULT_CHANNEL_ID = 'task_default_v2';
-export const ALARM_CHANNEL_ID = 'task_alarm_v5';
-const ALARM_SOUND = 'alarm_urgent_loop.wav';
+export const VIBRATION_PATTERNS = {
+  notificationSoft: [0, 35, 45, 40],
+  reminder: [0, 60, 70, 60, 120, 90],
+  important: [0, 120, 80, 180],
+  alarmGentle: [0, 250, 120, 250, 120, 400, 350],
+  alarmUrgent: [0, 500, 180, 500, 180, 700, 180, 700],
+};
 
-async function configureAndroidNotificationChannels() {
+export const VIBRATION_PRESETS = {
+  taskCompleted: [],
+  newTask: VIBRATION_PATTERNS.notificationSoft,
+  reminder: VIBRATION_PATTERNS.reminder,
+  importantReminder: VIBRATION_PATTERNS.important,
+  morningReminder: VIBRATION_PATTERNS.notificationSoft,
+  eveningReminder: VIBRATION_PATTERNS.notificationSoft,
+  overdueTask: VIBRATION_PATTERNS.alarmGentle,
+  alarm: VIBRATION_PATTERNS.alarmGentle,
+  criticalAlarm: VIBRATION_PATTERNS.alarmUrgent,
+};
+
+export function getChannelId(isAlarm, sound, vibrationEnabled) {
+  const base = isAlarm ? 'alarm' : 'default';
+  const soundName = sound ? sound.replace('.wav', '') : 'default';
+  const vib = vibrationEnabled ? 'vib1' : 'vib0';
+  return `task_${base}_${soundName}_${vib}`;
+}
+
+export async function configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled) {
   if (Platform.OS !== 'android') {
     return;
   }
 
+  const defaultChannelId = getChannelId(false, notificationSound, vibrationEnabled);
   await Notifications.setNotificationChannelAsync(
-    DEFAULT_CHANNEL_ID,
+    defaultChannelId,
     {
       name: 'Task reminders',
       description: 'Standard task reminder notifications',
       importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      enableVibrate: true,
-      sound: 'default',
+      vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.reminder : [0],
+      enableVibrate: vibrationEnabled,
+      sound: notificationSound || 'default',
       lockscreenVisibility:
         Notifications.AndroidNotificationVisibility.PUBLIC,
     }
   );
 
+  const alarmChannelId = getChannelId(true, alarmSound, vibrationEnabled);
   await Notifications.setNotificationChannelAsync(
-    ALARM_CHANNEL_ID,
+    alarmChannelId,
     {
       name: 'Task alarms',
       description: 'Urgent task alarms with sound and vibration',
       importance: Notifications.AndroidImportance.MAX,
 
-      sound: ALARM_SOUND,
+      sound: alarmSound || 'alarm_urgent_loop.wav',
 
-      enableVibrate: true,
-      vibrationPattern: [
-        0,
-        900,
-        350,
-        900,
-        350,
-        1200,
-      ],
+      enableVibrate: vibrationEnabled,
+      vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.alarm : [0],
 
       audioAttributes: {
         usage: Notifications.AndroidAudioUsage.ALARM,
@@ -68,14 +86,18 @@ async function configureAndroidNotificationChannels() {
   );
 }
 
-export const DEFAULT_APP_CHANNEL = DEFAULT_CHANNEL_ID;
 
-export async function registerForPushNotificationsAsync() {
+
+export async function registerForPushNotificationsAsync(themeState = {}) {
   if (Platform.OS === 'web') {
     return null;
   }
 
-  await configureAndroidNotificationChannels();
+  const notifSound = themeState.notificationSound || '01_notification_air_32f.wav';
+  const alrmSound = themeState.alarmSound || '10_alarm_urgent_32f.wav';
+  const vibEnabled = themeState.vibrationEnabled !== false;
+
+  await configureAndroidNotificationChannels(notifSound, alrmSound, vibEnabled);
 
   const permission =
     await Notifications.getPermissionsAsync();
@@ -157,7 +179,7 @@ import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 dayjs.extend(customParseFormat);
-export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false) {
+export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false, themeState = {}) {
   if (!completionDateStr) return [];
   const ids = [];
 
@@ -193,7 +215,8 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       targetDate.toDate(),
       taskId,
       isAlarm,
-      isAlarm ? 'task_reminder' : 'task_regular'
+      isAlarm ? 'task_reminder' : 'task_regular',
+      themeState
     );
     if (timeId) ids.push(timeId);
   } else {
@@ -211,7 +234,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     const offset = offsets[reminderValue];
     if (offset) {
       let reminderDate = targetDate.subtract(offset.amount, offset.unit);
-      const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm, 'task_reminder');
+      const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm, 'task_reminder', themeState);
       if (remId) ids.push(remId);
     }
   }
@@ -224,7 +247,8 @@ export async function scheduleExactTaskReminder(
   targetDateObj,
   taskId = null,
   isAlarm = false,
-  category = 'task_reminder'
+  category = 'task_reminder',
+  themeState = {}
 ) {
   const targetDate = dayjs(targetDateObj);
 
@@ -239,13 +263,15 @@ export async function scheduleExactTaskReminder(
     return null;
   }
 
-  const channelId = isAlarm
-    ? ALARM_CHANNEL_ID
-    : DEFAULT_CHANNEL_ID;
+  const notificationSound = themeState.notificationSound || '01_notification_air_32f.wav';
+  const alarmSound = themeState.alarmSound || '10_alarm_urgent_32f.wav';
+  const vibrationEnabled = themeState.vibrationEnabled !== false;
+
+  const channelId = getChannelId(isAlarm, isAlarm ? alarmSound : notificationSound, vibrationEnabled);
 
   const sound = isAlarm
-    ? ALARM_SOUND
-    : 'default';
+    ? alarmSound
+    : notificationSound;
 
   try {
     return await Notifications.scheduleNotificationAsync({
