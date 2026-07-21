@@ -36,7 +36,9 @@ export function getChannelId(isAlarm, sound, vibrationEnabled) {
   const base = isAlarm ? 'alarm' : 'default';
   const soundName = sound ? sound.replace(/\.(wav|mp3)$/i, '') : 'default';
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
-  return `task_${base}_${soundName}_${vib}`;
+  // Appending _v2 ensures Android creates a completely fresh channel,
+  // bypassing any broken channels that may have been restored from cloud backups.
+  return `task_${base}_${soundName}_${vib}_v2`;
 }
 
 export async function configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled) {
