@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, ToastAndroid } from 'react-native';
 
 // Set how notifications should be handled when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -34,7 +34,7 @@ export const VIBRATION_PRESETS = {
 
 export function getChannelId(isAlarm, sound, vibrationEnabled) {
   const base = isAlarm ? 'alarm' : 'default';
-  const soundName = sound ? sound.replace('.wav', '') : 'default';
+  const soundName = sound ? sound.replace(/\.(wav|mp3)$/i, '') : 'default';
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
   return `task_${base}_${soundName}_${vib}`;
 }
@@ -51,7 +51,7 @@ export async function configureAndroidNotificationChannels(notificationSound, al
       name: 'Task reminders',
       description: 'Standard task reminder notifications',
       importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.reminder : [0],
+      vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.reminder : undefined,
       enableVibrate: vibrationEnabled,
       sound: notificationSound || 'default',
       lockscreenVisibility:
@@ -70,7 +70,7 @@ export async function configureAndroidNotificationChannels(notificationSound, al
       sound: alarmSound || 'alarm_urgent_loop.wav',
 
       enableVibrate: vibrationEnabled,
-      vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.alarm : [0],
+      vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.alarm : undefined,
 
       audioAttributes: {
         usage: Notifications.AndroidAudioUsage.ALARM,
@@ -273,10 +273,10 @@ export async function scheduleExactTaskReminder(
     ? alarmSound
     : notificationSound;
 
-  // Ensure channels exist before scheduling
-  await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
-
   try {
+    // Ensure channels exist before scheduling
+    await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
+
     return await Notifications.scheduleNotificationAsync({
       content: {
         title: isAlarm
@@ -320,6 +320,9 @@ export async function scheduleExactTaskReminder(
       'Error scheduling task reminder:',
       error
     );
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(`Error scheduling: ${error.message}`, ToastAndroid.LONG);
+    }
 
     return null;
   }
