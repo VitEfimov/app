@@ -273,6 +273,9 @@ export async function scheduleExactTaskReminder(
     ? alarmSound
     : notificationSound;
 
+  // Ensure channels exist before scheduling
+  await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
+
   try {
     return await Notifications.scheduleNotificationAsync({
       content: {
@@ -307,20 +310,10 @@ export async function scheduleExactTaskReminder(
       trigger:
         Platform.OS === 'android'
           ? {
-              type:
-                Notifications
-                  .SchedulableTriggerInputTypes.DATE,
-
               date: targetDate.toDate(),
               channelId,
             }
-          : {
-              type:
-                Notifications
-                  .SchedulableTriggerInputTypes.DATE,
-
-              date: targetDate.toDate(),
-            },
+          : targetDate.toDate(),
     });
   } catch (error) {
     console.error(
