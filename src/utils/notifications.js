@@ -288,7 +288,72 @@ export async function configureAndroidNotificationChannels(
   }
 }
 
+export async function deleteObsoleteNotificationChannels(
+  notificationSound,
+  alarmSound,
+  vibrationEnabled
+) {
+  if (Platform.OS !== 'android') {
+    return;
+  }
 
+  const activeDefaultId = getChannelId(
+    false,
+    notificationSound,
+    vibrationEnabled
+  );
+
+  const activeAlarmId = getChannelId(
+    true,
+    alarmSound,
+    vibrationEnabled
+  );
+
+  const keepIds = new Set([
+    activeDefaultId,
+    activeAlarmId,
+    'debug_system_sound_v15',
+  ]);
+
+  try {
+    const channels =
+      await Notifications.getNotificationChannelsAsync();
+
+    for (const channel of channels) {
+      const isManagedByYourApp =
+        channel.id.startsWith('task_default_') ||
+        channel.id.startsWith('task_alarm_') ||
+        channel.id.startsWith('debug_system_sound_') ||
+        channel.id.startsWith('task_default_system_sound_') ||
+        channel.id.startsWith('default_sound_');
+
+      if (
+        isManagedByYourApp &&
+        !keepIds.has(channel.id)
+      ) {
+        await Notifications.deleteNotificationChannelAsync(
+          channel.id
+        );
+
+        DevLogger.info(
+          'Deleted old notification channel',
+          {
+            id: channel.id,
+            name: channel.name,
+          }
+        );
+      }
+    }
+  } catch (error) {
+    DevLogger.error(
+      'Notification channel cleanup failed',
+      {
+        message: error?.message,
+        stack: error?.stack,
+      }
+    );
+  }
+}
 
 export async function registerForPushNotificationsAsync(themeState = {}) {
   if (Platform.OS === 'web') {
@@ -298,6 +363,12 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
   const notifSound = themeState.notificationSound || 'default';
   const alrmSound = themeState.alarmSound || 'default';
   const vibEnabled = themeState.vibrationEnabled !== false;
+
+  await deleteObsoleteNotificationChannels(
+    notifSound,
+    alrmSound,
+    vibEnabled
+  );
 
   await configureAndroidNotificationChannels(notifSound, alrmSound, vibEnabled);
 
