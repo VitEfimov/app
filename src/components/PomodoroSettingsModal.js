@@ -20,7 +20,7 @@ const predefinedSounds = [
   { label: 'Default', value: 'default' },
   { label: 'None', value: 'none' },
   { label: 'Chime', value: 'chime.wav' },
-  { label: 'Light', value: 'light ping.wav' },
+  { label: 'Light', value: 'light_ping.wav' },
   { label: 'Notification', value: 'notification.wav' },
 ];
 

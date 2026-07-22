@@ -52,7 +52,7 @@ const IconSettings = ({ color }) => (
 
 const SOUND_MAP = {
   'chime.wav': require('../../assets/audio/chime.wav'),
-  'light ping.wav': require('../../assets/audio/light ping.wav'),
+  'light_ping.wav': require('../../assets/audio/light_ping.wav'),
   'notification.wav': require('../../assets/audio/notification.wav'),
   'end_sound.ogg': require('../../assets/audio/end_sound.ogg'),
   'start_sound.mp3': require('../../assets/audio/start_sound.mp3')
