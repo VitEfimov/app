@@ -39,7 +39,7 @@ export function getChannelId(isAlarm, sound, vibrationEnabled) {
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
   // Appending _v11 ensures Android creates a completely fresh channel,
   // bypassing any broken channels that may have been restored from cloud backups.
-  return `task_${base}_${soundName}_${vib}_v11`;
+  return `task_${base}_${soundName}_${vib}_v12`;
 }
 
 export async function configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled) {
@@ -511,7 +511,7 @@ export async function testAndroidDefaultNotification() {
   }
 
   // Use a brand-new ID every time you significantly change the channel.
-  const channelId = 'android_default_sound_test_v11';
+  const channelId = 'android_default_sound_test_v12';
 
   // Remove the test channel first so Android cannot reuse old silent settings.
   try {

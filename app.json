@@ -25,6 +25,7 @@
       },
       "package": "com.vitvalef.app",
       "permissions": [
+        "VIBRATE",
         "SCHEDULE_EXACT_ALARM",
         "USE_EXACT_ALARM",
         "POST_NOTIFICATIONS"
