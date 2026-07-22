@@ -54,9 +54,9 @@
         {
           "sounds": [
             "./assets/audio/alarm_02.mp3",
-            "./assets/audio/alarm_gentle_32f.wav",
+            "./assets/audio/alarm_gentle.wav",
             "./assets/audio/alarm_gentle_loop.wav",
-            "./assets/audio/alarm_urgent_32f.wav",
+            "./assets/audio/alarm_urgent.wav",
             "./assets/audio/alarm_urgent_loop.wav",
             "./assets/audio/alarn_03.mp3",
             "./assets/audio/bamboo.mp3",
@@ -70,20 +70,20 @@
             "./assets/audio/kot.mp3",
             "./assets/audio/koto.mp3",
             "./assets/audio/light_ping.wav",
-            "./assets/audio/morning_glass_32f.wav",
+            "./assets/audio/morning_glass.wav",
             "./assets/audio/notification.wav",
-            "./assets/audio/notification_air_32f.wav",
-            "./assets/audio/notification_focus_32f.wav",
+            "./assets/audio/notification_air.wav",
+            "./assets/audio/notification_focus.wav",
             "./assets/audio/notification_priority.wav",
             "./assets/audio/notification_soft.wav",
-            "./assets/audio/overdue_nudge_32f.wav",
-            "./assets/audio/reminder_soft_32f.wav",
+            "./assets/audio/overdue_nudge.wav",
+            "./assets/audio/reminder_soft.wav",
             "./assets/audio/sakura.mp3",
             "./assets/audio/shrine_bell.mp3",
             "./assets/audio/start_sound.mp3",
-            "./assets/audio/success_bloom_32f.wav",
-            "./assets/audio/task_complete_32f.wav",
-            "./assets/audio/warning_gentle_32f.wav"
+            "./assets/audio/success_bloom.wav",
+            "./assets/audio/task_complete.wav",
+            "./assets/audio/warning_gentle.wav"
           ]
         }
       ],

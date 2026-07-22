@@ -11,16 +11,16 @@ import AutoManageSettings from '../components/AutoManageSettings';
 import { Audio } from 'expo-av';
 
 const SOUND_ASSETS = {
-  'notification_air_32f.wav': require('../../assets/audio/notification_air_32f.wav'),
-  'notification_focus_32f.wav': require('../../assets/audio/notification_focus_32f.wav'),
-  'reminder_soft_32f.wav': require('../../assets/audio/reminder_soft_32f.wav'),
-  'task_complete_32f.wav': require('../../assets/audio/task_complete_32f.wav'),
-  'success_bloom_32f.wav': require('../../assets/audio/success_bloom_32f.wav'),
-  'warning_gentle_32f.wav': require('../../assets/audio/warning_gentle_32f.wav'),
-  'overdue_nudge_32f.wav': require('../../assets/audio/overdue_nudge_32f.wav'),
-  'morning_glass_32f.wav': require('../../assets/audio/morning_glass_32f.wav'),
-  'alarm_gentle_32f.wav': require('../../assets/audio/alarm_gentle_32f.wav'),
-  'alarm_urgent_32f.wav': require('../../assets/audio/alarm_urgent_32f.wav'),
+  'notification_air.wav': require('../../assets/audio/notification_air.wav'),
+  'notification_focus.wav': require('../../assets/audio/notification_focus.wav'),
+  'reminder_soft.wav': require('../../assets/audio/reminder_soft.wav'),
+  'task_complete.wav': require('../../assets/audio/task_complete.wav'),
+  'success_bloom.wav': require('../../assets/audio/success_bloom.wav'),
+  'warning_gentle.wav': require('../../assets/audio/warning_gentle.wav'),
+  'overdue_nudge.wav': require('../../assets/audio/overdue_nudge.wav'),
+  'morning_glass.wav': require('../../assets/audio/morning_glass.wav'),
+  'alarm_gentle.wav': require('../../assets/audio/alarm_gentle.wav'),
+  'alarm_urgent.wav': require('../../assets/audio/alarm_urgent.wav'),
   'alarm_02.mp3': require('../../assets/audio/alarm_02.mp3'),
   'alarn_03.mp3': require('../../assets/audio/alarn_03.mp3'),
   'bamboo.mp3': require('../../assets/audio/bamboo.mp3'),
@@ -65,9 +65,9 @@ export default function SettingsScreen({ navigation }) {
   const fontSize = theme.fontSize || 'normal';
   const progressMode = theme.progressMode || 'daily';
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
-  const alarmSound = theme.alarmSound || 'alarm_urgent_32f.wav';
-  const notificationSound = theme.notificationSound || 'notification_air_32f.wav';
-  const taskCompleteSound = theme.taskCompleteSound || 'success_bloom_32f.wav';
+  const alarmSound = theme.alarmSound || 'alarm_urgent.wav';
+  const notificationSound = theme.notificationSound || 'notification_air.wav';
+  const taskCompleteSound = theme.taskCompleteSound || 'success_bloom.wav';
   const vibrationEnabled = theme.vibrationEnabled !== undefined ? theme.vibrationEnabled : true;
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
@@ -114,16 +114,16 @@ export default function SettingsScreen({ navigation }) {
   ];
 
   const soundOptions = [
-    { label: t('Notification Air'), value: 'notification_air_32f.wav' },
-    { label: t('Notification Focus'), value: 'notification_focus_32f.wav' },
-    { label: t('Reminder Soft'), value: 'reminder_soft_32f.wav' },
-    { label: t('Task Complete'), value: 'task_complete_32f.wav' },
-    { label: t('Success Bloom'), value: 'success_bloom_32f.wav' },
-    { label: t('Warning Gentle'), value: 'warning_gentle_32f.wav' },
-    { label: t('Overdue Nudge'), value: 'overdue_nudge_32f.wav' },
-    { label: t('Morning Glass'), value: 'morning_glass_32f.wav' },
-    { label: t('Alarm Gentle'), value: 'alarm_gentle_32f.wav' },
-    { label: t('Alarm Urgent'), value: 'alarm_urgent_32f.wav' },
+    { label: t('Notification Air'), value: 'notification_air.wav' },
+    { label: t('Notification Focus'), value: 'notification_focus.wav' },
+    { label: t('Reminder Soft'), value: 'reminder_soft.wav' },
+    { label: t('Task Complete'), value: 'task_complete.wav' },
+    { label: t('Success Bloom'), value: 'success_bloom.wav' },
+    { label: t('Warning Gentle'), value: 'warning_gentle.wav' },
+    { label: t('Overdue Nudge'), value: 'overdue_nudge.wav' },
+    { label: t('Morning Glass'), value: 'morning_glass.wav' },
+    { label: t('Alarm Gentle'), value: 'alarm_gentle.wav' },
+    { label: t('Alarm Urgent'), value: 'alarm_urgent.wav' },
     { label: t('Alarm 02'), value: 'alarm_02.mp3' },
     { label: t('Alarm 03'), value: 'alarn_03.mp3' },
     { label: t('Bamboo'), value: 'bamboo.mp3' },

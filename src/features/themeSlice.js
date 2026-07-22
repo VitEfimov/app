@@ -47,9 +47,9 @@ const initialState = {
   summaryReminderTime: loaded?.summaryReminderTime || '09:00',
   
   // Notification Settings
-  alarmSound: loaded?.alarmSound || 'alarm_urgent_32f.wav',
-  notificationSound: loaded?.notificationSound || 'notification_air_32f.wav',
-  taskCompleteSound: loaded?.taskCompleteSound || 'success_bloom_32f.wav',
+  alarmSound: loaded?.alarmSound || 'alarm_urgent.wav',
+  notificationSound: loaded?.notificationSound || 'notification_air.wav',
+  taskCompleteSound: loaded?.taskCompleteSound || 'success_bloom.wav',
   vibrationEnabled: loaded?.vibrationEnabled !== undefined ? loaded.vibrationEnabled : true,
   
   // Security
