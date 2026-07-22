@@ -329,12 +329,10 @@ export async function scheduleExactTaskReminder(
       trigger:
         Platform.OS === 'android'
           ? {
-              type: Notifications.SchedulableTriggerInputTypes.DATE,
               date: targetDate.toDate(),
               channelId,
             }
           : {
-              type: Notifications.SchedulableTriggerInputTypes.DATE,
               date: targetDate.toDate(),
             },
     });
@@ -392,9 +390,6 @@ export async function scheduleLocalNotification(
         },
 
         trigger: {
-          type:
-            Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-
           seconds,
           repeats: false,
           channelId,
@@ -410,9 +405,6 @@ export async function scheduleLocalNotification(
       },
 
       trigger: {
-        type:
-          Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-
         seconds,
         repeats: false,
       },
@@ -563,9 +555,6 @@ export async function testAndroidDefaultNotification() {
       },
 
       trigger: {
-        type:
-          Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-
         seconds: 3,
         repeats: false,
 
