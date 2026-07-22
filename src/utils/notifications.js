@@ -33,78 +33,258 @@ export const VIBRATION_PRESETS = {
   criticalAlarm: VIBRATION_PATTERNS.alarmUrgent,
 };
 
-export function getChannelId(isAlarm, sound, vibrationEnabled) {
+export function getChannelId(
+  isAlarm,
+  sound,
+  vibrationEnabled
+) {
   const base = isAlarm ? 'alarm' : 'default';
-  const soundName = sound ? sound.replace(/\.(wav|mp3)$/i, '') : 'default';
+
+  const soundName = sound
+    ? sound.replace(/\.(wav|mp3|ogg)$/i, '')
+    : 'default';
+
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
-  // Appending _v11 ensures Android creates a completely fresh channel,
-  // bypassing any broken channels that may have been restored from cloud backups.
-  return `task_${base}_${soundName}_${vib}_v14`;
+
+  return `task_${base}_${soundName}_${vib}_v15`;
 }
 
-let configuredChannels = new Set();
+// let configuredChannels = new Set(); // Temporarily removed for debugging
 
-export async function configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled) {
+function serializeError(error) {
+  if (!error) {
+    return {
+      message: 'Unknown error',
+    };
+  }
+
+  return {
+    name: error.name || 'Error',
+    message: error.message || String(error),
+    stack: error.stack || null,
+    code: error.code || null,
+  };
+}
+
+export function normalizeChannelForLog(channel) {
+  if (!channel) {
+    return null;
+  }
+
+  return {
+    id: channel.id,
+    name: channel.name,
+    description: channel.description,
+
+    importance: channel.importance,
+    sound: channel.sound,
+
+    enableVibrate: channel.enableVibrate,
+    vibrationPattern: channel.vibrationPattern,
+
+    enableLights: channel.enableLights,
+    lightColor: channel.lightColor,
+
+    lockscreenVisibility:
+      channel.lockscreenVisibility,
+
+    bypassDnd: channel.bypassDnd,
+
+    audioAttributes:
+      channel.audioAttributes || null,
+  };
+}
+
+export async function configureAndroidNotificationChannels(
+  notificationSound,
+  alarmSound,
+  vibrationEnabled
+) {
   if (Platform.OS !== 'android') {
     return;
   }
 
-  const defaultChannelId = getChannelId(false, notificationSound, vibrationEnabled);
-  const alarmChannelId = getChannelId(true, alarmSound, vibrationEnabled);
+  const defaultChannelId = getChannelId(
+    false,
+    notificationSound,
+    vibrationEnabled
+  );
 
-  if (configuredChannels.has(defaultChannelId) && configuredChannels.has(alarmChannelId)) {
-    return;
-  }
+  const alarmChannelId = getChannelId(
+    true,
+    alarmSound,
+    vibrationEnabled
+  );
 
-  DevLogger.info('Configuring Android Notification Channels', { notificationSound, alarmSound, vibrationEnabled });
+  DevLogger.info(
+    'Configuring Android notification channels',
+    {
+      notificationSound,
+      alarmSound,
+      vibrationEnabled,
+      defaultChannelId,
+      alarmChannelId,
+    }
+  );
 
   try {
-    DevLogger.info(`Setting up default channel ID: ${defaultChannelId}`);
     await Notifications.setNotificationChannelAsync(
-    defaultChannelId,
-    {
-      name: 'Task reminders',
-      description: 'Standard task reminder notifications',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.reminder : undefined,
-      enableVibrate: vibrationEnabled,
-      sound: notificationSound || 'default',
-      lockscreenVisibility:
-        Notifications.AndroidNotificationVisibility.PUBLIC,
+      defaultChannelId,
+      {
+        name: 'Task reminders',
+        description:
+          'Standard task reminder notifications',
+
+        importance:
+          Notifications.AndroidImportance.HIGH,
+
+        sound: notificationSound,
+
+        enableVibrate: vibrationEnabled,
+
+        vibrationPattern: vibrationEnabled
+          ? VIBRATION_PRESETS.reminder
+          : null,
+
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
+      }
+    );
+
+    await Notifications.setNotificationChannelAsync(
+      alarmChannelId,
+      {
+        name: 'Task alarms',
+        description:
+          'Urgent task alarms with sound and vibration',
+
+        importance:
+          Notifications.AndroidImportance.MAX,
+
+        sound: alarmSound,
+
+        enableVibrate: vibrationEnabled,
+
+        vibrationPattern: vibrationEnabled
+          ? VIBRATION_PRESETS.alarm
+          : null,
+
+        audioAttributes: {
+          usage:
+            Notifications.AndroidAudioUsage.ALARM,
+
+          contentType:
+            Notifications.AndroidAudioContentType
+              .SONIFICATION,
+        },
+
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
+
+        bypassDnd: true,
+      }
+    );
+
+    // Read both channels back from Android.
+    const storedDefault =
+      await Notifications.getNotificationChannelAsync(
+        defaultChannelId
+      );
+
+    const storedAlarm =
+      await Notifications.getNotificationChannelAsync(
+        alarmChannelId
+      );
+
+    DevLogger.info(
+      'Stored task-reminder channel',
+      normalizeChannelForLog(storedDefault)
+    );
+
+    DevLogger.info(
+      'Stored task-alarm channel',
+      normalizeChannelForLog(storedAlarm)
+    );
+
+    const problems = [];
+
+    if (!storedDefault) {
+      problems.push(
+        'Default notification channel was not found'
+      );
+    } else {
+      if (!storedDefault.sound) {
+        problems.push(
+          'Default notification channel has no sound'
+        );
+      }
+
+      if (
+        storedDefault.importance ===
+        Notifications.AndroidImportance.NONE
+      ) {
+        problems.push(
+          'Default notification channel is blocked'
+        );
+      }
     }
-  );
 
-  const alarmChannelId = getChannelId(true, alarmSound, vibrationEnabled);
-  DevLogger.info(`Setting up alarm channel ID: ${alarmChannelId}`);
-  await Notifications.setNotificationChannelAsync(
-    alarmChannelId,
-    {
-      name: 'Task alarms',
-      description: 'Urgent task alarms with sound and vibration',
-      importance: Notifications.AndroidImportance.MAX,
+    if (!storedAlarm) {
+      problems.push(
+        'Alarm notification channel was not found'
+      );
+    } else {
+      if (!storedAlarm.sound) {
+        problems.push(
+          'Alarm notification channel has no sound'
+        );
+      }
 
-      sound: alarmSound || 'alarm_urgent_loop.wav',
-
-      enableVibrate: vibrationEnabled,
-      vibrationPattern: vibrationEnabled ? VIBRATION_PRESETS.alarm : undefined,
-
-      audioAttributes: {
-        usage: Notifications.AndroidAudioUsage.ALARM,
-        contentType:
-          Notifications.AndroidAudioContentType.SONIFICATION,
-      },
-
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      bypassDnd: true,
+      if (
+        storedAlarm.importance ===
+        Notifications.AndroidImportance.NONE
+      ) {
+        problems.push(
+          'Alarm notification channel is blocked'
+        );
+      }
     }
-  );
 
-    configuredChannels.add(defaultChannelId);
-    configuredChannels.add(alarmChannelId);
+    if (problems.length > 0) {
+      DevLogger.error(
+        'Android stored invalid or silent channel settings',
+        {
+          problems,
+          defaultChannel:
+            normalizeChannelForLog(storedDefault),
+          alarmChannel:
+            normalizeChannelForLog(storedAlarm),
+        }
+      );
 
-    DevLogger.success('Android Notification Channels configured successfully');
+      // Do not cache a channel that Android reports as bad.
+      return;
+    }
+
+    // configuredChannels.add(defaultChannelId);
+    // configuredChannels.add(alarmChannelId);
+
+    DevLogger.success(
+      'Android notification channels verified',
+      {
+        defaultChannelId,
+        alarmChannelId,
+        defaultSound: storedDefault.sound,
+        alarmSound: storedAlarm.sound,
+      }
+    );
   } catch (error) {
-    DevLogger.error('Failed to configure Android Notification Channels', error.message);
+    DevLogger.error(
+      'Failed to configure Android notification channels',
+      serializeError(error)
+    );
+
+    throw error;
   }
 }
 
@@ -504,81 +684,246 @@ export async function updateRecurringAutomations(themeState) {
 
 export async function testAndroidDefaultNotification() {
   if (Platform.OS !== 'android') {
+    DevLogger.warn('System notification test is Android-only');
     return null;
   }
 
-  const permission = await Notifications.requestPermissionsAsync();
+  // Use a new ID for this diagnostic test.
+  // Increment this manually if you test a changed configuration later.
+  const channelId = 'debug_system_sound_v15';
 
-  console.log('Notification permission:', permission);
+  DevLogger.info('Starting Android default-sound diagnostic', {
+    platform: Platform.OS,
+    channelId,
+    time: new Date().toISOString(),
+  });
 
-  if (permission.status !== 'granted') {
-    ToastAndroid.show(
-      'Notification permission is not granted',
-      ToastAndroid.LONG
+  try {
+    // 1. Read notification permission.
+    const permissions =
+      await Notifications.getPermissionsAsync();
+
+    DevLogger.info('Notification permissions', permissions);
+
+    if (permissions.status !== 'granted') {
+      const requested =
+        await Notifications.requestPermissionsAsync();
+
+      DevLogger.info(
+        'Notification permissions after request',
+        requested
+      );
+
+      if (requested.status !== 'granted') {
+        DevLogger.error(
+          'Notification permission is not granted',
+          requested
+        );
+        return null;
+      }
+    }
+
+    // 2. Remove this exact diagnostic channel first.
+    // This helps during development, provided Android does not restore it.
+    try {
+      await Notifications.deleteNotificationChannelAsync(
+        channelId
+      );
+
+      DevLogger.info(
+        'Deleted previous diagnostic channel',
+        { channelId }
+      );
+    } catch (deleteError) {
+      DevLogger.warn(
+        'Could not delete previous diagnostic channel',
+        serializeError(deleteError)
+      );
+    }
+
+    // 3. Create a channel using only Android's system sound.
+    const createdChannel =
+      await Notifications.setNotificationChannelAsync(
+        channelId,
+        {
+          name: 'Sound diagnostic',
+          description:
+            'Temporary channel for notification sound diagnostics',
+
+          importance:
+            Notifications.AndroidImportance.MAX,
+
+          sound: 'default',
+
+          enableVibrate: true,
+
+          vibrationPattern: [0, 300, 150, 300],
+
+          lockscreenVisibility:
+            Notifications.AndroidNotificationVisibility.PUBLIC,
+        }
+      );
+
+    DevLogger.info(
+      'setNotificationChannelAsync result',
+      createdChannel
+    );
+
+    // 4. Read back what Android actually stored.
+    const storedChannel =
+      await Notifications.getNotificationChannelAsync(
+        channelId
+      );
+
+    DevLogger.info(
+      'Stored Android diagnostic channel',
+      normalizeChannelForLog(storedChannel)
+    );
+
+    if (!storedChannel) {
+      DevLogger.error(
+        'Android did not return the diagnostic channel',
+        { channelId }
+      );
+      return null;
+    }
+
+    if (
+      storedChannel.importance ===
+      Notifications.AndroidImportance.NONE
+    ) {
+      DevLogger.error(
+        'Diagnostic channel is blocked',
+        normalizeChannelForLog(storedChannel)
+      );
+    }
+
+    if (!storedChannel.sound) {
+      DevLogger.error(
+        'Diagnostic channel is silent: Android returned no sound',
+        normalizeChannelForLog(storedChannel)
+      );
+    }
+
+    // 5. Schedule the notification.
+    const notificationId =
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Android Sound Test',
+          body: 'This notification should use the system sound.',
+
+          // Channel controls Android 8+ sound, but keeping this
+          // makes the intended behavior explicit.
+          sound: 'default',
+
+          priority:
+            Notifications.AndroidNotificationPriority.MAX,
+
+          data: {
+            diagnostic: true,
+            expectedSound: 'default',
+            channelId,
+          },
+        },
+
+        trigger: {
+          seconds: 3,
+          repeats: false,
+          channelId,
+        },
+      });
+
+    DevLogger.success(
+      'Diagnostic notification scheduled',
+      {
+        notificationId,
+        channelId,
+        expectedSound: 'default',
+        firesInSeconds: 3,
+      }
+    );
+
+    // 6. Confirm it exists in Expo's scheduled list.
+    const scheduled =
+      await Notifications.getAllScheduledNotificationsAsync();
+
+    const matchingNotification = scheduled.find(
+      item => item.identifier === notificationId
+    );
+
+    DevLogger.info(
+      'Scheduled notification verification',
+      matchingNotification
+        ? {
+            found: true,
+            identifier: matchingNotification.identifier,
+            content: matchingNotification.content,
+            trigger: matchingNotification.trigger,
+          }
+        : {
+            found: false,
+            notificationId,
+          }
+    );
+
+    return notificationId;
+  } catch (error) {
+    DevLogger.error(
+      'Android default-sound diagnostic failed',
+      serializeError(error)
     );
 
     return null;
   }
+}
 
-  // Use a brand-new ID every time you significantly change the channel.
-  const channelId = 'android_default_sound_test_v14';
+export function attachNotificationDiagnostics() {
+  const receivedSubscription =
+    Notifications.addNotificationReceivedListener(
+      notification => {
+        DevLogger.success(
+          'Notification received by application',
+          {
+            identifier:
+              notification.request.identifier,
 
-  // Remove the test channel first so Android cannot reuse old silent settings.
-  try {
-    await Notifications.deleteNotificationChannelAsync(channelId);
-  } catch (error) {
-    console.log('Channel did not previously exist:', error);
-  }
+            content:
+              notification.request.content,
 
-  await Notifications.setNotificationChannelAsync(channelId, {
-    name: 'Default Sound Test V10',
-    description: 'Tests the Android system notification sound',
-    importance: Notifications.AndroidImportance.MAX,
-    sound: 'default',
-    enableVibrate: true,
-    vibrationPattern: [0, 250, 150, 250],
-    lockscreenVisibility:
-      Notifications.AndroidNotificationVisibility.PUBLIC,
-  });
+            trigger:
+              notification.request.trigger,
 
-  const channel =
-    await Notifications.getNotificationChannelAsync(channelId);
+            receivedAt:
+              new Date().toISOString(),
+          }
+        );
+      }
+    );
 
-  console.log('CREATED CHANNEL:', channel);
+  const responseSubscription =
+    Notifications.addNotificationResponseReceivedListener(
+      response => {
+        DevLogger.info(
+          'User interacted with notification',
+          {
+            actionIdentifier:
+              response.actionIdentifier,
 
-  const notificationId =
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Default sound test',
-        body: 'This notification should play the Android default sound.',
+            identifier:
+              response.notification.request.identifier,
 
-        // Android mainly uses the channel sound.
-        // Keeping this set is still appropriate.
-        sound: 'default',
+            content:
+              response.notification.request.content,
 
-        priority:
-          Notifications.AndroidNotificationPriority.MAX,
+            trigger:
+              response.notification.request.trigger,
+          }
+        );
+      }
+    );
 
-        data: {
-          test: true,
-        },
-      },
-
-      trigger: {
-        seconds: 3,
-        repeats: false,
-
-        // Critical: explicitly connect the notification to the channel.
-        channelId,
-      },
-    });
-
-  console.log('Scheduled test notification:', notificationId);
-
-  ToastAndroid.show(
-    'Default notification scheduled in 3 seconds',
-    ToastAndroid.SHORT
-  );
-
-  return notificationId;
+  return () => {
+    receivedSubscription.remove();
+    responseSubscription.remove();
+  };
 }

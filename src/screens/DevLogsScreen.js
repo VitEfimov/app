@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { DevLogger } from '../utils/logger';
 import { useTheme } from '../styles/ThemeContext';
-import { testAndroidDefaultNotification } from '../utils/notifications';
+import { testAndroidDefaultNotification, normalizeChannelForLog } from '../utils/notifications';
+import * as Notifications from 'expo-notifications';
 
 export default function DevLogsScreen() {
   const [logs, setLogs] = useState([]);
@@ -14,6 +15,48 @@ export default function DevLogsScreen() {
     });
     return unsubscribe;
   }, []);
+
+  const handleSystemNotificationTest = async () => {
+    DevLogger.info('User started system notification test');
+
+    try {
+      const notificationId = await testAndroidDefaultNotification();
+
+      if (notificationId) {
+        DevLogger.success('System notification test started', { notificationId });
+      } else {
+        DevLogger.error('System notification test did not return an ID');
+      }
+    } catch (error) {
+      DevLogger.error('Unhandled system notification test error', {
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack,
+      });
+    }
+  };
+
+  const handleInspectChannels = async () => {
+    if (Platform.OS !== 'android') {
+      DevLogger.warn('Notification channels only exist on Android');
+      return;
+    }
+
+    try {
+      const channels = await Notifications.getNotificationChannelsAsync();
+
+      DevLogger.info(
+        `Android notification channels: ${channels.length}`,
+        channels.map(normalizeChannelForLog)
+      );
+    } catch (error) {
+      DevLogger.error('Failed to inspect Android channels', {
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack,
+      });
+    }
+  };
 
   const renderItem = ({ item }) => {
     let color = colors.textPrimary;
@@ -40,8 +83,11 @@ export default function DevLogsScreen() {
         <TouchableOpacity style={styles.button} onPress={() => DevLogger.clearLogs()}>
           <Text style={styles.buttonText}>Clear Logs</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={() => testAndroidDefaultNotification()}>
+        <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleSystemNotificationTest}>
           <Text style={[styles.buttonText, { color: '#fff' }]}>Test Sys Notification</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={handleInspectChannels}>
+          <Text style={styles.buttonText}>Inspect Channels</Text>
         </TouchableOpacity>
       </View>
       <FlatList

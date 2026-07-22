@@ -20,7 +20,7 @@ import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
 import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
-import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId } from './src/utils/notifications';
+import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId, attachNotificationDiagnostics } from './src/utils/notifications';
 import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
 import PinLockScreen from './src/screens/PinLockScreen';
@@ -83,6 +83,11 @@ function InitApp() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const themeReducer = useSelector(state => state.themeReducer);
+
+  useEffect(() => {
+    const removeDiagnostics = attachNotificationDiagnostics();
+    return removeDiagnostics;
+  }, []);
 
   useEffect(() => {
     if (hasShareIntent && shareIntent && ready) {
