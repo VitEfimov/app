@@ -42,15 +42,23 @@ export function getChannelId(isAlarm, sound, vibrationEnabled) {
   return `task_${base}_${soundName}_${vib}_v12`;
 }
 
+let configuredChannels = new Set();
+
 export async function configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled) {
   if (Platform.OS !== 'android') {
+    return;
+  }
+
+  const defaultChannelId = getChannelId(false, notificationSound, vibrationEnabled);
+  const alarmChannelId = getChannelId(true, alarmSound, vibrationEnabled);
+
+  if (configuredChannels.has(defaultChannelId) && configuredChannels.has(alarmChannelId)) {
     return;
   }
 
   DevLogger.info('Configuring Android Notification Channels', { notificationSound, alarmSound, vibrationEnabled });
 
   try {
-    const defaultChannelId = getChannelId(false, notificationSound, vibrationEnabled);
     DevLogger.info(`Setting up default channel ID: ${defaultChannelId}`);
     await Notifications.setNotificationChannelAsync(
     defaultChannelId,
@@ -86,12 +94,14 @@ export async function configureAndroidNotificationChannels(notificationSound, al
           Notifications.AndroidAudioContentType.SONIFICATION,
       },
 
-      lockscreenVisibility:
-        Notifications.AndroidNotificationVisibility.PUBLIC,
-
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd: true,
     }
   );
+
+    configuredChannels.add(defaultChannelId);
+    configuredChannels.add(alarmChannelId);
+
     DevLogger.success('Android Notification Channels configured successfully');
   } catch (error) {
     DevLogger.error('Failed to configure Android Notification Channels', error.message);
