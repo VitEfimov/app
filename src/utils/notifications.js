@@ -206,8 +206,9 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
   if (!targetDate.isValid()) return [];
 
   if (timeStr) {
+    const dateOnly = targetDate.format('YYYY-MM-DD');
     const parsedTime = dayjs(
-      `${completionDateStr} ${timeStr}`,
+      `${dateOnly} ${timeStr}`,
       [
         'YYYY-MM-DD HH:mm',
         'YYYY-MM-DD H:mm',
@@ -220,11 +221,8 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     if (parsedTime.isValid()) {
       targetDate = parsedTime;
     } else {
-      console.warn(
-        'Invalid task time:',
-        timeStr
-      );
-
+      console.warn('Invalid task time:', timeStr, 'for date:', dateOnly);
+      DevLogger.warn(`Invalid task time format. Expected HH:mm. Got: ${timeStr} for date ${dateOnly}`);
       return [];
     }
 
