@@ -13,6 +13,9 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
 import androidx.core.app.NotificationManagerCompat
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Intent
 
 class AlarmActivity : Activity() {
     private var mediaPlayer: MediaPlayer? = null
@@ -45,15 +48,20 @@ class AlarmActivity : Activity() {
         
         val titleId = resources.getIdentifier("alarm_title", "id", packageName)
         val nameId = resources.getIdentifier("alarm_task_name", "id", packageName)
-        val btnId = resources.getIdentifier("alarm_dismiss_button", "id", packageName)
+        val dismissBtnId = resources.getIdentifier("alarm_dismiss_button", "id", packageName)
+        val snoozeBtnId = resources.getIdentifier("alarm_snooze_button", "id", packageName)
 
         findViewById<TextView>(titleId)?.text = "Task Alarm"
         findViewById<TextView>(nameId)?.text = taskName
 
-        findViewById<Button>(btnId)?.setOnClickListener {
+        findViewById<Button>(dismissBtnId)?.setOnClickListener {
             stopAlarm()
             NotificationManagerCompat.from(this).cancel(requestCode)
             finish()
+        }
+
+        findViewById<Button>(snoozeBtnId)?.setOnClickListener {
+            snoozeAlarm()
         }
 
         startAlarmSoundAndVibration(soundName)
@@ -91,6 +99,40 @@ class AlarmActivity : Activity() {
         mediaPlayer = null
 
         vibrator?.cancel()
+    }
+
+    private fun snoozeAlarm() {
+        val taskId = intent.getStringExtra("taskId") ?: return
+        val taskName = intent.getStringExtra("taskName") ?: "Task Alarm"
+        val soundName = intent.getStringExtra("soundName") ?: "default"
+        val requestCode = intent.getIntExtra("requestCode", 0)
+
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val receiverIntent = Intent(this, TaskAlarmReceiver::class.java).apply {
+            putExtra("taskId", taskId)
+            putExtra("taskName", taskName)
+            putExtra("soundName", soundName)
+            putExtra("requestCode", requestCode)
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            this,
+            requestCode,
+            receiverIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val snoozeTimeMillis = System.currentTimeMillis() + 5 * 60 * 1000 // 5 minutes
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeTimeMillis, pendingIntent)
+        } else {
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, snoozeTimeMillis, pendingIntent)
+        }
+
+        stopAlarm()
+        NotificationManagerCompat.from(this).cancel(requestCode)
+        finish()
     }
 
     override fun onDestroy() {

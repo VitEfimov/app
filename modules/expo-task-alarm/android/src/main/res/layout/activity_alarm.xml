@@ -4,15 +4,16 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:background="#121212">
+    android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true">
 
     <TextView
         android:id="@+id/alarm_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Task Alarm"
-        android:textColor="#FFFFFF"
-        android:textSize="32sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="36sp"
         android:textStyle="bold"
         android:layout_marginBottom="16dp" />
 
@@ -21,17 +22,30 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Task Name"
-        android:textColor="#BBBBBB"
-        android:textSize="20sp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="22sp"
         android:layout_marginBottom="64dp" />
+
+    <Button
+        android:id="@+id/alarm_snooze_button"
+        style="?android:attr/borderlessButtonStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SNOOZE (5 MIN)"
+        android:textSize="18sp"
+        android:paddingHorizontal="32dp"
+        android:paddingVertical="16dp"
+        android:textColor="?android:attr/colorAccent"
+        android:layout_marginBottom="16dp" />
 
     <Button
         android:id="@+id/alarm_dismiss_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="DISMISS"
-        android:textSize="20sp"
-        android:padding="16dp"
-        android:backgroundTint="#EF4444"
-        android:textColor="#FFFFFF" />
+        android:textSize="18sp"
+        android:paddingHorizontal="32dp"
+        android:paddingVertical="16dp"
+        android:backgroundTint="?android:attr/colorAccent"
+        android:textColor="?android:attr/textColorPrimaryInverse" />
 </LinearLayout>
