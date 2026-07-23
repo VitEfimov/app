@@ -13,12 +13,9 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val soundName = intent.getStringExtra("soundName") ?: "default"
         val requestCode = intent.getIntExtra("requestCode", 0)
 
-        val taskId = intent.getStringExtra("taskId") ?: ""
-
         // Wake intent
         val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("taskId", taskId)
             putExtra("taskName", taskName)
             putExtra("soundName", soundName)
             putExtra("requestCode", requestCode)
