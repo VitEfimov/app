@@ -24,11 +24,13 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.vitvalef.app",
+      "allowBackup": false,
       "permissions": [
         "VIBRATE",
         "SCHEDULE_EXACT_ALARM",
         "USE_EXACT_ALARM",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "ACCESS_NOTIFICATION_POLICY"
       ]
     },
     "web": {

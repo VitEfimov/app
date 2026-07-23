@@ -33,20 +33,20 @@ export const VIBRATION_PRESETS = {
   criticalAlarm: VIBRATION_PATTERNS.alarmUrgent,
 };
 
+export function getSoundBasename(sound) {
+  return sound ? sound.replace(/\.(wav|mp3|ogg)$/i, '') : 'default';
+}
+
 export function getChannelId(
   isAlarm,
   sound,
   vibrationEnabled
 ) {
   const base = isAlarm ? 'alarm' : 'default';
-
-  const soundName = sound
-    ? sound.replace(/\.(wav|mp3|ogg)$/i, '')
-    : 'default';
-
+  const soundName = getSoundBasename(sound);
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
 
-  return `task_${base}_${soundName}_${vib}_v15`;
+  return `task_${base}_${soundName}_${vib}_v16`;
 }
 
 // let configuredChannels = new Set(); // Temporarily removed for debugging
@@ -138,7 +138,7 @@ export async function configureAndroidNotificationChannels(
         importance:
           Notifications.AndroidImportance.HIGH,
 
-        sound: notificationSound,
+        sound: getSoundBasename(notificationSound),
 
         enableVibrate: vibrationEnabled,
 
@@ -161,7 +161,7 @@ export async function configureAndroidNotificationChannels(
         importance:
           Notifications.AndroidImportance.MAX,
 
-        sound: alarmSound,
+        sound: getSoundBasename(alarmSound),
 
         enableVibrate: vibrationEnabled,
 
@@ -312,7 +312,7 @@ export async function deleteObsoleteNotificationChannels(
   const keepIds = new Set([
     activeDefaultId,
     activeAlarmId,
-    'debug_system_sound_v15',
+    'debug_system_sound_v16',
   ]);
 
   try {
@@ -567,7 +567,7 @@ export async function scheduleExactTaskReminder(
           ? `${taskName} is due now`
           : `Reminder: ${taskName}`,
 
-        sound,
+        sound: getSoundBasename(sound),
 
         priority:
           Notifications.AndroidNotificationPriority.MAX,
@@ -761,7 +761,7 @@ export async function testAndroidDefaultNotification() {
 
   // Use a new ID for this diagnostic test.
   // Increment this manually if you test a changed configuration later.
-  const channelId = 'debug_system_sound_v15';
+  const channelId = 'debug_system_sound_v16';
 
   DevLogger.info('Starting Android default-sound diagnostic', {
     platform: Platform.OS,
