@@ -453,7 +453,6 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
   return null;
 }
 
-import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 dayjs.extend(customParseFormat);
