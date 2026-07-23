@@ -105,6 +105,15 @@ function TabNavigator() {
   );
 }
 
+const linking = {
+  prefixes: ['taskmanager://'],
+  config: {
+    screens: {
+      Board: 'board',
+    },
+  },
+};
+
 export default function AppNavigator() {
   const { isAuthenticated, isGuest } = useSelector((state) => state.userReducer);
   const { colors, isDark } = useTheme();
@@ -122,7 +131,7 @@ export default function AppNavigator() {
   };
 
   return (
-    <NavigationContainer ref={navigationRef} theme={MyTheme}>
+    <NavigationContainer ref={navigationRef} theme={MyTheme} linking={linking}>
       <StatusBar 
         backgroundColor={colors.bgHeader} 
         barStyle={isDark ? 'light-content' : 'dark-content'} 

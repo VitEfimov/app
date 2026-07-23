@@ -16,6 +16,8 @@ import androidx.core.app.NotificationManagerCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.content.Intent
+import android.net.Uri
 
 class AlarmActivity : Activity() {
     private var mediaPlayer: MediaPlayer? = null
@@ -45,13 +47,31 @@ class AlarmActivity : Activity() {
         val taskName = intent.getStringExtra("taskName") ?: "Unknown Task"
         val soundName = intent.getStringExtra("soundName") ?: "default"
         val requestCode = intent.getIntExtra("requestCode", 0)
+        val taskId = intent.getStringExtra("taskId") ?: ""
         
         val titleId = resources.getIdentifier("alarm_title", "id", packageName)
         val nameId = resources.getIdentifier("alarm_task_name", "id", packageName)
         val dismissBtnId = resources.getIdentifier("alarm_dismiss_button", "id", packageName)
         val snoozeBtnId = resources.getIdentifier("alarm_snooze_button", "id", packageName)
 
-        findViewById<TextView>(titleId)?.text = taskName
+        val titleView = findViewById<TextView>(titleId)
+        titleView?.text = taskName
+        
+        titleView?.setOnClickListener {
+            stopAlarm()
+            NotificationManagerCompat.from(this).cancel(requestCode)
+            
+            if (taskId.isNotEmpty()) {
+                val launchIntent = Intent(Intent.ACTION_VIEW, Uri.parse("taskmanager://board?editTaskId=$taskId"))
+                launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                startActivity(launchIntent)
+            } else {
+                val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                launchIntent?.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                startActivity(launchIntent)
+            }
+            finish()
+        }
         
         val dateFormat = SimpleDateFormat("EEE, MMM d • hh:mm a", Locale.getDefault())
         val currentDateTime = dateFormat.format(Date())
