@@ -1,6 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, ToastAndroid } from 'react-native';
+import { scheduleExactAlarm, cancelAlarm } from '../../modules/expo-task-alarm';
+import dayjs from 'dayjs';
 import { DevLogger } from './logger';
 
 // Set how notifications should be handled when the app is in the foreground
@@ -557,6 +559,19 @@ export async function scheduleExactTaskReminder(
     // Ensure channels exist before scheduling
     await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
 
+    if (Platform.OS === 'android' && isAlarm) {
+      const success = await scheduleExactAlarm(
+        taskId,
+        taskName,
+        targetDate.valueOf(),
+        getSoundBasename(sound)
+      );
+      if (success) {
+        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, sound, taskName });
+        return `native_alarm_${taskId}`;
+      }
+    }
+
     const scheduledId = await Notifications.scheduleNotificationAsync({
       content: {
         title: isAlarm
@@ -567,7 +582,7 @@ export async function scheduleExactTaskReminder(
           ? `${taskName} is due now`
           : `Reminder: ${taskName}`,
 
-        sound: getSoundBasename(sound),
+        ...(Platform.OS !== 'android' && { sound }),
 
         priority:
           Notifications.AndroidNotificationPriority.MAX,
@@ -692,7 +707,13 @@ export async function cancelNotification(notificationIds) {
     const ids = Array.isArray(notificationIds) ? notificationIds : [notificationIds];
     for (const id of ids) {
       if (id) {
-        await Notifications.cancelScheduledNotificationAsync(id);
+        if (typeof id === 'string' && id.startsWith('native_alarm_')) {
+          if (Platform.OS === 'android') {
+            await cancelAlarm(id.replace('native_alarm_', ''));
+          }
+        } else {
+          await Notifications.cancelScheduledNotificationAsync(id);
+        }
       }
     }
   }

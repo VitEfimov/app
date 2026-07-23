@@ -14,6 +14,7 @@
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.26",
     "@reduxjs/toolkit": "^2.12.0",
+    "@types/react": "~18.2.79",
     "axios": "^1.17.0",
     "dayjs": "^1.11.21",
     "expo": "~51.0.28",
@@ -47,6 +48,7 @@
     "react-native-web": "^0.19.13",
     "react-redux": "^9.3.0",
     "reanimated-color-picker": "^5.1.1",
+    "typescript": "~5.3.3",
     "wavefile": "^11.0.0"
   },
   "scripts": {
