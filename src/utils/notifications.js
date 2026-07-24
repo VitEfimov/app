@@ -563,10 +563,10 @@ export async function scheduleExactTaskReminder(
         taskId,
         taskName,
         targetDate.valueOf(),
-        getSoundBasename(sound)
+        channelId
       );
       if (success) {
-        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, sound, taskName });
+        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, channelId, taskName });
         return `native_alarm_${taskId}`;
       }
     }
@@ -713,6 +713,31 @@ export async function cancelNotification(notificationIds) {
         } else {
           await Notifications.cancelScheduledNotificationAsync(id);
         }
+      }
+    }
+  }
+}
+
+export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, updateTaskAction) {
+  for (const task of tasks) {
+    if (task.completed) continue;
+    if (task.notificationId && task.notificationId.length > 0) {
+      await cancelNotification(task.notificationId);
+      
+      const notifIds = await scheduleTaskReminder(
+        task.taskname,
+        task.reminder || 'None',
+        task.completionDate,
+        task.time,
+        task.id,
+        task.isAlarm || false,
+        themeState
+      );
+      
+      if (notifIds && notifIds.length > 0) {
+        dispatch(updateTaskAction({ taskId: task.id, notificationId: notifIds }));
+      } else {
+        dispatch(updateTaskAction({ taskId: task.id, notificationId: [] }));
       }
     }
   }

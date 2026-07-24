@@ -164,5 +164,21 @@
   "Choose between light, dark, high contrast, or follow your device settings.": "在浅色、深色、高对比度之间选择，或者跟随您的设备设置。",
   "Custom HEX:": "自定义 HEX:",
   "⚙️ Task Automations": "⚙️ 任务自动化",
-  "Main": "主要的"
+  "Main": "主要的",
+  "this week": "本星期",
+  "next week": "下周",
+  "Appearance": "外貌",
+  "Notifications": "通知",
+  "Automation": "自动化",
+  "Vibration": "振动",
+  "Notification Sound": "通知声音",
+  "Alarm Sound": "警报声",
+  "Completion Sound": "完成声音",
+  "Default Snooze": "默认贪睡",
+  "App PIN Lock": "应用程序 PIN 锁",
+  "5 mins": "5分钟",
+  "10 mins": "10分钟",
+  "15 mins": "15分钟",
+  "30 mins": "30分钟",
+  "1 hour": "1小时"
 }

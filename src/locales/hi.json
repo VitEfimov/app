@@ -164,5 +164,21 @@
   "Choose between light, dark, high contrast, or follow your device settings.": "हल्का, गहरा, उच्च कंट्रास्ट में से चुनें या अपनी डिवाइस सेटिंग का पालन करें।",
   "Custom HEX:": "कस्टम HEX:",
   "⚙️ Task Automations": "⚙️ कार्य स्वचालन",
-  "Main": "मुख्य"
+  "Main": "मुख्य",
+  "this week": "इस सप्ताह",
+  "next week": "अगले सप्ताह",
+  "Appearance": "उपस्थिति",
+  "Notifications": "सूचनाएं",
+  "Automation": "स्वचालन",
+  "Vibration": "कंपन",
+  "Notification Sound": "अधिसूचना ध्वनि",
+  "Alarm Sound": "अलार्म ध्वनि",
+  "Completion Sound": "समापन ध्वनि",
+  "Default Snooze": "डिफ़ॉल्ट स्नूज़",
+  "App PIN Lock": "ऐप पिन लॉक",
+  "5 mins": "5 मिनट",
+  "10 mins": "10 मिनिट",
+  "15 mins": "15 मिनट",
+  "30 mins": "30 मिनट",
+  "1 hour": "1 घंटा"
 }

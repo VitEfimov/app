@@ -164,5 +164,21 @@
   "Choose between light, dark, high contrast, or follow your device settings.": "Scegli tra chiaro, scuro, alto contrasto o segui le impostazioni del dispositivo.",
   "Custom HEX:": "HEX Personalizado:",
   "⚙️ Task Automations": "⚙️ Automazione Attività",
-  "Main": "Principale"
+  "Main": "Principale",
+  "this week": "questa settimana",
+  "next week": "la prossima settimana",
+  "Appearance": "Aspetto",
+  "Notifications": "Notifiche",
+  "Automation": "Automazione",
+  "Vibration": "Vibrazione",
+  "Notification Sound": "Suono di notifica",
+  "Alarm Sound": "Suono di allarme",
+  "Completion Sound": "Suono di completamento",
+  "Default Snooze": "Posticipazione predefinita",
+  "App PIN Lock": "Blocco PIN dell'app",
+  "5 mins": "5 minuti",
+  "10 mins": "10 minuti",
+  "15 mins": "15 minuti",
+  "30 mins": "30 minuti",
+  "1 hour": "1 ora"
 }

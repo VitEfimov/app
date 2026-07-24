@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { clearTasks } from '../features/taskSlice';
+import { clearTasks, updateTask } from '../features/taskSlice';
+import { rescheduleAllActiveTasks } from '../utils/notifications';
 import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setTaskCompleteSound, setVibrationEnabled } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -61,6 +62,8 @@ export default function SettingsScreen({ navigation }) {
   const { t, i18n } = useTranslation();
   
   const theme = useSelector(state => state.themeReducer);
+  const tasks = useSelector(state => state.taskReducer.tasks);
+  
   const taskNameWrap = theme.taskNameWrap || 'wrap';
   const fontSize = theme.fontSize || 'normal';
   const progressMode = theme.progressMode || 'daily';
@@ -279,7 +282,9 @@ export default function SettingsScreen({ navigation }) {
               onSelect={val => {
                 dispatch(setNotificationSound(val));
                 playSoundPreview(val);
-              }} 
+                const newTheme = { ...theme, notificationSound: val };
+                rescheduleAllActiveTasks(tasks, newTheme, dispatch, updateTask);
+              }}
               colors={colors}
               layout="horizontal"
             />
@@ -292,7 +297,9 @@ export default function SettingsScreen({ navigation }) {
               onSelect={val => {
                 dispatch(setAlarmSound(val));
                 playSoundPreview(val);
-              }} 
+                const newTheme = { ...theme, alarmSound: val };
+                rescheduleAllActiveTasks(tasks, newTheme, dispatch, updateTask);
+              }}
               colors={colors}
               layout="horizontal"
             />
@@ -314,7 +321,11 @@ export default function SettingsScreen({ navigation }) {
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Vibration')}</Text>
             <Switch
               value={vibrationEnabled}
-              onValueChange={val => dispatch(setVibrationEnabled(val))}
+              onValueChange={val => {
+                dispatch(setVibrationEnabled(val));
+                const newTheme = { ...theme, vibrationEnabled: val };
+                rescheduleAllActiveTasks(tasks, newTheme, dispatch, updateTask);
+              }}
               trackColor={{ false: colors.borderColor, true: colors.primary }}
             />
           </View>

@@ -10,7 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 class TaskAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val taskName = intent.getStringExtra("taskName") ?: "Task Alarm"
-        val soundName = intent.getStringExtra("soundName") ?: "default"
+        val channelId = intent.getStringExtra("channelId") ?: "task_alarm_channel"
         val requestCode = intent.getIntExtra("requestCode", 0)
 
         val taskId = intent.getStringExtra("taskId") ?: ""
@@ -20,7 +20,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("taskId", taskId)
             putExtra("taskName", taskName)
-            putExtra("soundName", soundName)
+            putExtra("channelId", channelId)
             putExtra("requestCode", requestCode)
         }
 
@@ -37,7 +37,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             iconResId = context.resources.getIdentifier("ic_launcher", "mipmap", context.packageName)
         }
 
-        val notification = NotificationCompat.Builder(context, "task_alarm_channel")
+        val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(iconResId)
             .setContentTitle("Task Alarm")
             .setContentText(taskName)
@@ -45,9 +45,12 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setContentIntent(fullScreenPendingIntent)
             .setOngoing(true)
             .setAutoCancel(false)
             .build()
+            
+        notification.flags = notification.flags or android.app.Notification.FLAG_INSISTENT
 
         try {
             NotificationManagerCompat.from(context).notify(requestCode, notification)

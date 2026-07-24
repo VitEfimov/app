@@ -164,5 +164,21 @@
   "Choose between light, dark, high contrast, or follow your device settings.": "ライト、ダーク、ハイコントラスト、またはデバイス設定に従うかを選択します。",
   "Custom HEX:": "カスタム HEX:",
   "⚙️ Task Automations": "⚙️ タスクの自動化",
-  "Main": "メイン"
+  "Main": "メイン",
+  "this week": "今週",
+  "next week": "来週",
+  "Appearance": "外観",
+  "Notifications": "通知",
+  "Automation": "オートメーション",
+  "Vibration": "振動",
+  "Notification Sound": "通知音",
+  "Alarm Sound": "アラーム音",
+  "Completion Sound": "完了音",
+  "Default Snooze": "デフォルトのスヌーズ",
+  "App PIN Lock": "アプリPINロック",
+  "5 mins": "5分",
+  "10 mins": "10分",
+  "15 mins": "15分",
+  "30 mins": "30分",
+  "1 hour": "1時間"
 }

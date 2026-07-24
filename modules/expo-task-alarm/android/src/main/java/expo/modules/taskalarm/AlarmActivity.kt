@@ -3,15 +3,13 @@ package expo.modules.taskalarm
 import android.app.Activity
 import android.app.KeyguardManager
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import android.app.PendingIntent
+import android.app.AlarmManager
 import androidx.core.app.NotificationManagerCompat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -20,8 +18,6 @@ import android.content.Intent
 import android.net.Uri
 
 class AlarmActivity : Activity() {
-    private var mediaPlayer: MediaPlayer? = null
-    private var vibrator: Vibrator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,7 +41,7 @@ class AlarmActivity : Activity() {
         setContentView(layoutId)
 
         val taskName = intent.getStringExtra("taskName") ?: "Unknown Task"
-        val soundName = intent.getStringExtra("soundName") ?: "default"
+        val channelId = intent.getStringExtra("channelId") ?: "task_alarm_channel"
         val requestCode = intent.getIntExtra("requestCode", 0)
         val taskId = intent.getStringExtra("taskId") ?: ""
         
@@ -58,7 +54,6 @@ class AlarmActivity : Activity() {
         titleView?.text = taskName
         
         titleView?.setOnClickListener {
-            stopAlarm()
             NotificationManagerCompat.from(this).cancel(requestCode)
             
             if (taskId.isNotEmpty()) {
@@ -78,56 +73,36 @@ class AlarmActivity : Activity() {
         findViewById<TextView>(nameId)?.text = currentDateTime
 
         findViewById<Button>(dismissBtnId)?.setOnClickListener {
-            stopAlarm()
             NotificationManagerCompat.from(this).cancel(requestCode)
             finish()
         }
 
         findViewById<Button>(snoozeBtnId)?.setOnClickListener {
-            stopAlarm()
             NotificationManagerCompat.from(this).cancel(requestCode)
+            
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val snoozeIntent = Intent(this, TaskAlarmReceiver::class.java).apply {
+                putExtra("taskId", taskId)
+                putExtra("taskName", taskName)
+                putExtra("channelId", channelId)
+                putExtra("requestCode", requestCode)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                requestCode,
+                snoozeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            
+            val triggerTime = System.currentTimeMillis() + 5 * 60 * 1000 // 5 minutes
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+            }
+            
             finish()
         }
-
-        startAlarmSoundAndVibration(soundName)
-    }
-
-    private fun startAlarmSoundAndVibration(soundName: String) {
-        val soundResId = resources.getIdentifier(soundName, "raw", packageName)
-        if (soundResId != 0) {
-            mediaPlayer = MediaPlayer.create(this, soundResId)?.apply {
-                isLooping = true
-                val attrs = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-                setAudioAttributes(attrs)
-                start()
-            }
-        }
-
-        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
-        
-        @Suppress("DEPRECATION")
-        vibrator?.vibrate(longArrayOf(0, 500, 500), 0) // Vibrate in a loop
-    }
-
-    private fun stopAlarm() {
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
-
-        vibrator?.cancel()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        stopAlarm()
     }
 }

@@ -164,5 +164,21 @@
   "Choose between light, dark, high contrast, or follow your device settings.": "Choose between light, dark, high contrast, or follow your device settings.",
   "Custom HEX:": "Custom HEX:",
   "⚙️ Task Automations": "⚙️ Task Automations",
-  "Main": "Main"
+  "Main": "Main",
+  "this week": "this week",
+  "next week": "next week",
+  "Appearance": "Appearance",
+  "Notifications": "Notifications",
+  "Automation": "Automation",
+  "Vibration": "Vibration",
+  "Notification Sound": "Notification Sound",
+  "Alarm Sound": "Alarm Sound",
+  "Completion Sound": "Completion Sound",
+  "Default Snooze": "Default Snooze",
+  "App PIN Lock": "App PIN Lock",
+  "5 mins": "5 mins",
+  "10 mins": "10 mins",
+  "15 mins": "15 mins",
+  "30 mins": "30 mins",
+  "1 hour": "1 hour"
 }
