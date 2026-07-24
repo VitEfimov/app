@@ -37,6 +37,21 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             iconResId = context.resources.getIdentifier("ic_launcher", "mipmap", context.packageName)
         }
 
+        val stopIntent = Intent(context, AlarmActionReceiver::class.java).apply {
+            action = "STOP_ALARM"
+            putExtra("requestCode", requestCode)
+        }
+        val stopPendingIntent = PendingIntent.getBroadcast(context, requestCode + 1000, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val snoozeIntent = Intent(context, AlarmActionReceiver::class.java).apply {
+            action = "SNOOZE_ALARM"
+            putExtra("requestCode", requestCode)
+            putExtra("taskId", taskId)
+            putExtra("taskName", taskName)
+            putExtra("channelId", channelId)
+        }
+        val snoozePendingIntent = PendingIntent.getBroadcast(context, requestCode + 2000, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(iconResId)
             .setContentTitle("Task Alarm")
@@ -48,6 +63,8 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             .setContentIntent(fullScreenPendingIntent)
             .setOngoing(true)
             .setAutoCancel(false)
+            .addAction(0, "Snooze", snoozePendingIntent)
+            .addAction(0, "Stop", stopPendingIntent)
             .build()
             
         notification.flags = notification.flags or android.app.Notification.FLAG_INSISTENT

@@ -14,12 +14,17 @@
 
         <TextView
             android:id="@+id/alarm_title"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="04:47"
             android:textColor="#FCEEE6"
-            android:textSize="72sp"
-            android:includeFontPadding="false" />
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:ellipsize="end"
+            android:maxLines="4"
+            android:includeFontPadding="false"
+            android:layout_marginHorizontal="24dp" />
 
         <TextView
             android:id="@+id/alarm_task_name"
