@@ -180,5 +180,20 @@
   "10 mins": "10 मिनिट",
   "15 mins": "15 मिनट",
   "30 mins": "30 मिनट",
-  "1 hour": "1 घंटा"
+  "1 hour": "1 घंटा",
+  "Customize theme": "थीम अनुकूलित करें",
+  "Task Automations": "कार्य स्वचालन",
+  "Accent Color": "एक्सेंट रंग",
+  "Increase when overdue": "अतिदेय होने पर बढ़ाएँ",
+  "Delete overdue after": "अतिदेय के बाद हटा दें",
+  "Morning reminder": "सुबह का अनुस्मारक",
+  "Evening reminder": "शाम का अनुस्मारक",
+  "Summary": "सारांश",
+  "Never": "कभी नहीं",
+  "3 days": "3 दिन",
+  "7 days": "7 दिन",
+  "30 days": "30 दिन",
+  "When overdue": "अतिदेय होने पर",
+  "Frequency": "आवृत्ति",
+  "Next Workday": "अगला कार्यदिवस"
 }

@@ -180,5 +180,20 @@
   "10 mins": "10分",
   "15 mins": "15分",
   "30 mins": "30分",
-  "1 hour": "1時間"
+  "1 hour": "1時間",
+  "Customize theme": "テーマのカスタマイズ",
+  "Task Automations": "タスクの自動化",
+  "Accent Color": "アクセントカラー",
+  "Increase when overdue": "延滞時増額",
+  "Delete overdue after": "期限を過ぎてから削除",
+  "Morning reminder": "朝のリマインダー",
+  "Evening reminder": "夕方のリマインダー",
+  "Summary": "まとめ",
+  "Never": "一度もない",
+  "3 days": "3日間",
+  "7 days": "7日間",
+  "30 days": "30日",
+  "When overdue": "延滞した場合",
+  "Frequency": "頻度",
+  "Next Workday": "次の勤務日"
 }

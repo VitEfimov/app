@@ -180,5 +180,20 @@
   "10 mins": "10 Min",
   "15 mins": "15 Min",
   "30 mins": "30 Min",
-  "1 hour": "1 Stunde"
+  "1 hour": "1 Stunde",
+  "Customize theme": "Thema anpassen",
+  "Task Automations": "Aufgabenautomatisierungen",
+  "Accent Color": "Akzentfarbe",
+  "Increase when overdue": "Bei Überfälligkeit erhöhen",
+  "Delete overdue after": "Überfällig löschen nach",
+  "Morning reminder": "Morgenerinnerung",
+  "Evening reminder": "Abendliche Erinnerung",
+  "Summary": "Zusammenfassung",
+  "Never": "Niemals",
+  "3 days": "3 Tage",
+  "7 days": "7 Tage",
+  "30 days": "30 Tage",
+  "When overdue": "Wenn überfällig",
+  "Frequency": "Frequenz",
+  "Next Workday": "Nächster Arbeitstag"
 }

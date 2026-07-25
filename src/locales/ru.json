@@ -180,5 +180,20 @@
   "10 mins": "10 минут",
   "15 mins": "15 минут",
   "30 mins": "30 минут",
-  "1 hour": "1 час"
+  "1 hour": "1 час",
+  "Customize theme": "Настроить тему",
+  "Task Automations": "Автоматизация задач",
+  "Accent Color": "Акцентный цвет",
+  "Increase when overdue": "Увеличение при просрочке",
+  "Delete overdue after": "Удалить просрочку через",
+  "Morning reminder": "Утреннее напоминание",
+  "Evening reminder": "Вечернее напоминание",
+  "Summary": "Краткое содержание",
+  "Never": "Никогда",
+  "3 days": "3 дня",
+  "7 days": "7 дней",
+  "30 days": "30 дней",
+  "When overdue": "Когда просрочено",
+  "Frequency": "Частота",
+  "Next Workday": "Следующий рабочий день"
 }

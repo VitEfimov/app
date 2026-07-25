@@ -180,5 +180,20 @@
   "10 mins": "10 minutes",
   "15 mins": "15 minutes",
   "30 mins": "30 minutes",
-  "1 hour": "1 heure"
+  "1 hour": "1 heure",
+  "Customize theme": "Personnaliser le thème",
+  "Task Automations": "Automatisations de tâches",
+  "Accent Color": "Couleur d'accentuation",
+  "Increase when overdue": "Augmenter en cas de retard",
+  "Delete overdue after": "Supprimer les retards après",
+  "Morning reminder": "Rappel du matin",
+  "Evening reminder": "Rappel du soir",
+  "Summary": "Résumé",
+  "Never": "Jamais",
+  "3 days": "3 jours",
+  "7 days": "7 jours",
+  "30 days": "30 jours",
+  "When overdue": "En retard",
+  "Frequency": "Fréquence",
+  "Next Workday": "Jour ouvrable suivant"
 }

@@ -192,7 +192,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
                 )}
               </TouchableOpacity>
               {tempImage && (
-                <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 10, alignSelf: 'center' }}>
+                <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 10, alignSelf: 'center' }} accessible={true} accessibilityRole="button" accessibilityLabel="Remove background image">
                   <Text style={{ color: colors.error || '#c62828', fontSize: 13, fontWeight: 'bold' }}>{t('Remove Image')}</Text>
                 </TouchableOpacity>
               )}

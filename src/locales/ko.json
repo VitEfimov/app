@@ -183,5 +183,20 @@
   "10 mins": "10분",
   "15 mins": "15분",
   "30 mins": "30분",
-  "1 hour": "1시간"
+  "1 hour": "1시간",
+  "Customize theme": "테마 맞춤설정",
+  "Task Automations": "작업 자동화",
+  "Accent Color": "악센트 색상",
+  "Increase when overdue": "연체 시 증가",
+  "Delete overdue after": "다음 날짜 이후 연체 삭제",
+  "Morning reminder": "아침 알림",
+  "Evening reminder": "저녁 알림",
+  "Summary": "요약",
+  "Never": "절대",
+  "3 days": "3일",
+  "7 days": "7일",
+  "30 days": "30일",
+  "When overdue": "연체시",
+  "Frequency": "빈도",
+  "Next Workday": "다음 근무일"
 }

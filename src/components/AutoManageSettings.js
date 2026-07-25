@@ -74,19 +74,20 @@ export default function AutoManageSettings({ isVisible, onClose }) {
   } = localSettings;
 
   const SettingToggle = ({ label, value, onValueChange }) => (
-    <View style={styles.toggleRow}>
+    <View style={styles.toggleRow} accessible={true} accessibilityRole="switch" accessibilityState={{ checked: value }} accessibilityLabel={label}>
       <Text style={[styles.toggleLabel, { color: colors.textPrimary }]}>{label}</Text>
       <Switch 
         value={value} 
         onValueChange={onValueChange} 
         trackColor={{ true: colors.primary, false: colors.borderColor }}
         thumbColor="#ffffff"
+        importantForAccessibility="no"
       />
     </View>
   );
 
   const RadioButton = ({ label, selected, onPress }) => (
-    <TouchableOpacity style={styles.radioRow} onPress={onPress}>
+    <TouchableOpacity style={styles.radioRow} onPress={onPress} accessible={true} accessibilityRole="radio" accessibilityState={{ selected: selected }} accessibilityLabel={label}>
       <View style={[styles.radioCircle, { borderColor: selected ? colors.primary : colors.textSecondary }]}>
         {selected && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
       </View>
@@ -125,7 +126,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
         
         <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
           <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Auto-Manage Tasks')}</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessible={true} accessibilityRole="button" accessibilityLabel="Close auto manage settings">
             <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -260,10 +261,10 @@ export default function AutoManageSettings({ isVisible, onClose }) {
           <View style={{ height: 30 }} />
           
           <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
-            <TouchableOpacity onPress={handleReset} style={[styles.actionBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderColor }]}>
+            <TouchableOpacity onPress={handleReset} style={[styles.actionBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderColor }]} accessible={true} accessibilityRole="button" accessibilityLabel="Reset settings">
               <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>{t('Reset')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSave} style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
+            <TouchableOpacity onPress={handleSave} style={[styles.actionBtn, { backgroundColor: colors.primary }]} accessible={true} accessibilityRole="button" accessibilityLabel="Save settings">
               <Text style={{ color: colors.textInverse, fontWeight: 'bold' }}>{t('Save')}</Text>
             </TouchableOpacity>
           </View>

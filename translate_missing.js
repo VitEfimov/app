@@ -6,22 +6,21 @@ const localesDir = path.join(__dirname, 'src', 'locales');
 const enFilePath = path.join(localesDir, 'en.json');
 
 const missingStrings = [
-  "this week",
-  "next week",
-  "Appearance",
-  "Notifications",
-  "Automation",
-  "Vibration",
-  "Notification Sound",
-  "Alarm Sound",
-  "Completion Sound",
-  "Default Snooze",
-  "App PIN Lock",
-  "5 mins",
-  "10 mins",
-  "15 mins",
-  "30 mins",
-  "1 hour"
+  "Customize theme",
+  "Task Automations",
+  "Accent Color",
+  "Increase when overdue",
+  "Delete overdue after",
+  "Morning reminder",
+  "Evening reminder",
+  "Summary",
+  "Never",
+  "3 days",
+  "7 days",
+  "30 days",
+  "When overdue",
+  "Frequency",
+  "Next Workday"
 ];
 
 function translate(text, targetLang) {

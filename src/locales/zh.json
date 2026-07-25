@@ -180,5 +180,20 @@
   "10 mins": "10分钟",
   "15 mins": "15分钟",
   "30 mins": "30分钟",
-  "1 hour": "1小时"
+  "1 hour": "1小时",
+  "Customize theme": "自定义主题",
+  "Task Automations": "任务自动化",
+  "Accent Color": "强调色",
+  "Increase when overdue": "逾期时增加",
+  "Delete overdue after": "删除逾期后",
+  "Morning reminder": "早间提醒",
+  "Evening reminder": "晚间提醒",
+  "Summary": "概括",
+  "Never": "绝不",
+  "3 days": "3天",
+  "7 days": "7天",
+  "30 days": "30天",
+  "When overdue": "逾期时",
+  "Frequency": "频率",
+  "Next Workday": "下一个工作日"
 }
