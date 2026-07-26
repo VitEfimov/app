@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share } from 'react-native';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
@@ -87,7 +87,7 @@ export default function BoardScreen({ route, navigation }) {
     }
   };
 
-  const toggleTaskSelection = (taskId) => {
+  const toggleTaskSelection = useCallback((taskId) => {
     setSelectionMode(prev => {
       const isSelected = prev.selectedTaskIds.includes(taskId);
       return {
@@ -97,7 +97,7 @@ export default function BoardScreen({ route, navigation }) {
           : [...prev.selectedTaskIds, taskId]
       };
     });
-  };
+  }, []);
 
   const handleSelectAll = () => {
     const section = sections.find(s => s.id === selectionMode.sectionId);
@@ -162,65 +162,64 @@ export default function BoardScreen({ route, navigation }) {
     }
   };
 
-  const handleTaskPress = (task) => {
+  const handleTaskPress = useCallback((task) => {
     setSelectedTask(task);
     setDetailsVisible(true);
-  };
+  }, []);
 
   // Group tasks
-  const FILTERS = getFilters();
-  const boardTasks = tasks.filter(task => (task.boardId || 'main') === activeBoardId);
-  const sortTasks = (tasksArr, sectionId) => {
-    const sortBy = sortConfig[sectionId] || 'time';
-    return tasksArr.sort((a, b) => {
-      if (sortBy === 'priority') {
-        const pValues = { high: 3, medium: 2, low: 1, none: 0 };
-        const pA = pValues[a.priority?.toLowerCase()] || 0;
-        const pB = pValues[b.priority?.toLowerCase()] || 0;
-        if (pA !== pB) return pB - pA; // Higher priority first
-      }
+  const boardTasks = useMemo(() => tasks.filter(task => (task.boardId || 'main') === activeBoardId), [tasks, activeBoardId]);
+  
+  const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks } = useMemo(() => {
+    const FILTERS = getFilters();
+    const sortTasks = (tasksArr, sectionId) => {
+      const sortBy = sortConfig[sectionId] || 'time';
+      return tasksArr.sort((a, b) => {
+        if (sortBy === 'priority') {
+          const pValues = { high: 3, medium: 2, low: 1, none: 0 };
+          const pA = pValues[a.priority?.toLowerCase()] || 0;
+          const pB = pValues[b.priority?.toLowerCase()] || 0;
+          if (pA !== pB) return pB - pA; // Higher priority first
+        }
 
-      const dayA = a.completionDate ? dayjs(a.completionDate).format('YYYY-MM-DD') : '9999-12-31';
-      const dayB = b.completionDate ? dayjs(b.completionDate).format('YYYY-MM-DD') : '9999-12-31';
-      const dateCompare = dayA.localeCompare(dayB);
-      if (dateCompare !== 0) return dateCompare;
-      
-      const hasTimeA = !!a.time;
-      const hasTimeB = !!b.time;
-      
-      if (hasTimeA && !hasTimeB) return -1;
-      if (!hasTimeA && hasTimeB) return 1;
-      if (hasTimeA && hasTimeB) return a.time.localeCompare(b.time);
-      
-      return parseInt(a.id || '0') - parseInt(b.id || '0');
-    });
-  };
+        const dayA = a.completionDate ? dayjs(a.completionDate).format('YYYY-MM-DD') : '9999-12-31';
+        const dayB = b.completionDate ? dayjs(b.completionDate).format('YYYY-MM-DD') : '9999-12-31';
+        const dateCompare = dayA.localeCompare(dayB);
+        if (dateCompare !== 0) return dateCompare;
+        
+        const hasTimeA = !!a.time;
+        const hasTimeB = !!b.time;
+        
+        if (hasTimeA && !hasTimeB) return -1;
+        if (!hasTimeA && hasTimeB) return 1;
+        if (hasTimeA && hasTimeB) return a.time.localeCompare(b.time);
+        
+        return parseInt(a.id || '0') - parseInt(b.id || '0');
+      });
+    };
 
-  const todayTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed), 'today');
-  const tomorrowTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed), 'tomorrow');
-  const thisWeekTasks = sortTasks(boardTasks.filter(task =>
-    !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') &&
-    !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
-    dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed
-  ), 'on-this-week');
-  const nextWeekTasks = sortTasks(boardTasks.filter(task =>
-    !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
-    dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') &&
-    dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed
-  ), 'on-next-week');
-  const laterTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed), 'later');
-  const missedTasks = sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed), 'missed');
-  const completedTasks = sortTasks(boardTasks.filter(task => task.completed), 'completed');
+    return {
+      todayTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed), 'today'),
+      tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed), 'tomorrow'),
+      thisWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') && !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed), 'on-this-week'),
+      nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed), 'on-next-week'),
+      laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed), 'later'),
+      missedTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed), 'missed'),
+      completedTasks: sortTasks(boardTasks.filter(task => task.completed), 'completed')
+    };
+  }, [boardTasks, sortConfig]);
 
-  const sections = [
-    ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
-    { id: 'today', title: t('Today'), data: collapsedSections.includes('today') ? [] : todayTasks, count: todayTasks.length, color: '#ff9800' },
-    { id: 'tomorrow', title: t('Tomorrow'), data: collapsedSections.includes('tomorrow') ? [] : tomorrowTasks, count: tomorrowTasks.length, color: '#2196f3' },
-    { id: 'on-this-week', title: t('This week'), data: collapsedSections.includes('on-this-week') ? [] : thisWeekTasks, count: thisWeekTasks.length, color: '#9c27b0' },
-    { id: 'on-next-week', title: t('Next week'), data: collapsedSections.includes('on-next-week') ? [] : nextWeekTasks, count: nextWeekTasks.length, color: '#009688' },
-    { id: 'later', title: t('Upcoming'), data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
-    ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed'), data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4caf50' }] : []),
-  ];
+  const sections = useMemo(() => {
+    return [
+      ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
+      { id: 'today', title: t('Today'), data: collapsedSections.includes('today') ? [] : todayTasks, count: todayTasks.length, color: '#ff9800' },
+      { id: 'tomorrow', title: t('Tomorrow'), data: collapsedSections.includes('tomorrow') ? [] : tomorrowTasks, count: tomorrowTasks.length, color: '#2196f3' },
+      { id: 'on-this-week', title: t('This week'), data: collapsedSections.includes('on-this-week') ? [] : thisWeekTasks, count: thisWeekTasks.length, color: '#9c27b0' },
+      { id: 'on-next-week', title: t('Next week'), data: collapsedSections.includes('on-next-week') ? [] : nextWeekTasks, count: nextWeekTasks.length, color: '#009688' },
+      { id: 'later', title: t('Upcoming'), data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
+      ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed'), data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4caf50' }] : []),
+    ];
+  }, [missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, collapsedSections, t]);
 
   React.useEffect(() => {
     if (route?.params?.sectionId) {

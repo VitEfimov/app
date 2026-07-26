@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, PanResponder } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { setProgressMode } from '../features/themeSlice';
@@ -34,20 +34,24 @@ export default function DashboardScreen({ navigation }) {
 
   const FILTERS = getFilters();
   
-  const todayTasks = tasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed);
-  const tomorrowTasks = tasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed);
-  const thisWeekTasks = tasks.filter(task =>
-    !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') &&
-    !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
-    dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed
-  );
-  const nextWeekTasks = tasks.filter(task =>
-    !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
-    dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') &&
-    dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed
-  );
-  const laterTasks = tasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed);
-  const missedTasks = tasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed);
+  const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
+    return {
+      todayTasks: tasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed),
+      tomorrowTasks: tasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed),
+      thisWeekTasks: tasks.filter(task =>
+        !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') &&
+        !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
+        dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed
+      ),
+      nextWeekTasks: tasks.filter(task =>
+        !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
+        dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') &&
+        dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed
+      ),
+      laterTasks: tasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed),
+      missedTasks: tasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed)
+    };
+  }, [tasks]);
 
   const progressMode = useSelector(state => state.themeReducer.progressMode) || 'daily';
   
@@ -84,34 +88,38 @@ export default function DashboardScreen({ navigation }) {
     })
   ).current;
 
-  const uncompletedTasks = tasks.filter(task => !task.completed);
-  const totalTasks = uncompletedTasks.length;
-  const completedTasks = tasks.filter(task => task.completed).length;
-  
-  let calcTotal = 0;
-  let calcCompleted = 0;
+  const { uncompletedTasks, totalTasks, completedTasks, calcTotal, calcCompleted } = useMemo(() => {
+    const uncomp = tasks.filter(task => !task.completed);
+    const tot = uncomp.length;
+    const comp = tasks.filter(task => task.completed).length;
+    
+    let cTotal = 0;
+    let cCompleted = 0;
 
-  if (progressMode === 'daily') {
-    const dueTodayAll = tasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day'));
-    calcCompleted = dueTodayAll.filter(t => t.completed).length;
-    calcTotal = dueTodayAll.length;
-  } else if (progressMode === 'active') {
-    const completedToday = tasks.filter(task => task.completed && dayjs(task.completionDate).isSame(dayjs(), 'day'));
-    calcCompleted = completedToday.length;
-    calcTotal = uncompletedTasks.length + calcCompleted;
-  } else if (progressMode === 'weekly') {
-    const startOfWeek = dayjs().startOf('week');
-    const endOfWeek = dayjs().endOf('week');
-    const dueThisWeekAll = tasks.filter(task => {
-      const d = dayjs(task.completionDate);
-      return !d.isBefore(startOfWeek, 'day') && !d.isAfter(endOfWeek, 'day');
-    });
-    calcCompleted = dueThisWeekAll.filter(t => t.completed).length;
-    calcTotal = dueThisWeekAll.length;
-  } else {
-    calcCompleted = completedTasks;
-    calcTotal = tasks.length;
-  }
+    if (progressMode === 'daily') {
+      const dueTodayAll = tasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day'));
+      cCompleted = dueTodayAll.filter(t => t.completed).length;
+      cTotal = dueTodayAll.length;
+    } else if (progressMode === 'active') {
+      const completedToday = tasks.filter(task => task.completed && dayjs(task.completionDate).isSame(dayjs(), 'day'));
+      cCompleted = completedToday.length;
+      cTotal = tot + cCompleted;
+    } else if (progressMode === 'weekly') {
+      const startOfWeek = dayjs().startOf('week');
+      const endOfWeek = dayjs().endOf('week');
+      const dueThisWeekAll = tasks.filter(task => {
+        const d = dayjs(task.completionDate);
+        return !d.isBefore(startOfWeek, 'day') && !d.isAfter(endOfWeek, 'day');
+      });
+      cCompleted = dueThisWeekAll.filter(t => t.completed).length;
+      cTotal = dueThisWeekAll.length;
+    } else {
+      cCompleted = comp;
+      cTotal = tasks.length;
+    }
+
+    return { uncompletedTasks: uncomp, totalTasks: tot, completedTasks: comp, calcTotal: cTotal, calcCompleted: cCompleted };
+  }, [tasks, progressMode]);
 
   const completionPercentage = calcTotal > 0 ? Math.round((calcCompleted / calcTotal) * 100) : (progressMode === 'daily' || progressMode === 'weekly' ? 100 : 0);
   const currentFill = Math.max(0, Math.min(100, 100 - completionPercentage)); 

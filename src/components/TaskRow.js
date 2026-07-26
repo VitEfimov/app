@@ -52,7 +52,7 @@ const IconCheckCircle = ({ color }) => (
   </Svg>
 );
 
-export default function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect }) {
+const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -258,7 +258,9 @@ export default function TaskRow({ task, hideDate = false, onPress, disableInline
     </TouchableOpacity>
     
   );
-}
+});
+
+export default TaskRow;
 
 const styles = StyleSheet.create({
   container: {
