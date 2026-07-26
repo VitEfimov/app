@@ -6,6 +6,7 @@ on:
       - main
       - master
       - nologin
+      - optimization
   workflow_dispatch: # Allows manual trigger from the Actions tab
 
 jobs:
