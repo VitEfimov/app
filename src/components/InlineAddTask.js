@@ -121,7 +121,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     >
       <KeyboardAvoidingView 
         style={styles.modalOverlayInline} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <TouchableWithoutFeedback onPress={() => setIsEditing(false)}>
           <View style={{ flex: 1 }} />
