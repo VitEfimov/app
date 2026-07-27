@@ -579,7 +579,7 @@ export async function scheduleExactTaskReminder(
 
         body: isAlarm
           ? `${taskName} is due now`
-          : `Reminder: ${taskName}`,
+          : taskName,
 
         ...(Platform.OS !== 'android' && { sound }),
 

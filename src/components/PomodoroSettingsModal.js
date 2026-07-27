@@ -22,6 +22,10 @@ const predefinedSounds = [
   { label: 'Chime', value: 'chime.wav' },
   { label: 'Light', value: 'light_ping.wav' },
   { label: 'Notification', value: 'notification.wav' },
+  { label: 'Konob 2', value: 'Konob2.mp3' },
+  { label: 'Light Scrub', value: 'Light_scrub.mp3' },
+  { label: 'Low Piano', value: 'Low_piano.mp3' },
+  { label: 'Koto Notification', value: 'koto_notification.mp3' },
 ];
 
 export default function PomodoroSettingsModal() {

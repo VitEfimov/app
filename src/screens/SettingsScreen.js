@@ -35,6 +35,10 @@ const SOUND_ASSETS = {
   'sakura.mp3': require('../../assets/audio/sakura.mp3'),
   'shrine_bell.mp3': require('../../assets/audio/shrine_bell.mp3'),
   'start_sound.mp3': require('../../assets/audio/start_sound.mp3'),
+  'Konob2.mp3': require('../../assets/audio/Konob2.mp3'),
+  'Light_scrub.mp3': require('../../assets/audio/Light_scrub.mp3'),
+  'Low_piano.mp3': require('../../assets/audio/Low_piano.mp3'),
+  'koto_notification.mp3': require('../../assets/audio/koto_notification.mp3'),
 };
 
 const IconUser = ({ color }) => (
@@ -140,6 +144,10 @@ export default function SettingsScreen({ navigation }) {
     { label: t('Sakura'), value: 'sakura.mp3' },
     { label: t('Shrine Bell'), value: 'shrine_bell.mp3' },
     { label: t('Start Sound'), value: 'start_sound.mp3' },
+    { label: t('Konob 2'), value: 'Konob2.mp3' },
+    { label: t('Light Scrub'), value: 'Light_scrub.mp3' },
+    { label: t('Low Piano'), value: 'Low_piano.mp3' },
+    { label: t('Koto Notification'), value: 'koto_notification.mp3' },
   ];
 
   const handleTogglePin = (value) => {

@@ -20,9 +20,9 @@ export const DevLogger = {
     listeners.forEach(listener => listener([...logs]));
     
     if (type === 'error') {
-      console.error(`[DevLog] ${message}`, details || '');
+      // console.error(`[DevLog] ${message}`, details || '');
     } else {
-      console.log(`[DevLog] ${message}`, details || '');
+      // console.log(`[DevLog] ${message}`, details || '');
     }
   },
   error: (message, details = null) => DevLogger.log(message, details, 'error'),

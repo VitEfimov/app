@@ -121,7 +121,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     >
       <KeyboardAvoidingView 
         style={styles.modalOverlayInline} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
       >
         <TouchableWithoutFeedback onPress={() => setIsEditing(false)}>
           <View style={{ flex: 1 }} />
@@ -131,14 +131,14 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         ref={inputRef}
         testID="inline_task_input"
         accessible={true} accessibilityLabel="New task name"
-        style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
+        style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight), maxHeight: 150 }]}
         placeholder={t("Enter task name...")}
         placeholderTextColor={colors.textSecondary}
         value={taskName}
         onChangeText={setTaskName}
         onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
         multiline={true}
-        scrollEnabled={false}
+        scrollEnabled={true}
         blurOnSubmit={true}
         onSubmitEditing={handleAdd}
       />
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 24,
     flexShrink: 1,
   },
   cancelText: {
