@@ -121,7 +121,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { generateRepeatingTasks } = useTaskRepeat();
 
   const [datePickerType, setDatePickerType] = useState(null);
-  const [inputHeight, setInputHeight] = useState(46);
   const [isFullscreenImageVisible, setFullscreenImageVisible] = useState(false);
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
@@ -434,11 +433,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               <TextInput
                 testID="task_details_name_input"
                 accessible={true} accessibilityLabel="Task Name"
-                style={[styles.input, { flex: 1, color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight) }]}
+                style={[styles.input, { flex: 1, color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, minHeight: 46 }]}
                 value={taskName}
                 onChangeText={setTaskName}
                 onBlur={handleNameBlur}
-                onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
                 placeholder={t("What needs to be done?")}
                 placeholderTextColor={colors.textSecondary}
                 multiline={true}
@@ -608,6 +606,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 placeholder={t("Add extra details or notes...")}
                 placeholderTextColor={colors.textSecondary}
                 multiline={true}
+                scrollEnabled={false}
                 textAlignVertical="top"
               />
               {noteImage ? (

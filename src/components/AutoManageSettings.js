@@ -14,6 +14,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
   const { colors } = useTheme();
   const dispatch = useDispatch();
   const themeState = useSelector(state => state.themeReducer);
+  const tasks = useSelector(state => state.taskReducer.tasks);
 
   const scrollViewRef = useRef(null);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -49,7 +50,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
 
   const handleSave = () => {
     dispatch(setAutoManageSettings(localSettings));
-    updateRecurringAutomations(localSettings);
+    updateRecurringAutomations(localSettings, tasks);
     dispatch(processAutoManageTasks());
     onClose();
   };

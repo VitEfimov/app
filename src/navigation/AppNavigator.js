@@ -14,6 +14,7 @@ import PomodoroScreen from '../screens/PomodoroScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import DevLogsScreen from '../screens/DevLogsScreen';
+import StatisticsScreen from '../screens/StatisticsScreen';
 import Header from '../components/Header';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
@@ -101,6 +102,7 @@ function TabNavigator() {
       <Tab.Screen name="Pomodoro" component={PomodoroScreen} options={{ tabBarLabel: t('Pomodoro') }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('Settings') }} />
       <Tab.Screen name="DevLogs" component={DevLogsScreen} options={{ tabBarLabel: 'Dev Logs', tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Statistics" component={StatisticsScreen} options={{ tabBarLabel: 'Statistics', tabBarItemStyle: { display: 'none' } }} />
     </Tab.Navigator>
   );
 }

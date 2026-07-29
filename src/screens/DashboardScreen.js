@@ -221,6 +221,12 @@ export default function DashboardScreen({ navigation }) {
               </View>
             )}
           </View>
+          <TouchableOpacity 
+            style={{ marginTop: 15, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, backgroundColor: colors.surfaceContainer, borderRadius: 8 }}
+            onPress={() => navigation.navigate('Statistics')}
+          >
+            <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: 'bold' }}>{t('View Statistics')}</Text>
+          </TouchableOpacity>
             </View>
           </View>
           <TouchableOpacity onPress={handleNextMode} hitSlop={{top:20, bottom:20, left:20, right:20}} style={{ marginLeft: 10 }}>

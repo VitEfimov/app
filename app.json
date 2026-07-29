@@ -24,6 +24,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.vitvalef.app",
+      "backgroundColor": "#121212",
+      "softwareKeyboardLayoutMode": "pan",
       "allowBackup": false,
       "permissions": [
         "VIBRATE",

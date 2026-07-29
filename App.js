@@ -11,6 +11,7 @@ import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { hydrateUserState } from './src/features/userSlice';
 import { hydrateThemeState } from './src/features/themeSlice';
 import { hydratePomodoroState } from './src/features/pomodoroSlice';
+import { hydrateStatsState } from './src/features/statsSlice';
 import { fetchTasks } from './src/features/taskSlice';
 import axios from 'axios';
 import { Platform } from 'react-native';
@@ -281,6 +282,9 @@ function InitApp() {
           i18n.changeLanguage(appLanguage);
         }
 
+        const statsJson = await AsyncStorage.getItem('stats');
+        if (statsJson) dispatch(hydrateStatsState(JSON.parse(statsJson)));
+
         // Load tasks from local storage
         await dispatch(fetchTasks()).unwrap();
 
@@ -289,7 +293,10 @@ function InitApp() {
         await dispatch(processAutoManageTasks());
 
         const currentThemeState = store.getState().themeReducer;
+        const currentTasks = store.getState().taskReducer.tasks;
         await registerForPushNotificationsAsync(currentThemeState);
+        const { updateRecurringAutomations } = require('./src/utils/notifications');
+        await updateRecurringAutomations(currentThemeState, currentTasks);
       } catch (e) {
         console.error(e);
       } finally {
@@ -393,17 +400,17 @@ import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
 export default function App() {
   return (
     <ErrorBoundary>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <Provider store={store}>
-            <ThemeProvider>
-              <RootWrapper>
+      <Provider store={store}>
+        <ThemeProvider>
+          <RootWrapper>
+            <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
+              <SafeAreaProvider>
                 <InitApp />
-              </RootWrapper>
-            </ThemeProvider>
-          </Provider>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+              </SafeAreaProvider>
+            </GestureHandlerRootView>
+          </RootWrapper>
+        </ThemeProvider>
+      </Provider>
     </ErrorBoundary>
   );
 }

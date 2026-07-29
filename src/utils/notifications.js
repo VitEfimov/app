@@ -743,7 +743,7 @@ export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, upda
   }
 }
 
-export async function updateRecurringAutomations(themeState) {
+export async function updateRecurringAutomations(themeState, tasks = []) {
   const {
     morningReminder, morningReminderTime,
     eveningReminder, eveningReminderTime,
@@ -760,10 +760,24 @@ export async function updateRecurringAutomations(themeState) {
 
   if (morningReminder && morningReminderTime) {
     const [hour, minute] = morningReminderTime.split(':').map(Number);
+    let bodyText = "Check your tasks for today.";
+    
+    if (tasks && tasks.length > 0) {
+      const today = dayjs().format('YYYY-MM-DD');
+      const upcomingTasks = tasks.filter(t => !t.completed && (t.completionDate === today || !t.completionDate));
+      if (upcomingTasks.length > 0) {
+        const top5 = upcomingTasks.slice(0, 5);
+        bodyText = top5.map(t => `• ${t.taskname}`).join('\n');
+        if (upcomingTasks.length > 5) {
+          bodyText += `\n...and ${upcomingTasks.length - 5} more`;
+        }
+      }
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Good Morning!',
-        body: "Check your tasks for today.",
+        body: bodyText,
         sound: true,
         data: { isAutomation: true },
       },

@@ -62,17 +62,16 @@ export default function Header() {
   };
 
   const handleToggleTheme = () => {
-    let newTheme = 'light';
-    if (mode === 'light') newTheme = 'dark';
-    else if (mode === 'dark') newTheme = 'contrast';
-    else if (mode === 'contrast') newTheme = 'light';
-    
-    dispatch(setThemeMode(newTheme));
+    const modes = ['system', 'light', 'dark', 'contrast'];
+    const currentIndex = modes.indexOf(mode) !== -1 ? modes.indexOf(mode) : 0;
+    const nextIndex = (currentIndex + 1) % modes.length;
+    dispatch(setThemeMode(modes[nextIndex]));
   };
 
   const getThemeIcon = () => {
     if (mode === 'contrast') return <IconContrast color={colors.textPrimary} />;
-    if (mode === 'dark' || (mode === 'system' && isDark)) return <IconDarkMode color={colors.textPrimary} />;
+    if (mode === 'dark') return <IconDarkMode color={colors.textPrimary} />;
+    if (mode === 'system') return isDark ? <IconDarkMode color={colors.textPrimary} /> : <IconLightMode color={colors.textPrimary} />;
     return <IconLightMode color={colors.textPrimary} />;
   };
 
