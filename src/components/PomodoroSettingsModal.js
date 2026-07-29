@@ -26,6 +26,10 @@ const predefinedSounds = [
   { label: 'Light Scrub', value: 'light_scrub.mp3' },
   { label: 'Low Piano', value: 'low_piano.mp3' },
   { label: 'Koto Notification', value: 'koto_notification.mp3' },
+  { label: 'Bass Alarm', value: 'bass_alarm.mp3' },
+  { label: 'Koto Alarm', value: 'koto_alarm.mp3' },
+  { label: 'Koto Shamisen', value: 'koto_shamisen.mp3' },
+  { label: 'Shamisen', value: 'shamisen.mp3' },
 ];
 
 export default function PomodoroSettingsModal() {

@@ -16,6 +16,7 @@ import { fetchTasks } from './src/features/taskSlice';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
+import { registerBackgroundFetchAsync } from './src/utils/backgroundTasks';
 import i18n from './src/i18n';
 import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
 import { useShareIntent } from 'expo-share-intent';
@@ -268,6 +269,7 @@ function InitApp() {
   useEffect(() => {
     const loadStorage = async () => {
       try {
+        await registerBackgroundFetchAsync();
         const theme = await AsyncStorage.getItem('customTheme');
         if (theme) dispatch(hydrateThemeState(JSON.parse(theme)));
 

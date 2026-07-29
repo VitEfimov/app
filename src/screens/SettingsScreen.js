@@ -39,6 +39,10 @@ const SOUND_ASSETS = {
   'light_scrub.mp3': require('../../assets/audio/light_scrub.mp3'),
   'low_piano.mp3': require('../../assets/audio/low_piano.mp3'),
   'koto_notification.mp3': require('../../assets/audio/koto_notification.mp3'),
+  'bass_alarm.mp3': require('../../assets/audio/bass_alarm.mp3'),
+  'koto_alarm.mp3': require('../../assets/audio/koto_alarm.mp3'),
+  'koto_shamisen.mp3': require('../../assets/audio/koto_shamisen.mp3'),
+  'shamisen.mp3': require('../../assets/audio/shamisen.mp3'),
 };
 
 const IconUser = ({ color }) => (
@@ -148,6 +152,10 @@ export default function SettingsScreen({ navigation }) {
     { label: t('Light Scrub'), value: 'light_scrub.mp3' },
     { label: t('Low Piano'), value: 'low_piano.mp3' },
     { label: t('Koto Notification'), value: 'koto_notification.mp3' },
+    { label: t('Bass Alarm'), value: 'bass_alarm.mp3' },
+    { label: t('Koto Alarm'), value: 'koto_alarm.mp3' },
+    { label: t('Koto Shamisen'), value: 'koto_shamisen.mp3' },
+    { label: t('Shamisen'), value: 'shamisen.mp3' },
   ];
 
   const handleTogglePin = (value) => {

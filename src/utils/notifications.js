@@ -758,57 +758,80 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
     }
   }
 
+  // Helper to find the absolute next occurrence of a time
+  const getNextOccurrence = (hour, minute) => {
+    let now = dayjs();
+    let next = dayjs().hour(hour).minute(minute).second(0).millisecond(0);
+    if (next.isBefore(now)) {
+      next = next.add(1, 'day');
+    }
+    return next;
+  };
+
+  // Morning Reminder: Upcoming tasks
   if (morningReminder && morningReminderTime) {
     const [hour, minute] = morningReminderTime.split(':').map(Number);
-    let bodyText = "Check your tasks for today.";
-    
-    if (tasks && tasks.length > 0) {
-      const today = dayjs().format('YYYY-MM-DD');
-      const upcomingTasks = tasks.filter(t => !t.completed && (t.completionDate === today || !t.completionDate));
-      if (upcomingTasks.length > 0) {
-        const top5 = upcomingTasks.slice(0, 5);
-        bodyText = top5.map(t => `• ${t.taskname}`).join('\n');
-        if (upcomingTasks.length > 5) {
-          bodyText += `\n...and ${upcomingTasks.length - 5} more`;
-        }
-      }
-    }
+    const triggerDate = getNextOccurrence(hour, minute);
+    const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Good Morning!',
-        body: bodyText,
-        sound: true,
-        data: { isAutomation: true },
-      },
-      trigger: { hour, minute, repeats: true }
-    });
+    const upcomingTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
+    if (upcomingTasks.length > 0) {
+      let bodyText = `You have ${upcomingTasks.length} task${upcomingTasks.length === 1 ? '' : 's'} for today.\n`;
+      const top5 = upcomingTasks.slice(0, 5);
+      bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+      if (upcomingTasks.length > 5) {
+        bodyText += `\n...and ${upcomingTasks.length - 5} more`;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Good Morning!',
+          body: bodyText,
+          sound: true,
+          data: { isAutomation: true },
+        },
+        trigger: { date: triggerDate.toDate(), repeats: false }
+      });
+    }
   }
 
+  // Summary Reminder: Overdue tasks
   if (summaryReminder && summaryReminderTime) {
     const [hour, minute] = summaryReminderTime.split(':').map(Number);
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Daily Summary',
-        body: "You might have some overdue tasks waiting.",
-        sound: true,
-        data: { isAutomation: true },
-      },
-      trigger: { hour, minute, repeats: true }
-    });
+    const triggerDate = getNextOccurrence(hour, minute);
+    const targetDayStr = triggerDate.format('YYYY-MM-DD');
+
+    const overdueTasks = tasks.filter(t => !t.completed && t.completionDate && t.completionDate < targetDayStr);
+    if (overdueTasks.length > 0) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Daily Summary',
+          body: `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.`,
+          sound: true,
+          data: { isAutomation: true },
+        },
+        trigger: { date: triggerDate.toDate(), repeats: false }
+      });
+    }
   }
 
+  // Evening Reminder: Unfinished tasks
   if (eveningReminder && eveningReminderTime) {
     const [hour, minute] = eveningReminderTime.split(':').map(Number);
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Evening Review',
-        body: "Wrap up any unfinished tasks before the day ends.",
-        sound: true,
-        data: { isAutomation: true },
-      },
-      trigger: { hour, minute, repeats: true }
-    });
+    const triggerDate = getNextOccurrence(hour, minute);
+
+    const unfinishedTasks = tasks.filter(t => !t.completed);
+    if (unfinishedTasks.length > 0) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Evening Review',
+          body: `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.`,
+          sound: true,
+          data: { isAutomation: true },
+        },
+        trigger: { date: triggerDate.toDate(), repeats: false }
+      });
+    }
   }
 }
 
