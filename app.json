@@ -1,10 +1,10 @@
 {
   "expo": {
     "name": "TaskFlow",
-    "description": "To Do List & Planner",
-    "slug": "app",
+    "description": "A modern task manager, to-do list, daily planner, reminders, and focus timer.",
+    "slug": "taskflow",
     "version": "1.0.0",
-    "scheme": "taskmanager",
+    "scheme": "taskflow",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
