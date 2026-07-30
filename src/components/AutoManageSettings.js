@@ -113,7 +113,8 @@ export default function AutoManageSettings({ isVisible, onClose }) {
     <Modal
       isVisible={isVisible}
       onSwipeComplete={onClose}
-      swipeDirection={scrollOffset > 0 ? undefined : ['down']}
+      swipeDirection={['down']}
+      swipeThreshold={100}
       propagateSwipe={true}
       onBackdropPress={onClose}
       onBackButtonPress={onClose}
