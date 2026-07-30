@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
@@ -43,6 +43,14 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   const [tempColor, setTempColor] = useState(currentSourceColor);
   const [tempImage, setTempImage] = useState(currentUserPicture);
   const [tempThemeMode, setTempThemeMode] = useState(currentThemeMode || 'system');
+
+  useEffect(() => {
+    if (isVisible) {
+      setTempColor(currentSourceColor);
+      setTempImage(currentUserPicture);
+      setTempThemeMode(currentThemeMode || 'system');
+    }
+  }, [isVisible, currentSourceColor, currentUserPicture, currentThemeMode]);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();

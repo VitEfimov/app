@@ -144,7 +144,8 @@ export default function AutoManageSettings({ isVisible, onClose }) {
         >
           <Text style={[styles.groupHeader, { color: colors.textSecondary }]}>{t('Task Scheduling')}</Text>
           <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer, padding: 10 }]}>
-            <Text style={[styles.subText, { color: colors.textSecondary, marginBottom: 5 }]}>{t('When overdue')}</Text>
+            <Text style={[styles.subText, { color: colors.textSecondary, marginBottom: 2, fontWeight: 'bold' }]}>{t('When overdue')}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 10 }}>{t('Automatically move uncompleted tasks to a new date when their due date passes.')}</Text>
             <RadioButton label={t('Today')} selected={autoTransferMode === 'today'} onPress={() => handleUpdate({ autoTransferMode: 'today' })} />
             <RadioButton label={t('Tomorrow')} selected={autoTransferMode === 'tomorrow'} onPress={() => handleUpdate({ autoTransferMode: 'tomorrow' })} />
             <RadioButton label={t('Next Workday')} selected={autoTransferMode === 'next_workday'} onPress={() => handleUpdate({ autoTransferMode: 'next_workday' })} />
@@ -220,6 +221,11 @@ export default function AutoManageSettings({ isVisible, onClose }) {
 
           <Text style={[styles.groupHeader, { color: colors.textSecondary, marginTop: 15 }]}>{t('Recurring Reminders')}</Text>
           <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer }]}>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, paddingHorizontal: 15, paddingTop: 10, paddingBottom: 5, lineHeight: 18 }}>
+              {t('• Morning: Lists tasks due today.')}
+              {'\n'}{t('• Evening: Reminds you of tasks due today that are still unfinished.')}
+              {'\n'}{t('• Summary: Alerts you about overdue tasks.')}
+            </Text>
             
             <SettingToggle 
               label={t("Morning reminder")} 

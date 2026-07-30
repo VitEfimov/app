@@ -820,7 +820,9 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
     const [hour, minute] = eveningReminderTime.split(':').map(Number);
     const triggerDate = getNextOccurrence(hour, minute);
 
-    const unfinishedTasks = tasks.filter(t => !t.completed);
+    const targetDayStr = triggerDate.format('YYYY-MM-DD');
+
+    const unfinishedTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
     if (unfinishedTasks.length > 0) {
       await Notifications.scheduleNotificationAsync({
         content: {
