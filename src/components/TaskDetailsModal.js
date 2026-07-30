@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
-import CustomWheelTimePicker from './CustomWheelTimePicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -132,7 +131,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState(null);
-  const [timePickerType, setTimePickerType] = useState('wheel'); // 'wheel' or 'dial'
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [reminder, setReminder] = useState('None');
   const [isAlarm, setIsAlarm] = useState(false);
@@ -484,14 +482,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               <View style={styles.column}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={[styles.label, { color: colors.textSecondary }]}>{t('TIME')}</Text>
-                  <TouchableOpacity
-                    onPress={() => setTimePickerType(prev => prev === 'wheel' ? 'dial' : 'wheel')}
-                    style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: surfaceLighter, borderRadius: 4, borderWidth: 1, borderColor: colors.borderColor }}
-                  >
-                    <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
-                      {timePickerType === 'wheel' ? 'WHEEL' : 'DIAL'}
-                    </Text>
-                  </TouchableOpacity>
                 </View>
                 <TouchableOpacity 
                   accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
@@ -572,25 +562,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               />
             )} */}
 
-            {showTimePicker && timePickerType === 'wheel' && (
-              <CustomWheelTimePicker
-                visible={showTimePicker}
-                value={selectedTime}
-                colors={colors}
-                isDark={isDark}
-                onClose={() => setShowTimePicker(false)}
-                onSave={(newTime) => {
-                  setSelectedTime(newTime);
-                  handleUpdate({
-                    time: newTime,
-                    hasUserSelectedTime: true,
-                  });
-                  setShowTimePicker(false);
-                }}
-              />
-            )}
-
-            {showTimePicker && timePickerType === 'dial' && (
+            {showTimePicker && (
               <CustomTimePicker
                 visible={showTimePicker}
                 value={selectedTime}

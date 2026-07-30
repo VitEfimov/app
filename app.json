@@ -1,6 +1,7 @@
 {
   "expo": {
-    "name": "TD",
+    "name": "TaskFlow",
+    "description": "To Do List & Planner",
     "slug": "app",
     "version": "1.0.0",
     "scheme": "taskmanager",
