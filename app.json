@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "TaskFlow",
+    "name": "TaskFlow: To-Do List & Planner",
     "description": "A modern task manager, to-do list, daily planner, reminders, and focus timer.",
     "slug": "taskflow",
     "version": "1.0.0",
