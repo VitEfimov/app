@@ -18,6 +18,28 @@ import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
 import CustomDropdown from './CustomDropdown';
 import ConfirmModal from './ConfirmModal';
 import { useTranslation } from 'react-i18next';
+const MemoizedNotesInput = React.memo(({ initialValue, onBlur, placeholder, placeholderTextColor, style }) => {
+  const [text, setText] = useState(initialValue || '');
+
+  useEffect(() => {
+    setText(initialValue || '');
+  }, [initialValue]);
+
+  return (
+    <TextInput
+      accessible={true} accessibilityLabel="Task Notes"
+      style={style}
+      value={text}
+      onChangeText={setText}
+      onBlur={() => onBlur(text)}
+      placeholder={placeholder}
+      placeholderTextColor={placeholderTextColor}
+      multiline={true}
+      scrollEnabled={false}
+      textAlignVertical="top"
+    />
+  );
+});
 
 const IconClose = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -597,17 +619,12 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               </TouchableOpacity>
             </View>
             <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 100 }]}>
-              <TextInput
-                accessible={true} accessibilityLabel="Task Notes"
-                style={{ flex: 1, padding: 15, color: colors.textPrimary, fontSize: 15 }}
-                value={notes}
-                onChangeText={setNotes}
-                onBlur={handleNotesBlur}
+              <MemoizedNotesInput
+                initialValue={notes}
+                onBlur={(newText) => setNotes(newText)}
                 placeholder={t("Add extra details or notes...")}
                 placeholderTextColor={colors.textSecondary}
-                multiline={true}
-                scrollEnabled={false}
-                textAlignVertical="top"
+                style={{ flex: 1, padding: 15, color: colors.textPrimary, fontSize: 15 }}
               />
               {noteImage ? (
                 <View style={styles.imagePreviewContainer}>

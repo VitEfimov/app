@@ -186,6 +186,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         priorityFrequency,
         removePriorityWhenCompleted,
         autoDeleteOverdueDays,
+        autoDeleteCompletedDays,
         confirmBeforeDeletion
     } = themeState;
     
@@ -204,9 +205,9 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                 updatedTask.priority = 'none';
                 taskChanged = true;
             }
-            if (autoDeleteOverdueDays > 0) {
+            if (autoDeleteCompletedDays > 0) {
                 const daysOld = today.diff(taskDate, 'day');
-                if (daysOld >= autoDeleteOverdueDays) {
+                if (daysOld >= autoDeleteCompletedDays) {
                     tasksToDelete.push(updatedTask.id);
                 }
             }
@@ -217,39 +218,59 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                 tasksToDelete.push(updatedTask.id);
             } 
             else {
+                let priorityDidIncrease = false;
+
                 if (increasePriorityWhenOverdue) {
+                    // Logic based on accumulating days overdue
                     if (priorityFrequency === 'daily') {
                         if (daysOverdue >= 2 && updatedTask.priority !== 'high') {
                             updatedTask.priority = 'high';
                             taskChanged = true;
+                            priorityDidIncrease = true;
                         } else if (daysOverdue === 1 && (updatedTask.priority === 'none' || updatedTask.priority === 'low')) {
                             updatedTask.priority = 'medium';
                             taskChanged = true;
+                            priorityDidIncrease = true;
                         }
                     } else if (priorityFrequency === 'weekly') {
                         if (daysOverdue >= 14 && updatedTask.priority !== 'high') {
                             updatedTask.priority = 'high';
                             taskChanged = true;
+                            priorityDidIncrease = true;
                         } else if (daysOverdue >= 7 && (updatedTask.priority === 'none' || updatedTask.priority === 'low')) {
                             updatedTask.priority = 'medium';
                             taskChanged = true;
+                            priorityDidIncrease = true;
                         }
                     } else if (priorityFrequency === 'never' || !priorityFrequency) {
                         if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
                             updatedTask.priority = 'medium';
                             taskChanged = true;
+                            priorityDidIncrease = true;
                         }
                     }
                 }
                 
                 if (autoTransferMode && autoTransferMode !== 'none') {
+                    // If we are auto-transferring an overdue task, immediately bump its priority 
+                    // (since it won't be able to accumulate daysOverdue).
+                    if (increasePriorityWhenOverdue && !priorityDidIncrease && updatedTask.priority !== 'high') {
+                        if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
+                            updatedTask.priority = 'medium';
+                        } else if (updatedTask.priority === 'medium') {
+                            updatedTask.priority = 'high';
+                        }
+                        taskChanged = true;
+                    }
+
                     let targetDate = today;
                     if (autoTransferMode === 'tomorrow') {
                         targetDate = targetDate.add(1, 'day');
                     } else if (autoTransferMode === 'next_workday') {
                         targetDate = targetDate.add(1, 'day');
-                        if (targetDate.day() === 6) targetDate = targetDate.add(2, 'day'); 
-                        if (targetDate.day() === 0) targetDate = targetDate.add(1, 'day'); 
+                        while (targetDate.day() === 0 || targetDate.day() === 6) {
+                            targetDate = targetDate.add(1, 'day');
+                        }
                     }
                     updatedTask.completionDate = targetDate.toISOString();
                     taskChanged = true;

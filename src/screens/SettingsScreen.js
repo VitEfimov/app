@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask } from '../features/taskSlice';
 import { rescheduleAllActiveTasks } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setTaskCompleteSound, setVibrationEnabled } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
 import AutoManageSettings from '../components/AutoManageSettings';
+import ConfirmModal from '../components/ConfirmModal';
 import { Audio } from 'expo-av';
 
 const SOUND_ASSETS = {
@@ -43,6 +44,16 @@ const SOUND_ASSETS = {
   'koto_alarm.mp3': require('../../assets/audio/koto_alarm.mp3'),
   'koto_shamisen.mp3': require('../../assets/audio/koto_shamisen.mp3'),
   'shamisen.mp3': require('../../assets/audio/shamisen.mp3'),
+  'cellos_pizz.mp3': require('../../assets/audio/cellos_pizz.mp3'),
+  'cellos_tremolo.mp3': require('../../assets/audio/cellos_tremolo.mp3'),
+  'flute_test.mp3': require('../../assets/audio/flute_test.mp3'),
+  'glower.mp3': require('../../assets/audio/glower.mp3'),
+  'keys.mp3': require('../../assets/audio/keys.mp3'),
+  'keys2.mp3': require('../../assets/audio/keys2.mp3'),
+  'marinba.mp3': require('../../assets/audio/marinba.mp3'),
+  'phonk_bell.mp3': require('../../assets/audio/phonk_bell.mp3'),
+  'vpizzicato.mp3': require('../../assets/audio/vpizzicato.mp3'),
+  'xylo.mp3': require('../../assets/audio/xylo.mp3'),
 };
 
 const IconUser = ({ color }) => (
@@ -80,10 +91,14 @@ export default function SettingsScreen({ navigation }) {
   const notificationSound = theme.notificationSound || 'notification_air.wav';
   const taskCompleteSound = theme.taskCompleteSound || 'success_bloom.wav';
   const vibrationEnabled = theme.vibrationEnabled !== undefined ? theme.vibrationEnabled : true;
+  const {
+    appPin,
+  } = theme;
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
+  const [saveAlertVisible, setSaveAlertVisible] = useState(false);
 
   const languageOptions = [
     { label: 'English', value: 'en' },
@@ -156,6 +171,16 @@ export default function SettingsScreen({ navigation }) {
     { label: t('Koto Alarm'), value: 'koto_alarm.mp3' },
     { label: t('Koto Shamisen'), value: 'koto_shamisen.mp3' },
     { label: t('Shamisen'), value: 'shamisen.mp3' },
+    { label: t('Cellos Pizz'), value: 'cellos_pizz.mp3' },
+    { label: t('Cellos Tremolo'), value: 'cellos_tremolo.mp3' },
+    { label: t('Flute Test'), value: 'flute_test.mp3' },
+    { label: t('Glower'), value: 'glower.mp3' },
+    { label: t('Keys'), value: 'keys.mp3' },
+    { label: t('Keys 2'), value: 'keys2.mp3' },
+    { label: t('Marimba'), value: 'marinba.mp3' },
+    { label: t('Phonk Bell'), value: 'phonk_bell.mp3' },
+    { label: t('V-Pizzicato'), value: 'vpizzicato.mp3' },
+    { label: t('Xylophone'), value: 'xylo.mp3' },
   ];
 
   const handleTogglePin = (value) => {
@@ -212,10 +237,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleSave = () => {
-    Alert.alert(t('Settings Saved'), t('Your preferences have been updated.'));
-    if (navigation) {
-      navigation.navigate('Board');
-    }
+    setSaveAlertVisible(true);
   };
 
 
@@ -320,19 +342,7 @@ export default function SettingsScreen({ navigation }) {
               layout="horizontal"
             />
           </View>
-          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
-            <CustomDropdown 
-              label={t("Completion Sound")} 
-              value={taskCompleteSound} 
-              options={soundOptions} 
-              onSelect={val => {
-                dispatch(setTaskCompleteSound(val));
-                playSoundPreview(val);
-              }} 
-              colors={colors}
-              layout="horizontal"
-            />
-          </View>
+
           <View style={[styles.rowItem, { borderBottomWidth: 1 }]}>
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Vibration')}</Text>
             <Switch
@@ -418,6 +428,18 @@ export default function SettingsScreen({ navigation }) {
         onSubmit={handleSetPin}
         maxLength={4}
         keyboardType="numeric"
+      />
+      <ConfirmModal
+        isVisible={saveAlertVisible}
+        title={t('Settings Saved')}
+        message={t('Your preferences have been updated.')}
+        hideCancel={true}
+        confirmText={t('OK')}
+        onConfirm={() => {
+          setSaveAlertVisible(false);
+          if (navigation) navigation.navigate('Board');
+        }}
+        onCancel={() => setSaveAlertVisible(false)}
       />
     </View>
   );

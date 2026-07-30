@@ -30,6 +30,16 @@ const predefinedSounds = [
   { label: 'Koto Alarm', value: 'koto_alarm.mp3' },
   { label: 'Koto Shamisen', value: 'koto_shamisen.mp3' },
   { label: 'Shamisen', value: 'shamisen.mp3' },
+  { label: 'Cellos Pizz', value: 'cellos_pizz.mp3' },
+  { label: 'Cellos Tremolo', value: 'cellos_tremolo.mp3' },
+  { label: 'Flute Test', value: 'flute_test.mp3' },
+  { label: 'Glower', value: 'glower.mp3' },
+  { label: 'Keys', value: 'keys.mp3' },
+  { label: 'Keys 2', value: 'keys2.mp3' },
+  { label: 'Marimba', value: 'marinba.mp3' },
+  { label: 'Phonk Bell', value: 'phonk_bell.mp3' },
+  { label: 'V-Pizzicato', value: 'vpizzicato.mp3' },
+  { label: 'Xylophone', value: 'xylo.mp3' },
 ];
 
 export default function PomodoroSettingsModal() {

@@ -36,6 +36,7 @@ const initialState = {
   priorityFrequency: loaded?.priorityFrequency || 'never', // 'daily', 'weekly', 'never'
   removePriorityWhenCompleted: loaded?.removePriorityWhenCompleted || false,
   autoDeleteOverdueDays: loaded?.autoDeleteOverdueDays !== undefined ? loaded.autoDeleteOverdueDays : 0,
+  autoDeleteCompletedDays: loaded?.autoDeleteCompletedDays !== undefined ? loaded.autoDeleteCompletedDays : 0,
   confirmBeforeDeletion: loaded?.confirmBeforeDeletion !== undefined ? loaded.confirmBeforeDeletion : true,
   
   // Reminders
@@ -49,7 +50,6 @@ const initialState = {
   // Notification Settings
   alarmSound: loaded?.alarmSound || 'alarm_urgent.wav',
   notificationSound: loaded?.notificationSound || 'notification_air.wav',
-  taskCompleteSound: loaded?.taskCompleteSound || 'success_bloom.wav',
   vibrationEnabled: loaded?.vibrationEnabled !== undefined ? loaded.vibrationEnabled : true,
   
   // Security
@@ -104,10 +104,6 @@ const themeSlice = createSlice({
       state.notificationSound = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
-    setTaskCompleteSound: (state, action) => {
-      state.taskCompleteSound = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
-    },
     setVibrationEnabled: (state, action) => {
       state.vibrationEnabled = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
@@ -143,6 +139,7 @@ const themeSlice = createSlice({
       state.priorityFrequency = 'never';
       state.removePriorityWhenCompleted = false;
       state.autoDeleteOverdueDays = 0;
+      state.autoDeleteCompletedDays = 0;
       state.confirmBeforeDeletion = true;
       state.morningReminder = false;
       state.morningReminderTime = '08:00';
@@ -205,7 +202,7 @@ const themeSlice = createSlice({
 export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime,
-  setAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setTaskCompleteSound, setVibrationEnabled,
+  setAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat
 } = themeSlice.actions;
 

@@ -27,6 +27,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
     priorityFrequency: 'never',
     removePriorityWhenCompleted: false,
     autoDeleteOverdueDays: 0,
+    autoDeleteCompletedDays: 0,
     confirmBeforeDeletion: true,
     morningReminder: false,
     morningReminderTime: '08:00',
@@ -65,6 +66,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
     priorityFrequency = 'never',
     removePriorityWhenCompleted = false,
     autoDeleteOverdueDays = 0,
+    autoDeleteCompletedDays = 0,
     confirmBeforeDeletion = true,
     morningReminder = false,
     morningReminderTime = '08:00',
@@ -191,6 +193,21 @@ export default function AutoManageSettings({ isVisible, onClose }) {
                 { label: t('30 days'), value: 30 },
               ]}
               onSelect={(val) => handleUpdate({ autoDeleteOverdueDays: val })}
+              colors={colors}
+              layout="horizontal"
+            />
+            <View style={{ height: 10 }} />
+            <CustomDropdown
+              label={t('Delete completed after')}
+              value={autoDeleteCompletedDays}
+              options={[
+                { label: t('Never'), value: 0 },
+                { label: t('1 day'), value: 1 },
+                { label: t('3 days'), value: 3 },
+                { label: t('7 days'), value: 7 },
+                { label: t('30 days'), value: 30 },
+              ]}
+              onSelect={(val) => handleUpdate({ autoDeleteCompletedDays: val })}
               colors={colors}
               layout="horizontal"
             />

@@ -62,8 +62,14 @@ export default function Header() {
   };
 
   const handleToggleTheme = () => {
-    const modes = ['system', 'light', 'dark', 'contrast'];
-    const currentIndex = modes.indexOf(mode) !== -1 ? modes.indexOf(mode) : 0;
+    const modes = ['light', 'dark', 'contrast'];
+    let currentIndex = modes.indexOf(mode);
+    
+    // If currently 'system', jump into the cycle based on current visual state
+    if (currentIndex === -1) {
+      currentIndex = isDark ? 1 : 0; 
+    }
+    
     const nextIndex = (currentIndex + 1) % modes.length;
     dispatch(setThemeMode(modes[nextIndex]));
   };
