@@ -51,11 +51,38 @@ const IconSettings = ({ color }) => (
 );
 
 const SOUND_MAP = {
+  'alarm_02.mp3': require('../../assets/audio/alarm_02.mp3'),
+  'bass_alarm.mp3': require('../../assets/audio/bass_alarm.mp3'),
+  'bell.mp3': require('../../assets/audio/bell.mp3'),
+  'bell01.mp3': require('../../assets/audio/bell01.mp3'),
+  'cellos_pizz.mp3': require('../../assets/audio/cellos_pizz.mp3'),
+  'cellos_pizzDGG.mp3': require('../../assets/audio/cellos_pizzDGG.mp3'),
+  'cellos_pizzEDF.mp3': require('../../assets/audio/cellos_pizzEDF.mp3'),
+  'cellos_tremolo.mp3': require('../../assets/audio/cellos_tremolo.mp3'),
   'chime.wav': require('../../assets/audio/chime.wav'),
-  'light_ping.wav': require('../../assets/audio/light_ping.wav'),
+  'fireworks.mp3': require('../../assets/audio/fireworks.mp3'),
+  'keys.mp3': require('../../assets/audio/keys.mp3'),
+  'keys2.mp3': require('../../assets/audio/keys2.mp3'),
+  'koto.mp3': require('../../assets/audio/koto.mp3'),
+  'koto_notification.mp3': require('../../assets/audio/koto_notification.mp3'),
+  'koto_shamisen.mp3': require('../../assets/audio/koto_shamisen.mp3'),
+  'light_ping.mp3': require('../../assets/audio/light_ping.mp3'),
+  'light_scrub.mp3': require('../../assets/audio/light_scrub.mp3'),
+  'low_piano.mp3': require('../../assets/audio/low_piano.mp3'),
+  'marinba.mp3': require('../../assets/audio/marinba.mp3'),
+  'marinbaEEFGE.mp3': require('../../assets/audio/marinbaEEFGE.mp3'),
   'notification.wav': require('../../assets/audio/notification.wav'),
-  'end_sound.ogg': require('../../assets/audio/end_sound.ogg'),
-  'start_sound.mp3': require('../../assets/audio/start_sound.mp3')
+  'overdue_nudge.wav': require('../../assets/audio/overdue_nudge.wav'),
+  'shamisen.mp3': require('../../assets/audio/shamisen.mp3'),
+  'viola_solo_pizzicatoEGABEb.mp3': require('../../assets/audio/viola_solo_pizzicatoEGABEb.mp3'),
+  'viola_solo_pizzicatoEGAG.mp3': require('../../assets/audio/viola_solo_pizzicatoEGAG.mp3'),
+  'violin_pizzicatoBEFE.mp3': require('../../assets/audio/violin_pizzicatoBEFE.mp3'),
+  'violla_pizzicatoEGF.mp3': require('../../assets/audio/violla_pizzicatoEGF.mp3'),
+  'vpizzicato.mp3': require('../../assets/audio/vpizzicato.mp3'),
+  'xeloD.mp3': require('../../assets/audio/xeloD.mp3'),
+  'xeloDFS.mp3': require('../../assets/audio/xeloDFS.mp3'),
+  'xelof.mp3': require('../../assets/audio/xelof.mp3'),
+  'xylo.mp3': require('../../assets/audio/xylo.mp3'),
 };
 
 export default function PomodoroScreen() {
