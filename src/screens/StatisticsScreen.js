@@ -110,7 +110,7 @@ export default function StatisticsScreen() {
         
         if (i % 7 === 0 || i === daysInMonth) {
           weeks.push({
-            dayLabel: `W${weeks.length + 1}`,
+            dayLabel: t(`W${weeks.length + 1}`),
             ...currentWeekStats
           });
           currentWeekStats = { tasksCreated: 0, tasksCompleted: 0, pomodoroMinutes: 0 };
@@ -220,7 +220,7 @@ export default function StatisticsScreen() {
                   <ChartBar value={d.tasksCreated} max={maxTaskValue} color="#666" />
                   <ChartBar value={d.tasksCompleted} max={maxTaskValue} color={colors.primary} />
                 </View>
-                <Text style={[styles.dayLabel, { color: colors.textSecondary }]} numberOfLines={1}>{d.dayLabel}</Text>
+                <Text style={[styles.dayLabel, { color: colors.textSecondary }, d.dayLabel.length > 2 && { transform: [{ rotate: '-90deg' }], width: 50, textAlign: 'center', marginBottom: 15 }]}>{d.dayLabel}</Text>
               </View>
             ))}
           </View>

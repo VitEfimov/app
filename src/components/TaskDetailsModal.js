@@ -172,7 +172,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     setNotes(stripHtml(task.description?.text) || '');
     setNoteImage(task.description?.img || '');
     setSubtasks(task.subtasks || []);
-    setPriority(task.priority || 'none');
+    setPriority((task.priority || 'none').toLowerCase());
     setSelectedDate(task.completionDate || '');
 
     // Saved user time or null.
@@ -240,7 +240,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if ((selectedTime || '') !== (task.time || '')) return true;
     if (reminder !== (task.reminder || 'None')) return true;
     if (isAlarm !== (task.isAlarm || false)) return true;
-    if (priority !== (task.priority || 'none')) return true;
+    if (priority !== (task.priority || 'none').toLowerCase()) return true;
     if (selectedDate !== (task.completionDate || '')) return true;
     if (repeatFrequency !== (task.repeatFrequency || 'None')) return true;
     if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) return true;
@@ -257,7 +257,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     }
     if (selectedTime !== (task.time || '')) updates.time = selectedTime;
     if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
-    if (priority !== (task.priority || 'none')) updates.priority = priority;
+    if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
     if (repeatFrequency !== (task.repeatFrequency || 'None')) updates.repeatFrequency = repeatFrequency;
     if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) updates.repeatStartDate = repeatStartDate;
     if (repeatEndDate !== (task.repeatEndDate || '')) updates.repeatEndDate = repeatEndDate;
@@ -355,7 +355,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   };
 
   const handlePrioritySelect = (level) => {
-    setPriority(level);
+    setPriority(level.toLowerCase());
   };
 
   const handleDateSelect = (dateStr) => {
@@ -498,7 +498,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={styles.threeColumnRow}>
               <View style={styles.column}>
-                <CustomDropdown label={t("PRIORITY")} value={priority === 'none' ? 'None' : priority} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown label={t("PRIORITY")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
                 <CustomDropdown label={t("REMINDER")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />

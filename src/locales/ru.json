@@ -214,5 +214,11 @@
   "Are you sure you want to clear all your statistics? This cannot be undone.": "Вы уверены, что хотите очистить всю статистику? Это действие необратимо.",
   "View Statistics": "Посмотреть статистику",
   "Delete completed after": "Удалять завершенные через",
-  "1 day": "1 день"
+  "1 day": "1 день",
+  "W1": "П1",
+  "W2": "П2",
+  "W3": "W3",
+  "W4": "W4",
+  "W5": "W5",
+  "W6": "W6"
 }

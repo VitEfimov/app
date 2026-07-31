@@ -214,5 +214,11 @@
   "Are you sure you want to clear all your statistics? This cannot be undone.": "您确定要清除所有统计数据吗？此操作无法撤消。",
   "View Statistics": "查看统计数据",
   "Delete completed after": "删除已完成任务（之后）",
-  "1 day": "1天"
+  "1 day": "1天",
+  "W1": "W1",
+  "W2": "W2",
+  "W3": "W3",
+  "W4": "W4",
+  "W5": "W5",
+  "W6": "W6"
 }

@@ -20,7 +20,8 @@ const missingStrings = [
   "30 days",
   "When overdue",
   "Frequency",
-  "Next Workday"
+  "Next Workday",
+  "W1", "W2", "W3", "W4", "W5", "W6"
 ];
 
 function translate(text, targetLang) {

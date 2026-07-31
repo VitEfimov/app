@@ -133,6 +133,13 @@ export default function PomodoroScreen() {
   };
 
   const handlePeriodEnd = () => {
+    const title = localIsBreak ? 'Break time is over!' : 'Work session complete!';
+    const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
+
+    import('../utils/notifications').then(({ scheduleLocalNotification }) => {
+      scheduleLocalNotification(title, body, 1);
+    });
+
     if (localIsBreak) {
       dispatch(completeBreakInterval());
       playAudio(breakSoundKey);
@@ -154,18 +161,6 @@ export default function PomodoroScreen() {
     
     const endTime = Date.now() + (localTime * 1000);
     targetEndTimeRef.current = endTime;
-
-    // Schedule the notification to fire exactly when the timer ends
-    // This ensures it works even if the app goes to sleep or device locks
-    const title = localIsBreak ? 'Break time is over!' : 'Work session complete!';
-    const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
-    const seconds = Math.max(1, Math.floor((endTime - Date.now()) / 1000));
-    
-    import('../utils/notifications').then(({ scheduleLocalNotification }) => {
-      scheduleLocalNotification(title, body, seconds).then(id => {
-        notificationIdRef.current = id;
-      });
-    });
 
     intervalRef.current = setInterval(() => {
       const remainingMs = targetEndTimeRef.current - Date.now();

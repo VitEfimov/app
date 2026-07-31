@@ -214,5 +214,11 @@
   "Are you sure you want to clear all your statistics? This cannot be undone.": "すべての統計をクリアしてもよろしいですか？この操作は元に戻せません。",
   "View Statistics": "統計を表示",
   "Delete completed after": "完了したタスクを削除する",
-  "1 day": "1日"
+  "1 day": "1日",
+  "W1": "W1",
+  "W2": "W2",
+  "W3": "W3",
+  "W4": "W4",
+  "W5": "W5",
+  "W6": "W6"
 }

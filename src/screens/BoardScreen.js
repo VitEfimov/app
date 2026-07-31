@@ -9,7 +9,7 @@ import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
 import InlineAddTask from '../components/InlineAddTask';
 import Modal from 'react-native-modal';
-import getFilters from '../utils/filters';
+import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path } from 'react-native-svg';
@@ -199,12 +199,12 @@ export default function BoardScreen({ route, navigation }) {
     };
 
     return {
-      todayTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed), 'today'),
+      todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task)), 'today'),
       tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed), 'tomorrow'),
       thisWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') && !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed), 'on-this-week'),
       nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed), 'on-next-week'),
       laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed), 'later'),
-      missedTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed), 'missed'),
+      missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task)), 'missed'),
       completedTasks: sortTasks(boardTasks.filter(task => task.completed), 'completed')
     };
   }, [boardTasks, sortConfig]);

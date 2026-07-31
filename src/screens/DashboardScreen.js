@@ -5,7 +5,7 @@ import { setProgressMode } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import getFilters from '../utils/filters';
+import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
 import Svg, { Circle, Path } from 'react-native-svg';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +36,7 @@ export default function DashboardScreen({ navigation }) {
   
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
     return {
-      todayTasks: tasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day') && !task.completed),
+      todayTasks: tasks.filter(task => isTaskToday(task)),
       tomorrowTasks: tasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed),
       thisWeekTasks: tasks.filter(task =>
         !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') &&
@@ -49,7 +49,7 @@ export default function DashboardScreen({ navigation }) {
         dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed
       ),
       laterTasks: tasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed),
-      missedTasks: tasks.filter(task => dayjs(task.completionDate).isBefore(dayjs(), 'day') && !task.completed)
+      missedTasks: tasks.filter(task => isTaskMissed(task))
     };
   }, [tasks]);
 

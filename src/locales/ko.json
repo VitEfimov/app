@@ -217,5 +217,11 @@
   "Are you sure you want to clear all your statistics? This cannot be undone.": "모든 통계를 지우시겠습니까? 이 작업은 취소할 수 없습니다.",
   "View Statistics": "통계 보기",
   "Delete completed after": "완료된 작업 삭제",
-  "1 day": "1일"
+  "1 day": "1일",
+  "W1": "W1",
+  "W2": "W2",
+  "W3": "W3",
+  "W4": "W4",
+  "W5": "W5",
+  "W6": "W6"
 }
