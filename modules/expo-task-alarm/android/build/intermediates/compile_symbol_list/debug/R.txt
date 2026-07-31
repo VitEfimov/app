@@ -1,4 +1,7 @@
+int drawable bg_btn_snooze 0x0
+int drawable bg_btn_stop 0x0
 int id alarm_dismiss_button 0x0
+int id alarm_snooze_button 0x0
 int id alarm_task_name 0x0
 int id alarm_title 0x0
 int layout activity_alarm 0x0

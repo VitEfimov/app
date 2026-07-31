@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, ToastAndroid } from 'react-native';
-import { scheduleExactAlarm, cancelAlarm } from '../../modules/expo-task-alarm';
+import { scheduleExactAlarm, cancelAlarm, schedulePomodoroAlarm, cancelPomodoroAlarm } from '../../modules/expo-task-alarm';
 import dayjs from 'dayjs';
 import { DevLogger } from './logger';
 
@@ -287,6 +287,34 @@ export async function configureAndroidNotificationChannels(
     );
 
     throw error;
+  }
+}
+
+export async function configurePomodoroChannel(soundName, isBreak) {
+  if (Platform.OS !== 'android') return null;
+  const baseName = getSoundBasename(soundName);
+  const type = isBreak ? 'break' : 'work';
+  const channelId = `pomodoro_${type}_${baseName}_v1`;
+
+  try {
+    await Notifications.setNotificationChannelAsync(channelId, {
+      name: `Pomodoro ${isBreak ? 'Break' : 'Work'} Alarm`,
+      description: 'Pomodoro timer completion alarm',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: baseName === 'default' || baseName === 'none' ? null : baseName,
+      enableVibrate: true,
+      vibrationPattern: VIBRATION_PRESETS.alarm,
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.ALARM,
+        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+      },
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: true,
+    });
+    return channelId;
+  } catch (error) {
+    console.error('Failed to configure pomodoro channel', error);
+    return null;
   }
 }
 
@@ -710,6 +738,10 @@ export async function cancelNotification(notificationIds) {
           if (Platform.OS === 'android') {
             await cancelAlarm(id.replace('native_alarm_', ''));
           }
+        } else if (typeof id === 'string' && id.startsWith('pomodoro_alarm_')) {
+          if (Platform.OS === 'android') {
+            await cancelPomodoroAlarm(id.replace('pomodoro_alarm_', ''));
+          }
         } else {
           await Notifications.cancelScheduledNotificationAsync(id);
         }
@@ -717,6 +749,8 @@ export async function cancelNotification(notificationIds) {
     }
   }
 }
+
+export { schedulePomodoroAlarm, cancelPomodoroAlarm };
 
 export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, updateTaskAction) {
   for (const task of tasks) {

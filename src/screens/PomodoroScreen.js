@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, AppState, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -14,7 +14,7 @@ import {
   completeBreakInterval,
   togglePomodoroSettings
 } from '../features/pomodoroSlice';
-import { scheduleLocalNotification } from '../utils/notifications';
+import { scheduleLocalNotification, configurePomodoroChannel, schedulePomodoroAlarm, cancelPomodoroAlarm } from '../utils/notifications';
 import { useTranslation } from 'react-i18next';
 
 // Icons
@@ -146,13 +146,14 @@ export default function PomodoroScreen() {
   }, [localIsActive]);
 
   const playAudio = async (soundKey) => {
+    // We remove manual expo-av playback on Android because the native alarm channel plays the sound!
+    if (Platform.OS === 'android') return;
     if (soundKey === 'none') return;
     try {
       const soundModule = SOUND_MAP[soundKey];
       if (soundModule) {
         const { sound } = await Audio.Sound.createAsync(soundModule);
         await sound.playAsync();
-        // optionally unload sound after playing, but expo-av handles it fine for small clips
       }
     } catch (e) {
       console.warn("Failed to play sound", e);
@@ -189,6 +190,24 @@ export default function PomodoroScreen() {
     const endTime = Date.now() + (localTime * 1000);
     targetEndTimeRef.current = endTime;
 
+    // Schedule native alarm
+    const soundKey = localIsBreak ? breakSoundKey : workSoundKey;
+    const channelId = await configurePomodoroChannel(soundKey, localIsBreak);
+    if (channelId) {
+      const title = localIsBreak ? 'Break time is over!' : 'Work session complete!';
+      const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
+      const scheduled = await schedulePomodoroAlarm(
+        'current',
+        title,
+        body,
+        endTime,
+        channelId
+      );
+      if (scheduled) {
+        notificationIdRef.current = 'pomodoro_alarm_current';
+      }
+    }
+
     intervalRef.current = setInterval(() => {
       const remainingMs = targetEndTimeRef.current - Date.now();
       const newTime = Math.round(remainingMs / 1000);
@@ -197,6 +216,10 @@ export default function PomodoroScreen() {
         clearInterval(intervalRef.current);
         setLocalIsActive(false);
         dispatch(pauseTimer());
+        
+        // Clear native alarm id
+        notificationIdRef.current = null;
+        
         handlePeriodEnd();
       } else {
         setLocalTime(newTime);

@@ -65,6 +65,61 @@ class ExpoTaskAlarmModule : Module() {
       return@AsyncFunction true
     }
 
+    AsyncFunction("schedulePomodoroAlarm") { id: String, title: String, body: String, triggerTimeMillis: Long, channelId: String ->
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      
+      val requestCode = id.hashCode()
+      val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+      val receiverIntent = Intent(context, PomodoroAlarmReceiver::class.java).apply {
+          putExtra("id", id)
+          putExtra("title", title)
+          putExtra("body", body)
+          putExtra("channelId", channelId)
+          putExtra("requestCode", requestCode)
+      }
+
+      val pendingIntent = PendingIntent.getBroadcast(
+          context,
+          requestCode,
+          receiverIntent,
+          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      )
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+          alarmManager.setExactAndAllowWhileIdle(
+              AlarmManager.RTC_WAKEUP,
+              triggerTimeMillis,
+              pendingIntent
+          )
+      } else {
+          alarmManager.setExact(
+              AlarmManager.RTC_WAKEUP,
+              triggerTimeMillis,
+              pendingIntent
+          )
+      }
+      return@AsyncFunction true
+    }
+
+    AsyncFunction("cancelPomodoroAlarm") { id: String ->
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      val requestCode = id.hashCode()
+      val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+      val receiverIntent = Intent(context, PomodoroAlarmReceiver::class.java)
+      val pendingIntent = PendingIntent.getBroadcast(
+          context,
+          requestCode,
+          receiverIntent,
+          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      )
+      
+      alarmManager.cancel(pendingIntent)
+      pendingIntent.cancel()
+      return@AsyncFunction true
+    }
+
     AsyncFunction("cancelAlarm") { taskId: String ->
       val context = appContext.reactContext ?: return@AsyncFunction false
       val requestCode = taskId.hashCode()
