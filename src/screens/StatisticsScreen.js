@@ -207,30 +207,44 @@ export default function StatisticsScreen() {
             <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{t('Created')}</Text>
           </View>
         </View>
-        <View style={[styles.chartArea, { backgroundColor: surfaceLighter }]}>
-          {statsData.chartData.map((d, i) => (
-            <View key={i} style={styles.dayCol}>
-              <View style={styles.barsContainer}>
-                <ChartBar value={d.tasksCreated} max={maxTaskValue} color="#666" />
-                <ChartBar value={d.tasksCompleted} max={maxTaskValue} color={colors.primary} />
+        <View style={{ flexDirection: 'row', height: 180 }}>
+          <View style={styles.yAxis}>
+            <Text style={[styles.yAxisLabel, { color: colors.textSecondary }]}>{maxTaskValue}</Text>
+            <Text style={[styles.yAxisLabel, { color: colors.textSecondary }]}>{Math.round(maxTaskValue / 2)}</Text>
+            <Text style={[styles.yAxisLabel, { color: colors.textSecondary }]}>0</Text>
+          </View>
+          <View style={[styles.chartArea, { backgroundColor: surfaceLighter }]}>
+            {statsData.chartData.map((d, i) => (
+              <View key={i} style={styles.dayCol}>
+                <View style={styles.barsContainer}>
+                  <ChartBar value={d.tasksCreated} max={maxTaskValue} color="#666" />
+                  <ChartBar value={d.tasksCompleted} max={maxTaskValue} color={colors.primary} />
+                </View>
+                <Text style={[styles.dayLabel, { color: colors.textSecondary }]} numberOfLines={1}>{d.dayLabel}</Text>
               </View>
-              <Text style={[styles.dayLabel, { color: colors.textSecondary }]} numberOfLines={1}>{d.dayLabel}</Text>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
       </View>
 
       <View style={[styles.chartContainer, { backgroundColor: colors.bgCard }]}>
         <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>{t('Focus Time (Minutes)')}</Text>
-        <View style={[styles.chartArea, { backgroundColor: surfaceLighter }]}>
-          {statsData.chartData.map((d, i) => (
-            <View key={i} style={styles.dayCol}>
-              <View style={styles.barsContainer}>
-                <ChartBar value={d.pomodoroMinutes} max={maxPomodoroValue} color="#ff9800" />
+        <View style={{ flexDirection: 'row', height: 180 }}>
+          <View style={styles.yAxis}>
+            <Text style={[styles.yAxisLabel, { color: colors.textSecondary }]}>{maxPomodoroValue}</Text>
+            <Text style={[styles.yAxisLabel, { color: colors.textSecondary }]}>{Math.round(maxPomodoroValue / 2)}</Text>
+            <Text style={[styles.yAxisLabel, { color: colors.textSecondary }]}>0</Text>
+          </View>
+          <View style={[styles.chartArea, { backgroundColor: surfaceLighter }]}>
+            {statsData.chartData.map((d, i) => (
+              <View key={i} style={styles.dayCol}>
+                <View style={styles.barsContainer}>
+                  <ChartBar value={d.pomodoroMinutes} max={maxPomodoroValue} color="#ff9800" />
+                </View>
+                <Text style={[styles.dayLabel, { color: colors.textSecondary }]} numberOfLines={1}>{d.dayLabel}</Text>
               </View>
-              <Text style={[styles.dayLabel, { color: colors.textSecondary }]} numberOfLines={1}>{d.dayLabel}</Text>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
       </View>
 
@@ -265,7 +279,9 @@ const styles = StyleSheet.create({
   legend: { flexDirection: 'row', gap: 15, marginBottom: 15 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendColor: { width: 12, height: 12, borderRadius: 6 },
-  chartArea: { height: 180, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', padding: 15, borderRadius: 10 },
+  chartArea: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', padding: 15, borderRadius: 10 },
+  yAxis: { justifyContent: 'space-between', paddingVertical: 15, paddingRight: 10, alignItems: 'flex-end', paddingBottom: 35 },
+  yAxisLabel: { fontSize: 10 },
   dayCol: { alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end' },
   barsContainer: { flexDirection: 'row', gap: 2, flex: 1, alignItems: 'flex-end', width: '100%', justifyContent: 'center' },
   barWrapper: { width: 8, height: '100%', justifyContent: 'flex-end' },

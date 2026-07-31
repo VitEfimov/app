@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useTheme } from '../styles/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
@@ -66,16 +66,24 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
 
           if (key === 'delete') {
             return (
-              <TouchableOpacity key={index} style={styles.key} onPress={handleBackspace}>
+              <Pressable 
+                key={index} 
+                style={({ pressed }) => [styles.key, { opacity: pressed ? 0.5 : 1 }]} 
+                onPress={handleBackspace}
+              >
                 <IconBackspace color={colors.textSecondary} />
-              </TouchableOpacity>
+              </Pressable>
             );
           }
 
           return (
-            <TouchableOpacity key={index} style={[styles.key, { backgroundColor: colors.bgCard }]} onPress={() => handlePress(key)}>
+            <Pressable 
+              key={index} 
+              style={({ pressed }) => [styles.key, { backgroundColor: colors.bgCard, opacity: pressed ? 0.5 : 1 }]} 
+              onPress={() => handlePress(key)}
+            >
               <Text style={[styles.keyText, { color: colors.textPrimary }]}>{key}</Text>
-            </TouchableOpacity>
+            </Pressable>
           );
         })}
       </View>

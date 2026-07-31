@@ -141,7 +141,7 @@ export default function PomodoroScreen() {
         dispatch(resetTimer());
       }
     } else {
-      dispatch(completeWorkInterval());
+      dispatch(completeWorkInterval(pomodoro.initialTime));
       playAudio(workSoundKey);
     }
   };
@@ -159,10 +159,10 @@ export default function PomodoroScreen() {
     // This ensures it works even if the app goes to sleep or device locks
     const title = localIsBreak ? 'Break time is over!' : 'Work session complete!';
     const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
-    const triggerDate = new Date(endTime);
+    const seconds = Math.max(1, Math.floor((endTime - Date.now()) / 1000));
     
     import('../utils/notifications').then(({ scheduleLocalNotification }) => {
-      scheduleLocalNotification(title, body, triggerDate).then(id => {
+      scheduleLocalNotification(title, body, seconds).then(id => {
         notificationIdRef.current = id;
       });
     });
