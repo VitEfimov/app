@@ -1695,6 +1695,7 @@ function ClockDial({
   onHourChange,
   onMinuteChange,
   onHourGestureEnd,
+  onToggleAmPm,
 }) {
   const dialRef = useRef(null);
 
@@ -1709,6 +1710,12 @@ function ClockDial({
 
   const lastValue =
     useSharedValue(-1);
+
+  const prevAngle =
+    useSharedValue(-1);
+
+  const accumulatedAngle =
+    useSharedValue(0);
 
   const is24HourSV =
     useSharedValue(is24Hour);
@@ -1905,6 +1912,12 @@ function ClockDial({
             sharedAngle.value =
               angle;
 
+            prevAngle.value =
+              angle;
+            
+            accumulatedAngle.value =
+              angle;
+
             sharedRadius.value =
               isHourMode.value &&
               is24HourSV.value
@@ -1970,6 +1983,24 @@ function ClockDial({
              */
             sharedAngle.value =
               angle;
+            
+            if (prevAngle.value !== -1) {
+              let delta = angle - prevAngle.value;
+              if (delta > 180) delta -= 360;
+              if (delta < -180) delta += 360;
+              
+              const previousAccumulated = accumulatedAngle.value;
+              accumulatedAngle.value += delta;
+              
+              if (isHourMode.value && !is24HourSV.value && onToggleAmPm) {
+                const prevRot = Math.floor(previousAccumulated / 360);
+                const currRot = Math.floor(accumulatedAngle.value / 360);
+                if (prevRot !== currRot) {
+                  runOnJS(onToggleAmPm)();
+                }
+              }
+            }
+            prevAngle.value = angle;
 
             sharedRadius.value =
               isHourMode.value &&
@@ -2475,6 +2506,14 @@ export default function CustomTimePicker({
     useCallback(
       (nextHour) => {
         setHour(nextHour);
+      },
+      []
+    );
+
+  const handleToggleAmPm =
+    useCallback(
+      () => {
+        setIsPM((prev) => !prev);
       },
       []
     );
@@ -3083,6 +3122,9 @@ export default function CustomTimePicker({
                 }
                 onHourGestureEnd={
                   handleHourGestureEnd
+                }
+                onToggleAmPm={
+                  handleToggleAmPm
                 }
               />
             )}

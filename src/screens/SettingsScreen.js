@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask } from '../features/taskSlice';
@@ -90,6 +90,7 @@ export default function SettingsScreen({ navigation }) {
   const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [saveAlertVisible, setSaveAlertVisible] = useState(false);
+  const currentSoundRef = useRef(null);
 
   const languageOptions = [
     { label: 'English', value: 'en' },
@@ -131,6 +132,7 @@ export default function SettingsScreen({ navigation }) {
   ];
 
   const soundOptions = [
+    { label: t('Device Default'), value: 'default' },
     { label: t('Alarm 02'), value: 'alarm_02.mp3' },
     { label: t('Bass Alarm'), value: 'bass_alarm.mp3' },
     { label: t('Bell'), value: 'bell.mp3' },
@@ -175,14 +177,26 @@ export default function SettingsScreen({ navigation }) {
 
   const playSoundPreview = async (soundFilename) => {
     try {
+      if (currentSoundRef.current) {
+        await currentSoundRef.current.stopAsync();
+        await currentSoundRef.current.unloadAsync();
+        currentSoundRef.current = null;
+      }
+      if (soundFilename === 'default') {
+        return; // Don't try to preview system default sound directly via expo-av
+      }
       const asset = SOUND_ASSETS[soundFilename];
       if (asset) {
         const { sound } = await Audio.Sound.createAsync(asset);
+        currentSoundRef.current = sound;
         await sound.playAsync();
         // optionally unload sound after playing
         sound.setOnPlaybackStatusUpdate((status) => {
           if (status.didJustFinish) {
             sound.unloadAsync();
+            if (currentSoundRef.current === sound) {
+              currentSoundRef.current = null;
+            }
           }
         });
       }

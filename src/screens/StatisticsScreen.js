@@ -241,7 +241,7 @@ export default function StatisticsScreen() {
                 <View style={styles.barsContainer}>
                   <ChartBar value={d.pomodoroMinutes} max={maxPomodoroValue} color="#ff9800" />
                 </View>
-                <Text style={[styles.dayLabel, { color: colors.textSecondary }]} numberOfLines={1}>{d.dayLabel}</Text>
+                <Text style={[styles.dayLabel, { color: colors.textSecondary }, d.dayLabel.length > 2 && { transform: [{ rotate: '-90deg' }], width: 50, textAlign: 'center', marginBottom: 15 }]}>{d.dayLabel}</Text>
               </View>
             ))}
           </View>
