@@ -17,12 +17,17 @@ import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
 import CustomDropdown from './CustomDropdown';
 import ConfirmModal from './ConfirmModal';
 import { useTranslation } from 'react-i18next';
-const MemoizedNotesInput = React.memo(({ initialValue, onBlur, placeholder, placeholderTextColor, style }) => {
+
+const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style }, ref) => {
   const [text, setText] = useState(initialValue || '');
 
   useEffect(() => {
     setText(initialValue || '');
   }, [initialValue]);
+
+  React.useImperativeHandle(ref, () => ({
+    getText: () => text
+  }));
 
   return (
     <TextInput
@@ -30,7 +35,6 @@ const MemoizedNotesInput = React.memo(({ initialValue, onBlur, placeholder, plac
       style={style}
       value={text}
       onChangeText={setText}
-      onBlur={() => onBlur(text)}
       placeholder={placeholder}
       placeholderTextColor={placeholderTextColor}
       multiline={true}
@@ -38,7 +42,7 @@ const MemoizedNotesInput = React.memo(({ initialValue, onBlur, placeholder, plac
       textAlignVertical="top"
     />
   );
-});
+}));
 
 const IconClose = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -118,6 +122,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const dispatch = useDispatch();
   const themeState = useSelector(state => state.themeReducer);
   const scrollViewRef = useRef(null);
+  const notesRef = useRef(null);
   const { t, i18n } = useTranslation();
   const [scrollOffset, setScrollOffset] = useState(0);
 
@@ -235,8 +240,9 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const hasUnsavedChanges = () => {
     if (!task) return false;
+    const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
     if (taskName !== task.taskname) return true;
-    if (notes !== (stripHtml(task.description?.text) || '') || noteImage !== (task.description?.img || '')) return true;
+    if (currentNotes !== (stripHtml(task.description?.text) || '') || noteImage !== (task.description?.img || '')) return true;
     if ((selectedTime || '') !== (task.time || '')) return true;
     if (reminder !== (task.reminder || 'None')) return true;
     if (isAlarm !== (task.isAlarm || false)) return true;
@@ -250,10 +256,11 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   };
 
   const handleSave = async () => {
+    const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
     let updates = {};
     if (taskName !== task.taskname) updates.name = taskName;
-    if (notes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) {
-      updates.description = { text: notes, img: noteImage, url: '' };
+    if (currentNotes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) {
+      updates.description = { text: currentNotes, img: noteImage, url: '' };
     }
     if (selectedTime !== (task.time || '')) updates.time = selectedTime;
     if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
@@ -290,7 +297,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     }
 
     if (repeatFrequency !== 'None' && repeatEndDate) {
-      generateRepeatingTasks(task, { name: taskName, descriptionText: notes, priority }, { frequency: repeatFrequency, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate });
+      generateRepeatingTasks(task, { name: taskName, descriptionText: currentNotes, priority }, { frequency: repeatFrequency, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate });
     }
 
     onClose();
@@ -592,8 +599,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             </View>
             <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 100 }]}>
               <MemoizedNotesInput
+                ref={notesRef}
                 initialValue={notes}
-                onBlur={(newText) => setNotes(newText)}
                 placeholder={t("Add extra details or notes...")}
                 placeholderTextColor={colors.textSecondary}
                 style={{ flex: 1, padding: 15, color: colors.textPrimary, fontSize: 15 }}

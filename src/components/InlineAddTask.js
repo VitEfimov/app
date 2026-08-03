@@ -92,7 +92,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     return (
       <TouchableOpacity 
         testID={`inline_add_btn_${sectionId}`}
-        accessible={true} accessibilityRole="button" accessibilityLabel="Create new task"
+        accessible={true} accessibilityRole="button" accessibilityLabel={`Create new task for ${sectionId}`}
         style={[styles.addBtn, { borderBottomColor: colors.borderColor }]} 
         onPress={() => setIsEditing(true)}
       >

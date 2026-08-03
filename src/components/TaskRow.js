@@ -52,7 +52,7 @@ const IconCheckCircle = ({ color }) => (
   </Svg>
 );
 
-const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect }) {
+const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -127,7 +127,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
 
   return (
     <TouchableOpacity
-      testID="task_row"
+      testID={`task_row_${testIDPrefix}${task.taskname || task.name}`}
       accessible={true}
       accessibilityRole="button"
       accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}

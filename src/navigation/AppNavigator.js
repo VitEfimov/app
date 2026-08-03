@@ -96,11 +96,11 @@ function TabNavigator() {
         }
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: t('Dashboard') }} />
-      <Tab.Screen name="Board" component={BoardScreen} options={{ tabBarLabel: t('Board') }} />
-      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: t('Calendar') }} />
-      <Tab.Screen name="Pomodoro" component={PomodoroScreen} options={{ tabBarLabel: t('Pomodoro') }} />
-      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('Settings') }} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: t('Dashboard'), tabBarTestID: 'tab_dashboard' }} />
+      <Tab.Screen name="Board" component={BoardScreen} options={{ tabBarLabel: t('Board'), tabBarTestID: 'tab_board' }} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: t('Calendar'), tabBarTestID: 'tab_calendar' }} />
+      <Tab.Screen name="Pomodoro" component={PomodoroScreen} options={{ tabBarLabel: t('Pomodoro'), tabBarTestID: 'tab_pomodoro' }} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('Settings'), tabBarTestID: 'tab_settings' }} />
       <Tab.Screen name="DevLogs" component={DevLogsScreen} options={{ tabBarLabel: 'Dev Logs', tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Statistics" component={StatisticsScreen} options={{ tabBarLabel: 'Statistics', tabBarItemStyle: { display: 'none' } }} />
     </Tab.Navigator>

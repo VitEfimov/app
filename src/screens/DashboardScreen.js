@@ -138,6 +138,7 @@ export default function DashboardScreen({ navigation }) {
 
   const CategoryCard = ({ title, sub, num, color, sectionId }) => (
     <TouchableOpacity 
+      testID={`dashboard_category_${sectionId || 'all'}`}
       accessible={true} accessibilityRole="button" accessibilityLabel={`${title} category, ${sub}, ${num} tasks`}
       activeOpacity={0.8}
       onPress={() => {

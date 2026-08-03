@@ -333,12 +333,16 @@ export default function PomodoroScreen() {
         {/* Controls */}
         <View style={styles.controls}>
           <TouchableOpacity 
+            testID="play_pause_btn"
+            accessible={true} accessibilityRole="button"
             style={[styles.playPauseBtn, { backgroundColor: timerColor }]}
             onPress={localIsActive ? handlePauseTimer : handleStartTimer}
           >
             {localIsActive ? <IconPause color="#fff" /> : <IconPlayPath color="#fff" />}
           </TouchableOpacity>
           <TouchableOpacity 
+            testID="reset_btn"
+            accessible={true} accessibilityRole="button"
             style={[styles.resetBtn, { backgroundColor: colors.surfaceContainerHigh }]}
             onPress={handleResetTimer}
           >

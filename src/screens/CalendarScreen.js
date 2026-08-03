@@ -326,6 +326,7 @@ export default function CalendarScreen() {
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <View onLayout={handleCalendarLayout}>
         <Calendar
+          testID="task_calendar"
           key={`${colors.bgMain}-${isDark}-${i18n.language}`}
           current={selectedDate}
           onDayPress={(day) => {
@@ -396,6 +397,7 @@ export default function CalendarScreen() {
                 task={item} 
                 hideDate={true} 
                 disableInlineEdit={true} 
+                testIDPrefix="calendar_"
                 onPress={() => handleTaskPress(item)} 
                 isSelectionMode={selectionMode.isActive}
                 isSelected={selectionMode.selectedTaskIds.includes(item.id)}
