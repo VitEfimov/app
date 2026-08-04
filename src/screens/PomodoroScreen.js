@@ -106,11 +106,8 @@ export default function PomodoroScreen() {
   const intervalRef = useRef(null);
   const targetEndTimeRef = useRef(null);
 
-  // Determine sounds
-  const workSoundKey = pomodoro.workSound && pomodoro.workSound !== 'default' && pomodoro.workSound !== 'none' 
-    ? pomodoro.workSound : 'end_sound.ogg';
-  const breakSoundKey = pomodoro.breakSound && pomodoro.breakSound !== 'default' && pomodoro.breakSound !== 'none'
-    ? pomodoro.breakSound : 'start_sound.mp3';
+  const workSoundKey = pomodoro.workSound || 'default';
+  const breakSoundKey = pomodoro.breakSound || 'default';
 
   const appState = useRef(AppState.currentState);
   const notificationIdRef = useRef(null);
@@ -164,8 +161,13 @@ export default function PomodoroScreen() {
     const title = localIsBreak ? 'Break time is over!' : 'Work session complete!';
     const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
 
+    const currentSound = localIsBreak ? breakSoundKey : workSoundKey;
+    const shouldBeSilent = currentSound !== 'default';
+
     import('../utils/notifications').then(({ scheduleLocalNotification }) => {
-      scheduleLocalNotification(title, body, 1);
+      // Pass isSilent=true ONLY if they chose a custom sound or 'none'. 
+      // If 'default', we want the system sound to play normally!
+      scheduleLocalNotification(title, body, 1, shouldBeSilent);
     });
 
     if (localIsBreak) {

@@ -659,37 +659,30 @@ export async function scheduleExactTaskReminder(
 export async function scheduleLocalNotification(
   title,
   body,
-  seconds = 3
+  seconds = 3,
+  isSilent = false
 ) {
   try {
     if (Platform.OS === 'android') {
-      const channelId = 'task_default_system_sound_v11';
+      const channelId = isSilent ? 'task_silent_notification_v1' : 'task_default_system_sound_v11';
 
       await Notifications.setNotificationChannelAsync(channelId, {
-        name: 'Task notifications',
-        description: 'Task notifications with system sound',
-
-        importance:
-          Notifications.AndroidImportance.MAX,
-
-        sound: 'default',
-
-        enableVibrate: true,
-        vibrationPattern:
-          VIBRATION_PRESETS.newTask,
-
-        lockscreenVisibility:
-          Notifications.AndroidNotificationVisibility.PUBLIC,
+        name: isSilent ? 'Silent notifications' : 'Task notifications',
+        description: isSilent ? 'Notifications without sound' : 'Task notifications with system sound',
+        importance: isSilent ? Notifications.AndroidImportance.DEFAULT : Notifications.AndroidImportance.MAX,
+        sound: isSilent ? null : 'default',
+        enableVibrate: !isSilent,
+        vibrationPattern: isSilent ? null : VIBRATION_PRESETS.newTask,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
 
       return await Notifications.scheduleNotificationAsync({
         content: {
           title,
           body,
-          sound: 'default',
+          sound: isSilent ? null : 'default',
 
-          priority:
-            Notifications.AndroidNotificationPriority.MAX,
+          priority: isSilent ? Notifications.AndroidNotificationPriority.DEFAULT : Notifications.AndroidNotificationPriority.MAX,
         },
 
         trigger: {
@@ -704,7 +697,7 @@ export async function scheduleLocalNotification(
       content: {
         title,
         body,
-        sound: 'default',
+        sound: isSilent ? null : 'default',
       },
 
       trigger: {

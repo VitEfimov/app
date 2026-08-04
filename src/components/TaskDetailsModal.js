@@ -222,10 +222,41 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
       const message = `${t('Task')}: ${taskName}\n${t('Due')}: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : t('Not set')}${selectedTime ? ` ${t('at')} ${selectedTime}` : ''}${priorityStr ? `\n${t('Priority')}: ${priorityStr}` : ''}\n\n${notes ? `${t('Notes')}:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `${t('Subtasks')}:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
-      await Share.share({
-        message,
-        title: t('Share Task')
-      });
+      if (noteImage) {
+        // Copy text to clipboard so user can paste it when sharing the image
+        await Clipboard.setStringAsync(message);
+        
+        Alert.alert(
+          t('Sharing with Image'),
+          t('Task text copied to clipboard! You can paste it into your message after selecting where to share the image.'),
+          [
+            {
+              text: t('Continue'),
+              onPress: async () => {
+                try {
+                  const base64Data = noteImage.split(',')[1];
+                  const fileUri = FileSystem.cacheDirectory + 'task-image.jpg';
+                  await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+                    encoding: FileSystem.EncodingType.Base64,
+                  });
+                  
+                  await Sharing.shareAsync(fileUri, {
+                    mimeType: 'image/jpeg',
+                    dialogTitle: t('Share Task')
+                  });
+                } catch (e) {
+                  console.error(e);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        await Share.share({
+          message,
+          title: t('Share Task')
+        });
+      }
     } catch (error) {
       console.error(error.message);
     }
