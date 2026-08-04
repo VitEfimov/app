@@ -93,6 +93,9 @@ export const pomodoroSlice = createSlice({
       const breakTimeInSeconds = action.payload;
       console.log('Setting break time:', action.payload, 'seconds');
       state.pomodoro[0].breakInterval = breakTimeInSeconds;
+      if (state.pomodoro[0].isBreak) {
+        state.pomodoro[0].time = breakTimeInSeconds;
+      }
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
       console.log('Saved Pomodoro state after setBreakInterval:', state.pomodoro);
     },
@@ -116,6 +119,7 @@ export const pomodoroSlice = createSlice({
       console.log('Setting work time:', action.payload, 'seconds');
       state.pomodoro[0].time = workTimeInSeconds;
       state.pomodoro[0].initialTime = workTimeInSeconds;
+      state.pomodoro[0].isBreak = false;
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
       console.log('Saved Pomodoro state after setTime:', state.pomodoro);
     },
