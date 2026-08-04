@@ -361,7 +361,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 0.1,
+      quality: 0.2,
       base64: true,
     });
     
