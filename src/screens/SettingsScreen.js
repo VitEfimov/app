@@ -372,17 +372,21 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
         {/* Automation Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
-        <View style={styles.sectionGroup}>
-          <TouchableOpacity 
-            accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
-            style={[styles.rowItem, { borderBottomWidth: 0 }]} 
-            onPress={() => setAutoManageModalVisible(true)}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
-            <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
-          </TouchableOpacity>
-        </View>
+        {isPremium && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
+            <View style={styles.sectionGroup}>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
+                style={[styles.rowItem, { borderBottomWidth: 0 }]} 
+                onPress={() => setAutoManageModalVisible(true)}
+              >
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
+                <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         {/* Account Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Account')}</Text>
