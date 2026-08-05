@@ -17,6 +17,7 @@ export default function CalendarScreen() {
   const { t, i18n } = useTranslation();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || []);
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
@@ -459,12 +460,14 @@ export default function CalendarScreen() {
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Priority')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
-            setSelectionMode({ isActive: true, selectedTaskIds: [] }); 
-            setSectionOptionsConfig(false); 
-          }}>
-            <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
-          </TouchableOpacity>
+          {isPremium && (
+            <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+              setSelectionMode({ isActive: true, selectedTaskIds: [] }); 
+              setSectionOptionsConfig(false); 
+            }}>
+              <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
+            </TouchableOpacity>
+          )}
           
           <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleCompleteSection(), 400); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>

@@ -54,6 +54,7 @@ export default function DashboardScreen({ navigation }) {
   }, [tasks]);
 
   const progressMode = useSelector(state => state.themeReducer.progressMode) || 'daily';
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   
   const modes = ['daily', 'active', 'weekly', 'lifetime'];
   const handleNextMode = () => {
@@ -85,7 +86,9 @@ export default function DashboardScreen({ navigation }) {
           handleNextMode();
         } else if (Math.abs(gestureState.dx) < 10 && Math.abs(gestureState.dy) < 10) {
           // Tap detected
-          navigation.navigate('Statistics');
+          if (isPremium) {
+            navigation.navigate('Statistics');
+          }
         }
       },
     })

@@ -43,6 +43,7 @@ export default function BoardScreen({ route, navigation }) {
   const boards = useSelector(state => state.userReducer.boards || [{ id: 'main', name: 'Main' }]);
   const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
   const isAuthenticated = useSelector(state => state.userReducer.isAuthenticated);
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
@@ -529,12 +530,14 @@ export default function BoardScreen({ route, navigation }) {
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Priority')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
-            setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
-            setSectionOptionsConfig({ isVisible: false, section: null }); 
-          }}>
-            <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
-          </TouchableOpacity>
+          {isPremium && (
+            <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+              setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
+              setSectionOptionsConfig({ isVisible: false, section: null }); 
+            }}>
+              <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
+            </TouchableOpacity>
+          )}
           
           {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
             <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
