@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
-import axios from 'axios';
+// import axios from 'axios';
 import { clearTasks } from './taskSlice';
 
 const loadThemeFromLocalStorage = () => "light";
@@ -14,6 +14,7 @@ const loadLayoutVersionFromLocalStorage = () => "v1";
 
 const loadBoardsFromLocalStorage = () => [{ id: 'main', name: 'Main' }];
 
+/* --- VERCEL BACKEND THUNKS (COMMENTED OUT FOR LOCAL-ONLY MODE) ---
 export const checkAuth = createAsyncThunk('user/checkAuth', async (_, thunkAPI) => {
     try {
         const response = await axios.get('/api/auth/me', { withCredentials: true });
@@ -94,9 +95,22 @@ export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, 
     }
     return id;
 });
+--- */
+
+export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name }, thunkAPI) => {
+    return { id, name };
+});
+
+export const renameBoardAsync = createAsyncThunk('user/renameBoard', async ({ id, name }, thunkAPI) => {
+    return { id, name };
+});
+
+export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, thunkAPI) => {
+    return id;
+});
 
 const initialState = {
-    isAuthenticated: false,
+    isAuthenticated: true, // DEFAULT TO TRUE FOR OFFLINE MODE
     loading: false,
     error: null,
     theme: loadThemeFromLocalStorage(),
@@ -143,6 +157,7 @@ const userSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
+            /* --- VERCEL BACKEND REDUCERS (COMMENTED OUT) ---
             .addCase(checkAuth.pending, (state) => { state.loading = true; state.error = null; })
             .addCase(checkAuth.fulfilled, (state, action) => {
                 state.loading = false;
@@ -207,9 +222,11 @@ const userSlice = createSlice({
                 state.activeBoardId = 'main';
                 AsyncStorage.removeItem('isGuest');
             })
+            --- */
             .addCase(addBoardAsync.pending, (state, action) => {
                 const { id, name } = action.meta.arg;
                 state.boards.push({ id, name });
+                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
             .addCase(addBoardAsync.fulfilled, (state, action) => {
                 // Already added optimistically
@@ -220,16 +237,19 @@ const userSlice = createSlice({
                 if (state.activeBoardId === id) {
                     state.activeBoardId = 'main';
                 }
+                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
             .addCase(renameBoardAsync.fulfilled, (state, action) => {
                 const board = state.boards.find(b => b.id === action.payload.id);
                 if (board) board.name = action.payload.name;
+                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
             .addCase(deleteBoardAsync.fulfilled, (state, action) => {
                 state.boards = state.boards.filter(b => b.id !== action.payload);
                 if (state.activeBoardId === action.payload) {
                     state.activeBoardId = 'main';
                 }
+                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             });
     }
 });

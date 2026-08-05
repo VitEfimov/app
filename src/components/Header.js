@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { useTheme } from '../styles/ThemeContext';
 import { setThemeMode } from '../features/themeSlice';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 
 // Custom icons
 
@@ -39,7 +40,8 @@ const IconContrast = ({ color }) => (
 export default function Header() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const { colors, mode } = useTheme();
+  const { colors, mode, isDark } = useTheme();
+  const { t } = useTranslation();
   
   const themeReducer = useSelector(state => state.themeReducer || {});
   const userPicture = themeReducer.userPicture;
@@ -50,37 +52,50 @@ export default function Header() {
   const timeRemaining = pomodoroState?.time;
   const isTimeOver = isPomodoroActive && timeRemaining === 0;
 
+  const formatBadgeTime = (timeInSeconds) => {
+    if (typeof timeInSeconds !== 'number') return '00:00';
+    const hrs = Math.floor(timeInSeconds / 3600);
+    const mins = Math.floor((timeInSeconds % 3600) / 60);
+    const secs = timeInSeconds % 60;
+    if (hrs > 0) return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
   const handleToggleTheme = () => {
-    let newTheme = 'light';
-    if (mode === 'light') newTheme = 'dark';
-    else if (mode === 'dark') newTheme = 'contrast';
-    else if (mode === 'contrast') newTheme = 'light';
+    const modes = ['light', 'dark', 'contrast'];
+    let currentIndex = modes.indexOf(mode);
     
-    dispatch(setThemeMode(newTheme));
+    // If currently 'system', jump into the cycle based on current visual state
+    if (currentIndex === -1) {
+      currentIndex = isDark ? 1 : 0; 
+    }
+    
+    const nextIndex = (currentIndex + 1) % modes.length;
+    dispatch(setThemeMode(modes[nextIndex]));
   };
 
   const getThemeIcon = () => {
     if (mode === 'contrast') return <IconContrast color={colors.textPrimary} />;
     if (mode === 'dark') return <IconDarkMode color={colors.textPrimary} />;
+    if (mode === 'system') return isDark ? <IconDarkMode color={colors.textPrimary} /> : <IconLightMode color={colors.textPrimary} />;
     return <IconLightMode color={colors.textPrimary} />;
   };
 
   const HeaderContent = () => (
     <View style={[styles.headerContainer, { backgroundColor: userPicture ? 'rgba(0,0,0,0.5)' : colors.bgHeader }]}>
-      <View /> {/* Empty view to push rightSection to the right */}
-      {/* Right side: Pomodoro, Date, Theme Toggle */}
+      <View />
       <View style={styles.rightSection}>
-        {isPomodoroActive && !isTimeOver && (
+        {(!!isPomodoroActive && !isTimeOver) ? (
           <View style={styles.pomodoroBadge}>
-            <Text style={styles.pomodoroText}>Pomodoro: {timeRemaining}s</Text>
+            <Text style={styles.pomodoroText}>{t('Pomodoro')}: {formatBadgeTime(timeRemaining)}</Text>
           </View>
-        )}
+        ) : null}
         
-        {isTimeOver && (
+        {!!isTimeOver ? (
           <View style={[styles.pomodoroBadge, { backgroundColor: colors.danger }]}>
-            <Text style={[styles.pomodoroText, { color: '#fff' }]}>Time's Up!</Text>
+            <Text style={[styles.pomodoroText, { color: '#fff' }]}>{t("Time's Up!")}</Text>
           </View>
-        )}
+        ) : null}
 
         <Text style={[styles.dateText, { color: colors.textSecondary }]}>
           {dayjs().format('ddd, MMM D')}

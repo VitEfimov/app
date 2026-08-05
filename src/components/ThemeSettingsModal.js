@@ -1,26 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
-import { setSourceColor, setUserPicture, setHeaderBackgroundFit, resetTheme } from '../features/themeSlice';
+import { setSourceColor, resetTheme, setUserPicture, setThemeMode } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
-import ColorPicker, { Panel1, HueSlider } from 'reanimated-color-picker';
+import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getDeviceLanguage } from '../i18n';
 
-const PREDEFINED_COLORS = ['#4caf50', '#2196f3', '#9c27b0', '#ffeb3b', '#e91e63'];
+// const PREDEFINED_COLORS = [
+//   '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
+//   '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50',
+//   '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800',
+//   '#ff5722', '#795548', '#9e9e9e', '#607d8b'
+// ];
+
+const PREDEFINED_COLORS = [
+  '#C62828', // Red
+  '#AD1457', // Pink
+  '#8E24AA', // Purple
+  '#5E35B1', // Deep Purple
+  '#1E88E5', // Blue
+  '#00897B', // Teal
+  '#2E7D32', // Dark Green
+  '#6B8E6B', // Sage
+  '#C0CA33', // Lime
+  '#F9A825', // Yellow
+  '#FB8C00', // Orange
+  '#455A64'  // Slate
+];
 
 export default function ThemeSettingsModal({ isVisible, onClose }) {
   const dispatch = useDispatch();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const { t, i18n } = useTranslation();
   
   const currentSourceColor = useSelector(state => state.themeReducer.sourceColor);
-  const currentFit = useSelector(state => state.themeReducer.headerBackgroundFit) || 'cover';
   const currentUserPicture = useSelector(state => state.themeReducer.userPicture);
+  const currentThemeMode = useSelector(state => state.themeReducer.themeMode);
 
   const [tempColor, setTempColor] = useState(currentSourceColor);
-  const [tempFit, setTempFit] = useState(currentFit);
   const [tempImage, setTempImage] = useState(currentUserPicture);
-  const [isDropdownOpen, setDropdownOpen] = useState(false);
+  const [tempThemeMode, setTempThemeMode] = useState(currentThemeMode || 'system');
+
+  useEffect(() => {
+    if (isVisible) {
+      setTempColor(currentSourceColor);
+      setTempImage(currentUserPicture);
+      setTempThemeMode(currentThemeMode || 'system');
+    }
+  }, [isVisible, currentSourceColor, currentUserPicture, currentThemeMode]);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -41,25 +71,30 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   };
 
   const handleSave = () => {
-    dispatch(setSourceColor(tempColor));
-    dispatch(setHeaderBackgroundFit(tempFit));
+    const finalColor = tempColor.startsWith('#') ? tempColor : `#${tempColor}`;
+    dispatch(setSourceColor(finalColor));
     if (tempImage !== currentUserPicture) {
       dispatch(setUserPicture(tempImage));
+    }
+    if (tempThemeMode !== currentThemeMode) {
+      dispatch(setThemeMode(tempThemeMode));
     }
     onClose();
   };
 
   const handleReset = () => {
     Alert.alert(
-      "Reset Defaults",
-      "Are you sure you want to reset all theme settings to defaults?",
+      t("Reset Defaults"),
+      t("Are you sure you want to reset all theme settings to defaults?"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         { 
-          text: "Reset", 
+          text: t("Reset"), 
           style: "destructive",
           onPress: () => {
             dispatch(resetTheme());
+            AsyncStorage.removeItem('appLanguage');
+            i18n.changeLanguage(getDeviceLanguage());
             onClose();
           }
         }
@@ -74,109 +109,117 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
       swipeDirection={['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
+      onBackButtonPress={onClose}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
-      <View style={styles.modalContent}>
+      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
           <View style={styles.dragHandleContainer}>
-            <View style={styles.dragHandle} />
+            <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           
-          <View style={styles.header}>
-            <Text style={styles.title}>Theme Settings</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeText}>✕</Text>
+          <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Theme Settings')}</Text>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Close theme settings"
+              onPress={onClose} style={styles.closeBtn}
+            >
+              <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.scrollArea}>
-            <Text style={styles.sectionTitle}>Material You Theme</Text>
-            <Text style={styles.subtitle}>
-              Choose a source color and we'll generate a complete, accessible theme palette for you automatically.
-            </Text>
-
-            <View style={styles.colorRow}>
-              {PREDEFINED_COLORS.map((c, i) => (
-                <TouchableOpacity 
-                  key={i} 
-                  style={[styles.colorCircle, { backgroundColor: c }, tempColor === c && styles.selectedColor]} 
-                  onPress={() => setTempColor(c)}
-                />
-              ))}
-            </View>
-
-            <View style={styles.customColorRow}>
-              <Text style={styles.customColorLabel}>Custom Color:</Text>
-              <View style={[styles.customColorPreview, { backgroundColor: tempColor }]} />
-              <TextInput 
-                style={styles.colorInput}
-                value={tempColor}
-                onChangeText={setTempColor}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.colorPickerContainer}>
-              <ColorPicker 
-                style={styles.colorPicker} 
-                value={tempColor || '#4caf50'} 
-                onComplete={({ hex }) => setTempColor(hex)}
-              >
-                <Panel1 style={styles.colorPanel} />
-                <HueSlider style={styles.hueSlider} />
-              </ColorPicker>
-            </View>
-
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Header banner image</Text>
-            <TouchableOpacity style={styles.uploadBox} onPress={handlePickImage}>
-              {tempImage ? (
-                <Text style={styles.uploadText}>Image selected. Tap to change.</Text>
-              ) : (
-                <Text style={styles.uploadText}>📷 Tap to upload (max 1MB)</Text>
-              )}
-            </TouchableOpacity>
-            {tempImage && (
-              <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 5 }}>
-                <Text style={{ color: '#d32f2f', fontSize: 12 }}>Remove Image</Text>
-              </TouchableOpacity>
-            )}
-
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Header Image Fit</Text>
             
-            <TouchableOpacity 
-              style={styles.dropdownToggle} 
-              onPress={() => setDropdownOpen(!isDropdownOpen)}
-            >
-              <Text style={styles.dropdownText}>
-                {tempFit === 'cover' ? 'Cover (Crop to fill)' : 'Contain (Show entire image)'}
-              </Text>
-              <Text>▼</Text>
-            </TouchableOpacity>
-            
-            {isDropdownOpen && (
-              <View style={styles.dropdownMenu}>
-                <TouchableOpacity 
-                  style={styles.dropdownItem} 
-                  onPress={() => { setTempFit('cover'); setDropdownOpen(false); }}
-                >
-                  <Text>Cover (Crop to fill)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.dropdownItem, { borderBottomWidth: 0 }]} 
-                  onPress={() => { setTempFit('contain'); setDropdownOpen(false); }}
-                >
-                  <Text>Contain (Show entire image)</Text>
-                </TouchableOpacity>
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Appearance Mode')}</Text>
+              
+              <View style={styles.themeModeRow}>
+                {[
+                  { label: t('System'), value: 'system' },
+                  { label: t('Light'), value: 'light' },
+                  { label: t('Dark'), value: 'dark' },
+                  { label: t('Contrast'), value: 'contrast' }
+                ].map((modeOption) => (
+                  <TouchableOpacity
+                    key={modeOption.value}
+                    accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${modeOption.label} mode`}
+                    style={[
+                      styles.themeModeBtn, 
+                      { borderColor: colors.borderColor },
+                      tempThemeMode === modeOption.value && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                    onPress={() => setTempThemeMode(modeOption.value)}
+                  >
+                    <Text style={[
+                      styles.themeModeText, 
+                      { color: colors.textPrimary },
+                      tempThemeMode === modeOption.value && { color: colors.textInverse, fontWeight: 'bold' }
+                    ]}>
+                      {modeOption.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
+            </View>
 
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Material You Theme')}</Text>
+              
+              <View style={styles.colorRow}>
+                {PREDEFINED_COLORS.map((c, i) => (
+                  <TouchableOpacity 
+                    key={i} 
+                    accessible={true} accessibilityRole="button" accessibilityLabel={`Select predefined color ${i + 1}`}
+                    style={[styles.colorCircle, { backgroundColor: c }, tempColor === c && styles.selectedColor]} 
+                    onPress={() => setTempColor(c)}
+                  />
+                ))}
+              </View>
+
+              <View style={styles.customColorRow}>
+                <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Accent Color')}</Text>
+                <TextInput 
+                  accessible={true} accessibilityLabel="Custom hex color input"
+                  style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary }]}
+                  value={tempColor}
+                  onChangeText={setTempColor}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Background Picture')}</Text>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Upload background image"
+                style={[styles.uploadBox, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fa' }]} onPress={handlePickImage}
+              >
+                {tempImage ? (
+                  <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('Image selected. Tap to change.')}</Text>
+                ) : (
+                  <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('📷 Tap to upload')}</Text>
+                )}
+              </TouchableOpacity>
+              {tempImage && (
+                <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 10, alignSelf: 'center' }} accessible={true} accessibilityRole="button" accessibilityLabel="Remove background image">
+                  <Text style={{ color: colors.error || '#c62828', fontSize: 13, fontWeight: 'bold' }}>{t('Remove Image')}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={{ height: 20 }} />
           </ScrollView>
 
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-              <Text style={styles.resetText}>Reset Defaults</Text>
+          <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Reset to default theme"
+              style={[styles.resetBtn, { backgroundColor: colors.error || '#c62828' }]} onPress={handleReset}
+            >
+              <Text style={styles.resetText}>{t('Reset Defaults')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.doneBtn, { backgroundColor: colors.primary }]} onPress={handleSave}>
-              <Text style={styles.doneText}>Done</Text>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Save theme"
+              style={[styles.doneBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
+            >
+              <Text style={styles.doneText}>{t('Done')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -192,7 +235,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
@@ -233,25 +275,41 @@ const styles = StyleSheet.create({
   scrollArea: {
     padding: 20,
   },
+  card: {
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+  },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 15,
     color: '#333',
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 15,
+  themeModeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  themeModeBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  themeModeText: {
+    fontSize: 14,
   },
   colorRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 15,
     marginBottom: 20,
+    justifyContent: 'flex-start'
   },
   colorCircle: {
-    width: 45,
-    height: 45,
+    width: 40,
+    height: 40,
     borderRadius: 25,
     borderWidth: 2,
     borderColor: '#333',
@@ -263,85 +321,32 @@ const styles = StyleSheet.create({
   customColorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'space-between'
   },
   customColorLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    marginRight: 15,
-  },
-  customColorPreview: {
-    width: 40,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#333',
     marginRight: 10,
   },
   colorInput: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderRadius: 8,
     fontSize: 14,
-  },
-  colorPickerContainer: {
-    height: 250,
-    marginBottom: 10,
-  },
-  colorPicker: {
-    width: '100%',
-    height: '100%',
-  },
-  colorPanel: {
-    flex: 1,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  hueSlider: {
-    borderRadius: 10,
-    height: 30,
+    maxWidth: 150,
   },
   uploadBox: {
     borderWidth: 1,
-    borderColor: '#ccc',
     borderStyle: 'dashed',
     borderRadius: 10,
-    backgroundColor: '#f9f9fa',
     padding: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 10,
   },
   uploadText: {
-    color: '#666',
     fontSize: 14,
-  },
-  dropdownToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#e6e6ea',
-    padding: 15,
-    borderRadius: 20,
-    marginTop: 5,
-  },
-  dropdownText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  dropdownMenu: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    marginTop: 5,
-    backgroundColor: '#fff',
-  },
-  dropdownItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   footer: {
     flexDirection: 'row',
@@ -361,6 +366,7 @@ const styles = StyleSheet.create({
   resetText: {
     color: '#fff',
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   doneBtn: {
     backgroundColor: '#285da1',
@@ -373,5 +379,6 @@ const styles = StyleSheet.create({
   doneText: {
     color: '#fff',
     fontWeight: 'bold',
+    textAlign: 'center',
   }
 });

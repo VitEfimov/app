@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { themeFromSourceColor, argbFromHex, hexFromArgb } from '@material/material-color-utilities';
+import { useColorScheme } from 'react-native';
 
 const ThemeContext = createContext();
 
@@ -14,6 +15,7 @@ const hexToRgba = (hex, alpha) => {
 
 export const ThemeProvider = ({ children }) => {
   const { sourceColor, themeMode } = useSelector((state) => state.themeReducer || {});
+  const systemColorScheme = useColorScheme();
 
   const theme = useMemo(() => {
     // Default fallback color if none provided
@@ -21,7 +23,12 @@ export const ThemeProvider = ({ children }) => {
     
     const matTheme = themeFromSourceColor(argbFromHex(colorToUse));
     // Determine if we should use dark scheme
-    const isDark = themeMode === 'dark' || themeMode === 'contrast';
+    let isDark = false;
+    if (themeMode === 'system') {
+      isDark = systemColorScheme === 'dark';
+    } else {
+      isDark = themeMode === 'dark' || themeMode === 'contrast';
+    }
     const scheme = isDark ? matTheme.schemes.dark : matTheme.schemes.light;
 
     const primaryHex = hexFromArgb(scheme.primary);
@@ -47,7 +54,7 @@ export const ThemeProvider = ({ children }) => {
       colors.borderColor = primaryHex;
       colors.danger = '#ff3333';
     } else {
-      colors.bgMain = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(12)) : hexFromArgb(matTheme.palettes.primary.tone(95));
+      colors.bgMain = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(16)) : hexFromArgb(matTheme.palettes.neutral.tone(94));
       colors.bgSidebar = hexFromArgb(scheme.surfaceVariant);
       colors.bgCard = hexFromArgb(scheme.surface);
       colors.bgHeader = hexFromArgb(scheme.surface);

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, AppState, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -14,8 +14,8 @@ import {
   completeBreakInterval,
   togglePomodoroSettings
 } from '../features/pomodoroSlice';
-import PomodoroSettingsModal from '../components/PomodoroSettingsModal';
-import { scheduleLocalNotification } from '../utils/notifications';
+import { scheduleLocalNotification, configurePomodoroChannel, schedulePomodoroAlarm, cancelPomodoroAlarm } from '../utils/notifications';
+import { useTranslation } from 'react-i18next';
 
 // Icons
 const IconPlay = ({ color }) => (
@@ -51,16 +51,44 @@ const IconSettings = ({ color }) => (
 );
 
 const SOUND_MAP = {
+  'alarm_02.mp3': require('../../assets/audio/alarm_02.mp3'),
+  'bass_alarm.mp3': require('../../assets/audio/bass_alarm.mp3'),
+  'bell.mp3': require('../../assets/audio/bell.mp3'),
+  'bell01.mp3': require('../../assets/audio/bell01.mp3'),
+  'cellos_pizz.mp3': require('../../assets/audio/cellos_pizz.mp3'),
+  'cellos_pizzdgg.mp3': require('../../assets/audio/cellos_pizzdgg.mp3'),
+  'cellos_pizzedf.mp3': require('../../assets/audio/cellos_pizzedf.mp3'),
+  'cellos_tremolo.mp3': require('../../assets/audio/cellos_tremolo.mp3'),
   'chime.wav': require('../../assets/audio/chime.wav'),
-  'light ping.wav': require('../../assets/audio/light ping.wav'),
+  'fireworks.mp3': require('../../assets/audio/fireworks.mp3'),
+  'keys.mp3': require('../../assets/audio/keys.mp3'),
+  'keys2.mp3': require('../../assets/audio/keys2.mp3'),
+  'koto.mp3': require('../../assets/audio/koto.mp3'),
+  'koto_notification.mp3': require('../../assets/audio/koto_notification.mp3'),
+  'koto_shamisen.mp3': require('../../assets/audio/koto_shamisen.mp3'),
+  'light_ping.mp3': require('../../assets/audio/light_ping.mp3'),
+  'light_scrub.mp3': require('../../assets/audio/light_scrub.mp3'),
+  'low_piano.mp3': require('../../assets/audio/low_piano.mp3'),
+  'marinba.mp3': require('../../assets/audio/marinba.mp3'),
+  'marinbaeefge.mp3': require('../../assets/audio/marinbaeefge.mp3'),
   'notification.wav': require('../../assets/audio/notification.wav'),
-  'end_sound.ogg': require('../../assets/audio/end_sound.ogg'),
-  'start_sound.mp3': require('../../assets/audio/start_sound.mp3')
+  'overdue_nudge.wav': require('../../assets/audio/overdue_nudge.wav'),
+  'shamisen.mp3': require('../../assets/audio/shamisen.mp3'),
+  'viola_solo_pizzicatoegabeb.mp3': require('../../assets/audio/viola_solo_pizzicatoegabeb.mp3'),
+  'viola_solo_pizzicatoegag.mp3': require('../../assets/audio/viola_solo_pizzicatoegag.mp3'),
+  'violin_pizzicatobefe.mp3': require('../../assets/audio/violin_pizzicatobefe.mp3'),
+  'violla_pizzicatoegf.mp3': require('../../assets/audio/violla_pizzicatoegf.mp3'),
+  'vpizzicato.mp3': require('../../assets/audio/vpizzicato.mp3'),
+  'xelod.mp3': require('../../assets/audio/xelod.mp3'),
+  'xelodfs.mp3': require('../../assets/audio/xelodfs.mp3'),
+  'xelof.mp3': require('../../assets/audio/xelof.mp3'),
+  'xylo.mp3': require('../../assets/audio/xylo.mp3'),
 };
 
 export default function PomodoroScreen() {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   useKeepAwake(); // Keep screen awake during pomodoro
 
   const pomodoro = useSelector(state => state.pomodoroReducer.pomodoro[0]);
@@ -78,13 +106,11 @@ export default function PomodoroScreen() {
   const intervalRef = useRef(null);
   const targetEndTimeRef = useRef(null);
 
-  // Determine sounds
-  const workSoundKey = pomodoro.workSound && pomodoro.workSound !== 'default' && pomodoro.workSound !== 'none' 
-    ? pomodoro.workSound : 'end_sound.ogg';
-  const breakSoundKey = pomodoro.breakSound && pomodoro.breakSound !== 'default' && pomodoro.breakSound !== 'none'
-    ? pomodoro.breakSound : 'start_sound.mp3';
+  const workSoundKey = pomodoro.workSound || 'default';
+  const breakSoundKey = pomodoro.breakSound || 'default';
 
   const appState = useRef(AppState.currentState);
+  const notificationIdRef = useRef(null);
 
   useEffect(() => {
     setLocalTime(pomodoro.time);
@@ -104,7 +130,6 @@ export default function PomodoroScreen() {
           if (newTime <= 0) {
             handlePauseTimer();
             handlePeriodEnd();
-            setLocalTime(0);
           } else {
             setLocalTime(newTime);
           }
@@ -118,13 +143,14 @@ export default function PomodoroScreen() {
   }, [localIsActive]);
 
   const playAudio = async (soundKey) => {
+    // We remove manual expo-av playback on Android because the native alarm channel plays the sound!
+    if (Platform.OS === 'android') return;
     if (soundKey === 'none') return;
     try {
       const soundModule = SOUND_MAP[soundKey];
       if (soundModule) {
         const { sound } = await Audio.Sound.createAsync(soundModule);
         await sound.playAsync();
-        // optionally unload sound after playing, but expo-av handles it fine for small clips
       }
     } catch (e) {
       console.warn("Failed to play sound", e);
@@ -132,44 +158,75 @@ export default function PomodoroScreen() {
   };
 
   const handlePeriodEnd = () => {
+    const title = localIsBreak ? 'Break time is over!' : 'Work session complete!';
+    const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
+
+    const currentSound = localIsBreak ? breakSoundKey : workSoundKey;
+    const shouldBeSilent = currentSound !== 'default';
+
+    import('../utils/notifications').then(({ scheduleLocalNotification }) => {
+      // Pass isSilent=true ONLY if they chose a custom sound or 'none'. 
+      // If 'default', we want the system sound to play normally!
+      scheduleLocalNotification(title, body, 1, shouldBeSilent);
+    });
+
     if (localIsBreak) {
       dispatch(completeBreakInterval());
       playAudio(breakSoundKey);
-      scheduleLocalNotification('Break time is over!', 'Time to get back to work.', null);
 
       if (localCompletedIntervals + 1 >= staticIntervalCountRef.current) {
         dispatch(resetTimer());
       }
     } else {
-      dispatch(completeWorkInterval());
+      dispatch(completeWorkInterval(pomodoro.initialTime));
       playAudio(workSoundKey);
-      scheduleLocalNotification('Work session complete!', 'Take a short break.', null);
     }
   };
 
-  const handleStartTimer = () => {
+  const handleStartTimer = async () => {
     if (localIsActive) return;
     
     setLocalIsActive(true);
     dispatch(startTimer());
     
-    targetEndTimeRef.current = Date.now() + (localTime * 1000);
+    const endTime = Date.now() + (localTime * 1000);
+    targetEndTimeRef.current = endTime;
+
+    // Schedule native alarm
+    const soundKey = localIsBreak ? breakSoundKey : workSoundKey;
+    const channelId = await configurePomodoroChannel(soundKey, localIsBreak);
+    if (channelId) {
+      const title = localIsBreak ? 'Break time is over!' : 'Work session complete!';
+      const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
+      const scheduled = await schedulePomodoroAlarm(
+        'current',
+        title,
+        body,
+        endTime,
+        channelId
+      );
+      if (scheduled) {
+        notificationIdRef.current = 'pomodoro_alarm_current';
+      }
+    }
 
     intervalRef.current = setInterval(() => {
-      setLocalTime(prevTime => {
-        const remainingMs = targetEndTimeRef.current - Date.now();
-        const newTime = Math.round(remainingMs / 1000);
+      const remainingMs = targetEndTimeRef.current - Date.now();
+      const newTime = Math.round(remainingMs / 1000);
 
-        if (newTime <= 0) {
-          clearInterval(intervalRef.current);
-          setLocalIsActive(false);
-          dispatch(pauseTimer());
-          handlePeriodEnd();
-          return 0;
-        }
+      if (newTime <= 0) {
+        clearInterval(intervalRef.current);
+        setLocalIsActive(false);
+        dispatch(pauseTimer());
+        
+        // Clear native alarm id
+        notificationIdRef.current = null;
+        
+        handlePeriodEnd();
+      } else {
+        setLocalTime(newTime);
         dispatch(updateTime(newTime));
-        return newTime;
-      });
+      }
     }, 1000);
   };
 
@@ -178,6 +235,13 @@ export default function PomodoroScreen() {
     setLocalIsActive(false);
     targetEndTimeRef.current = null;
     dispatch(pauseTimer());
+    
+    import('../utils/notifications').then(({ cancelNotification }) => {
+      if (notificationIdRef.current) {
+        cancelNotification(notificationIdRef.current);
+        notificationIdRef.current = null;
+      }
+    });
   };
 
   const handleResetTimer = () => {
@@ -187,12 +251,21 @@ export default function PomodoroScreen() {
     setLocalCompletedIntervals(0);
     targetEndTimeRef.current = null;
     dispatch(resetTimer());
+
+    import('../utils/notifications').then(({ cancelNotification }) => {
+      if (notificationIdRef.current) {
+        cancelNotification(notificationIdRef.current);
+        notificationIdRef.current = null;
+      }
+    });
   };
 
   const formatTime = (timeInSeconds) => {
-    const minutes = Math.floor(timeInSeconds / 60);
+    const hours = Math.floor(timeInSeconds / 3600);
+    const minutes = Math.floor((timeInSeconds % 3600) / 60);
     const seconds = timeInSeconds % 60;
     return {
+      hrs: hours > 0 ? String(hours) : null,
       min: String(minutes).padStart(2, '0'),
       sec: String(seconds).padStart(2, '0')
     };
@@ -203,22 +276,22 @@ export default function PomodoroScreen() {
   const strokeDashoffset = circumference - (circumference * currentFill) / 100;
   
   const intervalCount = staticIntervalCountRef.current;
-  const timerColor = localIsBreak ? '#ff9800' : colors.primary;
+  const timerColor = colors.primary;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>Pomodoro</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Stay focused, take breaks</Text>
+        <View style={{ flex: 1, marginRight: 10 }}>
+          <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Pomodoro')}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('Stay focused, take breaks')}</Text>
         </View>
         <TouchableOpacity 
           style={[styles.settingsBtn, { backgroundColor: colors.surfaceContainer }]}
           onPress={() => dispatch(togglePomodoroSettings(true))}
         >
           <IconSettings color={colors.textPrimary} />
-          <Text style={[styles.settingsText, { color: colors.textPrimary }]}>Settings</Text>
+          <Text style={[styles.settingsText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -226,17 +299,17 @@ export default function PomodoroScreen() {
         
         {/* Work / Break Toggle */}
         <View style={styles.toggleContainer}>
-          <View style={[styles.toggleBtn, !localIsBreak && [styles.toggleBtnActive, { backgroundColor: colors.primary }]]}>
-            <Text style={[styles.toggleText, !localIsBreak && { color: colors.textInverse }]}>Work Time</Text>
+          <View style={[styles.toggleBtn, !localIsBreak ? styles.toggleBtnActive : null]}>
+            <Text style={[styles.toggleText, !localIsBreak && { color: colors.primary }]}>{t('Work Time')}</Text>
           </View>
-          <View style={[styles.toggleBtn, localIsBreak && [styles.toggleBtnActive, { backgroundColor: '#ff9800' }]]}>
-            <Text style={[styles.toggleText, localIsBreak && { color: '#fff' }]}>Break Time</Text>
+          <View style={[styles.toggleBtn, localIsBreak ? styles.toggleBtnActive : null]}>
+            <Text style={[styles.toggleText, localIsBreak && { color: colors.primary }]}>{t('Break Time')}</Text>
           </View>
         </View>
 
         {/* Circular Timer */}
         <View style={styles.circleTimer}>
-          <Svg viewBox="0 0 100 100" width="250" height="250">
+          <Svg viewBox="0 0 100 100" width="220" height="220">
             <Circle cx="50" cy="50" r="45" stroke={colors.surfaceContainerHigh} strokeWidth="5" fill="none" />
             <Circle 
               cx="50" cy="50" r="45" 
@@ -250,11 +323,11 @@ export default function PomodoroScreen() {
             />
           </Svg>
           <View style={styles.circleTextContainer}>
-            <Text style={[styles.timeText, { color: colors.textPrimary }]}>
-              {formatTime(localTime).min}:{formatTime(localTime).sec}
+            <Text style={[styles.timeText, { color: colors.textPrimary }, formatTime(localTime).hrs && { fontSize: 48 }]}>
+              {formatTime(localTime).hrs ? `${formatTime(localTime).hrs}:` : ''}{formatTime(localTime).min}:{formatTime(localTime).sec}
             </Text>
             <Text style={[styles.sessionLabel, { color: colors.textSecondary }]}>
-              {localIsBreak ? 'Break session' : 'Work session'}
+              {localIsBreak ? t('Break session') : t('Work session')}
             </Text>
           </View>
         </View>
@@ -262,12 +335,16 @@ export default function PomodoroScreen() {
         {/* Controls */}
         <View style={styles.controls}>
           <TouchableOpacity 
+            testID="play_pause_btn"
+            accessible={true} accessibilityRole="button"
             style={[styles.playPauseBtn, { backgroundColor: timerColor }]}
             onPress={localIsActive ? handlePauseTimer : handleStartTimer}
           >
             {localIsActive ? <IconPause color="#fff" /> : <IconPlayPath color="#fff" />}
           </TouchableOpacity>
           <TouchableOpacity 
+            testID="reset_btn"
+            accessible={true} accessibilityRole="button"
             style={[styles.resetBtn, { backgroundColor: colors.surfaceContainerHigh }]}
             onPress={handleResetTimer}
           >
@@ -288,13 +365,11 @@ export default function PomodoroScreen() {
             })}
           </View>
           <Text style={[styles.intervalsText, { color: colors.textSecondary }]}>
-            {Math.min(localCompletedIntervals + 1, intervalCount)} / {intervalCount} sessions completed
+            {Math.min(localCompletedIntervals + 1, intervalCount)} / {intervalCount} {t('sessions completed')}
           </Text>
         </View>
 
       </View>
-      
-      <PomodoroSettingsModal />
     </View>
   );
 }
@@ -308,7 +383,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 15,
   },
   title: {
     fontSize: 28,
@@ -321,10 +396,11 @@ const styles = StyleSheet.create({
   settingsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderRadius: 8,
-    gap: 5,
+    gap: 4,
+    flexShrink: 1,
   },
   settingsText: {
     fontSize: 14,
@@ -332,7 +408,7 @@ const styles = StyleSheet.create({
   },
   timerCard: {
     alignItems: 'center',
-    padding: 30,
+    padding: 20,
     borderRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -345,7 +421,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.05)',
     borderRadius: 25,
     padding: 5,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   toggleBtn: {
     paddingHorizontal: 20,
@@ -353,11 +429,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   toggleBtnActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'transparent', // removed background to fix android border bug
   },
   toggleText: {
     fontWeight: 'bold',
@@ -386,13 +458,13 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 25,
     gap: 20,
   },
   playPauseBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -402,14 +474,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   resetBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dotsContainer: {
-    marginTop: 40,
+    marginTop: 25,
     alignItems: 'center',
   },
   dots: {

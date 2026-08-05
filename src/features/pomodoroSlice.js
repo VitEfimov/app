@@ -29,7 +29,16 @@ export const pomodoroSlice = createSlice({
   initialState,
   reducers: {
     hydratePomodoroState: (state, action) => {
-      state.pomodoro = action.payload;
+      const payload = action.payload;
+      if (payload && payload[0]) {
+        if (payload[0].breakInterval === undefined) {
+          payload[0].breakInterval = 10 * 60; // default to 10 minutes
+        }
+        if (payload[0].isBreak && !payload[0].time) {
+          payload[0].time = payload[0].breakInterval;
+        }
+      }
+      state.pomodoro = payload;
     },
     startTimer: (state) => {
       state.pomodoro[0].isActive = true;
@@ -84,6 +93,9 @@ export const pomodoroSlice = createSlice({
       const breakTimeInSeconds = action.payload;
       console.log('Setting break time:', action.payload, 'seconds');
       state.pomodoro[0].breakInterval = breakTimeInSeconds;
+      if (state.pomodoro[0].isBreak) {
+        state.pomodoro[0].time = breakTimeInSeconds;
+      }
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
       console.log('Saved Pomodoro state after setBreakInterval:', state.pomodoro);
     },
@@ -107,6 +119,7 @@ export const pomodoroSlice = createSlice({
       console.log('Setting work time:', action.payload, 'seconds');
       state.pomodoro[0].time = workTimeInSeconds;
       state.pomodoro[0].initialTime = workTimeInSeconds;
+      state.pomodoro[0].isBreak = false;
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
       console.log('Saved Pomodoro state after setTime:', state.pomodoro);
     },

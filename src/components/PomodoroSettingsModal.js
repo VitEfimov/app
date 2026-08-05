@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Modal as RNModal } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
 import { togglePomodoroSettings, setTime, setBreakInterval, setIntervalCount, setWorkSound, setBreakSound } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path } from 'react-native-svg';
+import CustomDropdown from './CustomDropdown';
+import { useTranslation } from 'react-i18next';
 
 const IconClose = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -12,31 +14,73 @@ const IconClose = ({ color }) => (
   </Svg>
 );
 
+
+
 const predefinedSounds = [
   { label: 'Default', value: 'default' },
   { label: 'None', value: 'none' },
+  { label: 'Alarm 02', value: 'alarm_02.mp3' },
+  { label: 'Bass Alarm', value: 'bass_alarm.mp3' },
+  { label: 'Bell', value: 'bell.mp3' },
+  { label: 'Bell 01', value: 'bell01.mp3' },
+  { label: 'Oak (Cello)', value: 'cellos_pizz.mp3' },
+  { label: 'Summit (Cello)', value: 'cellos_pizzdgg.mp3' },
+  { label: 'Timber (Cello)', value: 'cellos_pizzedf.mp3' },
+  { label: 'Suspense (Cello)', value: 'cellos_tremolo.mp3' },
   { label: 'Chime', value: 'chime.wav' },
-  { label: 'Light', value: 'light ping.wav' },
+  { label: 'Fireworks', value: 'fireworks.mp3' },
+  { label: 'Keystone', value: 'keys.mp3' },
+  { label: 'Keystone Soft', value: 'keys2.mp3' },
+  { label: 'Koto', value: 'koto.mp3' },
+  { label: 'Zen (Koto)', value: 'koto_notification.mp3' },
+  { label: 'Koto Shamisen', value: 'koto_shamisen.mp3' },
+  { label: 'Light Ping', value: 'light_ping.mp3' },
+  { label: 'Brush', value: 'light_scrub.mp3' },
+  { label: 'Nocturne', value: 'low_piano.mp3' },
+  { label: 'Amber (Marimba)', value: 'marinba.mp3' },
+  { label: 'Aurora (Marimba)', value: 'marinbaeefge.mp3' },
   { label: 'Notification', value: 'notification.wav' },
+  { label: 'Overdue Nudge', value: 'overdue_nudge.wav' },
+  { label: 'Shamisen', value: 'shamisen.mp3' },
+  { label: 'Harmony (Viola)', value: 'viola_solo_pizzicatoegabeb.mp3' },
+  { label: 'Velvet (Viola)', value: 'viola_solo_pizzicatoegag.mp3' },
+  { label: 'Spark (Violin)', value: 'violin_pizzicatobefe.mp3' },
+  { label: 'Whisper (Viola)', value: 'violla_pizzicatoegf.mp3' },
+  { label: 'Pluck', value: 'vpizzicato.mp3' },
+  { label: 'Pebble (Xylo)', value: 'xelod.mp3' },
+  { label: 'Cascade (Xylo)', value: 'xelodfs.mp3' },
+  { label: 'Echo (Xylo)', value: 'xelof.mp3' },
+  { label: 'Crystal (Xylo)', value: 'xylo.mp3' },
 ];
 
 export default function PomodoroSettingsModal() {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   
   const { isSettingsOpen, pomodoro } = useSelector(state => state.pomodoroReducer);
   const currentPomodoro = pomodoro[0] || {};
 
+  const [workHrs, setWorkHrs] = useState('0');
   const [workMin, setWorkMin] = useState('25');
+  const [workSec, setWorkSec] = useState('0');
+  const [breakHrs, setBreakHrs] = useState('0');
   const [breakMin, setBreakMin] = useState('5');
+  const [breakSec, setBreakSec] = useState('0');
   const [sessions, setSessions] = useState('5');
   const [workSound, setWorkSoundState] = useState('default');
-  const [breakSound, setBreakSoundState] = useState('default');
+  const [breakSound, setBreakSoundState] = useState('none');
+
+  const localizedSounds = predefinedSounds.map(s => ({ ...s, label: t(s.label) }));
 
   useEffect(() => {
     if (isSettingsOpen) {
-      setWorkMin(String(Math.floor((currentPomodoro.initialTime || 1500) / 60)));
-      setBreakMin(String(Math.floor((currentPomodoro.breakInterval || 300) / 60)));
+      setWorkHrs(String(Math.floor((currentPomodoro.initialTime || 1500) / 3600)));
+      setWorkMin(String(Math.floor(((currentPomodoro.initialTime || 1500) % 3600) / 60)));
+      setWorkSec(String((currentPomodoro.initialTime || 1500) % 60));
+      setBreakHrs(String(Math.floor((currentPomodoro.breakInterval || 300) / 3600)));
+      setBreakMin(String(Math.floor(((currentPomodoro.breakInterval || 300) % 3600) / 60)));
+      setBreakSec(String((currentPomodoro.breakInterval || 300) % 60));
       setSessions(String(typeof currentPomodoro.intervalCount === 'object' ? currentPomodoro.intervalCount.count : 5));
       setWorkSoundState(currentPomodoro.workSound || 'default');
       setBreakSoundState(currentPomodoro.breakSound || 'default');
@@ -44,12 +88,22 @@ export default function PomodoroSettingsModal() {
   }, [isSettingsOpen, currentPomodoro]);
 
   const handleSave = () => {
-    const wMin = parseInt(workMin) || 25;
-    const bMin = parseInt(breakMin) || 5;
+    const wHrs = parseInt(workHrs) || 0;
+    const wMin = parseInt(workMin) || 0;
+    const wSec = parseInt(workSec) || 0;
+    const bHrs = parseInt(breakHrs) || 0;
+    const bMin = parseInt(breakMin) || 0;
+    const bSec = parseInt(breakSec) || 0;
     const sCount = parseInt(sessions) || 5;
 
-    dispatch(setTime(wMin * 60));
-    dispatch(setBreakInterval(bMin * 60));
+    let workTime = wHrs * 3600 + wMin * 60 + wSec;
+    if (workTime === 0) workTime = 25 * 60;
+
+    let breakTime = bHrs * 3600 + bMin * 60 + bSec;
+    if (breakTime === 0) breakTime = 5 * 60;
+
+    dispatch(setTime(workTime));
+    dispatch(setBreakInterval(breakTime));
     dispatch(setIntervalCount(Math.min(sCount, 10))); // Max 10 sessions
     dispatch(setWorkSound(workSound));
     dispatch(setBreakSound(breakSound));
@@ -57,31 +111,16 @@ export default function PomodoroSettingsModal() {
     dispatch(togglePomodoroSettings(false));
   };
 
-  const SoundPicker = ({ label, selectedValue, onSelect }) => (
-    <View style={styles.settingRow}>
-      <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{label}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.soundScroll}>
-        {predefinedSounds.map((sound) => (
-          <TouchableOpacity
-            key={sound.value}
-            style={[
-              styles.soundChip, 
-              { borderColor: colors.borderColor },
-              selectedValue === sound.value && { backgroundColor: colors.primary, borderColor: colors.primary }
-            ]}
-            onPress={() => onSelect(sound.value)}
-          >
-            <Text style={[
-              styles.soundChipText,
-              { color: selectedValue === sound.value ? colors.textInverse : colors.textPrimary }
-            ]}>
-              {sound.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
+  const handleResetToDefault = () => {
+    dispatch(setTime(25 * 60));
+    dispatch(setBreakInterval(5 * 60));
+    dispatch(setIntervalCount(5));
+    dispatch(setWorkSound('default'));
+    dispatch(setBreakSound('default'));
+    dispatch(togglePomodoroSettings(false));
+  };
+
+
 
   return (
     <Modal
@@ -89,6 +128,7 @@ export default function PomodoroSettingsModal() {
       onSwipeComplete={() => dispatch(togglePomodoroSettings(false))}
       swipeDirection={['down']}
       onBackdropPress={() => dispatch(togglePomodoroSettings(false))}
+      onBackButtonPress={() => dispatch(togglePomodoroSettings(false))}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <KeyboardAvoidingView 
@@ -99,36 +139,84 @@ export default function PomodoroSettingsModal() {
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>Pomodoro Settings</Text>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Pomodoro Settings')}</Text>
             <TouchableOpacity onPress={() => dispatch(togglePomodoroSettings(false))}>
               <IconClose color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Work duration (min)</Text>
-            <TextInput
-              style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
-              value={workMin}
-              onChangeText={setWorkMin}
-              keyboardType="numeric"
-              maxLength={3}
-            />
+          <View style={[styles.settingRow, { flexDirection: 'column', alignItems: 'center', rowGap: 15 }]}>
+            <Text style={[styles.settingLabel, { color: colors.textPrimary, alignSelf: 'flex-start' }]}>{t('Work duration')}</Text>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={workHrs}
+                onChangeText={setWorkHrs}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="Hrs"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={workMin}
+                onChangeText={setWorkMin}
+                keyboardType="numeric"
+                maxLength={3}
+                placeholder="Min"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={workSec}
+                onChangeText={setWorkSec}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="Sec"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+          </View>
+
+          <View style={[styles.settingRow, { flexDirection: 'column', alignItems: 'center', rowGap: 15 }]}>
+            <Text style={[styles.settingLabel, { color: colors.textPrimary, alignSelf: 'flex-start' }]}>{t('Break duration')}</Text>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={breakHrs}
+                onChangeText={setBreakHrs}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="Hrs"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={breakMin}
+                onChangeText={setBreakMin}
+                keyboardType="numeric"
+                maxLength={3}
+                placeholder="Min"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                value={breakSec}
+                onChangeText={setBreakSec}
+                keyboardType="numeric"
+                maxLength={2}
+                placeholder="Sec"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
           </View>
 
           <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Break duration (min)</Text>
-            <TextInput
-              style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
-              value={breakMin}
-              onChangeText={setBreakMin}
-              keyboardType="numeric"
-              maxLength={3}
-            />
-          </View>
-
-          <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Sessions (max 10)</Text>
+            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Sessions (max 10)')}</Text>
             <TextInput
               style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
               value={sessions}
@@ -138,14 +226,35 @@ export default function PomodoroSettingsModal() {
             />
           </View>
 
-          <SoundPicker label="Work complete sound" selectedValue={workSound} onSelect={setWorkSoundState} />
-          <SoundPicker label="Break complete sound" selectedValue={breakSound} onSelect={setBreakSoundState} />
+          <CustomDropdown 
+            label={t("Work complete sound")} 
+            value={workSound} 
+            options={localizedSounds} 
+            onSelect={setWorkSoundState} 
+            colors={colors} 
+            layout="horizontal" 
+          />
+          <CustomDropdown 
+            label={t("Break complete sound")} 
+            value={breakSound} 
+            options={localizedSounds} 
+            onSelect={setBreakSoundState} 
+            colors={colors} 
+            layout="horizontal" 
+          />
 
           <TouchableOpacity 
             style={[styles.saveBtn, { backgroundColor: colors.primary }]}
             onPress={handleSave}
           >
-            <Text style={[styles.saveBtnText, { color: colors.textInverse }]}>Save Settings</Text>
+            <Text style={[styles.saveBtnText, { color: colors.textInverse }]}>{t('Save Settings')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.saveBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderColor, marginTop: 10 }]}
+            onPress={handleResetToDefault}
+          >
+            <Text style={[styles.saveBtnText, { color: colors.textPrimary }]}>{t('Reset to Default')}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -195,35 +304,30 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
+    flexWrap: 'wrap',
+    rowGap: 10,
   },
   settingLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
+    flex: 1,
+    marginRight: 10,
+    minWidth: '50%',
   },
   input: {
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
-    width: 100,
+    width: 70,
+    textAlign: 'center',
   },
-  soundScroll: {
-    flexDirection: 'row',
-  },
-  soundChip: {
-    borderWidth: 1,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  soundChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
+
   saveBtn: {
     paddingVertical: 15,
     borderRadius: 12,
@@ -233,5 +337,6 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 16,
     fontWeight: 'bold',
+    textAlign: 'center',
   }
 });

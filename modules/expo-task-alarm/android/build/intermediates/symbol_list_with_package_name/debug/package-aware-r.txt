@@ -1,0 +1,8 @@
+expo.modules.taskalarm
+drawable bg_btn_snooze
+drawable bg_btn_stop
+id alarm_dismiss_button
+id alarm_snooze_button
+id alarm_task_name
+id alarm_title
+layout activity_alarm

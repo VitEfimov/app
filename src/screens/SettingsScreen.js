@@ -1,11 +1,51 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { clearTasks } from '../features/taskSlice';
-import { setTaskNameWrap, setFontSize } from '../features/themeSlice';
+import { clearTasks, updateTask } from '../features/taskSlice';
+import { rescheduleAllActiveTasks } from '../utils/notifications';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled } from '../features/themeSlice';
+import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
+import AutoManageSettings from '../components/AutoManageSettings';
+import ConfirmModal from '../components/ConfirmModal';
+import { Audio } from 'expo-av';
+
+const SOUND_ASSETS = {
+  'alarm_02.mp3': require('../../assets/audio/alarm_02.mp3'),
+  'bass_alarm.mp3': require('../../assets/audio/bass_alarm.mp3'),
+  'bell.mp3': require('../../assets/audio/bell.mp3'),
+  'bell01.mp3': require('../../assets/audio/bell01.mp3'),
+  'cellos_pizz.mp3': require('../../assets/audio/cellos_pizz.mp3'),
+  'cellos_pizzdgg.mp3': require('../../assets/audio/cellos_pizzdgg.mp3'),
+  'cellos_pizzedf.mp3': require('../../assets/audio/cellos_pizzedf.mp3'),
+  'cellos_tremolo.mp3': require('../../assets/audio/cellos_tremolo.mp3'),
+  'chime.wav': require('../../assets/audio/chime.wav'),
+  'fireworks.mp3': require('../../assets/audio/fireworks.mp3'),
+  'keys.mp3': require('../../assets/audio/keys.mp3'),
+  'keys2.mp3': require('../../assets/audio/keys2.mp3'),
+  'koto.mp3': require('../../assets/audio/koto.mp3'),
+  'koto_notification.mp3': require('../../assets/audio/koto_notification.mp3'),
+  'koto_shamisen.mp3': require('../../assets/audio/koto_shamisen.mp3'),
+  'light_ping.mp3': require('../../assets/audio/light_ping.mp3'),
+  'light_scrub.mp3': require('../../assets/audio/light_scrub.mp3'),
+  'low_piano.mp3': require('../../assets/audio/low_piano.mp3'),
+  'marinba.mp3': require('../../assets/audio/marinba.mp3'),
+  'marinbaeefge.mp3': require('../../assets/audio/marinbaeefge.mp3'),
+  'notification.wav': require('../../assets/audio/notification.wav'),
+  'overdue_nudge.wav': require('../../assets/audio/overdue_nudge.wav'),
+  'shamisen.mp3': require('../../assets/audio/shamisen.mp3'),
+  'viola_solo_pizzicatoegabeb.mp3': require('../../assets/audio/viola_solo_pizzicatoegabeb.mp3'),
+  'viola_solo_pizzicatoegag.mp3': require('../../assets/audio/viola_solo_pizzicatoegag.mp3'),
+  'violin_pizzicatobefe.mp3': require('../../assets/audio/violin_pizzicatobefe.mp3'),
+  'violla_pizzicatoegf.mp3': require('../../assets/audio/violla_pizzicatoegf.mp3'),
+  'vpizzicato.mp3': require('../../assets/audio/vpizzicato.mp3'),
+  'xelod.mp3': require('../../assets/audio/xelod.mp3'),
+  'xelodfs.mp3': require('../../assets/audio/xelodfs.mp3'),
+  'xelof.mp3': require('../../assets/audio/xelof.mp3'),
+  'xylo.mp3': require('../../assets/audio/xylo.mp3'),
+};
 
 const IconUser = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill={color}>
@@ -21,30 +61,171 @@ const IconSave = ({ color }) => (
   </Svg>
 );
 
-export default function SettingsScreen() {
+import CustomDropdown from '../components/CustomDropdown';
+import PromptModal from '../components/PromptModal';
+import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { t, i18n } = useTranslation();
   
   const theme = useSelector(state => state.themeReducer);
+  const tasks = useSelector(state => state.taskReducer.tasks);
+  
   const taskNameWrap = theme.taskNameWrap || 'wrap';
   const fontSize = theme.fontSize || 'normal';
+  const progressMode = theme.progressMode || 'daily';
+  const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
+  const alarmSound = theme.alarmSound || 'bass_alarm.mp3';
+  const notificationSound = theme.notificationSound || 'notification.wav';
+  const taskCompleteSound = theme.taskCompleteSound || 'notification.wav';
+  const vibrationEnabled = theme.vibrationEnabled !== undefined ? theme.vibrationEnabled : true;
+  const {
+    appPin,
+  } = theme;
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
-  const [wrapDropdownOpen, setWrapDropdownOpen] = useState(false);
-  const [fontDropdownOpen, setFontDropdownOpen] = useState(false);
+  const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
+  const [pinPromptVisible, setPinPromptVisible] = useState(false);
+  const [saveAlertVisible, setSaveAlertVisible] = useState(false);
+  const currentSoundRef = useRef(null);
+
+  const languageOptions = [
+    { label: 'English', value: 'en' },
+    { label: 'Русский', value: 'ru' },
+    { label: 'Español', value: 'es' },
+    { label: '中文', value: 'zh' },
+    { label: '日本語', value: 'ja' },
+    { label: 'हिन्दी', value: 'hi' },
+    { label: 'Français', value: 'fr' },
+    { label: 'Deutsch', value: 'de' },
+    { label: 'Italiano', value: 'it' },
+    { label: '한국어', value: 'ko' }
+  ];
+
+  const wrapOptions = [
+    { label: t('Full'), value: 'wrap' },
+    { label: t('Truncate'), value: 'nowrap' },
+  ];
+
+  const fontOptions = [
+    { label: t('Small'), value: 'small' },
+    { label: t('Normal'), value: 'normal' },
+    { label: t('Big'), value: 'big' },
+  ];
+
+  const progressOptions = [
+    { label: t('Daily Goal'), value: 'daily' },
+    { label: t('Active Workload'), value: 'active' },
+    { label: t('Weekly Sprint'), value: 'weekly' },
+    { label: t('Lifetime'), value: 'lifetime' },
+  ];
+
+  const snoozeOptions = [
+    { label: t('5 mins'), value: 5 },
+    { label: t('10 mins'), value: 10 },
+    { label: t('15 mins'), value: 15 },
+    { label: t('30 mins'), value: 30 },
+    { label: t('1 hour'), value: 60 },
+  ];
+
+  const soundOptions = [
+    { label: t('Device Default'), value: 'default' },
+    { label: t('Alarm 02'), value: 'alarm_02.mp3' },
+    { label: t('Bass Alarm'), value: 'bass_alarm.mp3' },
+    { label: t('Bell'), value: 'bell.mp3' },
+    { label: t('Bell 01'), value: 'bell01.mp3' },
+    { label: t('Oak (Cello)'), value: 'cellos_pizz.mp3' },
+    { label: t('Summit (Cello)'), value: 'cellos_pizzdgg.mp3' },
+    { label: t('Timber (Cello)'), value: 'cellos_pizzedf.mp3' },
+    { label: t('Suspense (Cello)'), value: 'cellos_tremolo.mp3' },
+    { label: t('Chime'), value: 'chime.wav' },
+    { label: t('Fireworks'), value: 'fireworks.mp3' },
+    { label: t('Keystone'), value: 'keys.mp3' },
+    { label: t('Keystone Soft'), value: 'keys2.mp3' },
+    { label: t('Koto'), value: 'koto.mp3' },
+    { label: t('Zen (Koto)'), value: 'koto_notification.mp3' },
+    { label: t('Koto Shamisen'), value: 'koto_shamisen.mp3' },
+    { label: t('Light Ping'), value: 'light_ping.mp3' },
+    { label: t('Brush'), value: 'light_scrub.mp3' },
+    { label: t('Nocturne'), value: 'low_piano.mp3' },
+    { label: t('Amber (Marimba)'), value: 'marinba.mp3' },
+    { label: t('Aurora (Marimba)'), value: 'marinbaeefge.mp3' },
+    { label: t('Notification'), value: 'notification.wav' },
+    { label: t('Overdue Nudge'), value: 'overdue_nudge.wav' },
+    { label: t('Shamisen'), value: 'shamisen.mp3' },
+    { label: t('Harmony (Viola)'), value: 'viola_solo_pizzicatoegabeb.mp3' },
+    { label: t('Velvet (Viola)'), value: 'viola_solo_pizzicatoegag.mp3' },
+    { label: t('Spark (Violin)'), value: 'violin_pizzicatobefe.mp3' },
+    { label: t('Whisper (Viola)'), value: 'violla_pizzicatoegf.mp3' },
+    { label: t('Pluck'), value: 'vpizzicato.mp3' },
+    { label: t('Pebble (Xylo)'), value: 'xelod.mp3' },
+    { label: t('Cascade (Xylo)'), value: 'xelodfs.mp3' },
+    { label: t('Echo (Xylo)'), value: 'xelof.mp3' },
+    { label: t('Crystal (Xylo)'), value: 'xylo.mp3' },
+  ];
+
+  const handleTogglePin = (value) => {
+    if (value) {
+      setPinPromptVisible(true);
+    } else {
+      dispatch(setAppPin(null));
+    }
+  };
+
+  const playSoundPreview = async (soundFilename) => {
+    try {
+      if (currentSoundRef.current) {
+        await currentSoundRef.current.stopAsync();
+        await currentSoundRef.current.unloadAsync();
+        currentSoundRef.current = null;
+      }
+      if (soundFilename === 'default') {
+        return; // Don't try to preview system default sound directly via expo-av
+      }
+      const asset = SOUND_ASSETS[soundFilename];
+      if (asset) {
+        const { sound } = await Audio.Sound.createAsync(asset);
+        currentSoundRef.current = sound;
+        await sound.playAsync();
+        // optionally unload sound after playing
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.didJustFinish) {
+            sound.unloadAsync();
+            if (currentSoundRef.current === sound) {
+              currentSoundRef.current = null;
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.log('Error playing sound preview:', error);
+    }
+  };
+
+  const handleSetPin = (pin) => {
+    if (pin && pin.length >= 4) {
+      dispatch(setAppPin(pin));
+      setPinPromptVisible(false);
+    } else {
+      Alert.alert('Invalid PIN', 'Please enter at least 4 digits.');
+    }
+  };
 
   const handleDeleteData = () => {
     Alert.alert(
-      "Delete All Data",
-      "Are you sure you want to clear all your tasks? This action cannot be undone.",
+      t("Delete All Data"),
+      t("Are you sure you want to clear all your tasks? This action cannot be undone."),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         { 
-          text: "Delete", 
+          text: t("Delete"), 
           style: "destructive",
           onPress: () => {
             dispatch(clearTasks());
-            Alert.alert('Deleted', 'All tasks have been cleared.');
+            Alert.alert(t('Deleted'), t('All tasks have been cleared.'));
           }
         }
       ]
@@ -52,12 +233,10 @@ export default function SettingsScreen() {
   };
 
   const handleSave = () => {
-    Alert.alert('Settings Saved', 'Your preferences have been updated.');
+    setSaveAlertVisible(true);
   };
 
-  const handleAbout = () => {
-    Alert.alert('About TaskFlow', 'TaskFlow version 1.0.0\nBuilt with React Native & Expo.');
-  };
+
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
@@ -65,102 +244,198 @@ export default function SettingsScreen() {
         
         {/* Header Section */}
         <View style={styles.topHeader}>
-          <View>
-            <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Settings</Text>
-            <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>App preferences & account</Text>
+          <View style={{ flex: 1, marginRight: 10 }}>
+            <Text style={[styles.pageTitle, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
+            <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('App preferences & account')}</Text>
           </View>
-          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Save settings"
+            style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
+          >
             <IconSave color="#fff" />
-            <Text style={styles.saveBtnText}>Save</Text>
+            <Text style={styles.saveBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('Save')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Appearance Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Appearance')}</Text>
+        <View style={styles.sectionGroup}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Customize theme"
+            style={[styles.rowItem, { borderBottomColor: colors.borderColor }]} 
+            onPress={() => setThemeModalVisible(true)}
+          >
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Customize theme')}</Text>
+            <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownRow}>
+            <CustomDropdown 
+              label={t("Text wrapping") || "Text wrapping"} 
+              value={taskNameWrap} 
+              options={wrapOptions} 
+              onSelect={val => dispatch(setTaskNameWrap(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+          <View style={styles.dropdownRow}>
+            <CustomDropdown 
+              label={t("Font size") || "Font size"} 
+              value={fontSize} 
+              options={fontOptions} 
+              onSelect={val => dispatch(setFontSize(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+            <CustomDropdown 
+              label={t('Language') || 'Language'} 
+              value={i18n.language} 
+              options={languageOptions} 
+              onSelect={val => {
+                i18n.changeLanguage(val);
+                AsyncStorage.setItem('appLanguage', val);
+              }} 
+              colors={colors}
+              layout="horizontal"
+              searchable={true}
+              searchPlaceholder={t('Search language...')}
+            />
+          </View>
+        </View>
+
+        {/* Notifications Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Notifications')}</Text>
+        <View style={styles.sectionGroup}>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+            <CustomDropdown 
+              label={t("Notification Sound")} 
+              value={notificationSound} 
+              options={soundOptions} 
+              onSelect={val => {
+                dispatch(setNotificationSound(val));
+                playSoundPreview(val);
+                const newTheme = { ...theme, notificationSound: val };
+                rescheduleAllActiveTasks(tasks, newTheme, dispatch, updateTask);
+              }}
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+            <CustomDropdown 
+              label={t("Alarm Sound")} 
+              value={alarmSound} 
+              options={soundOptions} 
+              onSelect={val => {
+                dispatch(setAlarmSound(val));
+                playSoundPreview(val);
+                const newTheme = { ...theme, alarmSound: val };
+                rescheduleAllActiveTasks(tasks, newTheme, dispatch, updateTask);
+              }}
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+
+          <View style={[styles.rowItem, { borderBottomWidth: 1 }]}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Vibration')}</Text>
+            <Switch
+              value={vibrationEnabled}
+              onValueChange={val => {
+                dispatch(setVibrationEnabled(val));
+                const newTheme = { ...theme, vibrationEnabled: val };
+                rescheduleAllActiveTasks(tasks, newTheme, dispatch, updateTask);
+              }}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
+            />
+          </View>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 0, paddingBottom: 0, paddingTop: 15 }]}>
+            <CustomDropdown 
+              label={t("Default Snooze")} 
+              value={defaultSnoozeTime} 
+              options={snoozeOptions} 
+              onSelect={val => dispatch(setDefaultSnoozeTime(val))} 
+              colors={colors}
+              layout="horizontal"
+            />
+          </View>
+        </View>
+
+        {/* Automation Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
+        <View style={styles.sectionGroup}>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
+            style={[styles.rowItem, { borderBottomWidth: 0 }]} 
+            onPress={() => setAutoManageModalVisible(true)}
+          >
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
+            <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Account Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</Text>
-        <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Account')}</Text>
+        <View style={styles.sectionGroup}>
           <View style={styles.profileRow}>
             <View style={styles.profileIconContainer}>
               <IconUser color="#42416b" />
             </View>
             <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, { color: colors.textPrimary }]}>User Profile</Text>
+              <Text style={[styles.profileName, { color: colors.textPrimary }]}>{t('User Profile')}</Text>
               <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>user@example.com</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteData}>
-            <Text style={styles.deleteBtnText}>Delete All Data</Text>
+          <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 15 }]}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('App PIN Lock')}</Text>
+            <Switch
+              value={!!theme.appPin}
+              onValueChange={handleTogglePin}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
+            />
+          </View>
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"
+            style={styles.deleteBtn} onPress={handleDeleteData}
+          >
+            <Text style={styles.deleteBtnText}>{t('Delete All Data')}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Customization Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 10 }]}>Customization</Text>
-        <View style={[styles.card, { backgroundColor: colors.bgCard }]}>
-          
-          {/* Text wrapping Dropdown */}
-          <View style={[styles.dropdownRow, { zIndex: 20 }]}>
-            <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>Text wrapping</Text>
-            <View style={styles.dropdownWrapper}>
-              <TouchableOpacity style={styles.dropdownBtn} onPress={() => setWrapDropdownOpen(!wrapDropdownOpen)}>
-                <Text style={styles.dropdownBtnText}>{taskNameWrap === 'wrap' ? 'Full' : 'Truncate'}</Text>
-                <Text style={styles.dropdownBtnIcon}>▼</Text>
-              </TouchableOpacity>
-              {wrapDropdownOpen && (
-                <View style={styles.dropdownList}>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setTaskNameWrap('wrap')); setWrapDropdownOpen(false); }}>
-                    <Text>Full</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setTaskNameWrap('nowrap')); setWrapDropdownOpen(false); }}>
-                    <Text>Truncate</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Font size Dropdown */}
-          <View style={[styles.dropdownRow, { zIndex: 10 }]}>
-            <Text style={[styles.dropdownLabel, { color: colors.textPrimary }]}>Font size</Text>
-            <View style={styles.dropdownWrapper}>
-              <TouchableOpacity style={styles.dropdownBtn} onPress={() => setFontDropdownOpen(!fontDropdownOpen)}>
-                <Text style={styles.dropdownBtnText}>
-                  {fontSize === 'small' ? 'Small' : fontSize === 'big' ? 'Big' : 'Normal'}
-                </Text>
-                <Text style={styles.dropdownBtnIcon}>▼</Text>
-              </TouchableOpacity>
-              {fontDropdownOpen && (
-                <View style={styles.dropdownList}>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setFontSize('small')); setFontDropdownOpen(false); }}>
-                    <Text>Small</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setFontSize('normal')); setFontDropdownOpen(false); }}>
-                    <Text>Normal</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.dropdownListItem} onPress={() => { dispatch(setFontSize('big')); setFontDropdownOpen(false); }}>
-                    <Text>Big</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Customize Theme Button */}
-          <TouchableOpacity style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary }]} onPress={() => setThemeModalVisible(true)}>
-            <Text style={styles.actionBtnText}>🎨 Customize theme</Text>
-          </TouchableOpacity>
-
-          {/* About Button */}
-          <TouchableOpacity style={[styles.actionBtn, { zIndex: 1, backgroundColor: colors.primary }]} onPress={handleAbout}>
-            <Text style={styles.actionBtnText}>ℹ️ About TaskFlow</Text>
-          </TouchableOpacity>
-
-        </View>
 
       </ScrollView>
 
-      {/* Modal */}
+      {/* Modals */}
       <ThemeSettingsModal 
         isVisible={isThemeModalVisible} 
         onClose={() => setThemeModalVisible(false)} 
+      />
+      <AutoManageSettings 
+        isVisible={isAutoManageModalVisible}
+        onClose={() => setAutoManageModalVisible(false)}
+      />
+      <PromptModal
+        isVisible={pinPromptVisible}
+        title={t('Set PIN')}
+        message={t('Enter a 4-digit PIN')}
+        onCancel={() => setPinPromptVisible(false)}
+        onSubmit={handleSetPin}
+        maxLength={4}
+        keyboardType="numeric"
+      />
+      <ConfirmModal
+        isVisible={saveAlertVisible}
+        title={t('Settings Saved')}
+        message={t('Your preferences have been updated.')}
+        hideCancel={true}
+        confirmText={t('OK')}
+        onConfirm={() => {
+          setSaveAlertVisible(false);
+          if (navigation) navigation.navigate('Board');
+        }}
+        onCancel={() => setSaveAlertVisible(false)}
       />
     </View>
   );
@@ -178,7 +453,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 15,
   },
   pageTitle: {
     fontSize: 32,
@@ -191,36 +466,51 @@ const styles = StyleSheet.create({
   saveBtn: {
     flexDirection: 'row',
     backgroundColor: '#285da1',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 8,
     alignItems: 'center',
+    maxWidth: 140,
   },
   saveBtnText: {
     color: '#fff',
     fontWeight: 'bold',
-    marginLeft: 8,
+    marginLeft: 6,
     fontSize: 16,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 10,
+    paddingTop: 5,
   },
-  card: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+  sectionGroup: {
+    marginBottom: 25,
+  },
+  rowItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+  },
+  rowLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  rowArrow: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dropdownRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
   },
   profileIconContainer: {
     width: 50,
@@ -243,74 +533,11 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     backgroundColor: '#c62828',
-    paddingVertical: 15,
+    paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
   },
   deleteBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  dropdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 25,
-    zIndex: 1,
-  },
-  dropdownLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dropdownWrapper: {
-    width: 150,
-    position: 'relative',
-    zIndex: 100,
-  },
-  dropdownBtn: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#e6e6ea',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  dropdownBtnText: {
-    fontSize: 14,
-  },
-  dropdownBtnIcon: {
-    fontSize: 10,
-    color: '#666',
-  },
-  dropdownList: {
-    position: 'absolute',
-    top: 45,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    zIndex: 1000,
-    elevation: 5,
-  },
-  dropdownListItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  actionBtn: {
-    backgroundColor: '#285da1',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  actionBtnText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,

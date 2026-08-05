@@ -1,15 +1,17 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "TaskFlow: To-Do List & Planner",
+    "description": "A modern task manager, to-do list, daily planner, reminders, and focus timer.",
+    "slug": "taskflow",
     "version": "1.0.0",
+    "scheme": "taskflow",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#121212"
     },
     "ios": {
       "supportsTablet": true,
@@ -17,12 +19,24 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#121212",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.vitvalef.app"
+      "package": "com.vitvalef.app",
+      "backgroundColor": "#121212",
+      "softwareKeyboardLayoutMode": "pan",
+      "allowBackup": false,
+      "permissions": [
+        "VIBRATE",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "POST_NOTIFICATIONS",
+        "ACCESS_NOTIFICATION_POLICY",
+        "USE_FULL_SCREEN_INTENT",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -31,6 +45,64 @@
       "eas": {
         "projectId": "395d86c4-8f1b-43b7-8153-4ac272e2e688"
       }
-    }
+    },
+    "plugins": [
+      "./modules/expo-task-alarm/app.plugin.js",
+      "./withAndroidImageCropperFix.js",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/audio/alarm_02.mp3",
+            "./assets/audio/bass_alarm.mp3",
+            "./assets/audio/bell.mp3",
+            "./assets/audio/bell01.mp3",
+            "./assets/audio/cellos_pizz.mp3",
+            "./assets/audio/cellos_pizzdgg.mp3",
+            "./assets/audio/cellos_pizzedf.mp3",
+            "./assets/audio/cellos_tremolo.mp3",
+            "./assets/audio/chime.wav",
+            "./assets/audio/fireworks.mp3",
+            "./assets/audio/keys.mp3",
+            "./assets/audio/keys2.mp3",
+            "./assets/audio/koto.mp3",
+            "./assets/audio/koto_notification.mp3",
+            "./assets/audio/koto_shamisen.mp3",
+            "./assets/audio/light_ping.mp3",
+            "./assets/audio/light_scrub.mp3",
+            "./assets/audio/low_piano.mp3",
+            "./assets/audio/marinba.mp3",
+            "./assets/audio/marinbaeefge.mp3",
+            "./assets/audio/notification.wav",
+            "./assets/audio/overdue_nudge.wav",
+            "./assets/audio/shamisen.mp3",
+            "./assets/audio/viola_solo_pizzicatoegabeb.mp3",
+            "./assets/audio/viola_solo_pizzicatoegag.mp3",
+            "./assets/audio/violin_pizzicatobefe.mp3",
+            "./assets/audio/violla_pizzicatoegf.mp3",
+            "./assets/audio/vpizzicato.mp3",
+            "./assets/audio/xelod.mp3",
+            "./assets/audio/xelodfs.mp3",
+            "./assets/audio/xelof.mp3",
+            "./assets/audio/xylo.mp3"
+          ]
+        }
+      ],
+      "expo-localization",
+      [
+        "expo-share-intent",
+        {
+          "customScheme": "taskmanager"
+        }
+      ]
+    ]
   }
 }

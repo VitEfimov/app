@@ -1,8 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { Platform, Alert } from 'react-native';
+import dayjs from 'dayjs';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 
-import axios from 'axios';
+dayjs.extend(isSameOrBefore);
 
+// import axios from 'axios';
+
+/* --- VERCEL BACKEND THUNKS (COMMENTED OUT FOR LOCAL-ONLY MODE) ---
 export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_) => {
     const response = await axios.get('/api/tasks', { withCredentials: true });
     return response.data;
@@ -43,6 +49,16 @@ export const deleteTaskAsync = createAsyncThunk('task/deleteTaskAsync', async (t
     await axios.delete(`/api/tasks/${taskId}`, { withCredentials: true });
     return taskId;
 });
+--- */
+
+export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_) => {
+    try {
+        const tasksJson = await AsyncStorage.getItem('tasks');
+        return tasksJson ? JSON.parse(tasksJson) : [];
+    } catch (e) {
+        return [];
+    }
+});
 
 const loadGuestTasksFromLocalStorage = () => [];
 
@@ -71,8 +87,12 @@ const taskSlice = createSlice({
              const { taskId } = action.payload;
              state.tasks = state.tasks.filter(t => t.id !== taskId);
         },
+        deleteTasksByBoardSync(state, action) {
+            const { boardId } = action.payload;
+            state.tasks = state.tasks.filter(t => (t.boardId || 'main') !== boardId);
+        },
         updateTaskSync(state, action) {
-            const { taskId, name, priority, completed, description, completionDate, time } = action.payload;
+            const { taskId, name, priority, completed, description, completionDate, time, subtasks } = action.payload;
             const task = state.tasks.find(task => task.id === taskId);
             if (task) {
                 task.taskname = name !== undefined ? name : task.taskname;
@@ -81,13 +101,20 @@ const taskSlice = createSlice({
                 task.completionDate = completionDate !== undefined ? completionDate : task.completionDate;
                 task.time = time !== undefined ? time : task.time;
                 task.reminder = action.payload.reminder !== undefined ? action.payload.reminder : task.reminder;
+                if (action.payload.isAlarm !== undefined) task.isAlarm = action.payload.isAlarm;
                 task.notificationId = action.payload.notificationId !== undefined ? action.payload.notificationId : task.notificationId;
+                if (action.payload.repeatFrequency !== undefined) task.repeatFrequency = action.payload.repeatFrequency;
+                if (action.payload.repeatStartDate !== undefined) task.repeatStartDate = action.payload.repeatStartDate;
+                if (action.payload.repeatEndDate !== undefined) task.repeatEndDate = action.payload.repeatEndDate;
                 if (description) {
                     task.description = {
                         text: description.text || '',
                         img: description.img || '',
                         url: description.url || '',
                     };
+                }
+                if (subtasks !== undefined) {
+                    task.subtasks = subtasks;
                 }
                 task.lastUpdatedDate = new Date().toISOString();
             }
@@ -110,26 +137,182 @@ const taskSlice = createSlice({
     }
 });
 
-export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, updateTaskSync, clearTasks, loadGuestTasks } = taskSlice.actions;
+export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, updateTaskSync, clearTasks, loadGuestTasks } = taskSlice.actions;
 
-export const addTask = (payload) => (dispatch) => {
+
+
+export const addTask = (payload) => async (dispatch, getState) => {
     dispatch(addTaskSync(payload)); 
-    dispatch(addTaskAsync(payload.task)); 
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    // dispatch(addTaskAsync(payload.task)); 
 };
 
-export const addMultipleTasks = (payload) => (dispatch) => {
+export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     dispatch(addMultipleTasksSync(payload));
-    dispatch(addMultipleTasksAsync(payload.tasks));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    // dispatch(addMultipleTasksAsync(payload.tasks));
 };
 
-export const deleteTask = (payload) => (dispatch) => {
+export const deleteTask = (payload) => async (dispatch, getState) => {
     dispatch(deleteTaskSync(payload));
-    dispatch(deleteTaskAsync(payload.taskId));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    // dispatch(deleteTaskAsync(payload.taskId));
 };
 
-export const updateTask = (payload) => (dispatch) => {
+export const deleteTasksByBoard = (boardId) => async (dispatch, getState) => {
+    dispatch(deleteTasksByBoardSync({ boardId }));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+};
+
+export const updateTask = (payload) => async (dispatch, getState) => {
     dispatch(updateTaskSync(payload));
-    dispatch(updateTaskAsync(payload));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    // dispatch(updateTaskAsync(payload));
+};
+
+export const processAutoManageTasks = () => async (dispatch, getState) => {
+    const state = getState();
+    const tasks = state.taskReducer.tasks;
+    const themeState = state.themeReducer;
+    
+    const {
+        autoTransferMode,
+        increasePriorityWhenOverdue,
+        priorityFrequency,
+        removePriorityWhenCompleted,
+        autoDeleteOverdueDays,
+        autoDeleteCompletedDays,
+        confirmBeforeDeletion
+    } = themeState;
+    
+    const today = dayjs().startOf('day');
+    let hasChanges = false;
+    let newTasks = [...tasks];
+    let tasksToDelete = [];
+    
+    newTasks = newTasks.map(task => {
+        let updatedTask = { ...task };
+        let taskChanged = false;
+        const taskDate = dayjs(task.completionDate).startOf('day');
+        
+        if (updatedTask.completed) {
+            if (removePriorityWhenCompleted && updatedTask.priority !== 'none') {
+                updatedTask.priority = 'none';
+                taskChanged = true;
+            }
+            if (autoDeleteCompletedDays > 0) {
+                const daysOld = today.diff(taskDate, 'day');
+                if (daysOld >= autoDeleteCompletedDays) {
+                    tasksToDelete.push(updatedTask.id);
+                }
+            }
+        } 
+        else if (taskDate.isBefore(today)) {
+            const daysOverdue = today.diff(taskDate, 'day');
+            if (autoDeleteOverdueDays > 0 && daysOverdue >= autoDeleteOverdueDays) {
+                tasksToDelete.push(updatedTask.id);
+            } 
+            else {
+                let priorityDidIncrease = false;
+
+                if (increasePriorityWhenOverdue) {
+                    // Logic based on accumulating days overdue
+                    if (priorityFrequency === 'daily') {
+                        if (daysOverdue >= 2 && updatedTask.priority !== 'high') {
+                            updatedTask.priority = 'high';
+                            taskChanged = true;
+                            priorityDidIncrease = true;
+                        } else if (daysOverdue === 1 && (updatedTask.priority === 'none' || updatedTask.priority === 'low')) {
+                            updatedTask.priority = 'medium';
+                            taskChanged = true;
+                            priorityDidIncrease = true;
+                        }
+                    } else if (priorityFrequency === 'weekly') {
+                        if (daysOverdue >= 14 && updatedTask.priority !== 'high') {
+                            updatedTask.priority = 'high';
+                            taskChanged = true;
+                            priorityDidIncrease = true;
+                        } else if (daysOverdue >= 7 && (updatedTask.priority === 'none' || updatedTask.priority === 'low')) {
+                            updatedTask.priority = 'medium';
+                            taskChanged = true;
+                            priorityDidIncrease = true;
+                        }
+                    } else if (priorityFrequency === 'never' || !priorityFrequency) {
+                        if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
+                            updatedTask.priority = 'medium';
+                            taskChanged = true;
+                            priorityDidIncrease = true;
+                        }
+                    }
+                }
+                
+                if (autoTransferMode && autoTransferMode !== 'none') {
+                    // If we are auto-transferring an overdue task, immediately bump its priority 
+                    // (since it won't be able to accumulate daysOverdue).
+                    if (increasePriorityWhenOverdue && !priorityDidIncrease && updatedTask.priority !== 'high') {
+                        if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
+                            updatedTask.priority = 'medium';
+                        } else if (updatedTask.priority === 'medium') {
+                            updatedTask.priority = 'high';
+                        }
+                        taskChanged = true;
+                    }
+
+                    let targetDate = today;
+                    if (autoTransferMode === 'tomorrow') {
+                        targetDate = targetDate.add(1, 'day');
+                    } else if (autoTransferMode === 'next_workday') {
+                        targetDate = targetDate.add(1, 'day');
+                        while (targetDate.day() === 0 || targetDate.day() === 6) {
+                            targetDate = targetDate.add(1, 'day');
+                        }
+                    }
+                    updatedTask.completionDate = targetDate.toISOString();
+                    taskChanged = true;
+                }
+            }
+        }
+        
+        if (taskChanged) {
+            hasChanges = true;
+            return updatedTask;
+        }
+        return task;
+    });
+
+    if (tasksToDelete.length > 0 && !confirmBeforeDeletion) {
+        newTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
+        hasChanges = true;
+    }
+
+    if (hasChanges) {
+        dispatch(hydrateTaskState(newTasks));
+        await AsyncStorage.setItem('tasks', JSON.stringify(newTasks));
+    }
+
+    if (tasksToDelete.length > 0 && confirmBeforeDeletion) {
+        Alert.alert(
+            "Automatic Cleanup",
+            `You have ${tasksToDelete.length} old task(s) scheduled for automatic deletion based on your settings. Do you want to delete them?`,
+            [
+                { text: "Keep Them", style: "cancel" },
+                { 
+                    text: "Delete", 
+                    style: "destructive", 
+                    onPress: async () => {
+                        const finalTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
+                        dispatch(hydrateTaskState(finalTasks));
+                        await AsyncStorage.setItem('tasks', JSON.stringify(finalTasks));
+                    }
+                }
+            ]
+        );
+    }
 };
 
 export default taskSlice.reducer;

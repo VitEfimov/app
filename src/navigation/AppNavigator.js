@@ -1,8 +1,11 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+export const navigationRef = createNavigationContainerRef();
 import { useSelector } from 'react-redux';
+import { StatusBar } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import BoardScreen from '../screens/BoardScreen';
@@ -10,6 +13,8 @@ import CalendarScreen from '../screens/CalendarScreen';
 import PomodoroScreen from '../screens/PomodoroScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
+import DevLogsScreen from '../screens/DevLogsScreen';
+import StatisticsScreen from '../screens/StatisticsScreen';
 import Header from '../components/Header';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
@@ -53,8 +58,15 @@ const IconPomodoro = ({ color }) => (
   </Svg>
 );
 
+const IconDevLogs = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 17l6-6-6-6M12 19h8" />
+  </Svg>
+);
+
 function TabNavigator() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   return (
     <Tab.Navigator 
       initialRouteName="Dashboard"
@@ -67,32 +79,66 @@ function TabNavigator() {
           if (route.name === 'Calendar') return <IconCalendar color={color} />;
           if (route.name === 'Pomodoro') return <IconPomodoro color={color} />;
           if (route.name === 'Settings') return <IconSettings color={color} />;
+          if (route.name === 'DevLogs') return <IconDevLogs color={color} />;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.bgCard,
           borderTopColor: colors.surfaceContainerHigh,
+          height: 80,
+          paddingBottom: 20,
+          paddingTop: 10,
         },
+        tabBarHideOnKeyboard: true,
         headerStyle: {
           backgroundColor: colors.bgHeader
         }
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Board" component={BoardScreen} />
-      <Tab.Screen name="Calendar" component={CalendarScreen} />
-      <Tab.Screen name="Pomodoro" component={PomodoroScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: t('Dashboard'), tabBarTestID: 'tab_dashboard' }} />
+      <Tab.Screen name="Board" component={BoardScreen} options={{ tabBarLabel: t('Board'), tabBarTestID: 'tab_board' }} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: t('Calendar'), tabBarTestID: 'tab_calendar' }} />
+      <Tab.Screen name="Pomodoro" component={PomodoroScreen} options={{ tabBarLabel: t('Pomodoro'), tabBarTestID: 'tab_pomodoro' }} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('Settings'), tabBarTestID: 'tab_settings' }} />
+      <Tab.Screen name="DevLogs" component={DevLogsScreen} options={{ tabBarLabel: 'Dev Logs', tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Statistics" component={StatisticsScreen} options={{ tabBarLabel: 'Statistics', tabBarItemStyle: { display: 'none' } }} />
     </Tab.Navigator>
   );
 }
 
+const linking = {
+  prefixes: ['taskmanager://'],
+  config: {
+    screens: {
+      Board: 'board',
+    },
+  },
+};
+
 export default function AppNavigator() {
   const { isAuthenticated, isGuest } = useSelector((state) => state.userReducer);
+  const { colors, isDark } = useTheme();
+
+  const MyTheme = {
+    dark: isDark,
+    colors: {
+      primary: colors.primary,
+      background: colors.bgMain,
+      card: colors.bgCard,
+      text: colors.textPrimary,
+      border: colors.borderColor,
+      notification: colors.primary,
+    },
+  };
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} theme={MyTheme} linking={linking}>
+      <StatusBar 
+        backgroundColor={colors.bgHeader} 
+        barStyle={isDark ? 'light-content' : 'dark-content'} 
+      />
+      {/* VERCEL BACKEND AUTH CHECK (COMMENTED OUT FOR LOCAL-ONLY MODE) 
       {isAuthenticated || isGuest ? (
         <TabNavigator />
       ) : (
@@ -100,6 +146,8 @@ export default function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       )}
+      */}
+      <TabNavigator />
     </NavigationContainer>
   );
 }

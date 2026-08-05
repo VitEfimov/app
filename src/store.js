@@ -5,13 +5,15 @@ import weatherReducer from "./features/weatherSlice";
 import pomodoroReducer from "./features/pomodoroSlice";
 import userReducer from "./features/userSlice";
 import themeReducer from "./features/themeSlice";
+import statsReducer from "./features/statsSlice";
 
 const reducer = {
     taskReducer: taskReducer,
     weatherReducer: weatherReducer,
     pomodoroReducer: pomodoroReducer,
     userReducer: userReducer,
-    themeReducer: themeReducer
+    themeReducer: themeReducer,
+    statsReducer: statsReducer
 }
 
 const store = configureStore({

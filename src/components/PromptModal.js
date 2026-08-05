@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal } from 'react-native';
 import { useTheme } from '../styles/ThemeContext';
 
-export default function PromptModal({ isVisible, title, message, defaultValue = '', onCancel, onSubmit, submitText = 'Submit' }) {
+export default function PromptModal({ isVisible, title, message, defaultValue = '', onCancel, onSubmit, submitText = 'Submit', maxLength, keyboardType }) {
   const { colors } = useTheme();
   const [value, setValue] = useState(defaultValue);
 
@@ -26,6 +26,8 @@ export default function PromptModal({ isVisible, title, message, defaultValue = 
             autoFocus
             onSubmitEditing={() => onSubmit(value)}
             returnKeyType="done"
+            maxLength={maxLength}
+            keyboardType={keyboardType}
           />
 
           <View style={styles.actions}>
