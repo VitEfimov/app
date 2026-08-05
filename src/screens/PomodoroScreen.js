@@ -92,6 +92,7 @@ export default function PomodoroScreen() {
   useKeepAwake(); // Keep screen awake during pomodoro
 
   const pomodoro = useSelector(state => state.pomodoroReducer.pomodoro[0]);
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   
   const [localTime, setLocalTime] = useState(pomodoro.time);
   const [localIsActive, setLocalIsActive] = useState(false);
@@ -286,13 +287,15 @@ export default function PomodoroScreen() {
           <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Pomodoro')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('Stay focused, take breaks')}</Text>
         </View>
-        <TouchableOpacity 
-          style={[styles.settingsBtn, { backgroundColor: colors.surfaceContainer }]}
-          onPress={() => dispatch(togglePomodoroSettings(true))}
-        >
-          <IconSettings color={colors.textPrimary} />
-          <Text style={[styles.settingsText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
-        </TouchableOpacity>
+        {isPremium && (
+          <TouchableOpacity 
+            style={[styles.settingsBtn, { backgroundColor: colors.surfaceContainer }]}
+            onPress={() => dispatch(togglePomodoroSettings(true))}
+          >
+            <IconSettings color={colors.textPrimary} />
+            <Text style={[styles.settingsText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={[styles.timerCard, { backgroundColor: colors.bgCard }]}>

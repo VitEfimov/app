@@ -8,6 +8,7 @@ on:
       - nologin
       - optimization
       - task_flow
+      - feature/freemium-strategy
   workflow_dispatch: # Allows manual trigger from the Actions tab
 
 jobs:

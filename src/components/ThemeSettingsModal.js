@@ -31,6 +31,12 @@ const PREDEFINED_COLORS = [
   '#455A64'  // Slate
 ];
 
+const FREE_COLORS = [
+  '#2E7D32', // Dark Green
+  '#1E88E5', // Blue
+  '#FB8C00'  // Orange
+];
+
 export default function ThemeSettingsModal({ isVisible, onClose }) {
   const dispatch = useDispatch();
   const { colors, isDark } = useTheme();
@@ -39,6 +45,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   const currentSourceColor = useSelector(state => state.themeReducer.sourceColor);
   const currentUserPicture = useSelector(state => state.themeReducer.userPicture);
   const currentThemeMode = useSelector(state => state.themeReducer.themeMode);
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
   const [tempColor, setTempColor] = useState(currentSourceColor);
   const [tempImage, setTempImage] = useState(currentUserPicture);
@@ -165,7 +172,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Material You Theme')}</Text>
               
               <View style={styles.colorRow}>
-                {PREDEFINED_COLORS.map((c, i) => (
+                {(isPremium ? PREDEFINED_COLORS : FREE_COLORS).map((c, i) => (
                   <TouchableOpacity 
                     key={i} 
                     accessible={true} accessibilityRole="button" accessibilityLabel={`Select predefined color ${i + 1}`}
@@ -175,16 +182,18 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
                 ))}
               </View>
 
-              <View style={styles.customColorRow}>
-                <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Accent Color')}</Text>
-                <TextInput 
-                  accessible={true} accessibilityLabel="Custom hex color input"
-                  style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary }]}
-                  value={tempColor}
-                  onChangeText={setTempColor}
-                  autoCapitalize="none"
-                />
-              </View>
+              {isPremium && (
+                <View style={styles.customColorRow}>
+                  <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Accent Color')}</Text>
+                  <TextInput 
+                    accessible={true} accessibilityLabel="Custom hex color input"
+                    style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary }]}
+                    value={tempColor}
+                    onChangeText={setTempColor}
+                    autoCapitalize="none"
+                  />
+                </View>
+              )}
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>

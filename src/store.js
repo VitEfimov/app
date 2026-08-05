@@ -6,6 +6,7 @@ import pomodoroReducer from "./features/pomodoroSlice";
 import userReducer from "./features/userSlice";
 import themeReducer from "./features/themeSlice";
 import statsReducer from "./features/statsSlice";
+import entitlementReducer from "./features/entitlementSlice";
 
 const reducer = {
     taskReducer: taskReducer,
@@ -13,7 +14,8 @@ const reducer = {
     pomodoroReducer: pomodoroReducer,
     userReducer: userReducer,
     themeReducer: themeReducer,
-    statsReducer: statsReducer
+    statsReducer: statsReducer,
+    entitlementReducer: entitlementReducer
 }
 
 const store = configureStore({

@@ -5,6 +5,7 @@ import { clearTasks, updateTask } from '../features/taskSlice';
 import { rescheduleAllActiveTasks } from '../utils/notifications';
 import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
+import { toggleDevPremium } from '../features/entitlementSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path, Circle } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
@@ -73,6 +74,7 @@ export default function SettingsScreen({ navigation }) {
   
   const theme = useSelector(state => state.themeReducer);
   const tasks = useSelector(state => state.taskReducer.tasks);
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   
   const taskNameWrap = theme.taskNameWrap || 'wrap';
   const fontSize = theme.fontSize || 'normal';
@@ -248,6 +250,12 @@ export default function SettingsScreen({ navigation }) {
             <Text style={[styles.pageTitle, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
             <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('App preferences & account')}</Text>
           </View>
+          <TouchableOpacity 
+            style={[styles.saveBtn, { backgroundColor: isPremium ? '#FFD700' : '#888', marginRight: 10 }]} 
+            onPress={() => dispatch(toggleDevPremium())}
+          >
+            <Text style={styles.saveBtnText} numberOfLines={1} adjustsFontSizeToFit>{isPremium ? 'PRO' : 'UPGRADE'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Save settings"
             style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}

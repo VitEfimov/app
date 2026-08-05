@@ -121,6 +121,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const themeState = useSelector(state => state.themeReducer);
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const scrollViewRef = useRef(null);
   const notesRef = useRef(null);
   const { t, i18n } = useTranslation();
@@ -541,12 +542,14 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               <View style={styles.column}>
                 <CustomDropdown label={t("REMINDER")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
-              <View style={styles.column}>
-                <CustomDropdown label={t("REPEAT")} value={repeatFrequency} options={[{label: t('None'), value: 'None'}, {label: t('Daily'), value: 'Daily'}, {label: t('Weekly'), value: 'Weekly'}, {label: t('Monthly'), value: 'Monthly'}]} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
-              </View>
+              {isPremium && (
+                <View style={styles.column}>
+                  <CustomDropdown label={t("REPEAT")} value={repeatFrequency} options={[{label: t('None'), value: 'None'}, {label: t('Daily'), value: 'Daily'}, {label: t('Weekly'), value: 'Weekly'}, {label: t('Monthly'), value: 'Monthly'}]} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                </View>
+              )}
             </View>
 
-            {reminder !== 'None' && (
+            {isPremium && reminder !== 'None' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 15 }}>
                 <Switch value={isAlarm} onValueChange={setIsAlarm} trackColor={{ true: colors.primary }} />
                 <Text style={{ color: colors.textPrimary, marginLeft: 8, fontWeight: 'bold' }}>{t('Play Reminder as Alarm')}</Text>
@@ -620,13 +623,15 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('NOTES')}</Text>
-              <TouchableOpacity 
-                accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
-                onPress={pickImage} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-              >
-                <IconImage color={colors.primary} />
-                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Add Photo')}</Text>
-              </TouchableOpacity>
+              {isPremium && (
+                <TouchableOpacity 
+                  accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
+                  onPress={pickImage} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                >
+                  <IconImage color={colors.primary} />
+                  <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Add Photo')}</Text>
+                </TouchableOpacity>
+              )}
             </View>
             <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 100 }]}>
               <MemoizedNotesInput
