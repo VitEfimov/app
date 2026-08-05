@@ -35,8 +35,14 @@ export const VIBRATION_PRESETS = {
   criticalAlarm: VIBRATION_PATTERNS.alarmUrgent,
 };
 
-export function getSoundBasename(sound) {
-  return sound ? sound.replace(/\.(wav|mp3|ogg)$/i, '') : 'default';
+export function getSoundBasename(sound, isAlarm = false) {
+  let baseName = sound ? sound.replace(/\.(wav|mp3|ogg)$/i, '') : 'default';
+  if (baseName === 'default' && isAlarm) {
+    // Expo hardcodes 'default' to the OS's NOTIFICATION sound.
+    // Since we can't trigger the OS default alarm sound, we map to a bundled alarm sound.
+    baseName = 'alarm_02';
+  }
+  return baseName;
 }
 
 export function getChannelId(
@@ -45,10 +51,10 @@ export function getChannelId(
   vibrationEnabled
 ) {
   const base = isAlarm ? 'alarm' : 'default';
-  const soundName = getSoundBasename(sound);
+  const soundName = getSoundBasename(sound, isAlarm);
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
 
-  return `task_${base}_${soundName}_${vib}_v16`;
+  return `task_${base}_${soundName}_${vib}_v17`;
 }
 
 // let configuredChannels = new Set(); // Temporarily removed for debugging
@@ -140,7 +146,7 @@ export async function configureAndroidNotificationChannels(
         importance:
           Notifications.AndroidImportance.HIGH,
 
-        sound: getSoundBasename(notificationSound),
+        sound: getSoundBasename(notificationSound, false),
 
         enableVibrate: vibrationEnabled,
 
@@ -163,7 +169,7 @@ export async function configureAndroidNotificationChannels(
         importance:
           Notifications.AndroidImportance.MAX,
 
-        sound: getSoundBasename(alarmSound),
+        sound: getSoundBasename(alarmSound, true),
 
         enableVibrate: vibrationEnabled,
 
@@ -292,7 +298,7 @@ export async function configureAndroidNotificationChannels(
 
 export async function configurePomodoroChannel(soundName, isBreak) {
   if (Platform.OS !== 'android') return null;
-  const baseName = getSoundBasename(soundName);
+  const baseName = getSoundBasename(soundName, true);
   const type = isBreak ? 'break' : 'work';
   const channelId = `pomodoro_${type}_${baseName}_v1`;
 
@@ -301,7 +307,8 @@ export async function configurePomodoroChannel(soundName, isBreak) {
       name: `Pomodoro ${isBreak ? 'Break' : 'Work'} Alarm`,
       description: 'Pomodoro timer completion alarm',
       importance: Notifications.AndroidImportance.MAX,
-      sound: baseName === 'default' || baseName === 'none' ? null : baseName,
+      // We don't need to check for 'default' here because getSoundBasename(soundName, true) guarantees it will be mapped to a real file.
+      sound: baseName === 'none' ? null : baseName,
       enableVibrate: true,
       vibrationPattern: VIBRATION_PRESETS.alarm,
       audioAttributes: {
@@ -664,12 +671,14 @@ export async function scheduleLocalNotification(
 ) {
   try {
     if (Platform.OS === 'android') {
-      const channelId = isSilent ? 'task_silent_notification_v1' : 'task_default_system_sound_v11';
+      // Use v2 to force Android to create a fresh channel with these settings
+      const channelId = isSilent ? 'task_silent_notification_v2' : 'task_default_system_sound_v11';
 
       await Notifications.setNotificationChannelAsync(channelId, {
         name: isSilent ? 'Silent notifications' : 'Task notifications',
         description: isSilent ? 'Notifications without sound' : 'Task notifications with system sound',
-        importance: isSilent ? Notifications.AndroidImportance.DEFAULT : Notifications.AndroidImportance.MAX,
+        // LOW importance (2) shows visually but guarantees NO sound and NO vibration on Android
+        importance: isSilent ? Notifications.AndroidImportance.LOW : Notifications.AndroidImportance.MAX,
         sound: isSilent ? null : 'default',
         enableVibrate: !isSilent,
         vibrationPattern: isSilent ? null : VIBRATION_PRESETS.newTask,
@@ -681,8 +690,8 @@ export async function scheduleLocalNotification(
           title,
           body,
           sound: isSilent ? null : 'default',
-
-          priority: isSilent ? Notifications.AndroidNotificationPriority.DEFAULT : Notifications.AndroidNotificationPriority.MAX,
+          // Use LOW priority to match channel importance
+          priority: isSilent ? Notifications.AndroidNotificationPriority.LOW : Notifications.AndroidNotificationPriority.MAX,
         },
 
         trigger: {
