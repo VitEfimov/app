@@ -6,6 +6,9 @@ import { useTheme } from '../styles/ThemeContext';
 import TaskRow from '../components/TaskRow';
 import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
+import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
+import SnoozeModal from '../components/SnoozeModal';
+import PremiumModal from '../components/PremiumModal';
 import ConfirmModal from '../components/ConfirmModal';
 import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
@@ -21,6 +24,10 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
+  const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
+  const [isSnoozeVisible, setSnoozeVisible] = useState(false);
+  const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
+  const [premiumFeatureName, setPremiumFeatureName] = useState('');
 
   const dispatch = useDispatch();
 
@@ -399,10 +406,15 @@ export default function CalendarScreen() {
                 hideDate={true} 
                 disableInlineEdit={true} 
                 testIDPrefix="calendar_"
-                onPress={() => handleTaskPress(item)} 
                 isSelectionMode={selectionMode.isActive}
                 isSelected={selectionMode.selectedTaskIds.includes(item.id)}
                 onToggleSelect={() => toggleTaskSelection(item.id)}
+                onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
+                onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
+                onPress={() => {
+                  setSelectedTask(item);
+                  setDetailsVisible(true);
+                }}
               />
             )}
             renderSectionHeader={({ section: { title } }) => (
@@ -437,6 +449,30 @@ export default function CalendarScreen() {
         task={selectedTask}
         isVisible={isDetailsVisible}
         onClose={() => setDetailsVisible(false)}
+      />
+
+      <TaskQuickMenuModal 
+        isVisible={isQuickMenuVisible}
+        onClose={() => setQuickMenuVisible(false)}
+        task={selectedTask}
+        colors={colors}
+        isDark={colors.background === '#121212'}
+        onPressEdit={(t) => { setSelectedTask(t); setDetailsVisible(true); }}
+        onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
+      />
+      
+      <SnoozeModal 
+        isVisible={isSnoozeVisible}
+        onClose={() => setSnoozeVisible(false)}
+        task={selectedTask}
+        colors={colors}
+        onOpenPremiumModal={(feature) => { setPremiumFeatureName(feature); setPremiumModalVisible(true); }}
+      />
+      
+      <PremiumModal 
+        isVisible={isPremiumModalVisible}
+        onClose={() => setPremiumModalVisible(false)}
+        featureName={premiumFeatureName}
       />
 
       <Modal 

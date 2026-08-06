@@ -5,6 +5,9 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import TaskRow from '../components/TaskRow';
 import TaskDetailsModal from '../components/TaskDetailsModal';
+import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
+import SnoozeModal from '../components/SnoozeModal';
+import PremiumModal from '../components/PremiumModal';
 import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
 import InlineAddTask from '../components/InlineAddTask';
@@ -47,6 +50,10 @@ export default function BoardScreen({ route, navigation }) {
   
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
+  const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
+  const [isSnoozeVisible, setSnoozeVisible] = useState(false);
+  const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
+  const [premiumFeatureName, setPremiumFeatureName] = useState('');
   
   const [promptConfig, setPromptConfig] = useState({ isVisible: false, type: null, targetBoard: null });
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
@@ -475,10 +482,15 @@ export default function BoardScreen({ route, navigation }) {
         renderItem={({ item, section }) => (
           <TaskRow 
             task={item} 
-            onPress={() => handleTaskPress(item)} 
-            isSelectionMode={selectionMode.isActive && selectionMode.sectionId === section.id}
+            isSelectionMode={selectionMode.isActive}
             isSelected={selectionMode.selectedTaskIds.includes(item.id)}
             onToggleSelect={() => toggleTaskSelection(item.id)}
+            onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
+            onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
+            onPress={() => {
+              setSelectedTask(item);
+              setDetailsVisible(true);
+            }}
           />
         )}
         renderSectionHeader={renderSectionHeader}
@@ -599,6 +611,30 @@ export default function BoardScreen({ route, navigation }) {
         isDestructive={confirmConfig.isDestructive}
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
         onConfirm={confirmConfig.onConfirm}
+      />
+      
+      <TaskQuickMenuModal 
+        isVisible={isQuickMenuVisible}
+        onClose={() => setQuickMenuVisible(false)}
+        task={selectedTask}
+        colors={colors}
+        isDark={colors.background === '#121212'}
+        onPressEdit={(t) => { setSelectedTask(t); setDetailsVisible(true); }}
+        onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
+      />
+
+      <SnoozeModal 
+        isVisible={isSnoozeVisible}
+        onClose={() => setSnoozeVisible(false)}
+        task={selectedTask}
+        colors={colors}
+        onOpenPremiumModal={(feature) => { setPremiumFeatureName(feature); setPremiumModalVisible(true); }}
+      />
+
+      <PremiumModal 
+        isVisible={isPremiumModalVisible}
+        onClose={() => setPremiumModalVisible(false)}
+        featureName={premiumFeatureName}
       />
     </KeyboardAvoidingView>
   );

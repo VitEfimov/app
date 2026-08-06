@@ -491,7 +491,7 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 dayjs.extend(customParseFormat);
-export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false, themeState = {}) {
+export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false, themeState = {}, advancedOptions = {}) {
   DevLogger.info(`scheduleTaskReminder called for task: ${taskName}`, { reminderValue, completionDateStr, timeStr, isAlarm });
   if (!completionDateStr) {
     DevLogger.warn(`scheduleTaskReminder: No completionDateStr provided, aborting`);
@@ -550,6 +550,33 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       let reminderDate = targetDate.subtract(offset.amount, offset.unit);
       const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm, 'task_reminder', themeState);
       if (remId) ids.push(remId);
+    }
+  }
+
+  if (advancedOptions.escalationLevel === 'active') {
+    const escOffsets = [
+      { amount: 1, unit: 'hour' },
+      { amount: 30, unit: 'minute' },
+      { amount: 15, unit: 'minute' },
+      { amount: 5, unit: 'minute' },
+      { amount: 1, unit: 'minute' }
+    ];
+    for (const escOffset of escOffsets) {
+      let remDate = targetDate.subtract(escOffset.amount, escOffset.unit);
+      if (remDate.isAfter(dayjs())) {
+        const remId = await scheduleExactTaskReminder(`[URGENT] ${taskName}`, remDate.toDate(), taskId, true, 'task_alarm', themeState);
+        if (remId) ids.push(remId);
+      }
+    }
+  }
+
+  if (advancedOptions.isNagMode === true) {
+    for (let i = 1; i <= 12; i++) {
+      let nagDate = targetDate.add(i * 10, 'minute');
+      if (nagDate.isAfter(dayjs())) {
+        const nagId = await scheduleExactTaskReminder(`[OVERDUE] ${taskName}`, nagDate.toDate(), taskId, true, 'task_alarm', themeState);
+        if (nagId) ids.push(nagId);
+      }
     }
   }
 
@@ -767,7 +794,8 @@ export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, upda
         task.time,
         task.id,
         task.isAlarm || false,
-        themeState
+        themeState,
+        { isNagMode: task.isNagMode, escalationLevel: task.escalationLevel }
       );
       
       if (notifIds && notifIds.length > 0) {

@@ -106,6 +106,8 @@ const taskSlice = createSlice({
                 if (action.payload.repeatFrequency !== undefined) task.repeatFrequency = action.payload.repeatFrequency;
                 if (action.payload.repeatStartDate !== undefined) task.repeatStartDate = action.payload.repeatStartDate;
                 if (action.payload.repeatEndDate !== undefined) task.repeatEndDate = action.payload.repeatEndDate;
+                if (action.payload.isNagMode !== undefined) task.isNagMode = action.payload.isNagMode;
+                if (action.payload.escalationLevel !== undefined) task.escalationLevel = action.payload.escalationLevel;
                 if (description) {
                     task.description = {
                         text: description.text || '',

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateTask } from '../features/taskSlice';
+import { updateTask, deleteTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
@@ -52,7 +53,7 @@ const IconCheckCircle = ({ color }) => (
   </Svg>
 );
 
-const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, testIDPrefix = "" }) {
+const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -66,6 +67,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(task.taskname);
   const [cursorSelection, setCursorSelection] = useState(null);
+  const swipeableRef = useRef(null);
 
   const handleTextPress = () => {
     if (isSelectionMode) {
@@ -79,6 +81,68 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
     setEditName(task.taskname);
     setCursorSelection({ start: task.taskname.length, end: task.taskname.length });
     setIsEditing(true);
+  };
+
+  const closeSwipeable = () => {
+    if (swipeableRef.current) {
+      swipeableRef.current.close();
+    }
+  };
+
+  const handleSwipeComplete = () => {
+    closeSwipeable();
+    handleToggleComplete();
+  };
+
+  const handleSwipeDelete = () => {
+    closeSwipeable();
+    dispatch(deleteTask({ taskId: task.id }));
+  };
+
+  const handleSwipeSnooze = () => {
+    closeSwipeable();
+    if (onPressSnooze) onPressSnooze(task);
+  };
+
+  const handleSwipeMore = () => {
+    closeSwipeable();
+    if (onPressMore) onPressMore(task);
+  };
+
+  const renderLeftActions = (progress, dragX) => {
+    const scale = dragX.interpolate({
+      inputRange: [0, 100],
+      outputRange: [0, 1],
+      extrapolate: 'clamp',
+    });
+    return (
+      <View style={[styles.leftAction, { backgroundColor: '#4caf50' }]}>
+        <Animated.Text style={[styles.actionText, { transform: [{ scale }] }]}>
+          ✓ {t('Complete')}
+        </Animated.Text>
+      </View>
+    );
+  };
+
+  const renderRightActions = (progress, dragX) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+    return (
+      <View style={styles.rightActionContainer}>
+        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: '#ff9800' }]} onPress={handleSwipeSnooze}>
+          <Animated.Text style={[styles.actionIcon, { transform: [{ scale }] }]}>💤</Animated.Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: '#f44336' }]} onPress={handleSwipeDelete}>
+          <Animated.Text style={[styles.actionIcon, { transform: [{ scale }] }]}>🗑️</Animated.Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: '#607d8b' }]} onPress={handleSwipeMore}>
+          <Animated.Text style={[styles.actionIcon, { transform: [{ scale }] }]}>⋮</Animated.Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const formatDisplayTime = (timeStr) => {
@@ -126,26 +190,37 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   const hasSubtasks = totalSubtasksCount > 0;
 
   return (
-    <TouchableOpacity
-      testID={`task_row_${testIDPrefix}${task.taskname || task.name}`}
-      accessible={true}
-      accessibilityRole="button"
-      accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
-      accessibilityState={{ checked: task.completed }}
-      style={[styles.container, { borderBottomColor: colors.borderColor }]}
-      onPress={(e) => {
-        if (isSelectionMode) {
-          if (onToggleSelect) onToggleSelect();
-          return;
-        }
-        if (isEditing) {
-          submitEdit();
-        }
-        if (onPress) onPress(e);
-      }}
-      activeOpacity={0.7}
+    <Swipeable
+      ref={swipeableRef}
+      renderLeftActions={renderLeftActions}
+      renderRightActions={renderRightActions}
+      onSwipeableLeftOpen={handleSwipeComplete}
+      friction={2}
+      rightThreshold={40}
     >
-      {priorityColor ? (
+      <TouchableOpacity
+        testID={`task_row_${testIDPrefix}${task.taskname || task.name}`}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
+        accessibilityState={{ checked: task.completed }}
+        style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: colors.bgMain }]}
+        onLongPress={() => {
+           if (onToggleSelect) onToggleSelect();
+        }}
+        onPress={(e) => {
+          if (isSelectionMode) {
+            if (onToggleSelect) onToggleSelect();
+            return;
+          }
+          if (isEditing) {
+            submitEdit();
+          }
+          if (onPress) onPress(e);
+        }}
+        activeOpacity={0.7}
+      >
+        {priorityColor ? (
         <View style={[styles.priorityIndicator, { backgroundColor: priorityColor }]} />
       ) : null}
 
@@ -172,7 +247,6 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
           task.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />
         )}
       </TouchableOpacity>
-
       {/* Region 3: Content */}
       <View style={styles.content}>
         <View style={styles.taskNameBox}>
@@ -256,7 +330,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
       ) : null}
 
     </TouchableOpacity>
-    
+    </Swipeable>
   );
 });
 
@@ -345,5 +419,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.1)',
     marginBottom: 4,
+  },
+  leftAction: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingLeft: 20
+  },
+  actionText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16
+  },
+  rightActionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 150
+  },
+  rightActionBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100%'
+  },
+  actionIcon: {
+    color: 'white',
+    fontSize: 20
   }
 });
