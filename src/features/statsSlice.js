@@ -4,6 +4,10 @@ import dayjs from 'dayjs';
 
 const initialState = {
   dailyStats: {}, // { 'YYYY-MM-DD': { tasksCreated: 0, tasksCompleted: 0, pomodoroSessions: 0, pomodoroMinutes: 0 } }
+  goals: [],
+  selectedRange: 'week',
+  selectedMetric: 'completed',
+  selectedDate: dayjs().format('YYYY-MM-DD'),
 };
 
 export const statsSlice = createSlice({
@@ -11,7 +15,8 @@ export const statsSlice = createSlice({
   initialState,
   reducers: {
     hydrateStatsState: (state, action) => {
-      state.dailyStats = action.payload || {};
+      state.dailyStats = action.payload?.dailyStats || action.payload || {};
+      state.goals = action.payload?.goals || [];
     },
     recordTaskCreated: (state) => {
       const today = dayjs().format('YYYY-MM-DD');
@@ -35,7 +40,32 @@ export const statsSlice = createSlice({
     },
     clearStats: (state) => {
       state.dailyStats = {};
+      state.goals = [];
       AsyncStorage.removeItem('stats');
+    },
+    addGoal: (state, action) => {
+      state.goals.push(action.payload);
+      AsyncStorage.setItem('stats', JSON.stringify({ dailyStats: state.dailyStats, goals: state.goals }));
+    },
+    updateGoal: (state, action) => {
+      const index = state.goals.findIndex(g => g.id === action.payload.id);
+      if (index !== -1) {
+        state.goals[index] = action.payload;
+        AsyncStorage.setItem('stats', JSON.stringify({ dailyStats: state.dailyStats, goals: state.goals }));
+      }
+    },
+    deleteGoal: (state, action) => {
+      state.goals = state.goals.filter(g => g.id !== action.payload);
+      AsyncStorage.setItem('stats', JSON.stringify({ dailyStats: state.dailyStats, goals: state.goals }));
+    },
+    setSelectedRange: (state, action) => {
+      state.selectedRange = action.payload;
+    },
+    setSelectedMetric: (state, action) => {
+      state.selectedMetric = action.payload;
+    },
+    setSelectedDate: (state, action) => {
+      state.selectedDate = action.payload;
     }
   },
   extraReducers: (builder) => {
@@ -68,6 +98,18 @@ export const statsSlice = createSlice({
   }
 });
 
-export const { hydrateStatsState, recordTaskCreated, recordTaskCompleted, recordPomodoroSession, clearStats } = statsSlice.actions;
+export const { 
+  hydrateStatsState, 
+  recordTaskCreated, 
+  recordTaskCompleted, 
+  recordPomodoroSession, 
+  clearStats,
+  addGoal,
+  updateGoal,
+  deleteGoal,
+  setSelectedRange,
+  setSelectedMetric,
+  setSelectedDate
+} = statsSlice.actions;
 
 export default statsSlice.reducer;
