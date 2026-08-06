@@ -1,5 +1,6 @@
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateRecurringAutomations } from './notifications';
 
@@ -31,6 +32,7 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
  * Registers the background fetch task with the OS.
  */
 export async function registerBackgroundFetchAsync() {
+  if (Platform.OS === 'web') return;
   try {
     await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
       minimumInterval: 60 * 15, // 15 minutes

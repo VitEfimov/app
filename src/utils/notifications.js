@@ -780,6 +780,7 @@ export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, upda
 }
 
 export async function updateRecurringAutomations(themeState, tasks = []) {
+  if (Platform.OS === 'web') return;
   const {
     morningReminder, morningReminderTime,
     eveningReminder, eveningReminderTime,
