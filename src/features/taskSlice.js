@@ -114,6 +114,7 @@ const taskSlice = createSlice({
                         text: description.text || '',
                         img: description.img || '',
                         url: description.url || '',
+                        attachments: description.attachments || task.description?.attachments || [],
                     };
                 }
                 if (subtasks !== undefined) {

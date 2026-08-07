@@ -26,7 +26,7 @@ export default function FreeOverviewSection({ colors, isDark, dailyStats, curren
         const dateStr = d.format('YYYY-MM-DD');
         const stats = dailyStats[dateStr] || { tasksCreated: 0, tasksCompleted: 0, pomodoroMinutes: 0 };
         return {
-          dayLabel: d.format('dd'),
+          dayLabel: t(d.format('dd')),
           ...stats
         };
       });
@@ -69,7 +69,7 @@ export default function FreeOverviewSection({ colors, isDark, dailyStats, curren
         }
         
         return {
-          dayLabel: monthStart.format('MMM').substring(0, 3),
+          dayLabel: t(monthStart.format('MMM').substring(0, 3)),
           ...monthStats
         };
       });

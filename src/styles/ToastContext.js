@@ -9,7 +9,7 @@ export const useToast = () => {
 };
 
 export const ToastProvider = ({ children }) => {
-  const { colors } = useTheme();
+  const { colors, isDark, mode } = useTheme();
   const [toastConfig, setToastConfig] = useState({
     visible: false,
     message: '',
@@ -75,33 +75,40 @@ export const ToastProvider = ({ children }) => {
     <ToastContext.Provider value={{ showToast, hideToast }}>
       {children}
       {toastConfig.visible && (
-        <Animated.View 
-          style={[
-            styles.container, 
-            { 
-              backgroundColor: colors.textPrimary, // Inverse colors for high contrast
-              transform: [{ translateY }],
-              opacity
-            }
-          ]}
-        >
-          <Text style={[styles.message, { color: colors.bgMain }]}>{toastConfig.message}</Text>
-          {toastConfig.actionLabel && toastConfig.onAction && (
-            <TouchableOpacity onPress={toastConfig.onAction} style={styles.actionButton}>
-              <Text style={[styles.actionLabel, { color: colors.primary }]}>{toastConfig.actionLabel}</Text>
-            </TouchableOpacity>
-          )}
-        </Animated.View>
+        <View style={styles.toastWrapper} pointerEvents="box-none">
+          <Animated.View 
+            style={[
+              styles.container, 
+              { 
+                backgroundColor: isDark ? (mode === 'contrast' ? '#ffffff' : '#e0e0e0') : '#333333',
+                transform: [{ translateY }],
+                opacity
+              }
+            ]}
+          >
+            <Text style={[styles.message, { color: isDark ? '#000000' : '#ffffff' }]}>{toastConfig.message}</Text>
+            {toastConfig.actionLabel && toastConfig.onAction && (
+              <TouchableOpacity onPress={toastConfig.onAction} style={styles.actionButton}>
+                <Text style={[styles.actionLabel, { color: isDark ? colors.primary : '#ffca28' }]}>{toastConfig.actionLabel}</Text>
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        </View>
       )}
     </ToastContext.Provider>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  toastWrapper: {
     position: 'absolute',
     bottom: 30,
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

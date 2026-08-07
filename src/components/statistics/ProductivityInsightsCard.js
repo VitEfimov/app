@@ -33,7 +33,7 @@ export default function ProductivityInsightsCard({ colors }) {
     if (maxCompleted > 5) {
       const bestDayIndex = weekdayCounts.indexOf(maxCompleted);
       const dayNames = [t('Sunday'), t('Monday'), t('Tuesday'), t('Wednesday'), t('Thursday'), t('Friday'), t('Saturday')];
-      generated.push(`${dayNames[bestDayIndex]} ${t('is your most productive day for completing tasks.')}`);
+      generated.push(t('{{day}} is your most productive day for completing tasks.', { day: dayNames[bestDayIndex] }));
     }
 
     // 2. Focus time comparison

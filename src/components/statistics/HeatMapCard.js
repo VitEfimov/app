@@ -54,7 +54,7 @@ export default function HeatMapCard({ colors, isDark }) {
                     <View style={styles.monthLabelRow}>
                       {firstDayOfMonth && (
                         <Text style={[styles.axisLabel, { color: colors.textSecondary }]}>
-                          {dayjs(firstDayOfMonth.date).format('MMM')}
+                          {t(dayjs(firstDayOfMonth.date).format('MMM'))}
                         </Text>
                       )}
                     </View>
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   },
   axisLabel: {
     fontSize: 10,
-    height: 12
+    lineHeight: 14,
   },
   weeksContainer: {
     flexDirection: 'row',

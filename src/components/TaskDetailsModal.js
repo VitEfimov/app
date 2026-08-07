@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, 
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
@@ -98,8 +99,21 @@ const IconListNumbered = ({ color }) => (
 );
 
 const IconSquare = ({ color }) => (
-  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+  </Svg>
+);
+
+const IconFile = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z" />
+    <Polyline points="13 2 13 9 20 9" />
+  </Svg>
+);
+
+const IconAttachment = ({ color }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
   </Svg>
 );
 
@@ -132,7 +146,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [scrollViewHeight, setScrollViewHeight] = useState(0);
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const [notes, setNotes] = useState('');
-  const [noteImage, setNoteImage] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const [subtasks, setSubtasks] = useState(task ? (task.subtasks || []) : []);
   const [priority, setPriority] = useState('none');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -155,30 +169,24 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const stripHtml = (html) => html ? html.replace(/<[^>]+>/g, '').trim() : '';
 
-  // useEffect(() => {
-  //   if (isVisible && task) {
-  //     setTaskName(task.taskname || '');
-  //     setNotes(stripHtml(task.description?.text));
-  //     setNoteImage(task.description?.img || '');
-  //     setSubtasks(task.subtasks || []);
-  //     setPriority(task.priority || 'none');
-  //     setSelectedDate(task.completionDate || '');
-  //     setSelectedTime(task.time || null);
-      
-  //     setRepeatFrequency(task.repeatFrequency || 'None');
-  //     setRepeatStartDate(task.repeatStartDate || task.completionDate || '');
-  //     setRepeatEndDate(task.repeatEndDate || '');
-  //     setReminder(task.reminder || 'None');
-  //     setIsAlarm(task.isAlarm || false);
-  //   }
-  // }, [isVisible, task?.id]);
-
-
   useEffect(() => {
   if (isVisible && task) {
     setTaskName(task.taskname || '');
     setNotes(stripHtml(task.description?.text) || '');
-    setNoteImage(task.description?.img || '');
+    
+    // Backwards compatibility for old base64 img
+    const existingAttachments = task.description?.attachments ? [...task.description.attachments] : [];
+    if (task.description?.img && existingAttachments.length === 0) {
+      existingAttachments.push({
+        id: 'legacy_img',
+        type: 'image',
+        uri: task.description.img,
+        name: 'Attached Image',
+        size: 0
+      });
+    }
+    setAttachments(existingAttachments);
+    
     setSubtasks(task.subtasks || []);
     setPriority((task.priority || 'none').toLowerCase());
     setSelectedDate(task.completionDate || '');
@@ -225,8 +233,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
       const message = `${t('Task')}: ${taskName}\n${t('Due')}: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : t('Not set')}${selectedTime ? ` ${t('at')} ${selectedTime}` : ''}${priorityStr ? `\n${t('Priority')}: ${priorityStr}` : ''}\n\n${notes ? `${t('Notes')}:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `${t('Subtasks')}:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
-      if (noteImage) {
-        // Copy text to clipboard so user can paste it when sharing the image
+      const images = attachments.filter(a => a.type === 'image');
+      if (images.length > 0) {
         await Clipboard.setStringAsync(message);
         
         Alert.alert(
@@ -237,13 +245,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               text: t('Continue'),
               onPress: async () => {
                 try {
-                  const base64Data = noteImage.split(',')[1];
-                  const fileUri = FileSystem.cacheDirectory + 'task-image.jpg';
-                  await FileSystem.writeAsStringAsync(fileUri, base64Data, {
-                    encoding: FileSystem.EncodingType.Base64,
-                  });
-                  
-                  await Sharing.shareAsync(fileUri, {
+                  await Sharing.shareAsync(images[0].uri, {
                     mimeType: 'image/jpeg',
                     dialogTitle: t('Share Task')
                   });
@@ -276,7 +278,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if (!task) return false;
     const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
     if (taskName !== task.taskname) return true;
-    if (currentNotes !== (stripHtml(task.description?.text) || '') || noteImage !== (task.description?.img || '')) return true;
+    
+    const initialAttachments = task.description?.attachments || (task.description?.img ? [{ id: 'legacy_img', type: 'image', uri: task.description.img }] : []);
+    if (currentNotes !== (stripHtml(task.description?.text) || '') || JSON.stringify(attachments) !== JSON.stringify(initialAttachments)) return true;
+    
     if ((selectedTime || '') !== (task.time || '')) return true;
     if (reminder !== (task.reminder || 'None')) return true;
     if (isAlarm !== (task.isAlarm || false)) return true;
@@ -296,9 +301,17 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
     let updates = {};
     if (taskName !== task.taskname) updates.name = taskName;
-    if (currentNotes !== stripHtml(task.description?.text) || noteImage !== (task.description?.img || '')) {
-      updates.description = { text: currentNotes, img: noteImage, url: '' };
+    
+    const initialAttachments = task.description?.attachments || (task.description?.img ? [{ id: 'legacy_img', type: 'image', uri: task.description.img }] : []);
+    if (currentNotes !== stripHtml(task.description?.text) || JSON.stringify(attachments) !== JSON.stringify(initialAttachments)) {
+      updates.description = { 
+        text: currentNotes, 
+        img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', // keep first img for legacy support
+        attachments: attachments,
+        url: '' 
+      };
     }
+    
     if (selectedTime !== (task.time || '')) updates.time = selectedTime;
     if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
     if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
@@ -369,19 +382,107 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     // Removed auto-save
   };
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.2,
-      base64: true,
-    });
-    
-    if (!result.canceled && result.assets && result.assets[0].base64) {
-      const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      setNoteImage(base64Img);
-      // Wait for user to save
+  const saveFileToDocuments = async (uri, name) => {
+    try {
+      const fileExt = name.split('.').pop();
+      const newFileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const newUri = `${FileSystem.documentDirectory}${newFileName}`;
+      await FileSystem.copyAsync({ from: uri, to: newUri });
+      return newUri;
+    } catch (e) {
+      console.error(e);
+      return uri; // fallback
     }
+  };
+
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+  const handleAttach = () => {
+    Alert.alert(
+      t('Attach to Task'),
+      t('Choose the type of file to attach (Max 5MB)'),
+      [
+        { text: t('Cancel'), style: 'cancel' },
+        { text: t('Take Photo'), onPress: () => pickImage(true) },
+        { text: t('Choose Image'), onPress: () => pickImage(false) },
+        { text: t('Choose Document'), onPress: pickDocument }
+      ]
+    );
+  };
+
+  const pickImage = async (useCamera = false) => {
+    const options = {
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false, // Set false to allow multiple
+      allowsMultipleSelection: !useCamera,
+      quality: 0.5,
+    };
+    
+    let result;
+    if (useCamera) {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera permission is required.');
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync(options);
+    } else {
+      result = await ImagePicker.launchImageLibraryAsync(options);
+    }
+    
+    if (!result.canceled && result.assets) {
+      const newAttachments = [...attachments];
+      for (const asset of result.assets) {
+        if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE) {
+          Alert.alert('File Too Large', 'Images must be less than 5MB.');
+          continue;
+        }
+        const savedUri = await saveFileToDocuments(asset.uri, asset.fileName || 'image.jpg');
+        newAttachments.push({
+          id: Date.now().toString() + Math.random().toString(),
+          type: 'image',
+          uri: savedUri,
+          name: asset.fileName || 'Image',
+          size: asset.fileSize || 0
+        });
+      }
+      setAttachments(newAttachments);
+    }
+  };
+
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: false,
+        multiple: true
+      });
+      
+      if (!result.canceled && result.assets) {
+        const newAttachments = [...attachments];
+        for (const asset of result.assets) {
+          if (asset.size && asset.size > MAX_FILE_SIZE) {
+            Alert.alert('File Too Large', `The file ${asset.name} is larger than 5MB limit.`);
+            continue;
+          }
+          const savedUri = await saveFileToDocuments(asset.uri, asset.name);
+          newAttachments.push({
+            id: Date.now().toString() + Math.random().toString(),
+            type: 'document',
+            uri: savedUri,
+            name: asset.name,
+            size: asset.size || 0
+          });
+        }
+        setAttachments(newAttachments);
+      }
+    } catch (e) {
+      console.error('Error picking document', e);
+    }
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments(attachments.filter(a => a.id !== id));
   };
 
   const addSubtask = () => {
@@ -608,21 +709,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 </View>
               </View>
             )}
-{/* 
-            {showTimePicker && (
-              <CustomWheelTimePicker
-                visible={showTimePicker}
-                value={selectedTime}
-                colors={colors}
-                isDark={isDark}
-                onClose={() => setShowTimePicker(false)}
-                onSave={(timeStr) => {
-                  setSelectedTime(timeStr);
-                  handleUpdate({ time: timeStr });
-                  setShowTimePicker(false);
-                }}
-              />
-            )} */}
 
             {showTimePicker && (
               <CustomTimePicker
@@ -643,14 +729,14 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             )}
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
-              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('NOTES')}</Text>
+              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('NOTES & ATTACHMENTS')}</Text>
               {isPremium && (
                 <TouchableOpacity 
-                  accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
-                  onPress={pickImage} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                  accessible={true} accessibilityRole="button" accessibilityLabel="Add Attachment"
+                  onPress={handleAttach} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
                 >
-                  <IconImage color={colors.primary} />
-                  <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Add Photo')}</Text>
+                  <IconAttachment color={colors.primary} />
+                  <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Attach')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -662,23 +748,31 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                 placeholderTextColor={colors.textSecondary}
                 style={{ flex: 1, padding: 15, color: colors.textPrimary, fontSize: 15 }}
               />
-              {noteImage ? (
-                <View style={styles.imagePreviewContainer}>
-                  <TouchableOpacity onPress={() => setFullscreenImageVisible(true)} activeOpacity={0.8}>
-                    <Image source={{ uri: noteImage }} style={styles.imagePreview} />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    accessible={true} accessibilityRole="button" accessibilityLabel="Remove Photo"
-                    style={styles.imageRemoveBtn} 
-                    onPress={() => {
-                      setNoteImage('');
-                      handleUpdate({ description: { text: notes, img: '', url: '' } });
-                    }}
-                  >
-                    <IconClose color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ) : null}
+              
+              {attachments.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.attachmentsScroll}>
+                  {attachments.map(att => (
+                    <View key={att.id} style={styles.attachmentItem}>
+                      {att.type === 'image' ? (
+                        <TouchableOpacity onPress={() => setFullscreenImageVisible(true)} activeOpacity={0.8}>
+                          <Image source={{ uri: att.uri }} style={styles.attachmentThumb} />
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={[styles.attachmentThumb, { backgroundColor: colors.bgMain, justifyContent: 'center', alignItems: 'center', borderColor: colors.borderColor, borderWidth: 1 }]}>
+                          <IconFile color={colors.primary} />
+                          <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1}>{att.name}</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity 
+                        style={styles.attachmentRemoveBtn} 
+                        onPress={() => removeAttachment(att.id)}
+                      >
+                        <IconClose color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 10 }}>
@@ -819,20 +913,18 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
         <RNModal visible={isFullscreenImageVisible} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImageVisible(false)}>
           <View style={styles.fullscreenImageOverlay}>
-            <View style={styles.fullscreenImageHeader}>
-              <TouchableOpacity 
-                style={styles.headerBtn} 
-                onPress={() => setFullscreenImageVisible(false)}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              >
+            <View style={styles.fullscreenImageContainer}>
+              <TouchableOpacity style={styles.fullscreenImageClose} onPress={() => setFullscreenImageVisible(false)}>
                 <IconClose color="#fff" />
               </TouchableOpacity>
+              {attachments.filter(a => a.type === 'image').length > 0 && (
+                <Image 
+                  source={{ uri: attachments.find(a => a.type === 'image').uri }} 
+                  style={styles.fullscreenImage}
+                  resizeMode="contain"
+                />
+              )}
             </View>
-            <Image 
-              source={{ uri: noteImage }} 
-              style={styles.fullscreenImage} 
-              resizeMode="contain" 
-            />
           </View>
         </RNModal>
       <CustomRepeatModal
@@ -1012,21 +1104,35 @@ const styles = StyleSheet.create({
   },
   imagePreviewContainer: {
     padding: 10,
-    position: 'relative',
-    alignItems: 'flex-start'
+    alignItems: 'center',
   },
-  imagePreview: {
-    width: 200,
-    height: 200,
+  attachmentsScroll: {
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128,128,128,0.2)'
+  },
+  attachmentItem: {
+    marginRight: 15,
+    position: 'relative'
+  },
+  attachmentThumb: {
+    width: 80,
+    height: 80,
     borderRadius: 8,
+    resizeMode: 'cover'
   },
-  imageRemoveBtn: {
+  attachmentRemoveBtn: {
     position: 'absolute',
-    top: 5,
-    left: 190,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 15,
-    padding: 4,
+    top: -5,
+    right: -5,
+    backgroundColor: '#f44336',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff'
   },
   fullscreenImageOverlay: {
     flex: 1,
@@ -1034,9 +1140,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fullscreenImageHeader: {
+  fullscreenImageContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImageClose: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
+    top: 50,
     right: 20,
     zIndex: 10,
     backgroundColor: 'rgba(0,0,0,0.5)',
