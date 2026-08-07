@@ -2,8 +2,9 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateTask, deleteTask } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
+import { useToast } from '../styles/ToastContext';
 import dayjs from 'dayjs';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
@@ -56,6 +57,7 @@ const IconCheckCircle = ({ color }) => (
 const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const { t } = useTranslation();
 
   const theme = useSelector(state => state.themeReducer);
@@ -97,6 +99,13 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   const handleSwipeDelete = () => {
     closeSwipeable();
     dispatch(deleteTask({ taskId: task.id }));
+    showToast(
+      t('Task Deleted'),
+      t('Undo'),
+      () => {
+        dispatch(addTask({ task }));
+      }
+    );
   };
 
   const handleSwipeSnooze = () => {
@@ -167,10 +176,19 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   };
 
   const handleToggleComplete = () => {
+    const newCompletedState = !task.completed;
     dispatch(updateTask({
       taskId: task.id,
-      completed: !task.completed
+      completed: newCompletedState
     }));
+    
+    showToast(
+      newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
+      t('Undo'),
+      () => {
+        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState }));
+      }
+    );
   };
 
   const getPriorityColor = (priority) => {

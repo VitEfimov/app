@@ -15,6 +15,7 @@ import { Calendar } from 'react-native-calendars';
 import { scheduleTaskReminder, cancelNotification } from '../utils/notifications';
 import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
 import CustomDropdown from './CustomDropdown';
+import CustomRepeatModal from './CustomRepeatModal';
 import ConfirmModal from './ConfirmModal';
 import { useTranslation } from 'react-i18next';
 
@@ -140,7 +141,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [reminder, setReminder] = useState('None');
   const [isAlarm, setIsAlarm] = useState(false);
-  const [repeatFrequency, setRepeatFrequency] = useState('None');
+  const [repeatConfig, setRepeatConfig] = useState({ preset: 'None' });
+  const [isRepeatModalVisible, setIsRepeatModalVisible] = useState(false);
   const [repeatStartDate, setRepeatStartDate] = useState('');
   const [repeatEndDate, setRepeatEndDate] = useState('');
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
@@ -184,9 +186,9 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     // Saved user time or null.
     setSelectedTime(task.time || null);
 
-    setRepeatFrequency(
-      task.repeatFrequency || 'None'
-    );
+    let config = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
+    if (typeof config === 'string') config = JSON.parse(config);
+    setRepeatConfig(config);
 
     setRepeatStartDate(
       task.repeatStartDate ||
@@ -280,7 +282,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if (isAlarm !== (task.isAlarm || false)) return true;
     if (priority !== (task.priority || 'none').toLowerCase()) return true;
     if (selectedDate !== (task.completionDate || '')) return true;
-    if (repeatFrequency !== (task.repeatFrequency || 'None')) return true;
+    
+    const initialConfig = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
+    if (JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig)) return true;
+    
     if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) return true;
     if (repeatEndDate !== (task.repeatEndDate || '')) return true;
     if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) return true;
@@ -297,7 +302,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     if (selectedTime !== (task.time || '')) updates.time = selectedTime;
     if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
     if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
-    if (repeatFrequency !== (task.repeatFrequency || 'None')) updates.repeatFrequency = repeatFrequency;
+    
+    const initialConfig = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
+    if (JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig)) {
+      updates.repeatConfig = repeatConfig;
+      updates.repeatFrequency = repeatConfig.preset; // backwards compatibility
+    }
+    
     if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) updates.repeatStartDate = repeatStartDate;
     if (repeatEndDate !== (task.repeatEndDate || '')) updates.repeatEndDate = repeatEndDate;
     
@@ -328,8 +339,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       dispatch(updateTask({ taskId: task.id, ...updates }));
     }
 
-    if (repeatFrequency !== 'None' && repeatEndDate) {
-      generateRepeatingTasks(task, { name: taskName, descriptionText: currentNotes, priority }, { frequency: repeatFrequency, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate });
+    if (repeatConfig.preset !== 'None' && repeatEndDate) {
+      generateRepeatingTasks(task, { name: taskName, descriptionText: currentNotes, priority }, { ...repeatConfig, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate });
     }
 
     onClose();
@@ -544,7 +555,17 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               </View>
               {isPremium && (
                 <View style={styles.column}>
-                  <CustomDropdown label={t("REPEAT")} value={repeatFrequency} options={[{label: t('None'), value: 'None'}, {label: t('Daily'), value: 'Daily'}, {label: t('Weekly'), value: 'Weekly'}, {label: t('Monthly'), value: 'Monthly'}]} onSelect={setRepeatFrequency} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('REPEAT')}</Text>
+                  <TouchableOpacity 
+                    style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 8 }]}
+                    onPress={() => setIsRepeatModalVisible(true)}
+                  >
+                    <Text style={{ color: colors.textPrimary }}>
+                      {repeatConfig.preset === 'custom' ? t('Custom...') : 
+                       repeatConfig.preset === 'None' ? t('None') : 
+                       repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
@@ -556,7 +577,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               </View>
             )}
 
-            {repeatFrequency !== 'None' && (
+            {repeatConfig.preset !== 'None' && (
               <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}>
                 <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('REPEAT CONFIGURATION')}</Text>
                 <View style={styles.twoColumnRow}>
@@ -814,6 +835,12 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             />
           </View>
         </RNModal>
+      <CustomRepeatModal
+        isVisible={isRepeatModalVisible}
+        onClose={() => setIsRepeatModalVisible(false)}
+        initialConfig={repeatConfig}
+        onSave={setRepeatConfig}
+      />
     </Modal>
   );
 }

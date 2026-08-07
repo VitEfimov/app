@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, ScrollVie
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
+import { useToast } from '../styles/ToastContext';
 import TaskRow from '../components/TaskRow';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
@@ -16,7 +17,7 @@ import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path } from 'react-native-svg';
-import { updateTask, deleteTask, deleteTasksByBoard } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask, deleteTasksByBoard } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed } from '../features/themeSlice';
 import { useTranslation } from 'react-i18next';
@@ -40,6 +41,7 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
@@ -245,10 +247,21 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: 'Complete',
       isDestructive: false,
       onConfirm: () => {
-        section.data.forEach(task => {
+        const tasksToComplete = [...section.data];
+        tasksToComplete.forEach(task => {
           dispatch(updateTask({ taskId: task.id, completed: true }));
         });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        
+        showToast(
+          `${tasksToComplete.length} ${t('tasks completed')}`,
+          t('Undo'),
+          () => {
+            tasksToComplete.forEach(task => {
+              dispatch(updateTask({ taskId: task.id, completed: task.completed }));
+            });
+          }
+        );
       }
     });
   };
@@ -287,10 +300,21 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: 'Delete',
       isDestructive: true,
       onConfirm: () => {
-        section.data.forEach(task => {
+        const tasksToDelete = [...section.data];
+        tasksToDelete.forEach(task => {
           dispatch(deleteTask({ taskId: task.id }));
         });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        
+        showToast(
+          `${tasksToDelete.length} ${t('tasks deleted')}`,
+          t('Undo'),
+          () => {
+            tasksToDelete.forEach(task => {
+              dispatch(addTask({ task }));
+            });
+          }
+        );
       }
     });
   };

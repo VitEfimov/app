@@ -104,6 +104,7 @@ const taskSlice = createSlice({
                 if (action.payload.isAlarm !== undefined) task.isAlarm = action.payload.isAlarm;
                 task.notificationId = action.payload.notificationId !== undefined ? action.payload.notificationId : task.notificationId;
                 if (action.payload.repeatFrequency !== undefined) task.repeatFrequency = action.payload.repeatFrequency;
+                if (action.payload.repeatConfig !== undefined) task.repeatConfig = action.payload.repeatConfig;
                 if (action.payload.repeatStartDate !== undefined) task.repeatStartDate = action.payload.repeatStartDate;
                 if (action.payload.repeatEndDate !== undefined) task.repeatEndDate = action.payload.repeatEndDate;
                 if (action.payload.isNagMode !== undefined) task.isNagMode = action.payload.isNagMode;

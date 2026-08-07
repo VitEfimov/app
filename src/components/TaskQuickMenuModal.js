@@ -4,6 +4,7 @@ import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import { updateTask, deleteTask, addTask } from '../features/taskSlice';
+import { useToast } from '../styles/ToastContext';
 import dayjs from 'dayjs';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -21,17 +22,35 @@ export default function TaskQuickMenuModal({
 }) {
   const { t } = useTranslation();
   const dispatch = useDispatch();
+  const { showToast } = useToast();
 
   if (!task) return null;
 
   const handleComplete = () => {
-    dispatch(updateTask({ taskId: task.id, completed: !task.completed }));
+    const newCompletedState = !task.completed;
+    dispatch(updateTask({ taskId: task.id, completed: newCompletedState }));
     onClose();
+    
+    showToast(
+      newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
+      t('Undo'),
+      () => {
+        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState }));
+      }
+    );
   };
 
   const handleDelete = () => {
     dispatch(deleteTask({ taskId: task.id }));
     onClose();
+    
+    showToast(
+      t('Task Deleted'),
+      t('Undo'),
+      () => {
+        dispatch(addTask({ task }));
+      }
+    );
   };
 
   const handleDuplicate = () => {

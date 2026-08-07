@@ -3,6 +3,7 @@ import { View, StyleSheet, FlatList, SectionList, Text, Animated, PanResponder, 
 import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
 import { useTheme } from '../styles/ThemeContext';
+import { useToast } from '../styles/ToastContext';
 import TaskRow from '../components/TaskRow';
 import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
@@ -13,10 +14,11 @@ import ConfirmModal from '../components/ConfirmModal';
 import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import { updateTask, deleteTask } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask } from '../features/taskSlice';
 
 export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
+  const { showToast } = useToast();
   const { t, i18n } = useTranslation();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || []);
@@ -145,11 +147,25 @@ export default function CalendarScreen() {
       confirmText: 'Complete',
       isDestructive: false,
       onConfirm: () => {
-        selectionMode.selectedTaskIds.forEach(id => {
+        const ids = [...selectionMode.selectedTaskIds];
+        ids.forEach(id => {
           dispatch(updateTask({ taskId: id, completed: true }));
         });
         setSelectionMode({ isActive: false, selectedTaskIds: [] });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        
+        showToast(
+          `${ids.length} ${t('tasks completed')}`,
+          t('Undo'),
+          () => {
+            ids.forEach(id => {
+              const task = selectedTasks.find(t => t.id === id);
+              if (task) {
+                dispatch(updateTask({ taskId: id, completed: task.completed }));
+              }
+            });
+          }
+        );
       }
     });
   };
@@ -162,9 +178,22 @@ export default function CalendarScreen() {
       confirmText: 'Delete',
       isDestructive: true,
       onConfirm: () => {
-        selectionMode.selectedTaskIds.forEach(id => dispatch(deleteTask({ taskId: id })));
+        const ids = [...selectionMode.selectedTaskIds];
+        const tasksToDelete = selectedTasks.filter(t => ids.includes(t.id));
+        
+        ids.forEach(id => dispatch(deleteTask({ taskId: id })));
         setSelectionMode({ isActive: false, selectedTaskIds: [] });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        
+        showToast(
+          `${ids.length} ${t('tasks deleted')}`,
+          t('Undo'),
+          () => {
+            tasksToDelete.forEach(task => {
+              dispatch(addTask({ task }));
+            });
+          }
+        );
       }
     });
   };
@@ -198,12 +227,22 @@ export default function CalendarScreen() {
       confirmText: 'Complete',
       isDestructive: false,
       onConfirm: () => {
-        selectedTasks.forEach(task => {
-          if (!task.completed) {
-            dispatch(updateTask({ taskId: task.id, completed: true }));
-          }
+        const uncompletedTasks = selectedTasks.filter(t => !t.completed);
+        
+        uncompletedTasks.forEach(task => {
+          dispatch(updateTask({ taskId: task.id, completed: true }));
         });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        
+        showToast(
+          `${uncompletedTasks.length} ${t('tasks completed')}`,
+          t('Undo'),
+          () => {
+            uncompletedTasks.forEach(task => {
+              dispatch(updateTask({ taskId: task.id, completed: false }));
+            });
+          }
+        );
       }
     });
   };
@@ -235,10 +274,22 @@ export default function CalendarScreen() {
       confirmText: 'Delete',
       isDestructive: true,
       onConfirm: () => {
-        selectedTasks.forEach(task => {
+        const tasksToDelete = [...selectedTasks];
+        
+        tasksToDelete.forEach(task => {
           dispatch(deleteTask({ taskId: task.id }));
         });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        
+        showToast(
+          `${tasksToDelete.length} ${t('tasks deleted')}`,
+          t('Undo'),
+          () => {
+            tasksToDelete.forEach(task => {
+              dispatch(addTask({ task }));
+            });
+          }
+        );
       }
     });
   };

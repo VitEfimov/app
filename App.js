@@ -12,6 +12,7 @@ import { hydrateUserState } from './src/features/userSlice';
 import { hydrateThemeState } from './src/features/themeSlice';
 import { hydratePomodoroState } from './src/features/pomodoroSlice';
 import { hydrateStatsState } from './src/features/statsSlice';
+import { hydrateEntitlementState } from './src/features/entitlementSlice';
 import { fetchTasks } from './src/features/taskSlice';
 import axios from 'axios';
 import { Platform } from 'react-native';
@@ -287,6 +288,9 @@ function InitApp() {
         const statsJson = await AsyncStorage.getItem('stats');
         if (statsJson) dispatch(hydrateStatsState(JSON.parse(statsJson)));
 
+        const entitlementJson = await AsyncStorage.getItem('entitlement');
+        if (entitlementJson) dispatch(hydrateEntitlementState(JSON.parse(entitlementJson)));
+
         // Load tasks from local storage
         await dispatch(fetchTasks()).unwrap();
 
@@ -402,19 +406,22 @@ function RootWrapper({ children }) {
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
+import { ToastProvider } from './src/styles/ToastContext';
 
 export default function App() {
   return (
     <ErrorBoundary>
       <Provider store={store}>
         <ThemeProvider>
-          <RootWrapper>
-            <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
-              <SafeAreaProvider>
-                <InitApp />
-              </SafeAreaProvider>
-            </GestureHandlerRootView>
-          </RootWrapper>
+          <ToastProvider>
+            <RootWrapper>
+              <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
+                <SafeAreaProvider>
+                  <InitApp />
+                </SafeAreaProvider>
+              </GestureHandlerRootView>
+            </RootWrapper>
+          </ToastProvider>
         </ThemeProvider>
       </Provider>
     </ErrorBoundary>
