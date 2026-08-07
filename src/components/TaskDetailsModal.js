@@ -117,6 +117,13 @@ const IconAttachment = ({ color }) => (
   </Svg>
 );
 
+const IconCamera = ({ color }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <Circle cx="12" cy="13" r="4" />
+  </Svg>
+);
+
 const IconImage = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -245,10 +252,19 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
               text: t('Continue'),
               onPress: async () => {
                 try {
-                  await Sharing.shareAsync(images[0].uri, {
-                    mimeType: 'image/jpeg',
-                    dialogTitle: t('Share Task')
-                  });
+                  for (let i = 0; i < images.length; i++) {
+                    let uriToShare = images[i].uri;
+                    if (uriToShare.startsWith('data:image')) {
+                      const base64Data = uriToShare.split(',')[1];
+                      const tempUri = FileSystem.cacheDirectory + `task-image-${Date.now()}-${i}.jpg`;
+                      await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+                      uriToShare = tempUri;
+                    }
+                    await Sharing.shareAsync(uriToShare, {
+                      mimeType: 'image/jpeg',
+                      dialogTitle: t('Share Task')
+                    });
+                  }
                 } catch (e) {
                   console.error(e);
                 }
@@ -405,17 +421,20 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
-  const handleAttach = () => {
+  const handleAttachPhoto = () => {
     Alert.alert(
-      t('Attach to Task'),
-      t('Choose the type of file to attach (Max 5MB)'),
+      t('Attach Photo'),
+      t('Choose source'),
       [
         { text: t('Cancel'), style: 'cancel' },
         { text: t('Take Photo'), onPress: () => setTimeout(() => pickImage(true), 100) },
-        { text: t('Choose Image'), onPress: () => setTimeout(() => pickImage(false), 100) },
-        { text: t('Choose Document'), onPress: () => setTimeout(() => pickDocument(), 100) }
+        { text: t('Choose Image'), onPress: () => setTimeout(() => pickImage(false), 100) }
       ]
     );
+  };
+
+  const handleAttachDocument = () => {
+    setTimeout(() => pickDocument(), 100);
   };
 
   const pickImage = async (useCamera = false) => {
@@ -739,13 +758,20 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('NOTES & ATTACHMENTS')}</Text>
               {isPremium && (
-                <TouchableOpacity 
-                  accessible={true} accessibilityRole="button" accessibilityLabel="Add Attachment"
-                  onPress={handleAttach} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                >
-                  <IconAttachment color={colors.primary} />
-                  <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Attach')}</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+                  <TouchableOpacity 
+                    accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
+                    onPress={handleAttachPhoto} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                  >
+                    <IconCamera color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    accessible={true} accessibilityRole="button" accessibilityLabel="Add Document"
+                    onPress={handleAttachDocument} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                  >
+                    <IconAttachment color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
             <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 100 }]}>

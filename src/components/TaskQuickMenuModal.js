@@ -65,8 +65,13 @@ export default function TaskQuickMenuModal({
 
   const handleShare = async () => {
     try {
-      if (task.description?.img) {
-        await Clipboard.setStringAsync(`${task.taskname}\n\n${task.description.text || ''}`);
+      const images = task.description?.attachments?.filter(a => a.type === 'image') || [];
+      if (task.description?.img && images.length === 0) {
+        images.push({ uri: task.description.img });
+      }
+
+      if (images.length > 0) {
+        await Clipboard.setStringAsync(`${task.taskname}\n\n${task.description?.text || ''}`);
         Alert.alert(
           t('Text Copied'),
           t('Task text copied to clipboard! You can paste it into your message after selecting where to share the image.'),
@@ -75,18 +80,18 @@ export default function TaskQuickMenuModal({
               text: t('Continue'),
               onPress: async () => {
                 try {
-                  let fileToShare = task.description.img;
-                  
-                  if (fileToShare.startsWith('data:image')) {
-                    const base64Data = fileToShare.split(',')[1];
-                    const tempUri = FileSystem.cacheDirectory + 'task-image.jpg';
-                    await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-                    fileToShare = tempUri;
+                  for (let i = 0; i < images.length; i++) {
+                    let fileToShare = images[i].uri;
+                    if (fileToShare.startsWith('data:image')) {
+                      const base64Data = fileToShare.split(',')[1];
+                      const tempUri = FileSystem.cacheDirectory + `task-image-${Date.now()}-${i}.jpg`;
+                      await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+                      fileToShare = tempUri;
+                    }
+                    await Sharing.shareAsync(fileToShare, {
+                      dialogTitle: t('Share Task')
+                    });
                   }
-                  
-                  await Sharing.shareAsync(fileToShare, {
-                    dialogTitle: t('Share Task')
-                  });
                 } catch (err) {
                   Alert.alert("Error sharing image", err.message);
                 }
