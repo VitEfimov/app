@@ -411,9 +411,9 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       t('Choose the type of file to attach (Max 5MB)'),
       [
         { text: t('Cancel'), style: 'cancel' },
-        { text: t('Take Photo'), onPress: () => pickImage(true) },
-        { text: t('Choose Image'), onPress: () => pickImage(false) },
-        { text: t('Choose Document'), onPress: pickDocument }
+        { text: t('Take Photo'), onPress: () => setTimeout(() => pickImage(true), 100) },
+        { text: t('Choose Image'), onPress: () => setTimeout(() => pickImage(false), 100) },
+        { text: t('Choose Document'), onPress: () => setTimeout(() => pickDocument(), 100) }
       ]
     );
   };

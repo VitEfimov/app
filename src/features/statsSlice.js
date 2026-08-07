@@ -70,19 +70,25 @@ export const statsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase('task/addTaskSync', (state) => {
+      .addCase('task/addTaskSync', (state, action) => {
+        if (action.payload && action.payload.isUndo) return; // Undo delete shouldn't count as creation
         const today = dayjs().format('YYYY-MM-DD');
         if (!state.dailyStats[today]) state.dailyStats[today] = { tasksCreated: 0, tasksCompleted: 0, pomodoroSessions: 0, pomodoroMinutes: 0 };
         state.dailyStats[today].tasksCreated = (state.dailyStats[today].tasksCreated || 0) + 1;
         AsyncStorage.setItem('stats', JSON.stringify(state.dailyStats));
       })
       .addCase('task/updateTaskSync', (state, action) => {
-        // Only count as completed if the payload explicitly sets completed to true
         if (action.payload && action.payload.completed === true) {
           const today = dayjs().format('YYYY-MM-DD');
           if (!state.dailyStats[today]) state.dailyStats[today] = { tasksCreated: 0, tasksCompleted: 0, pomodoroSessions: 0, pomodoroMinutes: 0 };
           state.dailyStats[today].tasksCompleted = (state.dailyStats[today].tasksCompleted || 0) + 1;
           AsyncStorage.setItem('stats', JSON.stringify(state.dailyStats));
+        } else if (action.payload && action.payload.completed === false) {
+          const today = dayjs().format('YYYY-MM-DD');
+          if (state.dailyStats[today] && state.dailyStats[today].tasksCompleted > 0) {
+            state.dailyStats[today].tasksCompleted -= 1;
+            AsyncStorage.setItem('stats', JSON.stringify(state.dailyStats));
+          }
         }
       })
       .addCase('pomodoro/completeWorkInterval', (state, action) => {

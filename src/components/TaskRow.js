@@ -103,7 +103,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
       t('Task Deleted'),
       t('Undo'),
       () => {
-        dispatch(addTask({ task }));
+        dispatch(addTask({ task, isUndo: true }));
       }
     );
   };
@@ -186,7 +186,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
       newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
       t('Undo'),
       () => {
-        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState }));
+        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState, isUndo: true }));
       }
     );
   };

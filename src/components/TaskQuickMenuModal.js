@@ -35,7 +35,7 @@ export default function TaskQuickMenuModal({
       newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
       t('Undo'),
       () => {
-        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState }));
+        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState, isUndo: true }));
       }
     );
   };
@@ -48,7 +48,7 @@ export default function TaskQuickMenuModal({
       t('Task Deleted'),
       t('Undo'),
       () => {
-        dispatch(addTask({ task }));
+        dispatch(addTask({ task, isUndo: true }));
       }
     );
   };

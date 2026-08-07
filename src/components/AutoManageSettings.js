@@ -8,6 +8,7 @@ import { setAutoManageSettings } from '../features/themeSlice';
 import { processAutoManageTasks } from '../features/taskSlice';
 import { updateRecurringAutomations } from '../utils/notifications';
 import CustomDropdown from './CustomDropdown';
+import CustomTimePicker from './CustomTimePicker';
 
 export default function AutoManageSettings({ isVisible, onClose }) {
   const { t } = useTranslation();
@@ -20,6 +21,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [scrollViewHeight, setScrollViewHeight] = useState(0);
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
+  const [timePickerTarget, setTimePickerTarget] = useState(null);
 
   const defaultSettings = {
     autoTransferMode: 'none',
@@ -234,15 +236,10 @@ export default function AutoManageSettings({ isVisible, onClose }) {
               onValueChange={(val) => handleUpdate({ morningReminder: val })} 
             />
             {morningReminder && (
-              <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
-                <CustomDropdown
-                  value={morningReminderTime}
-                  options={timeOptions}
-                  onSelect={(val) => handleUpdate({ morningReminderTime: val })}
-                  colors={colors}
-                  layout="horizontal"
-                  customBtnStyle={{ paddingVertical: 5 }}
-                />
+              <View style={{ paddingHorizontal: 15, paddingBottom: 10, alignItems: 'flex-start' }}>
+                <TouchableOpacity onPress={() => setTimePickerTarget('morning')} style={{ paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.surfaceContainerHigh }}>
+                  <Text style={{ color: colors.textPrimary }}>{morningReminderTime}</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -252,15 +249,10 @@ export default function AutoManageSettings({ isVisible, onClose }) {
               onValueChange={(val) => handleUpdate({ eveningReminder: val })} 
             />
             {eveningReminder && (
-              <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
-                <CustomDropdown
-                  value={eveningReminderTime}
-                  options={timeOptions}
-                  onSelect={(val) => handleUpdate({ eveningReminderTime: val })}
-                  colors={colors}
-                  layout="horizontal"
-                  customBtnStyle={{ paddingVertical: 5 }}
-                />
+              <View style={{ paddingHorizontal: 15, paddingBottom: 10, alignItems: 'flex-start' }}>
+                <TouchableOpacity onPress={() => setTimePickerTarget('evening')} style={{ paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.surfaceContainerHigh }}>
+                  <Text style={{ color: colors.textPrimary }}>{eveningReminderTime}</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -270,15 +262,10 @@ export default function AutoManageSettings({ isVisible, onClose }) {
               onValueChange={(val) => handleUpdate({ summaryReminder: val })} 
             />
             {summaryReminder && (
-              <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
-                <CustomDropdown
-                  value={summaryReminderTime}
-                  options={timeOptions}
-                  onSelect={(val) => handleUpdate({ summaryReminderTime: val })}
-                  colors={colors}
-                  layout="horizontal"
-                  customBtnStyle={{ paddingVertical: 5 }}
-                />
+              <View style={{ paddingHorizontal: 15, paddingBottom: 10, alignItems: 'flex-start' }}>
+                <TouchableOpacity onPress={() => setTimePickerTarget('summary')} style={{ paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.surfaceContainerHigh }}>
+                  <Text style={{ color: colors.textPrimary }}>{summaryReminderTime}</Text>
+                </TouchableOpacity>
               </View>
             )}
             
@@ -294,6 +281,25 @@ export default function AutoManageSettings({ isVisible, onClose }) {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        {timePickerTarget && (
+          <CustomTimePicker
+            visible={!!timePickerTarget}
+            value={
+              timePickerTarget === 'morning' ? morningReminderTime :
+              timePickerTarget === 'evening' ? eveningReminderTime :
+              timePickerTarget === 'summary' ? summaryReminderTime : '12:00'
+            }
+            colors={colors}
+            isDark={themeState?.isDark || false}
+            onClose={() => setTimePickerTarget(null)}
+            onSave={(newTime) => {
+              if (timePickerTarget === 'morning') handleUpdate({ morningReminderTime: newTime });
+              else if (timePickerTarget === 'evening') handleUpdate({ eveningReminderTime: newTime });
+              else if (timePickerTarget === 'summary') handleUpdate({ summaryReminderTime: newTime });
+              setTimePickerTarget(null);
+            }}
+          />
+        )}
       </View>
     </Modal>
   );
