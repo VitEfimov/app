@@ -159,11 +159,11 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [isRepeatModalVisible, setIsRepeatModalVisible] = useState(false);
   const [repeatStartDate, setRepeatStartDate] = useState('');
   const [repeatEndDate, setRepeatEndDate] = useState('');
-  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null });
   const { generateRepeatingTasks } = useTaskRepeat();
 
   const [datePickerType, setDatePickerType] = useState(null);
-  const [isFullscreenImageVisible, setFullscreenImageVisible] = useState(false);
+  const [selectedFullscreenImage, setSelectedFullscreenImage] = useState(null);
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
 
@@ -361,14 +361,22 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const handleClose = () => {
     if (hasUnsavedChanges()) {
-      Alert.alert(
-        t('Unsaved Changes'),
-        t('You have unsaved changes. Are you sure you want to discard them?'),
-        [
-          { text: t('Cancel'), style: 'cancel' },
-          { text: t('Discard'), style: 'destructive', onPress: onClose }
-        ]
-      );
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Unsaved Changes'),
+        message: t('You have unsaved changes. Are you sure you want to discard them?'),
+        confirmText: t('Discard'),
+        isDestructive: true,
+        onConfirm: () => {
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          onClose();
+        },
+        secondaryConfirmText: t('Save'),
+        onSecondaryConfirm: () => {
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          handleSave();
+        }
+      });
     } else {
       onClose();
     }
@@ -754,7 +762,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                   {attachments.map(att => (
                     <View key={att.id} style={styles.attachmentItem}>
                       {att.type === 'image' ? (
-                        <TouchableOpacity onPress={() => setFullscreenImageVisible(true)} activeOpacity={0.8}>
+                        <TouchableOpacity onPress={() => setSelectedFullscreenImage(att.uri)} activeOpacity={0.8}>
                           <Image source={{ uri: att.uri }} style={styles.attachmentThumb} />
                         </TouchableOpacity>
                       ) : (
@@ -843,6 +851,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           message={confirmConfig.message}
           confirmText={confirmConfig.confirmText}
           isDestructive={confirmConfig.isDestructive}
+          secondaryConfirmText={confirmConfig.secondaryConfirmText}
+          onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
           onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
           onConfirm={confirmConfig.onConfirm}
         />
@@ -911,15 +921,15 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           </View>
         </RNModal>
 
-        <RNModal visible={isFullscreenImageVisible} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImageVisible(false)}>
+        <RNModal visible={!!selectedFullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setSelectedFullscreenImage(null)}>
           <View style={styles.fullscreenImageOverlay}>
             <View style={styles.fullscreenImageContainer}>
-              <TouchableOpacity style={styles.fullscreenImageClose} onPress={() => setFullscreenImageVisible(false)}>
+              <TouchableOpacity style={styles.fullscreenImageClose} onPress={() => setSelectedFullscreenImage(null)}>
                 <IconClose color="#fff" />
               </TouchableOpacity>
-              {attachments.filter(a => a.type === 'image').length > 0 && (
+              {selectedFullscreenImage && (
                 <Image 
-                  source={{ uri: attachments.find(a => a.type === 'image').uri }} 
+                  source={{ uri: selectedFullscreenImage }} 
                   style={styles.fullscreenImage}
                   resizeMode="contain"
                 />

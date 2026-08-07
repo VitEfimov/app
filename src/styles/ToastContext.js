@@ -80,13 +80,15 @@ export const ToastProvider = ({ children }) => {
             style={[
               styles.container, 
               { 
-                backgroundColor: isDark ? (mode === 'contrast' ? '#ffffff' : '#e0e0e0') : '#333333',
+                backgroundColor: isDark ? colors.bgCard : '#333333',
+                borderColor: isDark ? colors.borderColor : 'transparent',
+                borderWidth: isDark ? 1 : 0,
                 transform: [{ translateY }],
                 opacity
               }
             ]}
           >
-            <Text style={[styles.message, { color: isDark ? '#000000' : '#ffffff' }]}>{toastConfig.message}</Text>
+            <Text style={[styles.message, { color: isDark ? colors.textPrimary : '#ffffff' }]}>{toastConfig.message}</Text>
             {toastConfig.actionLabel && toastConfig.onAction && (
               <TouchableOpacity onPress={toastConfig.onAction} style={styles.actionButton}>
                 <Text style={[styles.actionLabel, { color: isDark ? colors.primary : '#ffca28' }]}>{toastConfig.actionLabel}</Text>

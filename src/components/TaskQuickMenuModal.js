@@ -75,11 +75,16 @@ export default function TaskQuickMenuModal({
               text: t('Continue'),
               onPress: async () => {
                 try {
-                  const base64Data = task.description.img.split(',')[1];
-                  const fileUri = FileSystem.cacheDirectory + 'task-image.jpg';
-                  await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+                  let fileToShare = task.description.img;
                   
-                  await Sharing.shareAsync(fileUri, {
+                  if (fileToShare.startsWith('data:image')) {
+                    const base64Data = fileToShare.split(',')[1];
+                    const tempUri = FileSystem.cacheDirectory + 'task-image.jpg';
+                    await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+                    fileToShare = tempUri;
+                  }
+                  
+                  await Sharing.shareAsync(fileToShare, {
                     dialogTitle: t('Share Task')
                   });
                 } catch (err) {

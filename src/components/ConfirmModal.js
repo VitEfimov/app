@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Modal from 'react-native-modal';
 import { useTheme } from '../styles/ThemeContext';
 
-export default function ConfirmModal({ isVisible, title, message, onCancel, onConfirm, confirmText = 'Confirm', cancelText = 'Cancel', isDestructive = false, hideCancel = false }) {
+export default function ConfirmModal({ isVisible, title, message, onCancel, onConfirm, confirmText = 'Confirm', cancelText = 'Cancel', isDestructive = false, hideCancel = false, secondaryConfirmText, onSecondaryConfirm }) {
   const { colors } = useTheme();
 
   return (
@@ -24,6 +24,11 @@ export default function ConfirmModal({ isVisible, title, message, onCancel, onCo
             {!hideCancel && (
               <TouchableOpacity testID="confirm_modal_cancel" style={styles.btn} onPress={onCancel}>
                 <Text style={[styles.btnText, { color: colors.textSecondary }]}>{cancelText}</Text>
+              </TouchableOpacity>
+            )}
+            {secondaryConfirmText && onSecondaryConfirm && (
+              <TouchableOpacity testID="confirm_modal_secondary" style={styles.btn} onPress={onSecondaryConfirm}>
+                <Text style={[styles.btnText, { color: colors.primary, fontWeight: 'bold' }]}>{secondaryConfirmText}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity testID="confirm_modal_submit" style={styles.btn} onPress={onConfirm}>
