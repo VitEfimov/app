@@ -9,7 +9,12 @@ import dayjs from 'dayjs';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Clipboard from 'expo-clipboard';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
+
+let RNShare;
+if (Platform.OS !== 'web') {
+  RNShare = require('react-native-share').default;
+}
 
 export default function TaskQuickMenuModal({ 
   isVisible, 
@@ -63,37 +68,78 @@ export default function TaskQuickMenuModal({
     onClose();
   };
 
-  const handleShare = async () => {
-    try {
-      const images = task.description?.attachments?.filter(a => a.type === 'image') || [];
-      if (task.description?.img && images.length === 0) {
-        images.push({ uri: task.description.img });
+  const prepareAttachmentsForShare = async (attachmentsToShare) => {
+    const urls = [];
+    for (let i = 0; i < attachmentsToShare.length; i++) {
+      const attachment = attachmentsToShare[i];
+      let uri = attachment.uri;
+
+      if (attachment.type === 'image' && uri.startsWith('data:image')) {
+        const comma = uri.indexOf(',');
+        const base64Data = uri.substring(comma + 1);
+        const ext = attachment.name?.split('.').pop() || 'jpg';
+        const tempUri = `${FileSystem.cacheDirectory}share-${Date.now()}-${i}.${ext}`;
+
+        await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        uri = tempUri;
       }
 
-      if (images.length > 0) {
-        await Clipboard.setStringAsync(`${task.taskname}\n\n${task.description?.text || ''}`);
+      const info = await FileSystem.getInfoAsync(uri);
+      if (!info.exists) {
+        console.warn('Skipping missing attachment:', attachment.name, uri);
+        continue;
+      }
+      urls.push(uri);
+    }
+    return urls;
+  };
+
+  const handleShare = async () => {
+    try {
+      const attachments = task.description?.attachments ? [...task.description.attachments] : [];
+      if (task.description?.img && attachments.length === 0) {
+        attachments.push({ uri: task.description.img, type: 'image', name: 'image.jpg' });
+      }
+
+      const message = `${task.taskname}\n\n${task.description?.text || ''}`;
+
+      if (attachments.length > 0 && Platform.OS !== 'web') {
+        await Clipboard.setStringAsync(message);
+        
         Alert.alert(
-          t('Text Copied'),
-          t('Task text copied to clipboard! You can paste it into your message after selecting where to share the image.'),
+          t('Sharing with Attachments'),
+          t('Task text copied to clipboard! You can paste it into your message after selecting where to share.'),
           [
+            { text: t('Cancel'), style: 'cancel' },
             {
               text: t('Continue'),
               onPress: async () => {
                 try {
-                  for (let i = 0; i < images.length; i++) {
-                    let fileToShare = images[i].uri;
-                    if (fileToShare.startsWith('data:image')) {
-                      const base64Data = fileToShare.split(',')[1];
-                      const tempUri = FileSystem.cacheDirectory + `task-image-${Date.now()}-${i}.jpg`;
-                      await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-                      fileToShare = tempUri;
-                    }
-                    await Sharing.shareAsync(fileToShare, {
-                      dialogTitle: t('Share Task')
-                    });
+                  const urlsToShare = await prepareAttachmentsForShare(attachments);
+                  
+                  if (urlsToShare.length === 0) {
+                    return;
                   }
+
+                  requestAnimationFrame(async () => {
+                    try {
+                      await RNShare.open({
+                        urls: urlsToShare,
+                        type: '*/*',
+                        title: t('Share Task'),
+                        failOnCancel: false
+                      });
+                    } catch (err) {
+                      if (err.message !== 'User did not share') {
+                        Alert.alert("Error sharing", err.message);
+                      }
+                    }
+                  });
                 } catch (err) {
-                  Alert.alert("Error sharing image", err.message);
+                  Alert.alert("Error sharing", err.message);
                 }
               }
             }
@@ -101,7 +147,7 @@ export default function TaskQuickMenuModal({
         );
       } else {
         await Share.share({
-          message: `${task.taskname}\n\n${task.description?.text || ''}`,
+          message,
           title: t('Share Task')
         });
       }

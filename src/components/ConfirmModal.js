@@ -22,17 +22,17 @@ export default function ConfirmModal({ isVisible, title, message, onCancel, onCo
 
           <View style={styles.actions}>
             {!hideCancel && (
-              <TouchableOpacity testID="confirm_modal_cancel" style={styles.btn} onPress={onCancel}>
-                <Text style={[styles.btnText, { color: colors.textSecondary }]}>{cancelText}</Text>
+              <TouchableOpacity testID="confirm_modal_cancel" style={[styles.btn, { backgroundColor: colors.surfaceContainer, borderColor: colors.borderColor, borderWidth: 1 }]} onPress={onCancel}>
+                <Text style={[styles.btnText, { color: colors.textPrimary }]}>{cancelText}</Text>
               </TouchableOpacity>
             )}
             {secondaryConfirmText && onSecondaryConfirm && (
-              <TouchableOpacity testID="confirm_modal_secondary" style={styles.btn} onPress={onSecondaryConfirm}>
-                <Text style={[styles.btnText, { color: colors.primary, fontWeight: 'bold' }]}>{secondaryConfirmText}</Text>
+              <TouchableOpacity testID="confirm_modal_secondary" style={[styles.btn, { backgroundColor: colors.surfaceContainer, borderColor: colors.borderColor, borderWidth: 1 }]} onPress={onSecondaryConfirm}>
+                <Text style={[styles.btnText, { color: colors.textPrimary, fontWeight: 'bold' }]}>{secondaryConfirmText}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity testID="confirm_modal_submit" style={styles.btn} onPress={onConfirm}>
-              <Text style={[styles.btnText, { color: isDestructive ? '#f44336' : colors.primary, fontWeight: 'bold' }]}>{confirmText}</Text>
+            <TouchableOpacity testID="confirm_modal_submit" style={[styles.btn, { backgroundColor: isDestructive ? 'transparent' : colors.primary }]} onPress={onConfirm}>
+              <Text style={[styles.btnText, { color: isDestructive ? '#f44336' : colors.textInverse, fontWeight: 'bold' }]}>{confirmText}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -71,7 +71,9 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   btn: {
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
   },
   btnText: {
     fontSize: 16,

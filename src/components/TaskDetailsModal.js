@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -7,8 +7,12 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
-import RNShare from 'react-native-share';
 import { useDispatch, useSelector } from 'react-redux';
+
+let RNShare;
+if (Platform.OS !== 'web') {
+  RNShare = require('react-native-share').default;
+}
 import { updateTask, deleteTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
@@ -147,6 +151,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const scrollViewRef = useRef(null);
   const notesRef = useRef(null);
+  const cameraLaunchPendingRef = useRef(false);
   const { t, i18n } = useTranslation();
   const [scrollOffset, setScrollOffset] = useState(0);
 
@@ -221,6 +226,35 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   }
 }, [isVisible, task?.id]);
 
+useEffect(() => {
+  const subscription = AppState.addEventListener('change', async state => {
+    if (state === 'active' && cameraLaunchPendingRef.current) {
+      cameraLaunchPendingRef.current = false;
+      const permission = await ImagePicker.getCameraPermissionsAsync();
+      if (permission.granted) {
+        requestAnimationFrame(() => {
+          launchCamera();
+        });
+      }
+    }
+  });
+  return () => subscription.remove();
+}, []);
+
+useEffect(() => {
+  if (Platform.OS !== 'android') return;
+  const recoverPickerResult = async () => {
+    try {
+      const pending = await ImagePicker.getPendingResultAsync();
+      if (pending && !pending.canceled && pending.assets) {
+        await processPickedImages(pending);
+      }
+    } catch (error) {
+      console.error('Pending ImagePicker recovery failed:', error);
+    }
+  };
+  recoverPickerResult();
+}, []);
 
   const formatDisplayTime = (timeStr) => {
     if (!timeStr || timeStr === '--:--') return '--:--';
@@ -236,12 +270,43 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     }
   };
 
+  const prepareAttachmentsForShare = async () => {
+    const urls = [];
+
+    for (let i = 0; i < attachments.length; i++) {
+      const attachment = attachments[i];
+      let uri = attachment.uri;
+
+      if (attachment.type === 'image' && uri.startsWith('data:image')) {
+        const comma = uri.indexOf(',');
+        const base64Data = uri.substring(comma + 1);
+        const ext = attachment.name?.split('.').pop() || 'jpg';
+        const tempUri = `${FileSystem.cacheDirectory}share-${Date.now()}-${i}.${ext}`;
+
+        await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        uri = tempUri;
+      }
+
+      const info = await FileSystem.getInfoAsync(uri);
+      if (!info.exists) {
+        console.warn('Skipping missing attachment:', attachment.name, uri);
+        continue;
+      }
+      urls.push(uri);
+    }
+    return urls;
+  };
+
   const handleShare = async () => {
     try {
       const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
-      const message = `${t('Task')}: ${taskName}\n${t('Due')}: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : t('Not set')}${selectedTime ? ` ${t('at')} ${selectedTime}` : ''}${priorityStr ? `\n${t('Priority')}: ${priorityStr}` : ''}\n\n${notes ? `${t('Notes')}:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `${t('Subtasks')}:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
+      const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
+      const message = `${t('Task')}: ${taskName}\n${t('Due')}: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : t('Not set')}${selectedTime ? ` ${t('at')} ${selectedTime}` : ''}${priorityStr ? `\n${t('Priority')}: ${priorityStr}` : ''}\n\n${currentNotes ? `${t('Notes')}:\n${currentNotes}\n\n` : ''}${subtasks.length > 0 ? `${t('Subtasks')}:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
-      if (attachments.length > 0) {
+      if (attachments.length > 0 && Platform.OS !== 'web') {
         await Clipboard.setStringAsync(message);
         
         setConfirmConfig({
@@ -253,22 +318,17 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           onConfirm: async () => {
             setConfirmConfig(prev => ({ ...prev, isVisible: false }));
             try {
-              let urlsToShare = [];
-              for (let i = 0; i < attachments.length; i++) {
-                let uriToShare = attachments[i].uri;
-                if (uriToShare.startsWith('data:image')) {
-                  const base64Data = uriToShare.split(',')[1];
-                  const tempUri = FileSystem.cacheDirectory + `task-image-${Date.now()}-${i}.jpg`;
-                  await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-                  uriToShare = tempUri;
-                }
-                urlsToShare.push(uriToShare);
-              }
+              const urlsToShare = await prepareAttachmentsForShare();
               
-              setTimeout(async () => {
+              if (urlsToShare.length === 0) {
+                return;
+              }
+
+              requestAnimationFrame(async () => {
                 try {
                   await RNShare.open({
                     urls: urlsToShare,
+                    type: '*/*',
                     title: t('Share Task'),
                     failOnCancel: false
                   });
@@ -277,7 +337,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
                     console.error(e);
                   }
                 }
-              }, 300);
+              });
             } catch (e) {
               console.error(e);
             }
@@ -444,115 +504,223 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       isDestructive: false,
       onSecondaryConfirm: () => {
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        setTimeout(() => pickImage(false), 300);
+        requestAnimationFrame(() => {
+          launchImageLibrary();
+        });
       },
       onConfirm: () => {
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        setTimeout(() => pickImage(true), 300);
+        requestAnimationFrame(() => {
+          launchCamera();
+        });
       }
     });
   };
 
   const handleAttachDocument = () => {
-    setTimeout(() => pickDocument(), 300);
+    requestAnimationFrame(() => pickDocument());
   };
 
-  const pickImage = async (useCamera = false) => {
-    const options = {
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false, // Set false to allow multiple
-      allowsMultipleSelection: !useCamera,
-      quality: 0.5,
-    };
-    
-    let result;
-    if (useCamera) {
-      let { status } = await ImagePicker.getCameraPermissionsAsync();
-      if (status !== 'granted') {
-        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-        status = permissionResult.status;
-        // Add delay after permission request so the activity transitions cleanly before firing camera intent
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      if (status !== 'granted') {
+  const processPickedImages = async (result) => {
+    if (result?.canceled || !result?.assets?.length) {
+      return;
+    }
+
+    const added = [];
+
+    for (const asset of result.assets) {
+      if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE) {
         setConfirmConfig({
           isVisible: true,
-          title: t('Permission Denied'),
-          message: t('Camera permission is required.'),
+          title: t('File Too Large'),
+          message: t('Images must be less than 5MB.'),
           hideCancel: true,
           confirmText: t('OK'),
-          onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+          onConfirm: () =>
+            setConfirmConfig(prev => ({
+              ...prev,
+              isVisible: false,
+            })),
         });
-        return;
+
+        continue;
       }
-      result = await ImagePicker.launchCameraAsync(options);
-    } else {
-      result = await ImagePicker.launchImageLibraryAsync(options);
+
+      const savedUri = await saveFileToDocuments(
+        asset.uri,
+        asset.fileName || `photo-${Date.now()}.jpg`
+      );
+
+      added.push({
+        id:
+          Date.now().toString() +
+          Math.random().toString(36),
+        type: 'image',
+        uri: savedUri,
+        name:
+          asset.fileName ||
+          `Photo-${Date.now()}.jpg`,
+        size: asset.fileSize || 0,
+        mimeType:
+          asset.mimeType || 'image/jpeg',
+      });
     }
-    
-    if (!result.canceled && result.assets) {
-      const newAttachments = [...attachments];
-      for (const asset of result.assets) {
-        if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE) {
+
+    if (added.length) {
+      setAttachments(prev => [
+        ...prev,
+        ...added,
+      ]);
+    }
+  };
+
+  const launchCamera = async () => {
+    try {
+      const permission =
+        await ImagePicker.getCameraPermissionsAsync();
+
+      if (!permission.granted) {
+        cameraLaunchPendingRef.current = true;
+
+        const requested =
+          await ImagePicker.requestCameraPermissionsAsync();
+
+        if (!requested.granted) {
+          cameraLaunchPendingRef.current = false;
+
           setConfirmConfig({
             isVisible: true,
-            title: t('File Too Large'),
-            message: t('Images must be less than 5MB.'),
+            title: t('Permission Denied'),
+            message: t(
+              'Camera permission is required.'
+            ),
             hideCancel: true,
             confirmText: t('OK'),
-            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+            onConfirm: () =>
+              setConfirmConfig(prev => ({
+                ...prev,
+                isVisible: false,
+              })),
           });
-          continue;
+
+          return;
         }
-        const savedUri = await saveFileToDocuments(asset.uri, asset.fileName || 'image.jpg');
-        newAttachments.push({
-          id: Date.now().toString() + Math.random().toString(),
-          type: 'image',
-          uri: savedUri,
-          name: asset.fileName || 'Image',
-          size: asset.fileSize || 0
-        });
+
+        /*
+         * Do not immediately fire another Android Activity
+         * from the permission callback.
+         */
+        return;
       }
-      setAttachments(newAttachments);
+
+      cameraLaunchPendingRef.current = false;
+
+      const result =
+        await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 0.7,
+        });
+
+      await processPickedImages(result);
+    } catch (error) {
+      cameraLaunchPendingRef.current = false;
+
+      console.error(
+        'Camera launch failed:',
+        error
+      );
+    }
+  };
+
+  const launchImageLibrary = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        allowsMultipleSelection: true,
+        quality: 0.7,
+      });
+      await processPickedImages(result);
+    } catch (error) {
+      console.error('Image library launch failed:', error);
     }
   };
 
   const pickDocument = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: false,
-        multiple: true
-      });
-      
-      if (!result.canceled && result.assets) {
-        const newAttachments = [...attachments];
-        for (const asset of result.assets) {
-          if (asset.size && asset.size > MAX_FILE_SIZE) {
-            setConfirmConfig({
-              isVisible: true,
-              title: t('File Too Large'),
-              message: t('The file ') + asset.name + t(' is larger than 5MB limit.'),
-              hideCancel: true,
-              confirmText: t('OK'),
-              onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
-            });
-            continue;
-          }
-          const savedUri = await saveFileToDocuments(asset.uri, asset.name);
-          newAttachments.push({
-            id: Date.now().toString() + Math.random().toString(),
-            type: 'document',
-            uri: savedUri,
-            name: asset.name,
-            size: asset.size || 0
-          });
-        }
-        setAttachments(newAttachments);
+      const result =
+        await DocumentPicker.getDocumentAsync({
+          type: '*/*',
+          copyToCacheDirectory: true,
+          multiple: true,
+        });
+
+      if (
+        result.canceled ||
+        !result.assets?.length
+      ) {
+        return;
       }
-    } catch (e) {
-      console.error('Error picking document', e);
+
+      const added = [];
+
+      for (const asset of result.assets) {
+        if (
+          asset.size &&
+          asset.size > MAX_FILE_SIZE
+        ) {
+          setConfirmConfig({
+            isVisible: true,
+            title: t('File Too Large'),
+            message:
+              `${asset.name} ` +
+              t('is larger than 5MB limit.'),
+            hideCancel: true,
+            confirmText: t('OK'),
+            onConfirm: () =>
+              setConfirmConfig(prev => ({
+                ...prev,
+                isVisible: false,
+              })),
+          });
+
+          continue;
+        }
+
+        const savedUri =
+          await saveFileToDocuments(
+            asset.uri,
+            asset.name
+          );
+
+        added.push({
+          id:
+            Date.now().toString() +
+            Math.random().toString(36),
+          type: 'document',
+          uri: savedUri,
+          name:
+            asset.name ||
+            `document-${Date.now()}`,
+          size: asset.size || 0,
+          mimeType:
+            asset.mimeType ||
+            'application/octet-stream',
+        });
+      }
+
+      if (added.length) {
+        setAttachments(prev => [
+          ...prev,
+          ...added,
+        ]);
+      }
+    } catch (error) {
+      console.error(
+        'Error picking document:',
+        error
+      );
     }
   };
 
