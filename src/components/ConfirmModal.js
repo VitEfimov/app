@@ -13,11 +13,10 @@ export default function ConfirmModal({ isVisible, title, message, onCancel, onCo
       animationOut="fadeOut"
       backdropOpacity={0.5}
       onBackdropPress={onCancel}
-      style={{ margin: 0 }}
+      style={{ margin: 20, justifyContent: 'center', alignItems: 'center' }}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.container, { backgroundColor: colors.bgCard, borderColor: colors.borderColor || 'transparent' }]}>
-          <Text testID="confirm_modal_title" style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+      <View style={[styles.container, { backgroundColor: colors.bgCard, borderColor: colors.borderColor || 'transparent' }]}>
+        <Text testID="confirm_modal_title" style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
           {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
 
           <View style={styles.actions}>
@@ -35,20 +34,12 @@ export default function ConfirmModal({ isVisible, title, message, onCancel, onCo
               <Text style={[styles.btnText, { color: isDestructive ? '#f44336' : colors.textInverse, fontWeight: 'bold' }]}>{confirmText}</Text>
             </TouchableOpacity>
           </View>
-        </View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
   container: {
     width: '100%',
     borderRadius: 12,
@@ -68,7 +59,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 20,
+    flexWrap: 'wrap',
+    gap: 12,
   },
   btn: {
     paddingVertical: 10,
