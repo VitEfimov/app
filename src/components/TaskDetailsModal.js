@@ -151,7 +151,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const scrollViewRef = useRef(null);
   const notesRef = useRef(null);
-  const cameraLaunchPendingRef = useRef(false);
   const { t, i18n } = useTranslation();
   const [scrollOffset, setScrollOffset] = useState(0);
 
@@ -226,20 +225,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   }
 }, [isVisible, task?.id]);
 
-useEffect(() => {
-  const subscription = AppState.addEventListener('change', async state => {
-    if (state === 'active' && cameraLaunchPendingRef.current) {
-      cameraLaunchPendingRef.current = false;
-      const permission = await ImagePicker.getCameraPermissionsAsync();
-      if (permission.granted) {
-        requestAnimationFrame(() => {
-          launchCamera();
-        });
-      }
-    }
-  });
-  return () => subscription.remove();
-}, []);
 
 useEffect(() => {
   if (Platform.OS !== 'android') return;
@@ -502,18 +487,24 @@ useEffect(() => {
       secondaryConfirmText: t('Choose Image'),
       hideCancel: false,
       isDestructive: false,
-      onSecondaryConfirm: () => {
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        requestAnimationFrame(() => {
-          launchImageLibrary();
-        });
-      },
       onConfirm: () => {
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        requestAnimationFrame(() => {
+        setConfirmConfig(prev => ({
+          ...prev,
+          isVisible: false,
+        }));
+        setTimeout(() => {
           launchCamera();
-        });
-      }
+        }, 450);
+      },
+      onSecondaryConfirm: () => {
+        setConfirmConfig(prev => ({
+          ...prev,
+          isVisible: false,
+        }));
+        setTimeout(() => {
+          launchImageLibrary();
+        }, 450);
+      },
     });
   };
 
@@ -576,74 +567,102 @@ useEffect(() => {
 
   const launchCamera = async () => {
     try {
-      const permission =
-        await ImagePicker.getCameraPermissionsAsync();
+      console.log('[Camera] start');
+      let permission = await ImagePicker.getCameraPermissionsAsync();
+      console.log('[Camera] current permission:', {
+        status: permission.status,
+        granted: permission.granted,
+        canAskAgain: permission.canAskAgain,
+      });
 
       if (!permission.granted) {
-        cameraLaunchPendingRef.current = true;
-
-        const requested =
-          await ImagePicker.requestCameraPermissionsAsync();
-
-        if (!requested.granted) {
-          cameraLaunchPendingRef.current = false;
-
+        if (permission.canAskAgain === false) {
           setConfirmConfig({
             isVisible: true,
             title: t('Permission Denied'),
-            message: t(
-              'Camera permission is required.'
-            ),
+            message: t('Camera permission is disabled. Please enable it in Android settings.'),
             hideCancel: true,
             confirmText: t('OK'),
-            onConfirm: () =>
-              setConfirmConfig(prev => ({
-                ...prev,
-                isVisible: false,
-              })),
+            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false })),
           });
-
           return;
         }
 
-        /*
-         * Do not immediately fire another Android Activity
-         * from the permission callback.
-         */
-        return;
-      }
-
-      cameraLaunchPendingRef.current = false;
-
-      const result =
-        await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'],
-          allowsEditing: false,
-          quality: 0.7,
+        const requested = await ImagePicker.requestCameraPermissionsAsync();
+        console.log('[Camera] permission response:', {
+          status: requested.status,
+          granted: requested.granted,
+          canAskAgain: requested.canAskAgain,
         });
 
-      await processPickedImages(result);
-    } catch (error) {
-      cameraLaunchPendingRef.current = false;
+        if (!requested.granted) {
+          return;
+        }
 
-      console.error(
-        'Camera launch failed:',
-        error
-      );
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
+      console.log('[Camera] calling launchCameraAsync');
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.7,
+      });
+
+      console.log('[Camera] picker returned', {
+        canceled: result.canceled,
+        assets: result.assets?.length ?? 0,
+      });
+
+      if (!result.canceled) {
+        await processPickedImages(result);
+      }
+    } catch (error) {
+      console.error('[Camera] exception', {
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack,
+      });
     }
   };
 
   const launchImageLibrary = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         allowsMultipleSelection: true,
         quality: 0.7,
       });
-      await processPickedImages(result);
+
+      if (!result.canceled) {
+        await processPickedImages(result);
+      }
     } catch (error) {
-      console.error('Image library launch failed:', error);
+      console.error('[Gallery] launch failed:', error);
+    }
+  };
+
+  const testCameraDirectly = async () => {
+    console.log('CAMERA TEST START');
+    try {
+      const permission = await ImagePicker.getCameraPermissionsAsync();
+      console.log('permission before:', permission);
+      if (!permission.granted) {
+        const result = await ImagePicker.requestCameraPermissionsAsync();
+        console.log('permission result:', result);
+        if (!result.granted) {
+          return;
+        }
+      }
+      console.log('ABOUT TO OPEN CAMERA');
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
+      console.log('CAMERA RETURNED:', result);
+    } catch (error) {
+      console.error('DIRECT CAMERA TEST ERROR:', error);
     }
   };
 
@@ -1100,6 +1119,22 @@ useEffect(() => {
           onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
           onConfirm={confirmConfig.onConfirm}
         />
+
+        <TouchableOpacity
+          onPress={testCameraDirectly}
+          style={{
+            padding: 15,
+            backgroundColor: colors.primary,
+            marginHorizontal: 20,
+            marginBottom: 20,
+            borderRadius: 8,
+            alignItems: 'center'
+          }}
+        >
+          <Text style={{ color: colors.textInverse, fontWeight: 'bold' }}>
+            DIRECT CAMERA TEST
+          </Text>
+        </TouchableOpacity>
 
         <RNModal visible={showDatePicker} transparent animationType="fade">
           <View style={styles.calendarOverlay}>
