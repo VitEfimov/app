@@ -7,6 +7,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { useDispatch, useSelector } from 'react-redux';
 
 let RNShare;
@@ -743,13 +744,22 @@ useEffect(() => {
     }
   };
 
-  const openDocument = async (uri) => {
+  const openDocument = async (uri, mimeType) => {
     try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(uri);
+      if (Platform.OS === 'android') {
+        const contentUri = await FileSystem.getContentUriAsync(uri);
+        const params = { data: contentUri, flags: 1 };
+        if (mimeType) {
+          params.type = mimeType;
+        }
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', params);
       } else {
-        Alert.alert(t('Error'), t('Sharing is not available on this device'));
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(uri);
+        } else {
+          Alert.alert(t('Error'), t('Sharing is not available on this device'));
+        }
       }
     } catch (e) {
       console.error(e);
@@ -1042,7 +1052,7 @@ useEffect(() => {
                           <Image source={{ uri: att.uri }} style={styles.attachmentThumb} />
                         </TouchableOpacity>
                       ) : (
-                        <TouchableOpacity onPress={() => openDocument(att.uri)} activeOpacity={0.8}>
+                        <TouchableOpacity onPress={() => openDocument(att.uri, att.mimeType)} activeOpacity={0.8}>
                           <View style={[styles.attachmentThumb, { backgroundColor: colors.bgMain, justifyContent: 'center', alignItems: 'center', borderColor: colors.borderColor, borderWidth: 1 }]}>
                             <IconFile color={colors.primary} />
                             <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1}>{att.name}</Text>
