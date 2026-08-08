@@ -743,6 +743,105 @@ useEffect(() => {
     }
   };
 
+  const openDocument = async (uri) => {
+    try {
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri);
+      } else {
+        Alert.alert(t('Error'), t('Sharing is not available on this device'));
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert(t('Error'), t('Could not open document.'));
+    }
+  };
+
+  const prepareAttachmentsForShare = async () => {
+    const urls = [];
+
+    for (let i = 0; i < attachments.length; i++) {
+      const attachment = attachments[i];
+      let uri = attachment.uri;
+
+      if (attachment.type === 'image' && uri.startsWith('data:image')) {
+        const base64Data = uri.split(',')[1];
+        const filename = FileSystem.cacheDirectory + `task_image_${Date.now()}.jpg`;
+        await FileSystem.writeAsStringAsync(filename, base64Data, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        uri = filename;
+      }
+
+      const info = await FileSystem.getInfoAsync(uri);
+      if (!info.exists) {
+        console.warn('Skipping missing attachment:', attachment.name, uri);
+        continue;
+      }
+      urls.push(uri);
+    }
+    return urls;
+  };
+
+  const handleShare = async () => {
+    try {
+      const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
+      
+      const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
+      const message = `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priorityStr ? `\nPriority: ${priorityStr}` : ''}\n\n${currentNotes ? `Notes:\n${currentNotes}\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
+      
+      if (attachments.length > 0 && Platform.OS !== 'web') {
+        await Clipboard.setStringAsync(message);
+        
+        Alert.alert(
+          t('Sharing with Attachments'),
+          t('Task text copied to clipboard! You can paste it into your message after selecting where to share.'),
+          [
+            { text: t('Cancel'), style: 'cancel' },
+            {
+              text: t('Continue'),
+              onPress: async () => {
+                try {
+                  const urlsToShare = await prepareAttachmentsForShare();
+                  
+                  if (urlsToShare.length === 0) {
+                    return;
+                  }
+
+                  requestAnimationFrame(async () => {
+                    try {
+                      await RNShare.open({
+                        urls: urlsToShare,
+                        type: '*/*',
+                        title: t('Share Task'),
+                        failOnCancel: false
+                      });
+                    } catch (err) {
+                      if (err.message !== 'User did not share') {
+                        Alert.alert("Error sharing", err.message);
+                      }
+                    }
+                  });
+                } catch (err) {
+                  console.error(err);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        await Share.share({
+          message,
+          title: t('Share Task')
+        });
+      }
+    } catch (error) {
+      if (error.message !== 'User did not share') {
+        console.error('Share error:', error.message);
+      }
+    }
+  };
+
   const removeAttachment = (id) => {
     setAttachments(attachments.filter(a => a.id !== id));
   };
@@ -1027,10 +1126,12 @@ useEffect(() => {
                           <Image source={{ uri: att.uri }} style={styles.attachmentThumb} />
                         </TouchableOpacity>
                       ) : (
-                        <View style={[styles.attachmentThumb, { backgroundColor: colors.bgMain, justifyContent: 'center', alignItems: 'center', borderColor: colors.borderColor, borderWidth: 1 }]}>
-                          <IconFile color={colors.primary} />
-                          <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1}>{att.name}</Text>
-                        </View>
+                        <TouchableOpacity onPress={() => openDocument(att.uri)} activeOpacity={0.8}>
+                          <View style={[styles.attachmentThumb, { backgroundColor: colors.bgMain, justifyContent: 'center', alignItems: 'center', borderColor: colors.borderColor, borderWidth: 1 }]}>
+                            <IconFile color={colors.primary} />
+                            <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1}>{att.name}</Text>
+                          </View>
+                        </TouchableOpacity>
                       )}
                       <TouchableOpacity 
                         style={styles.attachmentRemoveBtn} 
