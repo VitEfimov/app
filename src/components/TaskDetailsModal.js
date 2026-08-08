@@ -7,6 +7,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
+import RNShare from 'react-native-share';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -166,7 +167,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [isRepeatModalVisible, setIsRepeatModalVisible] = useState(false);
   const [repeatStartDate, setRepeatStartDate] = useState('');
   const [repeatEndDate, setRepeatEndDate] = useState('');
-  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null });
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null, hideCancel: false, cancelText: '' });
   const { generateRepeatingTasks } = useTaskRepeat();
 
   const [datePickerType, setDatePickerType] = useState(null);
@@ -240,38 +241,48 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
       const message = `${t('Task')}: ${taskName}\n${t('Due')}: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : t('Not set')}${selectedTime ? ` ${t('at')} ${selectedTime}` : ''}${priorityStr ? `\n${t('Priority')}: ${priorityStr}` : ''}\n\n${notes ? `${t('Notes')}:\n${notes}\n\n` : ''}${subtasks.length > 0 ? `${t('Subtasks')}:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
       
-      const images = attachments.filter(a => a.type === 'image');
-      if (images.length > 0) {
+      if (attachments.length > 0) {
         await Clipboard.setStringAsync(message);
         
-        Alert.alert(
-          t('Sharing with Image'),
-          t('Task text copied to clipboard! You can paste it into your message after selecting where to share the image.'),
-          [
-            {
-              text: t('Continue'),
-              onPress: async () => {
-                try {
-                  for (let i = 0; i < images.length; i++) {
-                    let uriToShare = images[i].uri;
-                    if (uriToShare.startsWith('data:image')) {
-                      const base64Data = uriToShare.split(',')[1];
-                      const tempUri = FileSystem.cacheDirectory + `task-image-${Date.now()}-${i}.jpg`;
-                      await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-                      uriToShare = tempUri;
-                    }
-                    await Sharing.shareAsync(uriToShare, {
-                      mimeType: 'image/jpeg',
-                      dialogTitle: t('Share Task')
-                    });
-                  }
-                } catch (e) {
-                  console.error(e);
+        setConfirmConfig({
+          isVisible: true,
+          title: t('Sharing with Attachments'),
+          message: t('Task text copied to clipboard! You can paste it into your message after selecting where to share.'),
+          hideCancel: true,
+          confirmText: t('Continue'),
+          onConfirm: async () => {
+            setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+            try {
+              let urlsToShare = [];
+              for (let i = 0; i < attachments.length; i++) {
+                let uriToShare = attachments[i].uri;
+                if (uriToShare.startsWith('data:image')) {
+                  const base64Data = uriToShare.split(',')[1];
+                  const tempUri = FileSystem.cacheDirectory + `task-image-${Date.now()}-${i}.jpg`;
+                  await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+                  uriToShare = tempUri;
                 }
+                urlsToShare.push(uriToShare);
               }
+              
+              setTimeout(async () => {
+                try {
+                  await RNShare.open({
+                    urls: urlsToShare,
+                    title: t('Share Task'),
+                    failOnCancel: false
+                  });
+                } catch (e) {
+                  if (e.message !== 'User did not share') {
+                    console.error(e);
+                  }
+                }
+              }, 300);
+            } catch (e) {
+              console.error(e);
             }
-          ]
-        );
+          }
+        });
       } else {
         await Share.share({
           message,
@@ -422,19 +433,28 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
   const handleAttachPhoto = () => {
-    Alert.alert(
-      t('Attach Photo'),
-      t('Choose source'),
-      [
-        { text: t('Cancel'), style: 'cancel' },
-        { text: t('Take Photo'), onPress: () => setTimeout(() => pickImage(true), 100) },
-        { text: t('Choose Image'), onPress: () => setTimeout(() => pickImage(false), 100) }
-      ]
-    );
+    setConfirmConfig({
+      isVisible: true,
+      title: t('Attach Photo'),
+      message: t('Choose source'),
+      cancelText: t('Cancel'),
+      confirmText: t('Take Photo'),
+      secondaryConfirmText: t('Choose Image'),
+      hideCancel: false,
+      isDestructive: false,
+      onSecondaryConfirm: () => {
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        setTimeout(() => pickImage(false), 300);
+      },
+      onConfirm: () => {
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        setTimeout(() => pickImage(true), 300);
+      }
+    });
   };
 
   const handleAttachDocument = () => {
-    setTimeout(() => pickDocument(), 100);
+    setTimeout(() => pickDocument(), 300);
   };
 
   const pickImage = async (useCamera = false) => {
@@ -447,9 +467,23 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     
     let result;
     if (useCamera) {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      let { status } = await ImagePicker.getCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission is required.');
+        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+        status = permissionResult.status;
+        // Add delay after permission request so the activity transitions cleanly before firing camera intent
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      if (status !== 'granted') {
+        setConfirmConfig({
+          isVisible: true,
+          title: t('Permission Denied'),
+          message: t('Camera permission is required.'),
+          hideCancel: true,
+          confirmText: t('OK'),
+          onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+        });
         return;
       }
       result = await ImagePicker.launchCameraAsync(options);
@@ -461,7 +495,14 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       const newAttachments = [...attachments];
       for (const asset of result.assets) {
         if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE) {
-          Alert.alert('File Too Large', 'Images must be less than 5MB.');
+          setConfirmConfig({
+            isVisible: true,
+            title: t('File Too Large'),
+            message: t('Images must be less than 5MB.'),
+            hideCancel: true,
+            confirmText: t('OK'),
+            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+          });
           continue;
         }
         const savedUri = await saveFileToDocuments(asset.uri, asset.fileName || 'image.jpg');
@@ -489,7 +530,14 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
         const newAttachments = [...attachments];
         for (const asset of result.assets) {
           if (asset.size && asset.size > MAX_FILE_SIZE) {
-            Alert.alert('File Too Large', `The file ${asset.name} is larger than 5MB limit.`);
+            setConfirmConfig({
+              isVisible: true,
+              title: t('File Too Large'),
+              message: t('The file ') + asset.name + t(' is larger than 5MB limit.'),
+              hideCancel: true,
+              confirmText: t('OK'),
+              onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+            });
             continue;
           }
           const savedUri = await saveFileToDocuments(asset.uri, asset.name);
@@ -876,6 +924,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           title={confirmConfig.title}
           message={confirmConfig.message}
           confirmText={confirmConfig.confirmText}
+          cancelText={confirmConfig.cancelText || t('Cancel')}
+          hideCancel={confirmConfig.hideCancel}
           isDestructive={confirmConfig.isDestructive}
           secondaryConfirmText={confirmConfig.secondaryConfirmText}
           onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
