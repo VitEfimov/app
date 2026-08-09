@@ -177,8 +177,14 @@ class ExpoTaskAlarmModule : Module() {
       intent.putExtra(Intent.EXTRA_TEXT, text)
       
       val parcelableUris = ArrayList<Uri>()
+      val authority = "${activity.packageName}.FileSystemFileProvider"
       for (uriString in uris) {
-          parcelableUris.add(Uri.parse(uriString))
+          var uri = Uri.parse(uriString)
+          if (uri.scheme == "file" && uri.path != null) {
+              val file = File(uri.path!!)
+              uri = FileProvider.getUriForFile(activity, authority, file)
+          }
+          parcelableUris.add(uri)
       }
       intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, parcelableUris)
       intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -190,7 +196,14 @@ class ExpoTaskAlarmModule : Module() {
     AsyncFunction("openDocumentAsync") { uriString: String, mimeType: String? ->
       val activity = appContext.currentActivity ?: return@AsyncFunction false
       val intent = Intent(Intent.ACTION_VIEW)
-      val uri = Uri.parse(uriString)
+      var uri = Uri.parse(uriString)
+      
+      if (uri.scheme == "file" && uri.path != null) {
+          val authority = "${activity.packageName}.FileSystemFileProvider"
+          val file = File(uri.path!!)
+          uri = FileProvider.getUriForFile(activity, authority, file)
+      }
+      
       if (mimeType != null) {
           intent.setDataAndType(uri, mimeType)
       } else {
