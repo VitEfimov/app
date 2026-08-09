@@ -33,3 +33,18 @@ export async function cancelPomodoroAlarm(id: string): Promise<boolean> {
   if (!ExpoTaskAlarm) return false;
   return await ExpoTaskAlarm.cancelPomodoroAlarm(id);
 }
+
+export async function takePhotoAsync(): Promise<string | null> {
+  if (!ExpoTaskAlarm) return null;
+  return await ExpoTaskAlarm.takePhotoAsync();
+}
+
+export async function shareTaskAsync(text: string, uris: string[]): Promise<boolean> {
+  if (!ExpoTaskAlarm) return false;
+  return await ExpoTaskAlarm.shareTaskAsync(text, uris);
+}
+
+export async function openDocumentAsync(uri: string, mimeType: string | null = null): Promise<boolean> {
+  if (!ExpoTaskAlarm) return false;
+  return await ExpoTaskAlarm.openDocumentAsync(uri, mimeType);
+}

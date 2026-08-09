@@ -21,6 +21,7 @@ import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
 import { Calendar } from 'react-native-calendars';
 import { scheduleTaskReminder, cancelNotification } from '../utils/notifications';
 import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
+import { takePhotoAsync, shareTaskAsync, openDocumentAsync as nativeOpenDocumentAsync } from '../../modules/expo-task-alarm';
 import CustomDropdown from './CustomDropdown';
 import CustomRepeatModal from './CustomRepeatModal';
 import ConfirmModal from './ConfirmModal';
@@ -312,12 +313,16 @@ useEffect(() => {
 
               requestAnimationFrame(async () => {
                 try {
-                  await RNShare.open({
-                    urls: urlsToShare,
-                    type: '*/*',
-                    title: t('Share Task'),
-                    failOnCancel: false
-                  });
+                  if (Platform.OS === 'android') {
+                    await shareTaskAsync(message, urlsToShare);
+                  } else {
+                    await RNShare.open({
+                      urls: urlsToShare,
+                      type: '*/*',
+                      title: t('Share Task'),
+                      failOnCancel: false
+                    });
+                  }
                 } catch (e) {
                   if (e.message !== 'User did not share') {
                     console.error(e);
@@ -604,11 +609,21 @@ useEffect(() => {
       }
 
       console.log('[Camera] calling launchCameraAsync');
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.7,
-      });
+      let result;
+      if (Platform.OS === 'android') {
+        const uri = await takePhotoAsync();
+        if (uri) {
+           result = { canceled: false, assets: [{ uri }] };
+        } else {
+           result = { canceled: true };
+        }
+      } else {
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.7,
+        });
+      }
 
       console.log('[Camera] picker returned', {
         canceled: result.canceled,
@@ -747,12 +762,7 @@ useEffect(() => {
   const openDocument = async (uri, mimeType) => {
     try {
       if (Platform.OS === 'android') {
-        const contentUri = await FileSystem.getContentUriAsync(uri);
-        const params = { data: contentUri, flags: 1 };
-        if (mimeType) {
-          params.type = mimeType;
-        }
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', params);
+        await nativeOpenDocumentAsync(uri, mimeType);
       } else {
         const isAvailable = await Sharing.isAvailableAsync();
         if (isAvailable) {

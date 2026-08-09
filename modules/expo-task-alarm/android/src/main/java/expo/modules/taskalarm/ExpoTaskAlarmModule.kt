@@ -1,16 +1,25 @@
 package expo.modules.taskalarm
 
+import android.app.Activity
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
+import androidx.core.content.FileProvider
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.io.File
+import java.util.ArrayList
 
 class ExpoTaskAlarmModule : Module() {
+  private var photoPromise: Promise? = null
+  private var tempPhotoPath: String? = null
   override fun definition() = ModuleDefinition {
     Name("ExpoTaskAlarm")
 
@@ -136,6 +145,87 @@ class ExpoTaskAlarmModule : Module() {
       alarmManager.cancel(pendingIntent)
       pendingIntent.cancel()
       return@AsyncFunction true
+    }
+
+    AsyncFunction("takePhotoAsync") { promise: Promise ->
+      val activity = appContext.currentActivity ?: run {
+          promise.reject("E_MISSING_ACTIVITY", "Current activity is null", null)
+          return@AsyncFunction
+      }
+      try {
+          val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+          val photoFile = File.createTempFile("photo_${System.currentTimeMillis()}", ".jpg", activity.cacheDir)
+          tempPhotoPath = photoFile.absolutePath
+          
+          val authority = "${activity.packageName}.FileSystemFileProvider"
+          val photoUri = FileProvider.getUriForFile(activity, authority, photoFile)
+          
+          intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+          intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+          
+          this@ExpoTaskAlarmModule.photoPromise = promise
+          activity.startActivityForResult(intent, 9002)
+      } catch (e: Exception) {
+          promise.reject("E_CAMERA_FAILED", e.message, e)
+      }
+    }
+
+    AsyncFunction("shareTaskAsync") { text: String, uris: List<String> ->
+      val activity = appContext.currentActivity ?: return@AsyncFunction false
+      val intent = Intent(Intent.ACTION_SEND_MULTIPLE)
+      intent.type = "*/*"
+      intent.putExtra(Intent.EXTRA_TEXT, text)
+      
+      val parcelableUris = ArrayList<Uri>()
+      for (uriString in uris) {
+          parcelableUris.add(Uri.parse(uriString))
+      }
+      intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, parcelableUris)
+      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      
+      activity.startActivity(Intent.createChooser(intent, "Share Task"))
+      return@AsyncFunction true
+    }
+
+    AsyncFunction("openDocumentAsync") { uriString: String, mimeType: String? ->
+      val activity = appContext.currentActivity ?: return@AsyncFunction false
+      val intent = Intent(Intent.ACTION_VIEW)
+      val uri = Uri.parse(uriString)
+      if (mimeType != null) {
+          intent.setDataAndType(uri, mimeType)
+      } else {
+          intent.data = uri
+      }
+      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      
+      try {
+          activity.startActivity(intent)
+          return@AsyncFunction true
+      } catch (e: Exception) {
+          e.printStackTrace()
+          return@AsyncFunction false
+      }
+    }
+
+    OnActivityResult { _, payload ->
+        if (payload.requestCode == 9002) {
+            val promise = photoPromise
+            if (promise != null) {
+                if (payload.resultCode == Activity.RESULT_OK) {
+                    val path = tempPhotoPath
+                    if (path != null) {
+                        promise.resolve("file://$path")
+                    } else {
+                        promise.reject("E_NO_PATH", "Temporary photo path is null", null)
+                    }
+                } else {
+                    promise.reject("E_CANCELLED", "User cancelled camera", null)
+                }
+                photoPromise = null
+                tempPhotoPath = null
+            }
+        }
     }
   }
 }
