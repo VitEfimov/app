@@ -1,2 +1,13 @@
-<manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="expo.modules.taskalarm">
+    <application>
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.TaskAlarmFileProvider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/task_alarm_file_paths" />
+        </provider>
+    </application>
 </manifest>

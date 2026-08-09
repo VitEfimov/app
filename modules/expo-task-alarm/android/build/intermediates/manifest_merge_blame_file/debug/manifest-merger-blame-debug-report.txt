@@ -4,4 +4,25 @@
 4
 5    <uses-sdk android:minSdkVersion="24" />
 6
-7</manifest>
+7    <application>
+7-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:2:5-12:19
+8        <provider
+8-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:3:9-11:20
+9            android:name="androidx.core.content.FileProvider"
+9-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:4:13-62
+10            android:authorities="${applicationId}.TaskAlarmFileProvider"
+10-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:5:13-73
+11            android:exported="false"
+11-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:6:13-37
+12            android:grantUriPermissions="true" >
+12-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:7:13-47
+13            <meta-data
+13-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:8:13-10:65
+14                android:name="android.support.FILE_PROVIDER_PATHS"
+14-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:9:17-67
+15                android:resource="@xml/task_alarm_file_paths" />
+15-->D:\Papa\Before Revature\Desc\TaskManagerRedux\app\modules\expo-task-alarm\android\src\main\AndroidManifest.xml:10:17-62
+16        </provider>
+17    </application>
+18
+19</manifest>

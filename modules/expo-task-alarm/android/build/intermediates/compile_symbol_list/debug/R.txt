@@ -5,3 +5,4 @@ int id alarm_snooze_button 0x0
 int id alarm_task_name 0x0
 int id alarm_title 0x0
 int layout activity_alarm 0x0
+int xml task_alarm_file_paths 0x0

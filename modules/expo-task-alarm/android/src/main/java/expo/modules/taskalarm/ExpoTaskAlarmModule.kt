@@ -157,7 +157,7 @@ class ExpoTaskAlarmModule : Module() {
           val photoFile = File.createTempFile("photo_${System.currentTimeMillis()}", ".jpg", activity.cacheDir)
           tempPhotoPath = photoFile.absolutePath
           
-          val authority = "${activity.packageName}.FileSystemFileProvider"
+          val authority = "${activity.packageName}.TaskAlarmFileProvider"
           val photoUri = FileProvider.getUriForFile(activity, authority, photoFile)
           
           intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
@@ -172,12 +172,9 @@ class ExpoTaskAlarmModule : Module() {
 
     AsyncFunction("shareTaskAsync") { text: String, uris: List<String> ->
       val activity = appContext.currentActivity ?: return@AsyncFunction false
-      val intent = Intent(Intent.ACTION_SEND_MULTIPLE)
-      intent.type = "*/*"
-      intent.putExtra(Intent.EXTRA_TEXT, text)
       
       val parcelableUris = ArrayList<Uri>()
-      val authority = "${activity.packageName}.FileSystemFileProvider"
+      val authority = "${activity.packageName}.TaskAlarmFileProvider"
       for (uriString in uris) {
           var uri = Uri.parse(uriString)
           if (uri.scheme == "file" && uri.path != null) {
@@ -186,7 +183,31 @@ class ExpoTaskAlarmModule : Module() {
           }
           parcelableUris.add(uri)
       }
-      intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, parcelableUris)
+      
+      val intent = if (parcelableUris.size > 1) {
+          Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+              putParcelableArrayListExtra(Intent.EXTRA_STREAM, parcelableUris)
+          }
+      } else if (parcelableUris.size == 1) {
+          Intent(Intent.ACTION_SEND).apply {
+              putExtra(Intent.EXTRA_STREAM, parcelableUris[0])
+          }
+      } else {
+          Intent(Intent.ACTION_SEND)
+      }
+      
+      intent.type = "*/*"
+      intent.putExtra(Intent.EXTRA_TEXT, text)
+
+      
+      if (parcelableUris.isNotEmpty()) {
+          val clipData = android.content.ClipData.newUri(activity.contentResolver, "Task Attachments", parcelableUris[0])
+          for (i in 1 until parcelableUris.size) {
+              clipData.addItem(android.content.ClipData.Item(parcelableUris[i]))
+          }
+          intent.clipData = clipData
+      }
+      
       intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
       
       activity.startActivity(Intent.createChooser(intent, "Share Task"))
@@ -199,7 +220,7 @@ class ExpoTaskAlarmModule : Module() {
       var uri = Uri.parse(uriString)
       
       if (uri.scheme == "file" && uri.path != null) {
-          val authority = "${activity.packageName}.FileSystemFileProvider"
+          val authority = "${activity.packageName}.TaskAlarmFileProvider"
           val file = File(uri.path!!)
           uri = FileProvider.getUriForFile(activity, authority, file)
       }
