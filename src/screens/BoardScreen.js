@@ -21,6 +21,13 @@ import { updateTask, deleteTask, addTask, deleteTasksByBoard } from '../features
 import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed } from '../features/themeSlice';
 import { useTranslation } from 'react-i18next';
+import * as FileSystem from 'expo-file-system';
+import { shareTaskAsync } from '../../modules/expo-task-alarm';
+
+let RNShare;
+if (Platform.OS !== 'web') {
+  RNShare = require('react-native-share').default;
+}
 
 dayjs.extend(isSameOrBefore);
 
@@ -163,12 +170,47 @@ export default function BoardScreen({ route, navigation }) {
         return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priority ? `\nPriority: ${priority}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${img ? `[Image Attached]\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`.trim();
       }).join('\n\n------------------------\n\n');
       
-      await Share.share({
-        message: `Tasks:\n\n${shareText}`,
+      const allAttachments = [];
+      selectedTasksObjects.forEach(t => {
+        const atts = t.description?.attachments ? [...t.description.attachments] : [];
+        if (t.description?.img && atts.length === 0) {
+          atts.push({ uri: t.description.img, type: 'image', name: 'image.jpg' });
+        }
+        allAttachments.push(...atts);
       });
+
+      if (allAttachments.length > 0 && Platform.OS !== 'web') {
+        const urlsToShare = [];
+        for (let i = 0; i < allAttachments.length; i++) {
+          const attachment = allAttachments[i];
+          let uri = attachment.uri;
+          if (attachment.type === 'image' && uri.startsWith('data:image')) {
+            const comma = uri.indexOf(',');
+            const base64Data = uri.substring(comma + 1);
+            const ext = attachment.name?.split('.').pop() || 'jpg';
+            const tempUri = `${FileSystem.cacheDirectory}share-${Date.now()}-${i}.${ext}`;
+            await FileSystem.writeAsStringAsync(tempUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+            uri = tempUri;
+          }
+          const info = await FileSystem.getInfoAsync(uri);
+          if (info.exists) urlsToShare.push(uri);
+        }
+
+        if (Platform.OS === 'android') {
+          await shareTaskAsync(`Tasks:\n\n${shareText}`, urlsToShare);
+        } else {
+          await RNShare.open({ urls: urlsToShare, type: '*/*', title: 'Share Tasks', failOnCancel: false });
+        }
+      } else {
+        await Share.share({
+          message: `Tasks:\n\n${shareText}`,
+        });
+      }
       setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
     } catch (error) {
-      console.log(error);
+      if (error.message !== 'User did not share') {
+        console.log(error);
+      }
     }
   };
 
@@ -376,7 +418,7 @@ export default function BoardScreen({ route, navigation }) {
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.badge, { backgroundColor: `${section.color}20` }]}
-          onPress={() => handleMenuPress(section)}
+          onPress={() => toggleSection(section.id)}
         >
           <Text style={[styles.badgeText, { color: section.color }]}>{section.count}</Text>
         </TouchableOpacity>

@@ -196,7 +196,11 @@ class ExpoTaskAlarmModule : Module() {
           Intent(Intent.ACTION_SEND)
       }
       
-      intent.type = "*/*"
+      if (parcelableUris.isNotEmpty()) {
+          intent.type = "*/*"
+      } else {
+          intent.type = "text/plain"
+      }
       intent.putExtra(Intent.EXTRA_TEXT, text)
 
       

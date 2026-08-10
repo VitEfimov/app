@@ -15,8 +15,10 @@ if (Platform.OS !== 'web') {
   RNShare = require('react-native-share').default;
 }
 import { updateTask, deleteTask } from '../features/taskSlice';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
+import * as Localization from 'expo-localization';
 import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
 import { Calendar } from 'react-native-calendars';
 import { scheduleTaskReminder, cancelNotification } from '../utils/notifications';
@@ -248,10 +250,20 @@ useEffect(() => {
     try {
       const [h, m] = timeStr.split(':');
       if (!h || !m || isNaN(h) || isNaN(m)) return timeStr;
-      const d = new Date();
-      d.setHours(parseInt(h, 10), parseInt(m, 10));
-      const result = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      return result === 'Invalid Date' ? timeStr : result;
+      
+      const is24Hour = Localization.getCalendars()[0]?.uses24hourClock ?? false;
+      let hour = parseInt(h, 10);
+      let ampm = '';
+      
+      if (!is24Hour) {
+        ampm = hour >= 12 ? ' PM' : ' AM';
+        if (hour > 12) hour -= 12;
+        if (hour === 0) hour = 12;
+      } else {
+        hour = hour.toString().padStart(2, '0');
+      }
+      
+      return `${hour}:${m.padStart(2, '0')}${ampm}`;
     } catch {
       return timeStr;
     }
@@ -484,34 +496,7 @@ useEffect(() => {
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
   const handleAttachPhoto = () => {
-    setConfirmConfig({
-      isVisible: true,
-      title: t('Attach Photo'),
-      message: t('Choose source'),
-      cancelText: t('Cancel'),
-      confirmText: t('Take Photo'),
-      secondaryConfirmText: t('Choose Image'),
-      hideCancel: false,
-      isDestructive: false,
-      onConfirm: () => {
-        setConfirmConfig(prev => ({
-          ...prev,
-          isVisible: false,
-        }));
-        setTimeout(() => {
-          launchCamera();
-        }, 450);
-      },
-      onSecondaryConfirm: () => {
-        setConfirmConfig(prev => ({
-          ...prev,
-          isVisible: false,
-        }));
-        setTimeout(() => {
-          launchImageLibrary();
-        }, 450);
-      },
-    });
+    launchCamera();
   };
 
   const handleAttachDocument = () => {

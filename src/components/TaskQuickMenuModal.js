@@ -10,6 +10,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Clipboard from 'expo-clipboard';
 import { Alert, Platform } from 'react-native';
+import { shareTaskAsync } from '../../modules/expo-task-alarm';
 
 let RNShare;
 if (Platform.OS !== 'web') {
@@ -126,12 +127,16 @@ export default function TaskQuickMenuModal({
 
                   requestAnimationFrame(async () => {
                     try {
-                      await RNShare.open({
-                        urls: urlsToShare,
-                        type: '*/*',
-                        title: t('Share Task'),
-                        failOnCancel: false
-                      });
+                      if (Platform.OS === 'android') {
+                        await shareTaskAsync(message, urlsToShare);
+                      } else {
+                        await RNShare.open({
+                          urls: urlsToShare,
+                          type: '*/*',
+                          title: t('Share Task'),
+                          failOnCancel: false
+                        });
+                      }
                     } catch (err) {
                       if (err.message !== 'User did not share') {
                         Alert.alert("Error sharing", err.message);

@@ -6,6 +6,7 @@ import { updateTask, deleteTask, addTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
 import dayjs from 'dayjs';
+import * as Localization from 'expo-localization';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 
@@ -155,14 +156,24 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   };
 
   const formatDisplayTime = (timeStr) => {
-    if (!timeStr) return '';
+    if (!timeStr || timeStr === '--:--') return '--:--';
     try {
       const [h, m] = timeStr.split(':');
       if (!h || !m || isNaN(h) || isNaN(m)) return timeStr;
-      const d = new Date();
-      d.setHours(parseInt(h, 10), parseInt(m, 10));
-      const result = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      return result === 'Invalid Date' ? timeStr : result;
+      
+      const is24Hour = Localization.getCalendars()[0]?.uses24hourClock ?? false;
+      let hour = parseInt(h, 10);
+      let ampm = '';
+      
+      if (!is24Hour) {
+        ampm = hour >= 12 ? ' PM' : ' AM';
+        if (hour > 12) hour -= 12;
+        if (hour === 0) hour = 12;
+      } else {
+        hour = hour.toString().padStart(2, '0');
+      }
+      
+      return `${hour}:${m.padStart(2, '0')}${ampm}`;
     } catch {
       return timeStr;
     }
