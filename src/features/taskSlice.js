@@ -271,7 +271,6 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                     if (autoTransferMode === 'tomorrow') {
                         targetDate = targetDate.add(1, 'day');
                     } else if (autoTransferMode === 'next_workday') {
-                        targetDate = targetDate.add(1, 'day');
                         while (targetDate.day() === 0 || targetDate.day() === 6) {
                             targetDate = targetDate.add(1, 'day');
                         }

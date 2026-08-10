@@ -644,28 +644,6 @@ useEffect(() => {
     }
   };
 
-  const testCameraDirectly = async () => {
-    console.log('CAMERA TEST START');
-    try {
-      const permission = await ImagePicker.getCameraPermissionsAsync();
-      console.log('permission before:', permission);
-      if (!permission.granted) {
-        const result = await ImagePicker.requestCameraPermissionsAsync();
-        console.log('permission result:', result);
-        if (!result.granted) {
-          return;
-        }
-      }
-      console.log('ABOUT TO OPEN CAMERA');
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
-      });
-      console.log('CAMERA RETURNED:', result);
-    } catch (error) {
-      console.error('DIRECT CAMERA TEST ERROR:', error);
-    }
-  };
 
   const pickDocument = async () => {
     try {
@@ -1142,21 +1120,6 @@ useEffect(() => {
           onConfirm={confirmConfig.onConfirm}
         />
 
-        <TouchableOpacity
-          onPress={testCameraDirectly}
-          style={{
-            padding: 15,
-            backgroundColor: colors.primary,
-            marginHorizontal: 20,
-            marginBottom: 20,
-            borderRadius: 8,
-            alignItems: 'center'
-          }}
-        >
-          <Text style={{ color: colors.textInverse, fontWeight: 'bold' }}>
-            DIRECT CAMERA TEST
-          </Text>
-        </TouchableOpacity>
 
         <RNModal visible={showDatePicker} transparent animationType="fade">
           <View style={styles.calendarOverlay}>
