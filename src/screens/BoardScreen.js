@@ -67,6 +67,7 @@ export default function BoardScreen({ route, navigation }) {
   const [promptConfig, setPromptConfig] = useState({ isVisible: false, type: null, targetBoard: null });
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
   const [sectionOptionsConfig, setSectionOptionsConfig] = useState({ isVisible: false, section: null });
+  const [boardOptionsConfig, setBoardOptionsConfig] = useState({ isVisible: false, board: null });
   const [sortConfig, setSortConfig] = useState({});
   const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
 
@@ -376,21 +377,7 @@ export default function BoardScreen({ route, navigation }) {
 
   const handleBoardOptions = (board) => {
     if (board.id === 'main') return;
-    Alert.alert(`Board: ${board.name}`, 'What would you like to do?', [
-      { text: 'Rename', onPress: () => {
-        setPromptConfig({ isVisible: true, type: 'rename', targetBoard: board });
-      }},
-      { text: 'Delete', style: 'destructive', onPress: () => {
-        Alert.alert('Delete Board', 'Are you sure? All tasks will be deleted.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => {
-            dispatch(deleteBoardAsync(board.id));
-            dispatch(deleteTasksByBoard(board.id));
-          }}
-        ]);
-      }},
-      { text: 'Cancel', style: 'cancel' }
-    ]);
+    setBoardOptionsConfig({ isVisible: true, board });
   };
 
   const handlePromptSubmit = (value) => {
@@ -640,6 +627,54 @@ export default function BoardScreen({ route, navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity testID="section_option_cancel" style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}>
+            <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <Modal 
+        isVisible={boardOptionsConfig.isVisible} 
+        onSwipeComplete={() => setBoardOptionsConfig({ isVisible: false, board: null })}
+        swipeDirection={['down']}
+        propagateSwipe={true}
+        onBackdropPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
+        style={{ margin: 0, justifyContent: 'flex-end' }}
+      >
+        <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+          <View style={styles.optionsModalDragHandle} />
+          <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
+            {t('Board')}: {boardOptionsConfig.board?.name}
+          </Text>
+          <Text style={{ color: colors.textSecondary, marginBottom: 15, paddingHorizontal: 20 }}>
+            {t('What would you like to do?')}
+          </Text>
+          
+          <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Rename board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setPromptConfig({ isVisible: true, type: 'rename', targetBoard: boardOptionsConfig.board }); setBoardOptionsConfig({ isVisible: false, board: null }); }}>
+            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Rename')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Delete board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+            const board = boardOptionsConfig.board;
+            setBoardOptionsConfig({ isVisible: false, board: null }); 
+            setTimeout(() => {
+              setConfirmConfig({
+                isVisible: true,
+                title: t('Delete Board'),
+                message: t('Are you sure? All tasks will be deleted.'),
+                confirmText: t('Delete'),
+                isDestructive: true,
+                onConfirm: () => {
+                  dispatch(deleteBoardAsync(board.id));
+                  dispatch(deleteTasksByBoard(board.id));
+                  setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+                }
+              });
+            }, 400);
+          }}>
+            <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}>
             <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
           </TouchableOpacity>
         </View>

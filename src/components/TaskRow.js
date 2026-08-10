@@ -7,8 +7,36 @@ import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
+
+const SwipeIconComplete = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Polyline points="20 6 9 17 4 12" />
+  </Svg>
+);
+
+const SwipeIconSnooze = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="10" />
+    <Polyline points="12 6 12 12 16 14" />
+  </Svg>
+);
+
+const SwipeIconDelete = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 6h18" />
+    <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
+
+const SwipeIconMore = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="1" />
+    <Circle cx="12" cy="5" r="1" />
+    <Circle cx="12" cy="19" r="1" />
+  </Svg>
+);
 
 const IconNote = ({ color }) => (
   <Svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -126,10 +154,11 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
       extrapolate: 'clamp',
     });
     return (
-      <View style={[styles.leftAction, { backgroundColor: '#4caf50' }]}>
-        <Animated.Text style={[styles.actionText, { transform: [{ scale }] }]}>
-          ✓ {t('Complete')}
-        </Animated.Text>
+      <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer }]}>
+        <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, { transform: [{ scale }] }]}>
+          <SwipeIconComplete color={colors.textPrimary} />
+          <Text style={[styles.actionText, { color: colors.textPrimary, marginLeft: 8 }]}>{t('Complete')}</Text>
+        </Animated.View>
       </View>
     );
   };
@@ -142,14 +171,20 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
     });
     return (
       <View style={styles.rightActionContainer}>
-        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: '#ff9800' }]} onPress={handleSwipeSnooze}>
-          <Animated.Text style={[styles.actionIcon, { transform: [{ scale }] }]}>💤</Animated.Text>
+        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]} onPress={handleSwipeSnooze}>
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <SwipeIconSnooze color={colors.textPrimary} />
+          </Animated.View>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: '#f44336' }]} onPress={handleSwipeDelete}>
-          <Animated.Text style={[styles.actionIcon, { transform: [{ scale }] }]}>🗑️</Animated.Text>
+        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainerHigh }]} onPress={handleSwipeDelete}>
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <SwipeIconDelete color="#f44336" />
+          </Animated.View>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: '#607d8b' }]} onPress={handleSwipeMore}>
-          <Animated.Text style={[styles.actionIcon, { transform: [{ scale }] }]}>⋮</Animated.Text>
+        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]} onPress={handleSwipeMore}>
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <SwipeIconMore color={colors.textPrimary} />
+          </Animated.View>
         </TouchableOpacity>
       </View>
     );

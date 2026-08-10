@@ -11,6 +11,51 @@ import * as FileSystem from 'expo-file-system';
 import * as Clipboard from 'expo-clipboard';
 import { Alert, Platform } from 'react-native';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
+import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
+
+const IconEdit = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </Svg>
+);
+
+const IconComplete = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Polyline points="20 6 9 17 4 12" />
+  </Svg>
+);
+
+const IconSnooze = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="10" />
+    <Polyline points="12 6 12 12 16 14" />
+  </Svg>
+);
+
+const IconDuplicate = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <Path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </Svg>
+);
+
+const IconShare = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="18" cy="5" r="3" />
+    <Circle cx="6" cy="12" r="3" />
+    <Circle cx="18" cy="19" r="3" />
+    <Path d="M8.59 13.51l6.83 3.98" />
+    <Path d="M15.41 6.51l-6.82 3.98" />
+  </Svg>
+);
+
+const IconDelete = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 6h18" />
+    <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
 
 let RNShare;
 if (Platform.OS !== 'web') {
@@ -163,12 +208,12 @@ export default function TaskQuickMenuModal({
   };
 
   const actionItems = [
-    { label: t('Edit'), icon: '✏️', onPress: () => { onClose(); onPressEdit(task); } },
-    { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: '✓', onPress: handleComplete },
-    { label: t('Snooze'), icon: '💤', onPress: () => { onClose(); onPressSnooze(task); } },
-    { label: t('Duplicate'), icon: '📋', onPress: handleDuplicate },
-    { label: t('Share'), icon: '📤', onPress: handleShare },
-    { label: t('Delete'), icon: '🗑️', onPress: handleDelete, danger: true },
+    { label: t('Edit'), icon: IconEdit, onPress: () => { onClose(); onPressEdit(task); } },
+    { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
+    { label: t('Snooze'), icon: IconSnooze, onPress: () => { onClose(); onPressSnooze(task); } },
+    { label: t('Duplicate'), icon: IconDuplicate, onPress: handleDuplicate },
+    { label: t('Share'), icon: IconShare, onPress: handleShare },
+    { label: t('Delete'), icon: IconDelete, onPress: handleDelete, danger: true },
   ];
 
   return (
@@ -196,7 +241,9 @@ export default function TaskQuickMenuModal({
               style={[styles.actionRow, { borderBottomColor: colors.borderColor }]} 
               onPress={item.onPress}
             >
-              <Text style={styles.actionIcon}>{item.icon}</Text>
+              <View style={styles.actionIconContainer}>
+                <item.icon color={item.danger ? '#f44336' : colors.textPrimary} />
+              </View>
               <Text style={[styles.actionLabel, { color: item.danger ? '#f44336' : colors.textPrimary }]}>
                 {item.label}
               </Text>
@@ -244,11 +291,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderBottomWidth: 1,
   },
-  actionIcon: {
-    fontSize: 22,
+  actionIconContainer: {
     marginRight: 15,
     width: 30,
-    textAlign: 'center'
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionLabel: {
     fontSize: 16,
