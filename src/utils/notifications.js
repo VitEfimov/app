@@ -815,6 +815,10 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
     summaryReminder, summaryReminderTime
   } = themeState;
 
+  const notificationSound = themeState?.notificationSound || 'default';
+  const vibrationEnabled = themeState?.vibrationEnabled !== false;
+  const channelId = getChannelId(false, notificationSound, vibrationEnabled);
+
   // Cancel existing automations
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   for (const notif of scheduled) {
@@ -823,81 +827,89 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
     }
   }
 
-  // Helper to find the absolute next occurrence of a time
-  const getNextOccurrence = (hour, minute) => {
+  // Helper to find the absolute next occurrence of a time, with an optional day offset
+  const getNextOccurrence = (hour, minute, daysOffset = 0) => {
     let now = dayjs();
     let next = dayjs().hour(hour).minute(minute).second(0).millisecond(0);
     if (next.isBefore(now)) {
       next = next.add(1, 'day');
     }
-    return next;
+    return next.add(daysOffset, 'day');
   };
 
-  // Morning Reminder: Upcoming tasks
+  // Morning Reminder: Upcoming tasks (Schedule for next 7 days)
   if (morningReminder && morningReminderTime) {
     const [hour, minute] = morningReminderTime.split(':').map(Number);
-    const triggerDate = getNextOccurrence(hour, minute);
-    const targetDayStr = triggerDate.format('YYYY-MM-DD');
+    
+    for (let i = 0; i < 7; i++) {
+      const triggerDate = getNextOccurrence(hour, minute, i);
+      const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
-    const upcomingTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
-    if (upcomingTasks.length > 0) {
-      let bodyText = `You have ${upcomingTasks.length} task${upcomingTasks.length === 1 ? '' : 's'} for today.\n`;
-      const top5 = upcomingTasks.slice(0, 5);
-      bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
-      if (upcomingTasks.length > 5) {
-        bodyText += `\n...and ${upcomingTasks.length - 5} more`;
+      const upcomingTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
+      if (upcomingTasks.length > 0) {
+        let bodyText = `You have ${upcomingTasks.length} task${upcomingTasks.length === 1 ? '' : 's'} for today.\n`;
+        const top5 = upcomingTasks.slice(0, 5);
+        bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+        if (upcomingTasks.length > 5) {
+          bodyText += `\n...and ${upcomingTasks.length - 5} more`;
+        }
+
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Good Morning!',
+            body: bodyText,
+            sound: true,
+            data: { isAutomation: true },
+          },
+          trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
+        });
       }
-
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Good Morning!',
-          body: bodyText,
-          sound: true,
-          data: { isAutomation: true },
-        },
-        trigger: { date: triggerDate.toDate(), repeats: false }
-      });
     }
   }
 
-  // Summary Reminder: Overdue tasks
+  // Summary Reminder: Overdue tasks (Schedule for next 7 days)
   if (summaryReminder && summaryReminderTime) {
     const [hour, minute] = summaryReminderTime.split(':').map(Number);
-    const triggerDate = getNextOccurrence(hour, minute);
-    const targetDayStr = triggerDate.format('YYYY-MM-DD');
+    
+    for (let i = 0; i < 7; i++) {
+      const triggerDate = getNextOccurrence(hour, minute, i);
+      const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
-    const overdueTasks = tasks.filter(t => !t.completed && t.completionDate && t.completionDate < targetDayStr);
-    if (overdueTasks.length > 0) {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Daily Summary',
-          body: `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.`,
-          sound: true,
-          data: { isAutomation: true },
-        },
-        trigger: { date: triggerDate.toDate(), repeats: false }
-      });
+      const overdueTasks = tasks.filter(t => !t.completed && t.completionDate && t.completionDate < targetDayStr);
+      if (overdueTasks.length > 0) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Daily Summary',
+            body: `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.`,
+            sound: true,
+            data: { isAutomation: true },
+          },
+          trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
+        });
+      }
     }
   }
 
-  // Evening Reminder: Unfinished tasks
+  // Evening Reminder: Unfinished tasks (Schedule for next 7 days)
   if (eveningReminder && eveningReminderTime) {
     const [hour, minute] = eveningReminderTime.split(':').map(Number);
-    const triggerDate = getNextOccurrence(hour, minute);
+    
+    for (let i = 0; i < 7; i++) {
+      const triggerDate = getNextOccurrence(hour, minute, i);
+      const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
-    const targetDayStr = triggerDate.format('YYYY-MM-DD');
-
-    const unfinishedTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
-    if (unfinishedTasks.length > 0) {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Evening Review',
-          body: `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.`,
-          sound: true,
-          data: { isAutomation: true },
-        },
-        trigger: { date: triggerDate.toDate(), repeats: false }
-      });
+      const unfinishedTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
+      if (unfinishedTasks.length > 0) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Evening Review',
+            body: `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.`,
+            sound: true,
+            data: { isAutomation: true },
+          },
+          trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
+        });
+      }
     }
   }
 }
