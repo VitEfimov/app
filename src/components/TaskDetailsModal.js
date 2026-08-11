@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -572,9 +572,14 @@ useEffect(() => {
             isVisible: true,
             title: t('Permission Denied'),
             message: t('Camera permission is disabled. Please enable it in Android settings.'),
-            hideCancel: true,
-            confirmText: t('OK'),
-            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false })),
+            hideCancel: false,
+            confirmText: t('Settings'),
+            onConfirm: () => {
+              setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+              Linking.openSettings();
+            },
+            secondaryConfirmText: t('Cancel'),
+            onSecondaryConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false })),
           });
           return;
         }

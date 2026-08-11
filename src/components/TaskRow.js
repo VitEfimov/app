@@ -247,7 +247,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   };
 
   const priorityColor = getPriorityColor(task.priority);
-  const hasNotes = (task.description?.text && task.description.text.trim() !== '') || (task.description?.img && task.description.img.trim() !== '');
+  const hasNotes = (task.description?.text && task.description.text.trim() !== '') || (task.description?.img && task.description.img.trim() !== '') || (task.description?.attachments && task.description.attachments.length > 0);
   const subtasks = task.subtasks || [];
   const totalSubtasksCount = subtasks.length;
   const completedSubtasksCount = subtasks.filter(s => s.completed).length;

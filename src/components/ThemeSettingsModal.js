@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setSourceColor, resetTheme, setUserPicture, setThemeMode } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDeviceLanguage } from '../i18n';
@@ -73,7 +74,16 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
     });
 
     if (!result.canceled) {
-      setTempImage(result.assets[0].uri);
+      const sourceUri = result.assets[0].uri;
+      try {
+        const filename = sourceUri.split('/').pop() || `bg_${Date.now()}.jpg`;
+        const destUri = `${FileSystem.documentDirectory}${filename}`;
+        await FileSystem.copyAsync({ from: sourceUri, to: destUri });
+        setTempImage(destUri);
+      } catch (e) {
+        console.error("Failed to copy image", e);
+        setTempImage(sourceUri);
+      }
     }
   };
 

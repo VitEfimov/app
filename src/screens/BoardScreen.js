@@ -435,7 +435,10 @@ export default function BoardScreen({ route, navigation }) {
       <InlineAddTask 
         sectionId={section.id} 
         isActive={activeAddSectionId === section.id}
-        onToggle={(active) => setActiveAddSectionId(active ? section.id : null)}
+        onToggle={(active) => {
+          setActiveAddSectionId(active ? section.id : null);
+          if (active) setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
+        }}
         onAddDetails={(task) => {
           setSelectedTask(task);
           setDetailsVisible(true);

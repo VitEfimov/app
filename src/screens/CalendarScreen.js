@@ -488,6 +488,9 @@ export default function CalendarScreen() {
         <View style={{ marginBottom: selectionMode.isActive ? 70 : 20 }}>
           <InlineAddTask 
             sectionId={selectedDate} 
+            onToggle={(active) => {
+              if (active) setSelectionMode({ isActive: false, selectedTaskIds: [] });
+            }}
             onAddDetails={(task) => {
               setSelectedTask(task);
               setDetailsVisible(true);
@@ -575,7 +578,7 @@ export default function CalendarScreen() {
       </Modal>
 
       {selectionMode.isActive && (
-        <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
+        <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor, zIndex: 100, elevation: 10 }]}>
           <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
             <TouchableOpacity onPress={handleSelectAll} style={styles.actionBtn}>

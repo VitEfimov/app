@@ -95,6 +95,7 @@ export default function SnoozeModal({
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
+  const autoRescheduleTime = useSelector(state => state.themeReducer.autoRescheduleTime || '09:00');
 
   const [activeTab, setActiveTab] = useState('date'); // 'date' or 'reminder'
 
@@ -106,19 +107,19 @@ export default function SnoozeModal({
 
     switch (mode) {
       case 'later_today':
-        targetDate = targetDate.add(4, 'hour');
+        targetDate = targetDate.add(3, 'hour');
         targetTime = targetDate.format('HH:mm');
         break;
       case 'tomorrow':
         targetDate = targetDate.add(1, 'day');
-        targetTime = '09:00';
+        targetTime = autoRescheduleTime;
         break;
       case 'next_workday':
         targetDate = targetDate.add(1, 'day');
         while (targetDate.day() === 0 || targetDate.day() === 6) {
           targetDate = targetDate.add(1, 'day');
         }
-        targetTime = '09:00';
+        targetTime = autoRescheduleTime;
         break;
       case 'weekend':
         // Next Saturday
@@ -183,7 +184,7 @@ export default function SnoozeModal({
   };
 
   const dateOptions = [
-    { label: t('Later today (+4 hrs)'), mode: 'later_today', icon: IconSun },
+    { label: t('Later today (+3 hrs)'), mode: 'later_today', icon: IconSun },
     { label: t('Tomorrow morning'), mode: 'tomorrow', icon: IconCoffee },
     { label: t('Next workday'), mode: 'next_workday', icon: IconBriefcase },
     { label: t('This weekend'), mode: 'weekend', icon: IconUmbrella }

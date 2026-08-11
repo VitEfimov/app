@@ -37,7 +37,8 @@ export default function AutoManageSettings({ isVisible, onClose }) {
     eveningReminder: false,
     eveningReminderTime: '20:00',
     summaryReminder: false,
-    summaryReminderTime: '09:00'
+    summaryReminderTime: '09:00',
+    autoRescheduleTime: '09:00'
   };
 
   const formatDisplayTime = (timeStr) => {
@@ -100,7 +101,8 @@ export default function AutoManageSettings({ isVisible, onClose }) {
     eveningReminder = false,
     eveningReminderTime = '20:00',
     summaryReminder = false,
-    summaryReminderTime = '09:00'
+    summaryReminderTime = '09:00',
+    autoRescheduleTime = '09:00'
   } = localSettings;
 
   const SettingToggle = ({ label, value, onValueChange }) => (
@@ -178,6 +180,14 @@ export default function AutoManageSettings({ isVisible, onClose }) {
             <RadioButton label={t('Tomorrow')} selected={autoTransferMode === 'tomorrow'} onPress={() => handleUpdate({ autoTransferMode: 'tomorrow' })} />
             <RadioButton label={t('Next Workday')} selected={autoTransferMode === 'next_workday'} onPress={() => handleUpdate({ autoTransferMode: 'next_workday' })} />
             <RadioButton label={t('Never')} selected={autoTransferMode === 'none'} onPress={() => handleUpdate({ autoTransferMode: 'none' })} />
+            {(autoTransferMode === 'tomorrow' || autoTransferMode === 'next_workday' || autoTransferMode === 'today') && (
+              <View style={{ marginTop: 10, paddingHorizontal: 10 }}>
+                <Text style={[styles.subText, { color: colors.textSecondary }]}>{t('Auto-reschedule time')}</Text>
+                <TouchableOpacity onPress={() => setTimePickerTarget('autoReschedule')} style={{ paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.surfaceContainerHigh, alignSelf: 'flex-start' }}>
+                  <Text style={{ color: colors.textPrimary }}>{formatDisplayTime(autoRescheduleTime)}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
           
           <Text style={[styles.groupHeader, { color: colors.textSecondary, marginTop: 15 }]}>{t('Priority Automation')}</Text>
@@ -312,7 +322,8 @@ export default function AutoManageSettings({ isVisible, onClose }) {
             value={
               timePickerTarget === 'morning' ? morningReminderTime :
               timePickerTarget === 'evening' ? eveningReminderTime :
-              timePickerTarget === 'summary' ? summaryReminderTime : '12:00'
+              timePickerTarget === 'summary' ? summaryReminderTime :
+              timePickerTarget === 'autoReschedule' ? autoRescheduleTime : '12:00'
             }
             colors={colors}
             isDark={themeState?.isDark || false}
@@ -321,6 +332,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
               if (timePickerTarget === 'morning') handleUpdate({ morningReminderTime: newTime });
               else if (timePickerTarget === 'evening') handleUpdate({ eveningReminderTime: newTime });
               else if (timePickerTarget === 'summary') handleUpdate({ summaryReminderTime: newTime });
+              else if (timePickerTarget === 'autoReschedule') handleUpdate({ autoRescheduleTime: newTime });
               setTimePickerTarget(null);
             }}
           />

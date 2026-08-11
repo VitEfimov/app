@@ -28,6 +28,7 @@ const initialState = {
   calendarPanePosition: loaded?.calendarPanePosition || null,
   progressMode: loaded?.progressMode || 'daily',
   defaultSnoozeTime: loaded?.defaultSnoozeTime || 30,
+  autoRescheduleTime: loaded?.autoRescheduleTime || '09:00',
   isBoardsCollapsed: loaded?.isBoardsCollapsed || false,
   
   // Auto-Manage settings
@@ -131,6 +132,7 @@ const themeSlice = createSlice({
       state.calendarPanePosition = null;
       state.progressMode = 'daily';
       state.defaultSnoozeTime = 30;
+      state.autoRescheduleTime = '09:00';
       state.isBoardsCollapsed = false;
       
       // Reset auto-manage settings
@@ -186,6 +188,10 @@ const themeSlice = createSlice({
       state.defaultSnoozeTime = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
+    setAutoRescheduleTime: (state, action) => {
+      state.autoRescheduleTime = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
     setAutoManageSettings: (state, action) => {
       Object.keys(action.payload).forEach(key => {
         state[key] = action.payload[key];
@@ -201,7 +207,7 @@ const themeSlice = createSlice({
 
 export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
-  setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime,
+  setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
   setAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat
 } = themeSlice.actions;
