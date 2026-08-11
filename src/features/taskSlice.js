@@ -66,6 +66,7 @@ const initialState = {
     tasks: [], // Initially empty, will be loaded on boot based on auth state
     loading: false,
     error: null,
+    pendingCleanupTaskIds: [],
 };
 
 const taskSlice = createSlice({
@@ -128,6 +129,12 @@ const taskSlice = createSlice({
         },
         loadGuestTasks(state) {
             state.tasks = loadGuestTasksFromLocalStorage();
+        },
+        setPendingCleanupTaskIds(state, action) {
+            state.pendingCleanupTaskIds = action.payload;
+        },
+        clearPendingCleanupTaskIds(state) {
+            state.pendingCleanupTaskIds = [];
         }
     },
     extraReducers: (builder) => {
@@ -141,7 +148,7 @@ const taskSlice = createSlice({
     }
 });
 
-export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, updateTaskSync, clearTasks, loadGuestTasks } = taskSlice.actions;
+export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, updateTaskSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds } = taskSlice.actions;
 
 
 
@@ -299,23 +306,24 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
     }
 
     if (tasksToDelete.length > 0 && confirmBeforeDeletion) {
-        Alert.alert(
-            "Automatic Cleanup",
-            `You have ${tasksToDelete.length} old task(s) scheduled for automatic deletion based on your settings. Do you want to delete them?`,
-            [
-                { text: "Keep Them", style: "cancel" },
-                { 
-                    text: "Delete", 
-                    style: "destructive", 
-                    onPress: async () => {
-                        const finalTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
-                        dispatch(hydrateTaskState(finalTasks));
-                        await AsyncStorage.setItem('tasks', JSON.stringify(finalTasks));
-                    }
-                }
-            ]
-        );
+        dispatch(setPendingCleanupTaskIds(tasksToDelete));
     }
+};
+
+export const executePendingCleanup = () => async (dispatch, getState) => {
+    const state = getState();
+    const tasksToDelete = state.taskReducer.pendingCleanupTaskIds;
+    if (tasksToDelete && tasksToDelete.length > 0) {
+        const currentTasks = state.taskReducer.tasks;
+        const finalTasks = currentTasks.filter(t => !tasksToDelete.includes(t.id));
+        dispatch(hydrateTaskState(finalTasks));
+        await AsyncStorage.setItem('tasks', JSON.stringify(finalTasks));
+    }
+    dispatch(clearPendingCleanupTaskIds());
+};
+
+export const cancelPendingCleanup = () => (dispatch) => {
+    dispatch(clearPendingCleanupTaskIds());
 };
 
 export default taskSlice.reducer;

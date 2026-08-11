@@ -20,6 +20,7 @@ import { registerForPushNotificationsAsync } from './src/utils/notifications';
 import { registerBackgroundFetchAsync } from './src/utils/backgroundTasks';
 import i18n from './src/i18n';
 import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
+import AutomaticCleanupModal from './src/components/AutomaticCleanupModal';
 import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
@@ -391,7 +392,12 @@ function InitApp() {
     return <PinLockScreen correctPin={themeReducer.appPin} onUnlock={() => setIsUnlocked(true)} />;
   }
 
-  return <AppNavigator />;
+  return (
+    <>
+      <AppNavigator />
+      <AutomaticCleanupModal />
+    </>
+  );
 }
 
 function RootWrapper({ children }) {
