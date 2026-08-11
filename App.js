@@ -273,7 +273,24 @@ function InitApp() {
       try {
         await registerBackgroundFetchAsync();
         const theme = await AsyncStorage.getItem('customTheme');
-        if (theme) dispatch(hydrateThemeState(JSON.parse(theme)));
+        if (theme) {
+          let themeData = JSON.parse(theme);
+          
+          if (themeData.randomColorDaily) {
+            const today = dayjs().format('YYYY-MM-DD');
+            if (themeData.lastRandomColorDate !== today) {
+              const PREDEFINED_COLORS = [
+                '#C62828', '#AD1457', '#8E24AA', '#5E35B1', '#1E88E5',
+                '#00897B', '#2E7D32', '#6B8E6B', '#C0CA33', '#F9A825', '#FB8C00', '#455A64'
+              ];
+              themeData.sourceColor = PREDEFINED_COLORS[Math.floor(Math.random() * PREDEFINED_COLORS.length)];
+              themeData.lastRandomColorDate = today;
+              await AsyncStorage.setItem('customTheme', JSON.stringify(themeData));
+            }
+          }
+          
+          dispatch(hydrateThemeState(themeData));
+        }
 
         const boardsJson = await AsyncStorage.getItem('boards');
         if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Switch } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
-import { setSourceColor, resetTheme, setUserPicture, setThemeMode } from '../features/themeSlice';
+import { setSourceColor, resetTheme, setUserPicture, setThemeMode, setRandomColorDaily } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -46,19 +46,22 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   const currentSourceColor = useSelector(state => state.themeReducer.sourceColor);
   const currentUserPicture = useSelector(state => state.themeReducer.userPicture);
   const currentThemeMode = useSelector(state => state.themeReducer.themeMode);
+  const currentRandomColorDaily = useSelector(state => state.themeReducer.randomColorDaily);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
   const [tempColor, setTempColor] = useState(currentSourceColor);
   const [tempImage, setTempImage] = useState(currentUserPicture);
   const [tempThemeMode, setTempThemeMode] = useState(currentThemeMode || 'system');
+  const [tempRandomColorDaily, setTempRandomColorDaily] = useState(currentRandomColorDaily || false);
 
   useEffect(() => {
     if (isVisible) {
       setTempColor(currentSourceColor);
       setTempImage(currentUserPicture);
       setTempThemeMode(currentThemeMode || 'system');
+      setTempRandomColorDaily(currentRandomColorDaily || false);
     }
-  }, [isVisible, currentSourceColor, currentUserPicture, currentThemeMode]);
+  }, [isVisible, currentSourceColor, currentUserPicture, currentThemeMode, currentRandomColorDaily]);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -95,6 +98,9 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
     }
     if (tempThemeMode !== currentThemeMode) {
       dispatch(setThemeMode(tempThemeMode));
+    }
+    if (tempRandomColorDaily !== currentRandomColorDaily) {
+      dispatch(setRandomColorDaily(tempRandomColorDaily));
     }
     onClose();
   };
@@ -204,6 +210,15 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
                   />
                 </View>
               )}
+
+              <View style={[styles.customColorRow, { marginTop: 15 }]}>
+                <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Randomize daily')}</Text>
+                <Switch 
+                  value={tempRandomColorDaily}
+                  onValueChange={setTempRandomColorDaily}
+                  trackColor={{ false: '#767577', true: colors.primary }}
+                />
+              </View>
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
@@ -293,6 +308,7 @@ const styles = StyleSheet.create({
   },
   scrollArea: {
     padding: 20,
+    flexShrink: 1,
   },
   card: {
     borderRadius: 12,
