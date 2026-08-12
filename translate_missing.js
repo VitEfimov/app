@@ -21,8 +21,12 @@ const missingStrings = [
   "When overdue",
   "Frequency",
   "Next Workday",
-  "W1", "W2", "W3", "W4", "W5", "W6"
+  "W1", "W2", "W3", "W4", "W5", "W6",
+  "Reschedule Date",
+  "Adjust Reminder",
+  "Randomize daily"
 ];
+
 
 function translate(text, targetLang) {
   return new Promise((resolve, reject) => {

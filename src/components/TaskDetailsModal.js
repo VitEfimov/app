@@ -1131,6 +1131,7 @@ useEffect(() => {
             <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
               <Calendar
                 key={i18n.language}
+                firstDay={i18n.language === 'en' ? 0 : 1}
                 current={
                   datePickerType === 'due' 
                     ? (selectedDate || dayjs().format('YYYY-MM-DD'))

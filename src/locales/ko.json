@@ -223,5 +223,8 @@
   "W3": "W3",
   "W4": "W4",
   "W5": "W5",
-  "W6": "W6"
+  "W6": "W6",
+  "Reschedule Date": "일정 변경 날짜",
+  "Adjust Reminder": "알림 조정",
+  "Randomize daily": "매일 무작위로 추출"
 }

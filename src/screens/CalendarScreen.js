@@ -388,6 +388,7 @@ export default function CalendarScreen() {
           testID="task_calendar"
           key={`${colors.bgMain}-${isDark}-${i18n.language}`}
           current={selectedDate}
+          firstDay={i18n.language === 'en' ? 0 : 1}
           onDayPress={(day) => {
             setSelectedDate(day.dateString);
             setSelectionMode({ isActive: false, selectedTaskIds: [] });
