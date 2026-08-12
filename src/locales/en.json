@@ -292,5 +292,15 @@
   "NOTES & ATTACHMENTS": "NOTES & ATTACHMENTS",
   "Reschedule Date": "Reschedule Date",
   "Adjust Reminder": "Adjust Reminder",
-  "Randomize daily": "Randomize daily"
+  "Randomize daily": "Randomize daily",
+  "+10 minutes": "+10 minutes",
+  "+30 minutes": "+30 minutes",
+  "+1 hour": "+1 hour",
+  "Later today (+3 hrs)": "Later today (+3 hrs)",
+  "Tomorrow morning": "Tomorrow morning",
+  "Next workday": "Next workday",
+  "This weekend": "This weekend",
+  "PRO FEATURES": "PRO FEATURES",
+  "Nag Mode (Every 10 min)": "Nag Mode (Every 10 min)",
+  "Escalating Reminder": "Escalating Reminder"
 }

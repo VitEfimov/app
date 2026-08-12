@@ -292,5 +292,15 @@
   "NOTES & ATTACHMENTS": "ЗАМЕТКИ И ВЛОЖЕНИЯ",
   "Reschedule Date": "Перенести дату",
   "Adjust Reminder": "Настроить напоминание",
-  "Randomize daily": "Рандомизировать ежедневно"
+  "Randomize daily": "Рандомизировать ежедневно",
+  "+10 minutes": "+10 минут",
+  "+30 minutes": "+30 минут",
+  "+1 hour": "+1 час",
+  "Later today (+3 hrs)": "Сегодня позже (+3 ч)",
+  "Tomorrow morning": "Завтра утром",
+  "Next workday": "Следующий рабочий день",
+  "This weekend": "В эти выходные",
+  "PRO FEATURES": "PRO ФУНКЦИИ",
+  "Nag Mode (Every 10 min)": "Режим назойливости (каждые 10 мин)",
+  "Escalating Reminder": "Нарастающее напоминание"
 }

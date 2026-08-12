@@ -567,23 +567,6 @@ useEffect(() => {
       });
 
       if (!permission.granted) {
-        if (permission.canAskAgain === false) {
-          setConfirmConfig({
-            isVisible: true,
-            title: t('Permission Denied'),
-            message: t('Camera permission is disabled. Please enable it in Android settings.'),
-            hideCancel: false,
-            confirmText: t('Settings'),
-            onConfirm: () => {
-              setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-              Linking.openSettings();
-            },
-            secondaryConfirmText: t('Cancel'),
-            onSecondaryConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false })),
-          });
-          return;
-        }
-
         const requested = await ImagePicker.requestCameraPermissionsAsync();
         console.log('[Camera] permission response:', {
           status: requested.status,
