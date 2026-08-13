@@ -153,7 +153,6 @@
   "Delete 3-day overdue tasks": "删除逾期 3 天的任务",
   "Delete 7-day completed tasks": "删除 7 天前完成的任务",
   "Confirm before automatic deletion": "自动删除前确认",
-  "Recurring Reminders": "定期提醒",
   "Daily summary of overdue tasks (9 AM)": "逾期任务每日摘要 (上午 9 点)",
   "Morning reminder of today's tasks (8 AM)": "今日任务晨间提醒 (上午 8 点)",
   "Evening reminder of unfinished tasks (8 PM)": "未完成任务晚间提醒 (晚上 8 点)",
@@ -223,5 +222,6 @@
   "W6": "W6",
   "Reschedule Date": "重新安排日期",
   "Adjust Reminder": "调整提醒",
-  "Randomize daily": "每日随机"
+  "Randomize daily": "每日随机",
+  "Upcoming Reminders": "Upcoming Reminders"
 }

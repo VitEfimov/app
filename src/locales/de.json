@@ -153,7 +153,6 @@
   "Delete 3-day overdue tasks": "Aufgaben löschen (3 Tage überfällig)",
   "Delete 7-day completed tasks": "Erledigte Aufgaben löschen (7 Tage alt)",
   "Confirm before automatic deletion": "Vor automatischem Löschen bestätigen",
-  "Recurring Reminders": "Wiederkehrende Erinnerungen",
   "Daily summary of overdue tasks (9 AM)": "Tägliche Zusammenfassung überfälliger Aufgaben (9:00 Uhr)",
   "Morning reminder of today's tasks (8 AM)": "Morgendliche Erinnerung an heutige Aufgaben (8:00 Uhr)",
   "Evening reminder of unfinished tasks (8 PM)": "Abendliche Erinnerung an unvollendete Aufgaben (20:00 Uhr)",
@@ -223,5 +222,6 @@
   "W6": "W6",
   "Reschedule Date": "Termin verschieben",
   "Adjust Reminder": "Passen Sie die Erinnerung an",
-  "Randomize daily": "Täglich randomisieren"
+  "Randomize daily": "Täglich randomisieren",
+  "Upcoming Reminders": "Upcoming Reminders"
 }

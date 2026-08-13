@@ -153,7 +153,6 @@
   "Delete 3-day overdue tasks": "3日遅れのタスクを削除",
   "Delete 7-day completed tasks": "7日前の完了タスクを削除",
   "Confirm before automatic deletion": "自動削除の前に確認する",
-  "Recurring Reminders": "定期的なリマインダー",
   "Daily summary of overdue tasks (9 AM)": "期限切れタスクの毎日の要約（午前9時）",
   "Morning reminder of today's tasks (8 AM)": "今日のタスクの朝のリマインダー（午前8時）",
   "Evening reminder of unfinished tasks (8 PM)": "未完了タスクの夜のリマインダー（午後8時）",
@@ -223,5 +222,6 @@
   "W6": "W6",
   "Reschedule Date": "日付の再スケジュール",
   "Adjust Reminder": "リマインダーを調整する",
-  "Randomize daily": "毎日ランダム化"
+  "Randomize daily": "毎日ランダム化",
+  "Upcoming Reminders": "Upcoming Reminders"
 }

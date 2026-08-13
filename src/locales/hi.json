@@ -153,7 +153,6 @@
   "Delete 3-day overdue tasks": "3-दिन पुराने छूटे हुए कार्य हटाएँ",
   "Delete 7-day completed tasks": "7-दिन पुराने पूर्ण किए गए कार्य हटाएँ",
   "Confirm before automatic deletion": "स्वचालित विलोपन से पहले पुष्टि करें",
-  "Recurring Reminders": "आवर्ती अनुस्मारक",
   "Daily summary of overdue tasks (9 AM)": "छूटे हुए कार्यों का दैनिक सारांश (सुबह 9 बजे)",
   "Morning reminder of today's tasks (8 AM)": "आज के कार्यों का सुबह का अनुस्मारक (सुबह 8 बजे)",
   "Evening reminder of unfinished tasks (8 PM)": "अधूरे कार्यों का शाम का अनुस्मारक (रात 8 बजे)",
@@ -223,5 +222,6 @@
   "W6": "W6",
   "Reschedule Date": "पुनर्निर्धारित तिथि",
   "Adjust Reminder": "अनुस्मारक समायोजित करें",
-  "Randomize daily": "प्रतिदिन यादृच्छिक करें"
+  "Randomize daily": "प्रतिदिन यादृच्छिक करें",
+  "Upcoming Reminders": "Upcoming Reminders"
 }

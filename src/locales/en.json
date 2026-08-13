@@ -153,7 +153,6 @@
   "Delete 3-day overdue tasks": "Delete 3-day overdue tasks",
   "Delete 7-day completed tasks": "Delete 7-day completed tasks",
   "Confirm before automatic deletion": "Confirm before automatic deletion",
-  "Recurring Reminders": "Recurring Reminders",
   "Daily summary of overdue tasks (9 AM)": "Daily summary of overdue tasks (9 AM)",
   "Morning reminder of today's tasks (8 AM)": "Morning reminder of today's tasks (8 AM)",
   "Evening reminder of unfinished tasks (8 PM)": "Evening reminder of unfinished tasks (8 PM)",
@@ -302,5 +301,6 @@
   "This weekend": "This weekend",
   "PRO FEATURES": "PRO FEATURES",
   "Nag Mode (Every 10 min)": "Nag Mode (Every 10 min)",
-  "Escalating Reminder": "Escalating Reminder"
+  "Escalating Reminder": "Escalating Reminder",
+  "Upcoming Reminders": "Upcoming Reminders"
 }

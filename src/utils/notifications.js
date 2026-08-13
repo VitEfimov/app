@@ -819,18 +819,26 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
   const vibrationEnabled = themeState?.vibrationEnabled !== false;
   const channelId = getChannelId(false, notificationSound, vibrationEnabled);
 
-  // Cancel existing automations
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  for (const notif of scheduled) {
-    if (notif.content.data?.isAutomation) {
-      await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+  // Ensure channel exists
+  await configureAndroidNotificationChannels(notificationSound, 'default', vibrationEnabled);
+
+  try {
+    // Cancel existing automations
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notif of scheduled) {
+      if (notif.content.data?.isAutomation) {
+        await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+      }
     }
+  } catch (error) {
+    DevLogger.error('Failed to cancel existing automations', error);
   }
 
   // Helper to find the absolute next occurrence of a time, with an optional day offset
   const getNextOccurrence = (hour, minute, daysOffset = 0) => {
     let now = dayjs();
     let next = dayjs().hour(hour).minute(minute).second(0).millisecond(0);
+    // If the time has already passed today, start from tomorrow
     if (next.isBefore(now)) {
       next = next.add(1, 'day');
     }
@@ -846,14 +854,18 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
       const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
       const upcomingTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
+      
+      let bodyText = 'You have no tasks due today. Have a great day!';
       if (upcomingTasks.length > 0) {
-        let bodyText = `You have ${upcomingTasks.length} task${upcomingTasks.length === 1 ? '' : 's'} for today.\n`;
+        bodyText = `You have ${upcomingTasks.length} task${upcomingTasks.length === 1 ? '' : 's'} for today.\n`;
         const top5 = upcomingTasks.slice(0, 5);
         bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
         if (upcomingTasks.length > 5) {
           bodyText += `\n...and ${upcomingTasks.length - 5} more`;
         }
+      }
 
+      try {
         await Notifications.scheduleNotificationAsync({
           content: {
             title: 'Good Morning!',
@@ -863,6 +875,8 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
           },
           trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
         });
+      } catch (error) {
+        DevLogger.error('Failed to schedule morning reminder', error);
       }
     }
   }
@@ -876,17 +890,23 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
       const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
       const overdueTasks = tasks.filter(t => !t.completed && t.completionDate && t.completionDate < targetDayStr);
+      
       if (overdueTasks.length > 0) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Daily Summary',
-            body: `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.`,
-            sound: true,
-            data: { isAutomation: true },
-          },
-          trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
-        });
+        try {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'Daily Summary',
+              body: `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.`,
+              sound: true,
+              data: { isAutomation: true },
+            },
+            trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
+          });
+        } catch (error) {
+          DevLogger.error('Failed to schedule summary reminder', error);
+        }
       }
+      // Omit summary reminder if there are no overdue tasks
     }
   }
 
@@ -899,16 +919,24 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
       const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
       const unfinishedTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
+      
+      let bodyText = 'All caught up for today! Have a relaxing evening.';
       if (unfinishedTasks.length > 0) {
+        bodyText = `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.`;
+      }
+
+      try {
         await Notifications.scheduleNotificationAsync({
           content: {
             title: 'Evening Review',
-            body: `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.`,
+            body: bodyText,
             sound: true,
             data: { isAutomation: true },
           },
           trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
         });
+      } catch (error) {
+        DevLogger.error('Failed to schedule evening reminder', error);
       }
     }
   }

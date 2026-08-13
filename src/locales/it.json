@@ -153,7 +153,6 @@
   "Delete 3-day overdue tasks": "Elimina attività in ritardo di 3 giorni",
   "Delete 7-day completed tasks": "Elimina attività completate da 7 giorni",
   "Confirm before automatic deletion": "Conferma prima dell'eliminazione automatica",
-  "Recurring Reminders": "Promemoria Ricorrenti",
   "Daily summary of overdue tasks (9 AM)": "Riepilogo giornaliero attività in ritardo (9:00)",
   "Morning reminder of today's tasks (8 AM)": "Promemoria mattutino delle attività di oggi (8:00)",
   "Evening reminder of unfinished tasks (8 PM)": "Promemoria serale delle attività non finite (20:00)",
@@ -223,5 +222,6 @@
   "W6": "W6",
   "Reschedule Date": "Riprogrammare la data",
   "Adjust Reminder": "Modifica promemoria",
-  "Randomize daily": "Randomizza ogni giorno"
+  "Randomize daily": "Randomizza ogni giorno",
+  "Upcoming Reminders": "Upcoming Reminders"
 }

@@ -156,7 +156,6 @@
   "Delete 3-day overdue tasks": "3일 지난 작업 삭제",
   "Delete 7-day completed tasks": "7일 된 완료 작업 삭제",
   "Confirm before automatic deletion": "자동 삭제 전 확인",
-  "Recurring Reminders": "반복 알림",
   "Daily summary of overdue tasks (9 AM)": "기한 초과 작업 일일 요약 (오전 9시)",
   "Morning reminder of today's tasks (8 AM)": "오늘 작업 아침 알림 (오전 8시)",
   "Evening reminder of unfinished tasks (8 PM)": "미완료 작업 저녁 알림 (오후 8시)",
@@ -226,5 +225,6 @@
   "W6": "W6",
   "Reschedule Date": "일정 변경 날짜",
   "Adjust Reminder": "알림 조정",
-  "Randomize daily": "매일 무작위로 추출"
+  "Randomize daily": "매일 무작위로 추출",
+  "Upcoming Reminders": "Upcoming Reminders"
 }
