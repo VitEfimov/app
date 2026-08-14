@@ -42,11 +42,11 @@ export const useTaskRepeat = () => {
                 
                 // Find next matching day in the current week
                 for (let i = 1; i <= 7; i++) {
-                    const candidate = next.add(i, 'day');
+                    let candidate = next.add(i, 'day');
                     // If we crossed into a new week, jump forward by (interval - 1) weeks
                     // dayjs week usually starts on Sunday, let's use isoWeek (Monday start) or just check if we passed a Sunday
                     if (candidate.day() === 1 && i > 1) { // Crossed into Monday
-                        candidate.add((interval - 1), 'week');
+                        candidate = candidate.add((interval - 1), 'week');
                     }
                     
                     if (customDaysOfWeek.includes(candidate.day())) {
@@ -60,9 +60,10 @@ export const useTaskRepeat = () => {
                 const targetMonth = next.add(interval, 'month').startOf('month');
                 
                 if (customMonthlyType === 'same_day') {
-                    // Try to preserve the original date (e.g., 31st)
+                    // Try to preserve the original date (e.g., 31st), clamped to month length
                     const originalDate = config._originalStartDate ? dayjs(config._originalStartDate).date() : next.date();
-                    return next.add(interval, 'month').date(originalDate); 
+                    const target = next.add(interval, 'month');
+                    return target.date(Math.min(originalDate, target.daysInMonth())); 
                 } 
                 else if (customMonthlyType === 'last_day') {
                     return targetMonth.endOf('month').startOf('day');
@@ -137,7 +138,7 @@ export const useTaskRepeat = () => {
                 taskname: formData.name || originalTask.taskname,
                 priority: formData.priority === 'None' ? '' : formData.priority || originalTask.priority,
                 completed: false,
-                completionDate: currentIterDate.format('YYYY-MM-DD'),
+                completionDate: currentIterDate.toISOString(),
                 time: formData.time || originalTask.time,
                 description: {
                     text: formData.descriptionText || originalTask.description?.text || '',

@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Audio } from 'expo-av';
-import Svg, { Circle, Path, Polyline, Line } from 'react-native-svg';
+import Svg, { Circle, Path, Polyline, Line, Polygon } from 'react-native-svg';
 import {
   startTimer,
   pauseTimer,

@@ -3,7 +3,10 @@ import * as Device from 'expo-device';
 import { Platform, ToastAndroid } from 'react-native';
 import { scheduleExactAlarm, cancelAlarm, schedulePomodoroAlarm, cancelPomodoroAlarm } from '../../modules/expo-task-alarm';
 import dayjs from 'dayjs';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import { DevLogger } from './logger';
+
+dayjs.extend(isSameOrBefore);
 
 // Set how notifications should be handled when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -813,7 +816,7 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
     morningReminder, morningReminderTime,
     eveningReminder, eveningReminderTime,
     summaryReminder, summaryReminderTime
-  } = themeState;
+  } = themeState || {};
 
   const notificationSound = themeState?.notificationSound || 'default';
   const vibrationEnabled = themeState?.vibrationEnabled !== false;
@@ -845,23 +848,49 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
     return next.add(daysOffset, 'day');
   };
 
+  // Helper to determine if a task is overdue relative to a reference trigger date/time
+  const isTaskOverdueAt = (task, refDateTime) => {
+    if (task.completed || !task.completionDate) return false;
+    const taskDate = dayjs(task.completionDate);
+    if (taskDate.isBefore(refDateTime, 'day')) return true;
+    if (taskDate.isSame(refDateTime, 'day') && task.time) {
+      const [h, m] = task.time.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        const taskDateTime = dayjs(task.completionDate).hour(h).minute(m).second(0).millisecond(0);
+        if (taskDateTime.isBefore(refDateTime)) return true;
+      }
+    }
+    return false;
+  };
+
   // Morning Reminder: Upcoming tasks (Schedule for next 7 days)
   if (morningReminder && morningReminderTime) {
     const [hour, minute] = morningReminderTime.split(':').map(Number);
     
     for (let i = 0; i < 7; i++) {
       const triggerDate = getNextOccurrence(hour, minute, i);
-      const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
-      const upcomingTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
+      const dueToday = tasks.filter(t => !t.completed && t.completionDate && dayjs(t.completionDate).isSame(triggerDate, 'day'));
+      const overdue = tasks.filter(t => isTaskOverdueAt(t, triggerDate));
       
       let bodyText = 'You have no tasks due today. Have a great day!';
-      if (upcomingTasks.length > 0) {
-        bodyText = `You have ${upcomingTasks.length} task${upcomingTasks.length === 1 ? '' : 's'} for today.\n`;
-        const top5 = upcomingTasks.slice(0, 5);
+      if (dueToday.length > 0) {
+        bodyText = `You have ${dueToday.length} task${dueToday.length === 1 ? '' : 's'} for today`;
+        if (overdue.length > 0) {
+          bodyText += ` (${overdue.length} overdue)`;
+        }
+        bodyText += '.\n';
+        const top5 = [...dueToday, ...overdue].slice(0, 5);
         bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
-        if (upcomingTasks.length > 5) {
-          bodyText += `\n...and ${upcomingTasks.length - 5} more`;
+        if (dueToday.length + overdue.length > 5) {
+          bodyText += `\n...and ${dueToday.length + overdue.length - 5} more`;
+        }
+      } else if (overdue.length > 0) {
+        bodyText = `You have no tasks due today, but ${overdue.length} overdue task${overdue.length === 1 ? '' : 's'} waiting.\n`;
+        const top5 = overdue.slice(0, 5);
+        bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+        if (overdue.length > 5) {
+          bodyText += `\n...and ${overdue.length - 5} more`;
         }
       }
 
@@ -887,26 +916,32 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
     
     for (let i = 0; i < 7; i++) {
       const triggerDate = getNextOccurrence(hour, minute, i);
-      const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
-      const overdueTasks = tasks.filter(t => !t.completed && t.completionDate && t.completionDate < targetDayStr);
+      const overdueTasks = tasks.filter(t => isTaskOverdueAt(t, triggerDate));
       
+      let bodyText = 'All tasks are on track! You have no overdue tasks.';
       if (overdueTasks.length > 0) {
-        try {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Daily Summary',
-              body: `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.`,
-              sound: true,
-              data: { isAutomation: true },
-            },
-            trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
-          });
-        } catch (error) {
-          DevLogger.error('Failed to schedule summary reminder', error);
+        bodyText = `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.\n`;
+        const top5 = overdueTasks.slice(0, 5);
+        bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+        if (overdueTasks.length > 5) {
+          bodyText += `\n...and ${overdueTasks.length - 5} more`;
         }
       }
-      // Omit summary reminder if there are no overdue tasks
+
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Daily Summary',
+            body: bodyText,
+            sound: true,
+            data: { isAutomation: true },
+          },
+          trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
+        });
+      } catch (error) {
+        DevLogger.error('Failed to schedule summary reminder', error);
+      }
     }
   }
 
@@ -916,13 +951,17 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
     
     for (let i = 0; i < 7; i++) {
       const triggerDate = getNextOccurrence(hour, minute, i);
-      const targetDayStr = triggerDate.format('YYYY-MM-DD');
 
-      const unfinishedTasks = tasks.filter(t => !t.completed && (t.completionDate === targetDayStr || !t.completionDate));
+      const unfinishedTasks = tasks.filter(t => !t.completed && t.completionDate && dayjs(t.completionDate).isSameOrBefore(triggerDate, 'day'));
       
       let bodyText = 'All caught up for today! Have a relaxing evening.';
       if (unfinishedTasks.length > 0) {
-        bodyText = `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.`;
+        bodyText = `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.\n`;
+        const top5 = unfinishedTasks.slice(0, 5);
+        bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+        if (unfinishedTasks.length > 5) {
+          bodyText += `\n...and ${unfinishedTasks.length - 5} more`;
+        }
       }
 
       try {

@@ -122,7 +122,8 @@ export default function SnoozeModal({
         targetTime = autoRescheduleTime;
         break;
       case 'weekend':
-        // Next Saturday
+        // Next Saturday (advance at least 1 day so if today is Saturday, it finds next Saturday)
+        targetDate = targetDate.add(1, 'day');
         while (targetDate.day() !== 6) {
           targetDate = targetDate.add(1, 'day');
         }
