@@ -57,6 +57,15 @@ const IconAlarm = ({ color }) => (
   </Svg>
 );
 
+const IconRepeat = ({ color }) => (
+  <Svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Polyline points="17 1 21 5 17 9" />
+    <Path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <Polyline points="7 23 3 19 7 15" />
+    <Path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </Svg>
+);
+
 const IconSquare = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -252,6 +261,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   const totalSubtasksCount = subtasks.length;
   const completedSubtasksCount = subtasks.filter(s => s.completed).length;
   const hasSubtasks = totalSubtasksCount > 0;
+  const isRepeatingTask = !!(task.recurringSeriesId || task.isRecurring || (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') || (task.repeatFrequency && task.repeatFrequency !== 'None'));
 
   return (
     <Swipeable
@@ -362,8 +372,14 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         </View>
 
         {/* Indicators under task name */}
-        {(hasSubtasks || hasNotes || (task.time && task.time.trim() !== '')) ? (
+        {(hasSubtasks || hasNotes || (task.time && task.time.trim() !== '') || isRepeatingTask) ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12, paddingHorizontal: 8 }}>
+            {isRepeatingTask ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <IconRepeat color={colors.primary} />
+              </View>
+            ) : null}
+
             {(task.time && task.time.trim() !== '') ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 {task.reminder && task.reminder !== 'None' ? <IconAlarm color={colors.textSecondary} /> : null}

@@ -192,7 +192,11 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
                   <TouchableOpacity 
                     key={i} 
                     accessible={true} accessibilityRole="button" accessibilityLabel={`Select predefined color ${i + 1}`}
-                    style={[styles.colorCircle, { backgroundColor: c }, tempColor === c && styles.selectedColor]} 
+                    style={[
+                      styles.colorCircle, 
+                      { backgroundColor: c, borderColor: colors.borderColor }, 
+                      tempColor === c && [styles.selectedColor, { borderColor: isDark ? '#ffffff' : '#000000' }]
+                    ]} 
                     onPress={() => setTempColor(c)}
                   />
                 ))}
@@ -203,7 +207,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
                   <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Accent Color')}</Text>
                   <TextInput 
                     accessible={true} accessibilityLabel="Custom hex color input"
-                    style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary }]}
+                    style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary, borderColor: colors.borderColor, borderWidth: 1 }]}
                     value={tempColor}
                     onChangeText={setTempColor}
                     autoCapitalize="none"
@@ -235,7 +239,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
               </TouchableOpacity>
               {tempImage && (
                 <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 10, alignSelf: 'center' }} accessible={true} accessibilityRole="button" accessibilityLabel="Remove background image">
-                  <Text style={{ color: colors.error || '#c62828', fontSize: 13, fontWeight: 'bold' }}>{t('Remove Image')}</Text>
+                  <Text style={{ color: colors.danger || colors.error || '#c62828', fontSize: 13, fontWeight: 'bold' }}>{t('Remove Image')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -245,7 +249,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
           <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
             <TouchableOpacity 
               accessible={true} accessibilityRole="button" accessibilityLabel="Reset to default theme"
-              style={[styles.resetBtn, { backgroundColor: colors.error || '#c62828' }]} onPress={handleReset}
+              style={[styles.resetBtn, { backgroundColor: colors.danger || colors.error || '#c62828' }]} onPress={handleReset}
             >
               <Text style={styles.resetText}>{t('Reset Defaults')}</Text>
             </TouchableOpacity>
@@ -253,7 +257,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
               accessible={true} accessibilityRole="button" accessibilityLabel="Save theme"
               style={[styles.doneBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
             >
-              <Text style={styles.doneText}>{t('Done')}</Text>
+              <Text style={[styles.doneText, { color: colors.textInverse }]}>{t('Done')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -350,8 +354,8 @@ const styles = StyleSheet.create({
     borderColor: '#333',
   },
   selectedColor: {
-    borderWidth: 4,
-    borderColor: '#000',
+    borderWidth: 3.5,
+    transform: [{ scale: 1.12 }],
   },
   customColorRow: {
     flexDirection: 'row',
@@ -391,7 +395,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   resetBtn: {
-    backgroundColor: '#c62828',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
@@ -404,7 +407,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   doneBtn: {
-    backgroundColor: '#285da1',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
@@ -412,7 +414,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   doneText: {
-    color: '#fff',
     fontWeight: 'bold',
     textAlign: 'center',
   }

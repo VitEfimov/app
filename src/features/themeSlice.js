@@ -32,6 +32,7 @@ const initialState = {
   isBoardsCollapsed: loaded?.isBoardsCollapsed || false,
   randomColorDaily: loaded?.randomColorDaily || false,
   lastRandomColorDate: loaded?.lastRandomColorDate || null,
+  showRecurringTasksOnBoard: loaded?.showRecurringTasksOnBoard !== undefined ? loaded.showRecurringTasksOnBoard : false,
   
   // Auto-Manage settings
   autoTransferMode: loaded?.autoTransferMode || 'none', // 'none', 'today', 'tomorrow', 'next_workday'
@@ -138,6 +139,7 @@ const themeSlice = createSlice({
       state.isBoardsCollapsed = false;
       state.randomColorDaily = false;
       state.lastRandomColorDate = null;
+      state.showRecurringTasksOnBoard = false;
       
       // Reset auto-manage settings
       state.autoTransferMode = 'none';
@@ -213,6 +215,10 @@ const themeSlice = createSlice({
     setLastRandomColorDate: (state, action) => {
       state.lastRandomColorDate = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setShowRecurringTasksOnBoard: (state, action) => {
+      state.showRecurringTasksOnBoard = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
@@ -221,7 +227,8 @@ export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
   setAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
-  setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate
+  setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
+  setShowRecurringTasksOnBoard
 } = themeSlice.actions;
 
 export default themeSlice.reducer;

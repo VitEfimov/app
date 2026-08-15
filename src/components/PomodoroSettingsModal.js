@@ -147,34 +147,34 @@ export default function PomodoroSettingsModal() {
 
           <View style={styles.settingRow}>
             <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Work duration')}</Text>
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+            <View style={styles.timeInputsContainer}>
               <TextInput
-                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={workHrs}
                 onChangeText={setWorkHrs}
                 keyboardType="numeric"
                 maxLength={2}
-                placeholder="Hrs"
+                placeholder="0"
                 placeholderTextColor={colors.textSecondary}
               />
-              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <Text style={[styles.timeColon, { color: colors.textSecondary }]}>:</Text>
               <TextInput
-                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={workMin}
                 onChangeText={setWorkMin}
                 keyboardType="numeric"
                 maxLength={3}
-                placeholder="Min"
+                placeholder="25"
                 placeholderTextColor={colors.textSecondary}
               />
-              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <Text style={[styles.timeColon, { color: colors.textSecondary }]}>:</Text>
               <TextInput
-                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={workSec}
                 onChangeText={setWorkSec}
                 keyboardType="numeric"
                 maxLength={2}
-                placeholder="Sec"
+                placeholder="00"
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -182,34 +182,34 @@ export default function PomodoroSettingsModal() {
 
           <View style={styles.settingRow}>
             <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Break duration')}</Text>
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+            <View style={styles.timeInputsContainer}>
               <TextInput
-                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={breakHrs}
                 onChangeText={setBreakHrs}
                 keyboardType="numeric"
                 maxLength={2}
-                placeholder="Hrs"
+                placeholder="0"
                 placeholderTextColor={colors.textSecondary}
               />
-              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <Text style={[styles.timeColon, { color: colors.textSecondary }]}>:</Text>
               <TextInput
-                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={breakMin}
                 onChangeText={setBreakMin}
                 keyboardType="numeric"
                 maxLength={3}
-                placeholder="Min"
+                placeholder="05"
                 placeholderTextColor={colors.textSecondary}
               />
-              <Text style={{ color: colors.textPrimary }}>:</Text>
+              <Text style={[styles.timeColon, { color: colors.textSecondary }]}>:</Text>
               <TextInput
-                style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+                style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={breakSec}
                 onChangeText={setBreakSec}
                 keyboardType="numeric"
                 maxLength={2}
-                placeholder="Sec"
+                placeholder="00"
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -218,7 +218,7 @@ export default function PomodoroSettingsModal() {
           <View style={styles.settingRow}>
             <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{t('Sessions (max 10)')}</Text>
             <TextInput
-              style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
+              style={[styles.sessionInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
               value={sessions}
               onChangeText={setSessions}
               keyboardType="numeric"
@@ -274,8 +274,8 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 25,
-    paddingBottom: 40, // safe area padding
+    padding: 20,
+    paddingBottom: 35, // safe area padding
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -5 },
     shadowOpacity: 0.1,
@@ -286,10 +286,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 20,
   },
   dragHandleContainer: {
-    paddingBottom: 15,
+    paddingBottom: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -307,29 +307,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    flexWrap: 'wrap',
-    rowGap: 10,
+    marginBottom: 16,
   },
   settingLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
     flex: 1,
     marginRight: 10,
-    minWidth: '50%',
   },
-  input: {
+  timeInputsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timeInput: {
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    width: 70,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    fontSize: 15,
+    width: 46,
+    height: 40,
     textAlign: 'center',
   },
-
+  timeColon: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    paddingHorizontal: 1,
+  },
+  sessionInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    fontSize: 15,
+    width: 50,
+    height: 40,
+    textAlign: 'center',
+  },
   saveBtn: {
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,

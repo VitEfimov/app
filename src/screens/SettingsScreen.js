@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask } from '../features/taskSlice';
 import { rescheduleAllActiveTasks } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -296,7 +296,7 @@ export default function SettingsScreen({ navigation }) {
               layout="horizontal"
             />
           </View>
-          <View style={[styles.dropdownRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
             <CustomDropdown 
               label={t('Language') || 'Language'} 
               value={i18n.language} 
@@ -309,6 +309,14 @@ export default function SettingsScreen({ navigation }) {
               layout="horizontal"
               searchable={true}
               searchPlaceholder={t('Search language...')}
+            />
+          </View>
+          <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12 }]}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary, flex: 1, marginRight: 10 }]}>{t('Show repeated tasks on board')}</Text>
+            <Switch
+              value={theme.showRecurringTasksOnBoard || false}
+              onValueChange={val => dispatch(setShowRecurringTasksOnBoard(val))}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
             />
           </View>
         </View>
@@ -392,8 +400,8 @@ export default function SettingsScreen({ navigation }) {
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Account')}</Text>
         <View style={styles.sectionGroup}>
           <View style={styles.profileRow}>
-            <View style={styles.profileIconContainer}>
-              <IconUser color="#42416b" />
+            <View style={[styles.profileIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
+              <IconUser color={colors.primary} />
             </View>
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { color: colors.textPrimary }]}>{t('User Profile')}</Text>
@@ -410,7 +418,7 @@ export default function SettingsScreen({ navigation }) {
           </View>
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"
-            style={styles.deleteBtn} onPress={handleDeleteData}
+            style={[styles.deleteBtn, { backgroundColor: colors.danger || '#c62828' }]} onPress={handleDeleteData}
           >
             <Text style={styles.deleteBtnText}>{t('Delete All Data')}</Text>
           </TouchableOpacity>
@@ -477,7 +485,6 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     flexDirection: 'row',
-    backgroundColor: '#285da1',
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 8,

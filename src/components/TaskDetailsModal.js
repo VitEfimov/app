@@ -14,7 +14,7 @@ let RNShare;
 if (Platform.OS !== 'web') {
   RNShare = require('react-native-share').default;
 }
-import { updateTask, deleteTask } from '../features/taskSlice';
+import { updateTask, deleteTask, updateRecurringSeries, deleteRecurringSeries } from '../features/taskSlice';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
@@ -387,7 +387,7 @@ useEffect(() => {
     return false;
   };
 
-  const handleSave = async () => {
+  const executeSave = async ({ updateSeries = false } = {}) => {
     const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
     let updates = {};
     if (taskName !== task.taskname) updates.name = taskName;
@@ -407,7 +407,8 @@ useEffect(() => {
     if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
     
     const initialConfig = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
-    if (JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig)) {
+    const repeatConfigChanged = JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig);
+    if (repeatConfigChanged) {
       updates.repeatConfig = repeatConfig;
       updates.repeatFrequency = repeatConfig.preset; // backwards compatibility
     }
@@ -438,15 +439,106 @@ useEffect(() => {
       updates.subtasks = subtasks;
     }
     
+    // If repeat is newly configured or task does not have a recurring series yet
+    if (repeatConfig.preset !== 'None' && repeatEndDate && !task.recurringSeriesId) {
+      const result = generateRepeatingTasks(
+        task, 
+        { 
+          name: taskName, 
+          priority, 
+          time: selectedTime, 
+          reminder, 
+          isAlarm, 
+          attachments, 
+          subtasks, 
+          description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments }
+        }, 
+        { ...repeatConfig, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate }
+      );
+      if (result && result.seriesId) {
+        updates.recurringSeriesId = result.seriesId;
+        updates.isRecurring = true;
+      }
+    } else if (task.recurringSeriesId && updateSeries) {
+      // If user chose to update all upcoming tasks in this series:
+      if (repeatConfigChanged && repeatConfig.preset === 'None') {
+        // Stop repeat: delete future instances
+        dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: task.completionDate }));
+        updates.recurringSeriesId = null;
+        updates.isRecurring = false;
+      } else if (repeatConfigChanged && repeatEndDate) {
+        // Regenerate future instances
+        dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: dayjs(task.completionDate).add(1, 'day').toISOString() }));
+        generateRepeatingTasks(
+          task, 
+          { 
+            name: taskName, 
+            priority, 
+            time: selectedTime, 
+            reminder, 
+            isAlarm, 
+            attachments, 
+            subtasks, 
+            description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments }
+          }, 
+          { ...repeatConfig, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate }
+        );
+      } else {
+        // Update all upcoming instances with the modified fields!
+        dispatch(updateRecurringSeries({
+          seriesId: task.recurringSeriesId,
+          fromDate: task.completionDate,
+          updates: {
+            name: taskName,
+            priority: priority,
+            time: selectedTime,
+            reminder: reminder,
+            isAlarm: isAlarm,
+            description: {
+              text: currentNotes,
+              img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '',
+              url: '',
+              attachments: attachments
+            },
+            subtasks: subtasks,
+            repeatConfig: repeatConfig,
+            repeatFrequency: repeatConfig.preset,
+            repeatStartDate: repeatStartDate,
+            repeatEndDate: repeatEndDate
+          }
+        }));
+      }
+    }
+
     if (Object.keys(updates).length > 0) {
       dispatch(updateTask({ taskId: task.id, ...updates }));
     }
 
-    if (repeatConfig.preset !== 'None' && repeatEndDate) {
-      generateRepeatingTasks(task, { name: taskName, descriptionText: currentNotes, priority }, { ...repeatConfig, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate });
-    }
-
     onClose();
+  };
+
+  const handleSave = () => {
+    const isRecurring = !!(task.recurringSeriesId || (task.isRecurring && task.recurringSeriesId));
+    if (isRecurring && hasUnsavedChanges()) {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Recurring Task'),
+        message: t('Do you want to apply changes to only this task or to all upcoming tasks in this series?'),
+        confirmText: t('This task only'),
+        isDestructive: false,
+        onConfirm: () => {
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          executeSave({ updateSeries: false });
+        },
+        secondaryConfirmText: t('All upcoming tasks'),
+        onSecondaryConfirm: () => {
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          executeSave({ updateSeries: true });
+        }
+      });
+    } else {
+      executeSave({ updateSeries: false });
+    }
   };
 
   const handleClose = () => {
@@ -769,18 +861,41 @@ useEffect(() => {
   };
 
   const handleDelete = () => {
-    setConfirmConfig({
-      isVisible: true,
-      title: t('Delete Task'),
-      message: t('Are you sure you want to delete this task?'),
-      confirmText: t('Delete'),
-      isDestructive: true,
-      onConfirm: () => {
-        dispatch(deleteTask({ taskId: task.id }));
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        onClose();
-      }
-    });
+    const isRecurring = !!(task.recurringSeriesId || (task.isRecurring && task.recurringSeriesId));
+    if (isRecurring) {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Delete Recurring Task'),
+        message: t('Do you want to delete only this task or all upcoming tasks in this series?'),
+        confirmText: t('This task only'),
+        isDestructive: true,
+        onConfirm: () => {
+          dispatch(deleteTask({ taskId: task.id }));
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          onClose();
+        },
+        secondaryConfirmText: t('All upcoming tasks'),
+        onSecondaryConfirm: () => {
+          dispatch(deleteTask({ taskId: task.id }));
+          dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: task.completionDate }));
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          onClose();
+        }
+      });
+    } else {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Delete Task'),
+        message: t('Are you sure you want to delete this task?'),
+        confirmText: t('Delete'),
+        isDestructive: true,
+        onConfirm: () => {
+          dispatch(deleteTask({ taskId: task.id }));
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          onClose();
+        }
+      });
+    }
   };
 
   const toggleComplete = () => {

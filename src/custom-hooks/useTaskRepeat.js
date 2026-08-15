@@ -116,6 +116,39 @@ export const useTaskRepeat = () => {
             return false;
         }
 
+        const seriesId = originalTask.recurringSeriesId || ('series_' + Date.now().toString() + Math.random().toString(36).substr(2, 9));
+
+        // Deep copy description & attachments
+        const descAttachments = formData.description?.attachments 
+            ? JSON.parse(JSON.stringify(formData.description.attachments))
+            : (formData.attachments 
+                ? JSON.parse(JSON.stringify(formData.attachments))
+                : (originalTask.description?.attachments 
+                    ? JSON.parse(JSON.stringify(originalTask.description.attachments)) 
+                    : []));
+
+        const descText = formData.description?.text !== undefined 
+            ? formData.description.text 
+            : (formData.descriptionText !== undefined 
+                ? formData.descriptionText 
+                : (originalTask.description?.text || ''));
+
+        const descImg = formData.description?.img !== undefined 
+            ? formData.description.img 
+            : (formData.descriptionImg !== undefined 
+                ? formData.descriptionImg 
+                : (originalTask.description?.img || ''));
+
+        const descUrl = formData.description?.url !== undefined 
+            ? formData.description.url 
+            : (formData.descriptionUrl !== undefined 
+                ? formData.descriptionUrl 
+                : (originalTask.description?.url || ''));
+
+        const sourceSubtasks = formData.subtasks !== undefined 
+            ? formData.subtasks 
+            : (originalTask.subtasks || []);
+
         // We do NOT want to spawn 10,000 tasks and crash the app. Set a hard limit.
         let safeguardCount = 0;
         const MAX_TASKS = 730; // Max 2 years of daily tasks
@@ -132,20 +165,37 @@ export const useTaskRepeat = () => {
             }
 
             const newTaskId = new Date().getTime().toString() + Math.random().toString(36).substr(2, 9);
+            
+            // Generate unique IDs for subtasks in new recurring instance
+            const clonedSubtasks = sourceSubtasks.map(st => ({
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 7),
+                text: st.text,
+                completed: false
+            }));
+
             tasksToGenerate.push({
                 id: newTaskId,
                 boardId: originalTask.boardId || 'main',
                 taskname: formData.name || originalTask.taskname,
-                priority: formData.priority === 'None' ? '' : formData.priority || originalTask.priority,
+                priority: formData.priority !== undefined ? (formData.priority === 'None' ? '' : formData.priority) : (originalTask.priority || ''),
                 completed: false,
                 completionDate: currentIterDate.toISOString(),
-                time: formData.time || originalTask.time,
+                time: formData.time !== undefined ? formData.time : (originalTask.time || null),
+                reminder: formData.reminder !== undefined ? formData.reminder : (originalTask.reminder || 'None'),
+                isAlarm: formData.isAlarm !== undefined ? formData.isAlarm : (originalTask.isAlarm || false),
                 description: {
-                    text: formData.descriptionText || originalTask.description?.text || '',
-                    img: formData.descriptionImg || originalTask.description?.img || '',
-                    url: formData.descriptionUrl || originalTask.description?.url || '',
+                    text: descText,
+                    img: descImg,
+                    url: descUrl,
+                    attachments: JSON.parse(JSON.stringify(descAttachments))
                 },
-                repeatFrequency: 'None', // Only the FIRST task holds the repeat config currently, generated tasks don't auto-spawn infinitely.
+                subtasks: clonedSubtasks,
+                recurringSeriesId: seriesId,
+                isRecurring: true,
+                repeatFrequency: repeatConfig.preset,
+                repeatConfig: repeatConfig,
+                repeatStartDate: startDate,
+                repeatEndDate: endDate,
                 lastUpdatedDate: new Date().toISOString()
             });
         }
@@ -153,10 +203,10 @@ export const useTaskRepeat = () => {
         if (tasksToGenerate.length > 0) {
             dispatch(addMultipleTasks({ tasks: tasksToGenerate }));
             Alert.alert('Success', `Successfully generated ${tasksToGenerate.length} recurring tasks!`);
-            return true;
+            return { success: true, seriesId };
         } else {
             Alert.alert('Notice', 'No tasks were generated. The end date might be too close to the start date.');
-            return false;
+            return { success: false, seriesId };
         }
     };
 

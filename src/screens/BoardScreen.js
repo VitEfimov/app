@@ -42,6 +42,7 @@ export default function BoardScreen({ route, navigation }) {
   const [activeAddSectionId, setActiveAddSectionId] = useState(null);
   
   const isBoardsCollapsed = useSelector(state => state.themeReducer.isBoardsCollapsed);
+  const showRecurringTasksOnBoard = useSelector(state => state.themeReducer.showRecurringTasksOnBoard || false);
 
   const toggleBoardsCollapsed = () => {
     dispatch(setBoardsCollapsed(!isBoardsCollapsed));
@@ -225,6 +226,12 @@ export default function BoardScreen({ route, navigation }) {
   
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks } = useMemo(() => {
     const FILTERS = getFilters();
+    
+    const isUpcomingRecurring = (task) => {
+      if (showRecurringTasksOnBoard) return false;
+      return !!(task.recurringSeriesId || task.isRecurring || (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') || (task.repeatFrequency && task.repeatFrequency !== 'None'));
+    };
+
     const sortTasks = (tasksArr, sectionId) => {
       const sortBy = sortConfig[sectionId] || 'time';
       return tasksArr.sort((a, b) => {
@@ -253,14 +260,14 @@ export default function BoardScreen({ route, navigation }) {
 
     return {
       todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task)), 'today'),
-      tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed), 'tomorrow'),
-      thisWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') && !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed), 'on-this-week'),
-      nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed), 'on-next-week'),
-      laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed), 'later'),
+      tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed && !isUpcomingRecurring(task)), 'tomorrow'),
+      thisWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') && !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed && !isUpcomingRecurring(task)), 'on-this-week'),
+      nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed && !isUpcomingRecurring(task)), 'on-next-week'),
+      laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed && !isUpcomingRecurring(task)), 'later'),
       missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task)), 'missed'),
       completedTasks: sortTasks(boardTasks.filter(task => task.completed), 'completed')
     };
-  }, [boardTasks, sortConfig]);
+  }, [boardTasks, sortConfig, showRecurringTasksOnBoard]);
 
   const sections = useMemo(() => {
     return [

@@ -3,9 +3,11 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { Platform, Alert } from 'react-native';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations } from '../utils/notifications';
 
 dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
 
 // import axios from 'axios';
 
@@ -105,6 +107,8 @@ const taskSlice = createSlice({
                 task.reminder = action.payload.reminder !== undefined ? action.payload.reminder : task.reminder;
                 if (action.payload.isAlarm !== undefined) task.isAlarm = action.payload.isAlarm;
                 task.notificationId = action.payload.notificationId !== undefined ? action.payload.notificationId : task.notificationId;
+                if (action.payload.recurringSeriesId !== undefined) task.recurringSeriesId = action.payload.recurringSeriesId;
+                if (action.payload.isRecurring !== undefined) task.isRecurring = action.payload.isRecurring;
                 if (action.payload.repeatFrequency !== undefined) task.repeatFrequency = action.payload.repeatFrequency;
                 if (action.payload.repeatConfig !== undefined) task.repeatConfig = action.payload.repeatConfig;
                 if (action.payload.repeatStartDate !== undefined) task.repeatStartDate = action.payload.repeatStartDate;
@@ -113,10 +117,10 @@ const taskSlice = createSlice({
                 if (action.payload.escalationLevel !== undefined) task.escalationLevel = action.payload.escalationLevel;
                 if (description) {
                     task.description = {
-                        text: description.text || '',
-                        img: description.img || '',
-                        url: description.url || '',
-                        attachments: description.attachments || task.description?.attachments || [],
+                        text: description.text !== undefined ? description.text : (task.description?.text || ''),
+                        img: description.img !== undefined ? description.img : (task.description?.img || ''),
+                        url: description.url !== undefined ? description.url : (task.description?.url || ''),
+                        attachments: description.attachments !== undefined ? description.attachments : (task.description?.attachments || []),
                     };
                 }
                 if (subtasks !== undefined) {
@@ -124,6 +128,62 @@ const taskSlice = createSlice({
                 }
                 task.lastUpdatedDate = new Date().toISOString();
             }
+        },
+        updateRecurringSeriesSync(state, action) {
+            const { seriesId, fromDate, updates } = action.payload;
+            if (!seriesId) return;
+            const fromDay = fromDate ? dayjs(fromDate).startOf('day') : null;
+            
+            state.tasks = state.tasks.map(task => {
+                if (task.recurringSeriesId === seriesId) {
+                    const taskDay = task.completionDate ? dayjs(task.completionDate).startOf('day') : null;
+                    if (!fromDay || (taskDay && (taskDay.isSame(fromDay, 'day') || taskDay.isAfter(fromDay)))) {
+                        const updated = { ...task };
+                        if (updates.name !== undefined) updated.taskname = updates.name;
+                        if (updates.priority !== undefined) updated.priority = updates.priority;
+                        if (updates.time !== undefined) updated.time = updates.time;
+                        if (updates.reminder !== undefined) updated.reminder = updates.reminder;
+                        if (updates.isAlarm !== undefined) updated.isAlarm = updates.isAlarm;
+                        if (updates.description !== undefined) {
+                            updated.description = {
+                                text: updates.description.text !== undefined ? updates.description.text : (task.description?.text || ''),
+                                img: updates.description.img !== undefined ? updates.description.img : (task.description?.img || ''),
+                                url: updates.description.url !== undefined ? updates.description.url : (task.description?.url || ''),
+                                attachments: updates.description.attachments ? JSON.parse(JSON.stringify(updates.description.attachments)) : (task.description?.attachments || [])
+                            };
+                        }
+                        if (updates.subtasks !== undefined) {
+                            updated.subtasks = updates.subtasks.map(s => ({
+                                id: Date.now().toString() + Math.random().toString(36).substring(7),
+                                text: s.text,
+                                completed: false
+                            }));
+                        }
+                        if (updates.repeatConfig !== undefined) updated.repeatConfig = updates.repeatConfig;
+                        if (updates.repeatFrequency !== undefined) updated.repeatFrequency = updates.repeatFrequency;
+                        if (updates.repeatStartDate !== undefined) updated.repeatStartDate = updates.repeatStartDate;
+                        if (updates.repeatEndDate !== undefined) updated.repeatEndDate = updates.repeatEndDate;
+                        updated.lastUpdatedDate = new Date().toISOString();
+                        return updated;
+                    }
+                }
+                return task;
+            });
+        },
+        deleteRecurringSeriesSync(state, action) {
+            const { seriesId, fromDate } = action.payload;
+            if (!seriesId) return;
+            const fromDay = fromDate ? dayjs(fromDate).startOf('day') : null;
+            state.tasks = state.tasks.filter(task => {
+                if (task.recurringSeriesId === seriesId) {
+                    if (!fromDay) return false;
+                    const taskDay = task.completionDate ? dayjs(task.completionDate).startOf('day') : null;
+                    if (taskDay && (taskDay.isSame(fromDay, 'day') || taskDay.isAfter(fromDay))) {
+                        return false;
+                    }
+                }
+                return true;
+            });
         },
         clearTasks(state) {
             state.tasks = [];
@@ -149,9 +209,7 @@ const taskSlice = createSlice({
     }
 });
 
-export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, updateTaskSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds } = taskSlice.actions;
-
-
+export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, updateTaskSync, updateRecurringSeriesSync, deleteRecurringSeriesSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds } = taskSlice.actions;
 
 const syncRecurringAutomations = (getState) => {
     try {
@@ -201,6 +259,20 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
     syncRecurringAutomations(getState);
     // dispatch(updateTaskAsync(payload));
+};
+
+export const updateRecurringSeries = (payload) => async (dispatch, getState) => {
+    dispatch(updateRecurringSeriesSync(payload));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    syncRecurringAutomations(getState);
+};
+
+export const deleteRecurringSeries = (payload) => async (dispatch, getState) => {
+    dispatch(deleteRecurringSeriesSync(payload));
+    const tasks = getState().taskReducer.tasks;
+    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    syncRecurringAutomations(getState);
 };
 
 export const processAutoManageTasks = () => async (dispatch, getState) => {
