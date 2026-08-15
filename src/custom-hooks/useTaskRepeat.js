@@ -3,11 +3,13 @@ import { addMultipleTasks } from '../features/taskSlice';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { Alert } from 'react-native';
+import { useToast } from '../styles/ToastContext';
 
 dayjs.extend(isoWeek);
 
 export const useTaskRepeat = () => {
     const dispatch = useDispatch();
+    const { showToast } = useToast();
 
     const getNextDate = (current, config) => {
         let next = current.clone();
@@ -100,7 +102,7 @@ export const useTaskRepeat = () => {
         const { preset, startDate, endDate } = repeatConfig;
         if (!preset || preset === 'None') return false;
         if (!startDate || !endDate) {
-            Alert.alert('Error', 'Please select both a start date and an end date for the repetition.');
+            showToast('Please select both a start date and an end date for the repetition.');
             return false;
         }
 
@@ -112,7 +114,7 @@ export const useTaskRepeat = () => {
         let currentIterDate = dayjs(startDate);
 
         if (currentIterDate.isAfter(end)) {
-            Alert.alert('Error', 'End date must be after the start date.');
+            showToast('End date must be after the start date.');
             return false;
         }
 
@@ -160,7 +162,7 @@ export const useTaskRepeat = () => {
             
             safeguardCount++;
             if (safeguardCount > MAX_TASKS) {
-                Alert.alert('Limit Reached', `Only the first ${MAX_TASKS} recurring tasks were generated to preserve performance.`);
+                showToast(`Only the first ${MAX_TASKS} recurring tasks were generated to preserve performance.`);
                 break;
             }
 
@@ -202,10 +204,10 @@ export const useTaskRepeat = () => {
 
         if (tasksToGenerate.length > 0) {
             dispatch(addMultipleTasks({ tasks: tasksToGenerate }));
-            Alert.alert('Success', `Successfully generated ${tasksToGenerate.length} recurring tasks!`);
+            showToast(`Successfully generated ${tasksToGenerate.length} recurring tasks!`);
             return { success: true, seriesId };
         } else {
-            Alert.alert('Notice', 'No tasks were generated. The end date might be too close to the start date.');
+            showToast('No tasks were generated. The end date might be too close to the start date.');
             return { success: false, seriesId };
         }
     };

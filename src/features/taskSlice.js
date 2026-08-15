@@ -287,10 +287,15 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         removePriorityWhenCompleted,
         autoDeleteOverdueDays,
         autoDeleteCompletedDays,
-        confirmBeforeDeletion
+        confirmBeforeDeletion,
+        autoRescheduleTime
     } = themeState;
     
-    const today = dayjs().startOf('day');
+    const actualToday = dayjs().startOf('day');
+    const [rescheduleHour, rescheduleMinute] = (autoRescheduleTime || '00:00').split(':').map(Number);
+    const rescheduleTimeToday = dayjs().hour(rescheduleHour).minute(rescheduleMinute).second(0).millisecond(0);
+    const effectiveToday = dayjs().isBefore(rescheduleTimeToday) ? actualToday.subtract(1, 'day') : actualToday;
+
     let hasChanges = false;
     let newTasks = [...tasks];
     let tasksToDelete = [];
@@ -306,14 +311,14 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                 taskChanged = true;
             }
             if (autoDeleteCompletedDays > 0) {
-                const daysOld = today.diff(taskDate, 'day');
+                const daysOld = actualToday.diff(taskDate, 'day');
                 if (daysOld >= autoDeleteCompletedDays) {
                     tasksToDelete.push(updatedTask.id);
                 }
             }
         } 
-        else if (taskDate.isBefore(today)) {
-            const daysOverdue = today.diff(taskDate, 'day');
+        else if (taskDate.isBefore(effectiveToday)) {
+            const daysOverdue = actualToday.diff(taskDate, 'day');
             if (autoDeleteOverdueDays > 0 && daysOverdue >= autoDeleteOverdueDays) {
                 tasksToDelete.push(updatedTask.id);
             } 
@@ -363,7 +368,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                         taskChanged = true;
                     }
 
-                    let targetDate = today;
+                    let targetDate = actualToday;
                     if (autoTransferMode === 'tomorrow') {
                         targetDate = targetDate.add(1, 'day');
                     } else if (autoTransferMode === 'next_workday') {
