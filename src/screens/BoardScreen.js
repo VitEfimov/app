@@ -224,13 +224,62 @@ export default function BoardScreen({ route, navigation }) {
   // Group tasks
   const boardTasks = useMemo(() => tasks.filter(task => (task.boardId || 'main') === activeBoardId), [tasks, activeBoardId]);
   
+  const hiddenRecurringTaskIds = useMemo(() => {
+    if (showRecurringTasksOnBoard) return new Set();
+
+    // Group uncompleted tasks by recurringSeriesId
+    const seriesMap = new Map();
+
+    boardTasks.forEach(task => {
+      if (task.completed) return;
+      const seriesId = task.recurringSeriesId;
+      if (!seriesId) return;
+
+      if (!seriesMap.has(seriesId)) {
+        seriesMap.set(seriesId, []);
+      }
+      seriesMap.get(seriesId).push(task);
+    });
+
+    const hiddenIds = new Set();
+
+    seriesMap.forEach(taskList => {
+      // Sort tasks in this series chronologically
+      taskList.sort((a, b) => {
+        const dayA = a.completionDate ? dayjs(a.completionDate).valueOf() : Infinity;
+        const dayB = b.completionDate ? dayjs(b.completionDate).valueOf() : Infinity;
+        if (dayA !== dayB) return dayA - dayB;
+        if (a.time && b.time) return a.time.localeCompare(b.time);
+        if (a.time && !b.time) return -1;
+        if (!a.time && b.time) return 1;
+        return parseInt(a.id || '0') - parseInt(b.id || '0');
+      });
+
+      // Missed tasks are always shown in Missed section
+      // Among the non-missed uncompleted tasks, show only the first (earliest upcoming) one
+      let hasFoundFirstActiveNonMissed = false;
+
+      taskList.forEach(task => {
+        if (isTaskMissed(task)) {
+          // Missed task is NOT hidden (stays visible on board in missed section)
+          return;
+        }
+
+        if (!hasFoundFirstActiveNonMissed) {
+          // This is the earliest upcoming/today active task in the series -> show it
+          hasFoundFirstActiveNonMissed = true;
+        } else {
+          // Subsequent upcoming tasks in the series are hidden until this one is completed or missed
+          hiddenIds.add(task.id);
+        }
+      });
+    });
+
+    return hiddenIds;
+  }, [boardTasks, showRecurringTasksOnBoard]);
+
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks } = useMemo(() => {
     const FILTERS = getFilters();
-    
-    const isUpcomingRecurring = (task) => {
-      if (showRecurringTasksOnBoard) return false;
-      return !!(task.recurringSeriesId || task.isRecurring || (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') || (task.repeatFrequency && task.repeatFrequency !== 'None'));
-    };
 
     const sortTasks = (tasksArr, sectionId) => {
       const sortBy = sortConfig[sectionId] || 'time';
@@ -259,15 +308,15 @@ export default function BoardScreen({ route, navigation }) {
     };
 
     return {
-      todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task)), 'today'),
-      tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed && !isUpcomingRecurring(task)), 'tomorrow'),
-      thisWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') && !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed && !isUpcomingRecurring(task)), 'on-this-week'),
-      nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed && !isUpcomingRecurring(task)), 'on-next-week'),
-      laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed && !isUpcomingRecurring(task)), 'later'),
+      todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task) && !hiddenRecurringTaskIds.has(task.id)), 'today'),
+      tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'tomorrow'),
+      thisWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') && !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'on-this-week'),
+      nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'on-next-week'),
+      laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'later'),
       missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task)), 'missed'),
       completedTasks: sortTasks(boardTasks.filter(task => task.completed), 'completed')
     };
-  }, [boardTasks, sortConfig, showRecurringTasksOnBoard]);
+  }, [boardTasks, sortConfig, hiddenRecurringTaskIds]);
 
   const sections = useMemo(() => {
     return [

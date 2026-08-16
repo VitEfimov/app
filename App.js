@@ -85,8 +85,26 @@ function InitApp() {
   const dispatch = useDispatch();
   const [ready, setReady] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [pendingNotificationTaskId, setPendingNotificationTaskId] = useState(null);
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const themeReducer = useSelector(state => state.themeReducer);
+
+  useEffect(() => {
+    if (isUnlocked && pendingNotificationTaskId) {
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (navigationRef.isReady()) {
+          navigationRef.navigate('Board', { editTaskId: pendingNotificationTaskId });
+          setPendingNotificationTaskId(null);
+          clearInterval(interval);
+        } else if (attempts > 30) {
+          clearInterval(interval);
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [isUnlocked, pendingNotificationTaskId]);
 
   useEffect(() => {
     const removeDiagnostics = attachNotificationDiagnostics();
@@ -360,6 +378,8 @@ function InitApp() {
           if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER || actionIdentifier === 'reschedule') {
             if (navigationRef.isReady()) {
               navigationRef.navigate('Board', { editTaskId: taskId });
+            } else {
+              setPendingNotificationTaskId(taskId);
             }
           } else if (actionIdentifier === 'complete_task') {
              dispatch(updateTask({ taskId, completed: true }));

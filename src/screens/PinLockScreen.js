@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '../styles/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
 
 const IconBackspace = ({ color }) => (
-  <Svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <Svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none">
     <Path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" />
     <Path d="M18 9l-6 6M12 9l6 6" />
   </Svg>
@@ -61,29 +61,33 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
       <View style={styles.keypad}>
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'delete'].map((key, index) => {
           if (key === '') {
-            return <View key={index} style={styles.key} />;
+            return <View key={index} style={styles.key} pointerEvents="none" />;
           }
 
           if (key === 'delete') {
             return (
-              <Pressable 
+              <TouchableOpacity 
                 key={index} 
-                style={({ pressed }) => [styles.key, { opacity: pressed ? 0.5 : 1 }]} 
+                activeOpacity={0.6}
+                style={styles.key} 
                 onPress={handleBackspace}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <IconBackspace color={colors.textSecondary} />
-              </Pressable>
+              </TouchableOpacity>
             );
           }
 
           return (
-            <Pressable 
+            <TouchableOpacity 
               key={index} 
-              style={({ pressed }) => [styles.key, { backgroundColor: colors.bgCard, opacity: pressed ? 0.5 : 1 }]} 
+              activeOpacity={0.6}
+              style={[styles.key, { backgroundColor: colors.bgCard }]} 
               onPress={() => handlePress(key)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={[styles.keyText, { color: colors.textPrimary }]}>{key}</Text>
-            </Pressable>
+            </TouchableOpacity>
           );
         })}
       </View>
@@ -94,9 +98,12 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    zIndex: 9999,
   },
   title: {
     fontSize: 24,
