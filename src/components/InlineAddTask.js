@@ -58,6 +58,50 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     setSelectedDate(getCompletionDate(sectionId));
   }, [sectionId]);
 
+  const getCalendarMarkedDates = () => {
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    const marks = {};
+
+    if (selectedDate) {
+      const isToday = selectedDate === todayStr;
+      marks[selectedDate] = {
+        customStyles: {
+          container: {
+            backgroundColor: colors.primary,
+            borderRadius: 18,
+            borderWidth: isToday ? 2 : 0,
+            borderColor: isToday ? (colors.textInverse || '#ffffff') : 'transparent',
+          },
+          text: {
+            color: colors.textInverse || '#ffffff',
+            fontWeight: '900',
+            fontSize: 15,
+          }
+        }
+      };
+    }
+
+    if (!marks[todayStr]) {
+      marks[todayStr] = {
+        customStyles: {
+          container: {
+            borderWidth: 2,
+            borderColor: colors.primary,
+            borderRadius: 18,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+          },
+          text: {
+            color: colors.primary,
+            fontWeight: '900',
+            fontSize: 15,
+          }
+        }
+      };
+    }
+
+    return marks;
+  };
+
   const handleAdd = () => {
     if (!taskName.trim()) return;
 
@@ -191,15 +235,14 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
           <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
             <Calendar
               key={i18n.language}
+              markingType={'custom'}
               firstDay={i18n.language === 'en' ? 0 : 1}
               current={selectedDate}
               onDayPress={(day) => {
                 setSelectedDate(day.dateString);
                 setShowDatePicker(false);
               }}
-              markedDates={{
-                [selectedDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse }
-              }}
+              markedDates={getCalendarMarkedDates()}
               theme={{
                 backgroundColor: colors.bgCard,
                 calendarBackground: colors.bgCard,
@@ -214,6 +257,10 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
                 arrowColor: colors.primary,
                 monthTextColor: colors.textPrimary,
                 indicatorColor: colors.primary,
+                textDayFontWeight: '600',
+                todayButtonFontWeight: 'bold',
+                textMonthFontWeight: 'bold',
+                textDayHeaderFontWeight: '600',
               }}
             />
             <TouchableOpacity 

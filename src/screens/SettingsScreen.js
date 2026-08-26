@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask } from '../features/taskSlice';
 import { rescheduleAllActiveTasks } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -11,6 +11,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
 import AutoManageSettings from '../components/AutoManageSettings';
 import ConfirmModal from '../components/ConfirmModal';
+import PremiumModal from '../components/PremiumModal';
 import { Audio } from 'expo-av';
 
 const SOUND_ASSETS = {
@@ -90,6 +91,7 @@ export default function SettingsScreen({ navigation }) {
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
+  const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [saveAlertVisible, setSaveAlertVisible] = useState(false);
   const currentSoundRef = useRef(null);
@@ -367,7 +369,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ false: colors.borderColor, true: colors.primary }}
             />
           </View>
-          <View style={[styles.dropdownRow, { borderBottomWidth: 0, paddingBottom: 0, paddingTop: 15 }]}>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
             <CustomDropdown 
               label={t("Default Snooze")} 
               value={defaultSnoozeTime} 
@@ -377,6 +379,31 @@ export default function SettingsScreen({ navigation }) {
               layout="horizontal"
             />
           </View>
+          <TouchableOpacity 
+            style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12 }]}
+            onPress={() => {
+              if (!isPremium) setPremiumModalVisible(true);
+            }}
+            activeOpacity={isPremium ? 1 : 0.7}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Android Auto Integration') || 'Android Auto Integration'}</Text>
+              {!isPremium && (
+                <View style={{ backgroundColor: '#FFD700', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#000' }}>PRO 🔒</Text>
+                </View>
+              )}
+            </View>
+            {isPremium ? (
+              <Switch
+                value={theme.androidAutoEnabled !== false}
+                onValueChange={val => dispatch(setAndroidAutoEnabled(val))}
+                trackColor={{ false: colors.borderColor, true: colors.primary }}
+              />
+            ) : (
+              <Text style={{ color: colors.textSecondary, fontSize: 14 }}>{'>'}</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Automation Section */}
@@ -456,6 +483,11 @@ export default function SettingsScreen({ navigation }) {
           if (navigation) navigation.navigate('Board');
         }}
         onCancel={() => setSaveAlertVisible(false)}
+      />
+      <PremiumModal
+        isVisible={isPremiumModalVisible}
+        onClose={() => setPremiumModalVisible(false)}
+        featureName="Android Auto Integration"
       />
     </View>
   );

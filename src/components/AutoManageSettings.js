@@ -4,14 +4,14 @@ import Modal from 'react-native-modal';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../styles/ThemeContext';
-import { setAutoManageSettings } from '../features/themeSlice';
+import { setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings } from '../features/themeSlice';
 import { processAutoManageTasks } from '../features/taskSlice';
 import { updateRecurringAutomations } from '../utils/notifications';
 import CustomDropdown from './CustomDropdown';
 import CustomTimePicker from './CustomTimePicker';
 import * as Localization from 'expo-localization';
 
-export default function AutoManageSettings({ isVisible, onClose }) {
+export default function AutoManageSettings({ isVisible, onClose, boardId, boardName }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const dispatch = useDispatch();
@@ -25,6 +25,7 @@ export default function AutoManageSettings({ isVisible, onClose }) {
   const [timePickerTarget, setTimePickerTarget] = useState(null);
 
   const defaultSettings = {
+    overrideGlobal: true,
     autoTransferMode: 'none',
     increasePriorityWhenOverdue: false,
     priorityFrequency: 'never',
@@ -69,23 +70,37 @@ export default function AutoManageSettings({ isVisible, onClose }) {
 
   useEffect(() => {
     if (isVisible) {
-      setLocalSettings(themeState || defaultSettings);
+      if (boardId) {
+        const boardCustom = themeState.boardAutomations?.[boardId];
+        setLocalSettings(boardCustom || { ...defaultSettings, overrideGlobal: true });
+      } else {
+        setLocalSettings(themeState || defaultSettings);
+      }
     }
-  }, [isVisible, themeState]);
+  }, [isVisible, boardId, themeState]);
 
   const handleUpdate = (updates) => {
     setLocalSettings(prev => ({ ...prev, ...updates }));
   };
 
   const handleSave = () => {
-    dispatch(setAutoManageSettings(localSettings));
-    updateRecurringAutomations(localSettings, tasks);
+    if (boardId) {
+      dispatch(setBoardAutoManageSettings({ boardId, settings: localSettings }));
+    } else {
+      dispatch(setAutoManageSettings(localSettings));
+      updateRecurringAutomations(localSettings, tasks);
+    }
     dispatch(processAutoManageTasks());
     onClose();
   };
 
   const handleReset = () => {
-    setLocalSettings(defaultSettings);
+    if (boardId) {
+      dispatch(removeBoardAutoManageSettings({ boardId }));
+      setLocalSettings({ ...defaultSettings, overrideGlobal: false });
+    } else {
+      setLocalSettings(defaultSettings);
+    }
   };
 
   const {
@@ -158,7 +173,16 @@ export default function AutoManageSettings({ isVisible, onClose }) {
         </View>
         
         <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Auto-Manage Tasks')}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>
+              {boardId ? `${t('Board Automation')}: ${boardName || ''}` : t('Auto-Manage Tasks')}
+            </Text>
+            {boardId && (
+              <Text style={{ fontSize: 12, color: colors.primary, marginTop: 2, fontWeight: 'bold' }}>
+                {localSettings.overrideGlobal !== false ? t('⚡ Custom Board Automation (Overrides Main)') : t('Using Main Global Automation')}
+              </Text>
+            )}
+          </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessible={true} accessibilityRole="button" accessibilityLabel="Close auto manage settings">
             <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
           </TouchableOpacity>
@@ -172,6 +196,19 @@ export default function AutoManageSettings({ isVisible, onClose }) {
           scrollEventThrottle={16}
           style={styles.scrollArea}
         >
+          {boardId && (
+            <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer, padding: 12, marginBottom: 15, borderRadius: 10, borderWidth: 1, borderColor: colors.primary }]}>
+              <SettingToggle 
+                label={t('Override Main Automation for this Board')}
+                value={localSettings.overrideGlobal !== false}
+                onValueChange={(val) => handleUpdate({ overrideGlobal: val })}
+              />
+              <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 6 }}>
+                {t('When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.')}
+              </Text>
+            </View>
+          )}
+
           <Text style={[styles.groupHeader, { color: colors.textSecondary }]}>{t('Task Scheduling')}</Text>
           <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer, padding: 10 }]}>
             <Text style={[styles.subText, { color: colors.textSecondary, marginBottom: 2, fontWeight: 'bold' }]}>{t('When overdue')}</Text>

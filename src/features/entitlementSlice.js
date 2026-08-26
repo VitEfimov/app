@@ -11,7 +11,8 @@ const initialState = {
     'pomodoroAccess',
     'advancedStatistics',
     'premiumThemes',
-    'cloudSync'
+    'cloudSync',
+    'androidAuto'
   ]
 };
 

@@ -279,22 +279,20 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
     const state = getState();
     const tasks = state.taskReducer.tasks;
     const themeState = state.themeReducer;
+    const boardAutomations = themeState.boardAutomations || {};
     
-    const {
-        autoTransferMode,
-        increasePriorityWhenOverdue,
-        priorityFrequency,
-        removePriorityWhenCompleted,
-        autoDeleteOverdueDays,
-        autoDeleteCompletedDays,
-        confirmBeforeDeletion,
-        autoRescheduleTime
-    } = themeState;
+    const globalSettings = {
+        autoTransferMode: themeState.autoTransferMode || 'none',
+        increasePriorityWhenOverdue: themeState.increasePriorityWhenOverdue || false,
+        priorityFrequency: themeState.priorityFrequency || 'never',
+        removePriorityWhenCompleted: themeState.removePriorityWhenCompleted || false,
+        autoDeleteOverdueDays: themeState.autoDeleteOverdueDays !== undefined ? themeState.autoDeleteOverdueDays : 0,
+        autoDeleteCompletedDays: themeState.autoDeleteCompletedDays !== undefined ? themeState.autoDeleteCompletedDays : 0,
+        confirmBeforeDeletion: themeState.confirmBeforeDeletion !== undefined ? themeState.confirmBeforeDeletion : true,
+        autoRescheduleTime: themeState.autoRescheduleTime || '09:00'
+    };
     
     const actualToday = dayjs().startOf('day');
-    const [rescheduleHour, rescheduleMinute] = (autoRescheduleTime || '00:00').split(':').map(Number);
-    const rescheduleTimeToday = dayjs().hour(rescheduleHour).minute(rescheduleMinute).second(0).millisecond(0);
-    const effectiveToday = dayjs().isBefore(rescheduleTimeToday) ? actualToday.subtract(1, 'day') : actualToday;
 
     let hasChanges = false;
     let newTasks = [...tasks];
@@ -304,30 +302,47 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         let updatedTask = { ...task };
         let taskChanged = false;
         const taskDate = dayjs(task.completionDate).startOf('day');
-        
+
+        // Check if board has custom automation override
+        const taskBoardId = task.boardId || 'main';
+        const boardCustom = boardAutomations[taskBoardId];
+        const isOverride = boardCustom && boardCustom.overrideGlobal !== false;
+
+        const effectiveAutoTransferMode = isOverride ? boardCustom.autoTransferMode : globalSettings.autoTransferMode;
+        const effectiveIncreasePriorityWhenOverdue = isOverride ? boardCustom.increasePriorityWhenOverdue : globalSettings.increasePriorityWhenOverdue;
+        const effectivePriorityFrequency = isOverride ? boardCustom.priorityFrequency : globalSettings.priorityFrequency;
+        const effectiveRemovePriorityWhenCompleted = isOverride ? boardCustom.removePriorityWhenCompleted : globalSettings.removePriorityWhenCompleted;
+        const effectiveAutoDeleteOverdueDays = isOverride ? (boardCustom.autoDeleteOverdueDays !== undefined ? boardCustom.autoDeleteOverdueDays : 0) : globalSettings.autoDeleteOverdueDays;
+        const effectiveAutoDeleteCompletedDays = isOverride ? (boardCustom.autoDeleteCompletedDays !== undefined ? boardCustom.autoDeleteCompletedDays : 0) : globalSettings.autoDeleteCompletedDays;
+        const effectiveAutoRescheduleTime = isOverride ? (boardCustom.autoRescheduleTime || '09:00') : globalSettings.autoRescheduleTime;
+
+        const [rescheduleHour, rescheduleMinute] = (effectiveAutoRescheduleTime || '00:00').split(':').map(Number);
+        const rescheduleTimeToday = dayjs().hour(rescheduleHour || 0).minute(rescheduleMinute || 0).second(0).millisecond(0);
+        const effectiveToday = dayjs().isBefore(rescheduleTimeToday) ? actualToday.subtract(1, 'day') : actualToday;
+
         if (updatedTask.completed) {
-            if (removePriorityWhenCompleted && updatedTask.priority !== 'none') {
+            if (effectiveRemovePriorityWhenCompleted && updatedTask.priority !== 'none') {
                 updatedTask.priority = 'none';
                 taskChanged = true;
             }
-            if (autoDeleteCompletedDays > 0) {
+            if (effectiveAutoDeleteCompletedDays > 0) {
                 const daysOld = actualToday.diff(taskDate, 'day');
-                if (daysOld >= autoDeleteCompletedDays) {
+                if (daysOld >= effectiveAutoDeleteCompletedDays) {
                     tasksToDelete.push(updatedTask.id);
                 }
             }
         } 
         else if (taskDate.isBefore(effectiveToday)) {
             const daysOverdue = actualToday.diff(taskDate, 'day');
-            if (autoDeleteOverdueDays > 0 && daysOverdue >= autoDeleteOverdueDays) {
+            if (effectiveAutoDeleteOverdueDays > 0 && daysOverdue >= effectiveAutoDeleteOverdueDays) {
                 tasksToDelete.push(updatedTask.id);
             } 
             else {
                 let priorityDidIncrease = false;
 
-                if (increasePriorityWhenOverdue) {
+                if (effectiveIncreasePriorityWhenOverdue) {
                     // Logic based on accumulating days overdue
-                    if (priorityFrequency === 'daily') {
+                    if (effectivePriorityFrequency === 'daily') {
                         if (daysOverdue >= 2 && updatedTask.priority !== 'high') {
                             updatedTask.priority = 'high';
                             taskChanged = true;
@@ -337,7 +352,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                             taskChanged = true;
                             priorityDidIncrease = true;
                         }
-                    } else if (priorityFrequency === 'weekly') {
+                    } else if (effectivePriorityFrequency === 'weekly') {
                         if (daysOverdue >= 14 && updatedTask.priority !== 'high') {
                             updatedTask.priority = 'high';
                             taskChanged = true;
@@ -347,7 +362,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                             taskChanged = true;
                             priorityDidIncrease = true;
                         }
-                    } else if (priorityFrequency === 'never' || !priorityFrequency) {
+                    } else if (effectivePriorityFrequency === 'never' || !effectivePriorityFrequency) {
                         if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
                             updatedTask.priority = 'medium';
                             taskChanged = true;
@@ -356,10 +371,10 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                     }
                 }
                 
-                if (autoTransferMode && autoTransferMode !== 'none') {
+                if (effectiveAutoTransferMode && effectiveAutoTransferMode !== 'none') {
                     // If we are auto-transferring an overdue task, immediately bump its priority 
                     // (since it won't be able to accumulate daysOverdue).
-                    if (increasePriorityWhenOverdue && !priorityDidIncrease && updatedTask.priority !== 'high') {
+                    if (effectiveIncreasePriorityWhenOverdue && !priorityDidIncrease && updatedTask.priority !== 'high') {
                         if (updatedTask.priority === 'none' || updatedTask.priority === 'low') {
                             updatedTask.priority = 'medium';
                         } else if (updatedTask.priority === 'medium') {
@@ -369,9 +384,9 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                     }
 
                     let targetDate = actualToday;
-                    if (autoTransferMode === 'tomorrow') {
+                    if (effectiveAutoTransferMode === 'tomorrow') {
                         targetDate = targetDate.add(1, 'day');
-                    } else if (autoTransferMode === 'next_workday') {
+                    } else if (effectiveAutoTransferMode === 'next_workday') {
                         while (targetDate.day() === 0 || targetDate.day() === 6) {
                             targetDate = targetDate.add(1, 'day');
                         }

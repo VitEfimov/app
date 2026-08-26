@@ -12,6 +12,7 @@ import PremiumModal from '../components/PremiumModal';
 import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
 import InlineAddTask from '../components/InlineAddTask';
+import AutoManageSettings from '../components/AutoManageSettings';
 import Modal from 'react-native-modal';
 import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
 import dayjs from 'dayjs';
@@ -58,6 +59,9 @@ export default function BoardScreen({ route, navigation }) {
   const isAuthenticated = useSelector(state => state.userReducer.isAuthenticated);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   
+  const themeState = useSelector(state => state.themeReducer);
+  const boardAutomations = useSelector(state => state.themeReducer.boardAutomations || {});
+
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
   const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
@@ -69,6 +73,7 @@ export default function BoardScreen({ route, navigation }) {
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
   const [sectionOptionsConfig, setSectionOptionsConfig] = useState({ isVisible: false, section: null });
   const [boardOptionsConfig, setBoardOptionsConfig] = useState({ isVisible: false, board: null });
+  const [boardAutomationModal, setBoardAutomationModal] = useState({ isVisible: false, boardId: null, boardName: '' });
   const [sortConfig, setSortConfig] = useState({});
   const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
 
@@ -550,6 +555,9 @@ export default function BoardScreen({ route, navigation }) {
                       styles.mainTabText, 
                       { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
                     ]}>{board.name === 'Main' ? t('Main') : board.name}</Text>
+                    {boardAutomations[board.id] && boardAutomations[board.id].overrideGlobal !== false && (
+                      <Text style={{ fontSize: 10, marginLeft: 4 }} title="Custom Board Automation Active">⚡</Text>
+                    )}
                     {(() => {
                       const count = tasks.filter(t => (t.boardId || 'main') === board.id && !t.completed).length;
                       if (count > 0) {
@@ -607,6 +615,7 @@ export default function BoardScreen({ route, navigation }) {
         )}
         renderSectionHeader={renderSectionHeader}
         renderSectionFooter={renderSectionFooter}
+        extraData={[collapsedSections, activeAddSectionId, tasks.length, colors]}
         contentContainerStyle={styles.listContent}
         stickySectionHeadersEnabled={true}
         keyboardShouldPersistTaps="handled"
@@ -708,6 +717,20 @@ export default function BoardScreen({ route, navigation }) {
             {t('What would you like to do?')}
           </Text>
           
+          <TouchableOpacity 
+            accessible={true} accessibilityRole="button" accessibilityLabel="Board automations" 
+            style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} 
+            onPress={() => { 
+              const board = boardOptionsConfig.board;
+              setBoardOptionsConfig({ isVisible: false, board: null }); 
+              setTimeout(() => {
+                setBoardAutomationModal({ isVisible: true, boardId: board.id, boardName: board.name });
+              }, 300);
+            }}
+          >
+            <Text style={[styles.optionText, { color: colors.primary, fontWeight: 'bold' }]}>⚡ {t('Board Automations')}</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Rename board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setPromptConfig({ isVisible: true, type: 'rename', targetBoard: boardOptionsConfig.board }); setBoardOptionsConfig({ isVisible: false, board: null }); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Rename')}</Text>
           </TouchableOpacity>
@@ -738,6 +761,13 @@ export default function BoardScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      <AutoManageSettings
+        isVisible={boardAutomationModal.isVisible}
+        boardId={boardAutomationModal.boardId}
+        boardName={boardAutomationModal.boardName}
+        onClose={() => setBoardAutomationModal({ isVisible: false, boardId: null, boardName: '' })}
+      />
 
       {selectionMode.isActive && (
         <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>

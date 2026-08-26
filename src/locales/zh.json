@@ -413,5 +413,12 @@
   "Search language...": "搜索语言...",
   "Set PIN": "设置密码",
   "Enter a 4-digit PIN": "输入 4 位 PIN 码",
-  "Clear": "清除"
+  "Clear": "清除",
+  "Android Auto Integration": "Android Auto Integration",
+  "Board Automation": "Board Automation",
+  "Board Automations": "Board Automations",
+  "⚡ Custom Board Automation (Overrides Main)": "⚡ Custom Board Automation (Overrides Main)",
+  "Using Main Global Automation": "Using Main Global Automation",
+  "Override Main Automation for this Board": "Override Main Automation for this Board",
+  "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.": "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board."
 }

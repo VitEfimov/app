@@ -296,6 +296,7 @@ export default function CalendarScreen() {
 
   // Prepare marked dates
   const markedDates = useMemo(() => {
+    const todayStr = dayjs().format('YYYY-MM-DD');
     const marks = {};
     tasks.forEach(task => {
       if (task.completionDate) {
@@ -319,19 +320,76 @@ export default function CalendarScreen() {
       else if (anyMissed) dotColor = '#f44336';
       else if (anyNotes) dotColor = '#ff9800';
 
-      finalMarks[dateStr] = { marked: true, dotColor: dotColor, textColor: dotColor === '#ffffff' ? colors.textSecondary : dotColor };
+      const isToday = dateStr === todayStr;
+      const isSelected = dateStr === selectedDate;
+
+      finalMarks[dateStr] = {
+        marked: true,
+        dotColor: isSelected ? (colors.textInverse || '#ffffff') : dotColor,
+        customStyles: {
+          container: isSelected ? {
+            backgroundColor: colors.primary,
+            borderRadius: 18,
+            borderWidth: isToday ? 2 : 0,
+            borderColor: isToday ? (colors.textInverse || '#ffffff') : 'transparent',
+          } : isToday ? {
+            borderWidth: 2,
+            borderColor: colors.primary,
+            borderRadius: 18,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+          } : {},
+          text: isSelected ? {
+            color: colors.textInverse || '#ffffff',
+            fontWeight: isToday ? '900' : 'bold',
+            fontSize: 15,
+          } : isToday ? {
+            color: colors.primary,
+            fontWeight: '900',
+            fontSize: 15,
+          } : {}
+        }
+      };
     });
 
-    // Mark the currently selected date
-    if (finalMarks[selectedDate]) {
-      finalMarks[selectedDate].selected = true;
-      finalMarks[selectedDate].selectedColor = colors.primary;
-    } else {
-      finalMarks[selectedDate] = { selected: true, selectedColor: colors.primary };
+    if (!finalMarks[selectedDate]) {
+      const isToday = selectedDate === todayStr;
+      finalMarks[selectedDate] = {
+        customStyles: {
+          container: {
+            backgroundColor: colors.primary,
+            borderRadius: 18,
+            borderWidth: isToday ? 2 : 0,
+            borderColor: isToday ? (colors.textInverse || '#ffffff') : 'transparent',
+          },
+          text: {
+            color: colors.textInverse || '#ffffff',
+            fontWeight: '900',
+            fontSize: 15,
+          }
+        }
+      };
+    }
+
+    if (!finalMarks[todayStr]) {
+      finalMarks[todayStr] = {
+        customStyles: {
+          container: {
+            borderWidth: 2,
+            borderColor: colors.primary,
+            borderRadius: 18,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+          },
+          text: {
+            color: colors.primary,
+            fontWeight: '900',
+            fontSize: 15,
+          }
+        }
+      };
     }
 
     return finalMarks;
-  }, [tasks, selectedDate, colors]);
+  }, [tasks, selectedDate, colors, isDark]);
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
@@ -387,6 +445,7 @@ export default function CalendarScreen() {
         <Calendar
           testID="task_calendar"
           key={`${colors.bgMain}-${isDark}-${i18n.language}`}
+          markingType={'custom'}
           current={selectedDate}
           firstDay={i18n.language === 'en' ? 0 : 1}
           onDayPress={(day) => {
@@ -409,7 +468,8 @@ export default function CalendarScreen() {
             arrowColor: colors.primary,
             monthTextColor: colors.textPrimary,
             indicatorColor: colors.primary,
-            textDayFontWeight: '500',
+            textDayFontWeight: '600',
+            todayButtonFontWeight: 'bold',
             textMonthFontWeight: 'bold',
             textDayHeaderFontWeight: '600',
             textDayFontSize: 16,

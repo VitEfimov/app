@@ -55,9 +55,13 @@ const initialState = {
   alarmSound: loaded?.alarmSound || 'bass_alarm.mp3',
   notificationSound: loaded?.notificationSound || 'notification.wav',
   vibrationEnabled: loaded?.vibrationEnabled !== undefined ? loaded.vibrationEnabled : true,
+  androidAutoEnabled: loaded?.androidAutoEnabled !== undefined ? loaded.androidAutoEnabled : true,
   
   // Security
-  appPin: loaded?.appPin || null
+  appPin: loaded?.appPin || null,
+
+  // Per-Board Automations Map
+  boardAutomations: loaded?.boardAutomations || {}
 };
 
 const themeSlice = createSlice({
@@ -204,6 +208,21 @@ const themeSlice = createSlice({
       });
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
+    setBoardAutoManageSettings: (state, action) => {
+      const { boardId, settings } = action.payload;
+      if (!state.boardAutomations) {
+        state.boardAutomations = {};
+      }
+      state.boardAutomations[boardId] = settings;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    removeBoardAutoManageSettings: (state, action) => {
+      const { boardId } = action.payload;
+      if (state.boardAutomations && state.boardAutomations[boardId]) {
+        delete state.boardAutomations[boardId];
+        AsyncStorage.setItem('customTheme', JSON.stringify(state));
+      }
+    },
     setBoardsCollapsed: (state, action) => {
       state.isBoardsCollapsed = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
@@ -219,6 +238,10 @@ const themeSlice = createSlice({
     setShowRecurringTasksOnBoard: (state, action) => {
       state.showRecurringTasksOnBoard = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setAndroidAutoEnabled: (state, action) => {
+      state.androidAutoEnabled = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
@@ -226,9 +249,9 @@ const themeSlice = createSlice({
 export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
-  setAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
+  setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
-  setShowRecurringTasksOnBoard
+  setShowRecurringTasksOnBoard, setAndroidAutoEnabled
 } = themeSlice.actions;
 
 export default themeSlice.reducer;

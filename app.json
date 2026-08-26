@@ -49,6 +49,7 @@
     "plugins": [
       "./modules/expo-task-alarm/app.plugin.js",
       "./withAndroidImageCropperFix.js",
+      "./withAndroidAuto.js",
       [
         "expo-build-properties",
         {

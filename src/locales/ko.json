@@ -413,5 +413,12 @@
   "Search language...": "검색 언어...",
   "Set PIN": "PIN 설정",
   "Enter a 4-digit PIN": "4자리 PIN을 입력하세요.",
-  "Clear": "분명한"
+  "Clear": "분명한",
+  "Android Auto Integration": "Android Auto Integration",
+  "Board Automation": "Board Automation",
+  "Board Automations": "Board Automations",
+  "⚡ Custom Board Automation (Overrides Main)": "⚡ Custom Board Automation (Overrides Main)",
+  "Using Main Global Automation": "Using Main Global Automation",
+  "Override Main Automation for this Board": "Override Main Automation for this Board",
+  "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.": "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board."
 }

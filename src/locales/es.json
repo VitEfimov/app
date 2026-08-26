@@ -413,5 +413,12 @@
   "Search language...": "Idioma de búsqueda...",
   "Set PIN": "Establecer PIN",
   "Enter a 4-digit PIN": "Ingrese un PIN de 4 dígitos",
-  "Clear": "Claro"
+  "Clear": "Claro",
+  "Android Auto Integration": "Android Auto Integration",
+  "Board Automation": "Board Automation",
+  "Board Automations": "Board Automations",
+  "⚡ Custom Board Automation (Overrides Main)": "⚡ Custom Board Automation (Overrides Main)",
+  "Using Main Global Automation": "Using Main Global Automation",
+  "Override Main Automation for this Board": "Override Main Automation for this Board",
+  "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.": "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board."
 }

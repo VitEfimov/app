@@ -85,26 +85,36 @@ function InitApp() {
   const dispatch = useDispatch();
   const [ready, setReady] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
-  const [pendingNotificationTaskId, setPendingNotificationTaskId] = useState(null);
+  const [pendingNotificationPayload, setPendingNotificationPayload] = useState(null);
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const themeReducer = useSelector(state => state.themeReducer);
 
   useEffect(() => {
-    if (isUnlocked && pendingNotificationTaskId) {
+    const isLocked = !!(themeReducer.appPin && !isUnlocked);
+    if (!isLocked && pendingNotificationPayload) {
       let attempts = 0;
       const interval = setInterval(() => {
         attempts++;
         if (navigationRef.isReady()) {
-          navigationRef.navigate('Board', { editTaskId: pendingNotificationTaskId });
-          setPendingNotificationTaskId(null);
+          const { type, taskId, automationType, actionIdentifier } = pendingNotificationPayload;
+          setPendingNotificationPayload(null);
           clearInterval(interval);
+
+          if (type === 'task' && taskId) {
+            if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER || actionIdentifier === 'reschedule') {
+              navigationRef.navigate('Board', { editTaskId: taskId });
+            }
+          } else if (type === 'automation' || automationType) {
+            const targetSection = automationType === 'summary' ? 'missed' : 'today';
+            navigationRef.navigate('Board', { sectionId: targetSection });
+          }
         } else if (attempts > 30) {
           clearInterval(interval);
         }
       }, 100);
       return () => clearInterval(interval);
     }
-  }, [isUnlocked, pendingNotificationTaskId]);
+  }, [isUnlocked, themeReducer.appPin, pendingNotificationPayload]);
 
   useEffect(() => {
     const removeDiagnostics = attachNotificationDiagnostics();
@@ -119,147 +129,162 @@ function InitApp() {
       let completionDate = dayjs().format('YYYY-MM-DD'); 
       let priority = 'none';
       let imgUri = '';
+      let attachments = [];
       let taskTime = null;
 
-      if (shareIntent.type === 'media' || shareIntent.type === 'file' || Array.isArray(shareIntent.value)) {
-        // Shared a file/image
-        const files = Array.isArray(shareIntent.value) ? shareIntent.value : [shareIntent.value];
-        if (files.length > 0) {
-          const file = files[0];
-          taskname = file.fileName || 'Shared File';
-          if (file.mimeType?.startsWith('image/')) {
-            imgUri = file.contentUri || file.path || '';
-          } else {
-            notes.push(`File: ${file.path || file.contentUri}`);
+      if (shareIntent.type === 'media' || shareIntent.type === 'file' || Array.isArray(shareIntent.value) || shareIntent.files) {
+        // Shared file(s) or image(s)
+        const files = Array.isArray(shareIntent.value) 
+          ? shareIntent.value 
+          : (shareIntent.files || (typeof shareIntent.value === 'object' && shareIntent.value ? [shareIntent.value] : []));
+        
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (!file) continue;
+          const uri = file.contentUri || file.path || file.uri || '';
+          const isImg = file.mimeType?.startsWith('image/') || file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.path || file.fileName || uri);
+          
+          if (isImg) {
+            if (!imgUri) imgUri = uri;
+            attachments.push({
+              id: `shared_img_${Date.now()}_${i}`,
+              type: 'image',
+              uri: uri,
+              name: file.fileName || `Photo-${Date.now()}.jpg`,
+              size: file.fileSize || file.size || 0,
+              mimeType: file.mimeType || file.type || 'image/jpeg'
+            });
+          } else if (uri) {
+            notes.push(`File: ${file.path || file.contentUri || uri}`);
           }
         }
-      } else {
-        const text = shareIntent.value || shareIntent.text || shareIntent.description || '';
-        if (typeof text === 'string' && text.trim().length > 0) {
-          const lines = text.split('\n');
-          let hasFoundSubtasks = false;
-          let remainingLines = [];
+      }
 
-          for (let line of lines) {
-              let trimmed = line.trim();
-              if (!trimmed) continue;
-              
-              const priorityMatch = trimmed.match(/Priority:\s*(low|medium|high)/i);
-              if (priorityMatch) {
-                  priority = priorityMatch[1].toLowerCase();
-                  trimmed = trimmed.replace(priorityMatch[0], '').trim();
-                  if (!trimmed) continue;
-              }
+      const text = shareIntent.value || shareIntent.text || shareIntent.description || '';
+      if (typeof text === 'string' && text.trim().length > 0) {
+        const lines = text.split('\n');
+        let hasFoundSubtasks = false;
+        let remainingLines = [];
 
-              const dRegex = /\b(today|tomorrow|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)\b/i;
-              const tRegex = /\b(\d{1,2}:\d{2}(?:\s*[aA][pP][mM])?|\d{1,2}\s*[aA][pP][mM])\b/i;
-              const keywordRegex = /\b(due time|due|deadline at|deadline|date\(due\)|date)\b/i;
-              
-              if (keywordRegex.test(trimmed)) {
-                  let foundAny = false;
-                  
-                  const dMatch = trimmed.match(dRegex);
-                  if (dMatch) {
-                      const dateStr = dMatch[1];
-                      if (dateStr.toLowerCase() === 'today') {
-                          completionDate = dayjs().format('YYYY-MM-DD');
-                      } else if (dateStr.toLowerCase() === 'tomorrow') {
-                          completionDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
-                      } else {
-                          let cleanDateStr = dateStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
-                          if (/[a-z]+\s+\d{1,2}$/i.test(cleanDateStr)) {
-                              cleanDateStr += `, ${dayjs().year()}`;
-                          }
-                          const parsedDate = dayjs(cleanDateStr);
-                          if (parsedDate.isValid()) {
-                              completionDate = parsedDate.format('YYYY-MM-DD');
-                          }
-                      }
-                      trimmed = trimmed.replace(dMatch[0], '');
-                      foundAny = true;
-                  }
-                  
-                  const tMatch = trimmed.match(tRegex);
-                  if (tMatch) {
-                      const timeStr = tMatch[1];
-                      let t = timeStr.trim();
-                      const pm = /pm/i.test(t);
-                      const am = /am/i.test(t);
-                      t = t.replace(/[aA][pP][mM]/i, '').trim();
-                      
-                      let [h, m] = t.split(':');
-                      h = parseInt(h, 10);
-                      m = m ? parseInt(m, 10) : 0;
-                      
-                      if (pm && h < 12) h += 12;
-                      if (am && h === 12) h = 0;
-                      
-                      taskTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                      trimmed = trimmed.replace(tMatch[0], '');
-                      foundAny = true;
-                  }
-                  
-                  if (foundAny) {
-                      trimmed = trimmed.replace(keywordRegex, '').replace(/\bat\b/i, '').replace(/:\s*$/, '').replace(/^\s*:\s*/, '').trim();
-                  }
-                  
-                  if (!trimmed) continue;
-              }
+        for (let line of lines) {
+            let trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            const priorityMatch = trimmed.match(/Priority:\s*(low|medium|high)/i);
+            if (priorityMatch) {
+                priority = priorityMatch[1].toLowerCase();
+                trimmed = trimmed.replace(priorityMatch[0], '').trim();
+                if (!trimmed) continue;
+            }
 
-              const subtaskMatch = trimmed.match(/^(\[ \]|\[x\]|-|\*|\d+\.)\s+(.+)/i);
-              if (subtaskMatch) {
-                  hasFoundSubtasks = true;
-                  subtasks.push({
-                      id: Date.now().toString() + Math.random().toString(),
-                      text: subtaskMatch[2].trim(),
-                      completed: subtaskMatch[1].toLowerCase() === '[x]'
-                  });
-                  continue;
-              }
+            const dRegex = /\b(today|tomorrow|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)\b/i;
+            const tRegex = /\b(\d{1,2}:\d{2}(?:\s*[aA][pP][mM])?|\d{1,2}\s*[aA][pP][mM])\b/i;
+            const keywordRegex = /\b(due time|due|deadline at|deadline|date\(due\)|date)\b/i;
+            
+            if (keywordRegex.test(trimmed)) {
+                let foundAny = false;
+                
+                const dMatch = trimmed.match(dRegex);
+                if (dMatch) {
+                    const dateStr = dMatch[1];
+                    if (dateStr.toLowerCase() === 'today') {
+                        completionDate = dayjs().format('YYYY-MM-DD');
+                    } else if (dateStr.toLowerCase() === 'tomorrow') {
+                        completionDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
+                    } else {
+                        let cleanDateStr = dateStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
+                        if (/[a-z]+\s+\d{1,2}$/i.test(cleanDateStr)) {
+                            cleanDateStr += `, ${dayjs().year()}`;
+                        }
+                        const parsedDate = dayjs(cleanDateStr);
+                        if (parsedDate.isValid()) {
+                            completionDate = parsedDate.format('YYYY-MM-DD');
+                        }
+                    }
+                    trimmed = trimmed.replace(dMatch[0], '');
+                    foundAny = true;
+                }
+                
+                const tMatch = trimmed.match(tRegex);
+                if (tMatch) {
+                    const timeStr = tMatch[1];
+                    let t = timeStr.trim();
+                    const pm = /pm/i.test(t);
+                    const am = /am/i.test(t);
+                    t = t.replace(/[aA][pP][mM]/i, '').trim();
+                    
+                    let [h, m] = t.split(':');
+                    h = parseInt(h, 10);
+                    m = m ? parseInt(m, 10) : 0;
+                    
+                    if (pm && h < 12) h += 12;
+                    if (am && h === 12) h = 0;
+                    
+                    taskTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                    trimmed = trimmed.replace(tMatch[0], '');
+                    foundAny = true;
+                }
+                
+                if (foundAny) {
+                    trimmed = trimmed.replace(keywordRegex, '').replace(/\bat\b/i, '').replace(/:\s*$/, '').replace(/^\s*:\s*/, '').trim();
+                }
+                
+                if (!trimmed) continue;
+            }
 
-              if (!hasFoundSubtasks) {
-                  remainingLines.push(trimmed);
-              } else {
-                  notes.push(trimmed);
-              }
-          }
+            const subtaskMatch = trimmed.match(/^(\[ \]|\[x\]|-|\*|\d+\.)\s+(.+)/i);
+            if (subtaskMatch) {
+                hasFoundSubtasks = true;
+                subtasks.push({
+                    id: Date.now().toString() + Math.random().toString(),
+                    text: subtaskMatch[2].trim(),
+                    completed: subtaskMatch[1].toLowerCase() === '[x]'
+                });
+                continue;
+            }
 
-          let preText = remainingLines.join('\n');
-          let extraNotes = [];
-
-          if (preText) {
-              const words = preText.split(/\s+/);
-              if (words.length > 5) {
-                  taskname = words.slice(0, 5).join(' ') + '...';
-                  let wordCount = 0;
-                  let splitIndex = 0;
-                  let inWord = false;
-                  for (let i = 0; i < preText.length; i++) {
-                      if (/\s/.test(preText[i])) {
-                          inWord = false;
-                      } else {
-                          if (!inWord) {
-                              wordCount++;
-                              inWord = true;
-                          }
-                      }
-                      if (wordCount === 6) {
-                          splitIndex = i;
-                          break;
-                      }
-                  }
-                  if (splitIndex > 0) {
-                      extraNotes.push(preText.substring(splitIndex).trim());
-                  } else {
-                      extraNotes.push(words.slice(5).join(' '));
-                  }
-              } else {
-                  taskname = preText;
-              }
-          }
-
-          notes = [...extraNotes, ...notes];
+            if (!hasFoundSubtasks) {
+                remainingLines.push(trimmed);
+            } else {
+                notes.push(trimmed);
+            }
         }
+
+        let preText = remainingLines.join('\n');
+        let extraNotes = [];
+
+        if (preText) {
+            const words = preText.split(/\s+/);
+            if (words.length > 5) {
+                taskname = words.slice(0, 5).join(' ') + '...';
+                let wordCount = 0;
+                let splitIndex = 0;
+                let inWord = false;
+                for (let i = 0; i < preText.length; i++) {
+                    if (/\s/.test(preText[i])) {
+                        inWord = false;
+                    } else {
+                        if (!inWord) {
+                            wordCount++;
+                            inWord = true;
+                        }
+                    }
+                    if (wordCount === 6) {
+                        splitIndex = i;
+                        break;
+                    }
+                }
+                if (splitIndex > 0) {
+                    extraNotes.push(preText.substring(splitIndex).trim());
+                } else {
+                    extraNotes.push(words.slice(5).join(' '));
+                }
+            } else {
+                taskname = preText;
+            }
+        }
+
+        notes = [...extraNotes, ...notes];
       }
 
       if (!taskname && notes.length > 0) {
@@ -270,11 +295,13 @@ function InitApp() {
           taskname = 'Shared Task';
       }
 
+      const newTaskId = Date.now().toString();
+
       dispatch(addTask({
         task: {
-          id: Date.now().toString(),
+          id: newTaskId,
           taskname: taskname.slice(0, 100), // Limit title length
-          description: { text: notes.join('\n'), img: imgUri, url: '' },
+          description: { text: notes.join('\n'), img: imgUri, attachments: attachments, url: '' },
           subtasks: subtasks,
           completed: false,
           priority: priority,
@@ -283,6 +310,12 @@ function InitApp() {
         }
       }));
       resetShareIntent();
+
+      if (navigationRef.isReady()) {
+        navigationRef.navigate('Board', { editTaskId: newTaskId });
+      } else {
+        setPendingNotificationPayload({ type: 'task', taskId: newTaskId, actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER });
+      }
     }
   }, [hasShareIntent, shareIntent, ready, dispatch, resetShareIntent]);
 
@@ -351,7 +384,10 @@ function InitApp() {
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(async response => {
       const actionIdentifier = response.actionIdentifier;
-      const taskId = response.notification.request.content.data?.taskId;
+      const data = response.notification.request.content.data || {};
+      const taskId = data.taskId;
+      const isAutomation = data.isAutomation;
+      const automationType = data.automationType;
       
       // Dismiss the notification from the system tray since Android doesn't always do this automatically for background actions
       if (response.notification?.request?.identifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
@@ -360,6 +396,22 @@ function InitApp() {
         } catch (err) {
           console.warn("Failed to dismiss notification", err);
         }
+      }
+
+      const isLocked = !!(store.getState().themeReducer.appPin && !isUnlocked);
+
+      if (isAutomation || automationType) {
+        if (isLocked) {
+          setPendingNotificationPayload({ type: 'automation', automationType, actionIdentifier });
+        } else {
+          const targetSection = automationType === 'summary' ? 'missed' : 'today';
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('Board', { sectionId: targetSection });
+          } else {
+            setPendingNotificationPayload({ type: 'automation', automationType, actionIdentifier });
+          }
+        }
+        return;
       }
 
       if (taskId) {
@@ -376,10 +428,14 @@ function InitApp() {
         
         if (task) {
           if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER || actionIdentifier === 'reschedule') {
-            if (navigationRef.isReady()) {
-              navigationRef.navigate('Board', { editTaskId: taskId });
+            if (isLocked) {
+              setPendingNotificationPayload({ type: 'task', taskId, actionIdentifier });
             } else {
-              setPendingNotificationTaskId(taskId);
+              if (navigationRef.isReady()) {
+                navigationRef.navigate('Board', { editTaskId: taskId });
+              } else {
+                setPendingNotificationPayload({ type: 'task', taskId, actionIdentifier });
+              }
             }
           } else if (actionIdentifier === 'complete_task') {
              dispatch(updateTask({ taskId, completed: true }));
@@ -415,7 +471,7 @@ function InitApp() {
       }
     });
     return () => subscription.remove();
-  }, [dispatch]);
+  }, [dispatch, isUnlocked]);
 
   if (!ready) {
     return (

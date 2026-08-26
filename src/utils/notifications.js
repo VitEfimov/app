@@ -900,7 +900,7 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
             title: 'Good Morning!',
             body: bodyText,
             sound: true,
-            data: { isAutomation: true },
+            data: { isAutomation: true, automationType: 'morning' },
           },
           trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
         });
@@ -935,7 +935,7 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
             title: 'Daily Summary',
             body: bodyText,
             sound: true,
-            data: { isAutomation: true },
+            data: { isAutomation: true, automationType: 'summary' },
           },
           trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
         });
@@ -970,7 +970,7 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
             title: 'Evening Review',
             body: bodyText,
             sound: true,
-            data: { isAutomation: true },
+            data: { isAutomation: true, automationType: 'evening' },
           },
           trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
         });

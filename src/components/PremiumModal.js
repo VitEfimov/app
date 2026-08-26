@@ -42,7 +42,7 @@ export default function PremiumModal({ isVisible, onClose, featureName }) {
         </Text>
 
         <View style={styles.benefitsList}>
-          {['Monthly and yearly trends', 'Productivity Score', 'Activity Heat Map', 'Streaks and personal records', 'Focus and board analytics', 'Productivity goals'].map((benefit, i) => (
+          {['Monthly and yearly trends', 'Productivity Score', 'Activity Heat Map', 'Streaks and personal records', 'Focus and board analytics', 'Productivity goals', 'Android Auto integration'].map((benefit, i) => (
             <View key={i} style={styles.benefitRow}>
               <Text style={{ color: colors.primary, marginRight: 10 }}>✓</Text>
               <Text style={{ color: colors.textPrimary }}>{t(benefit)}</Text>

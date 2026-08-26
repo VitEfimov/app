@@ -183,6 +183,56 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
 
+  const getCalendarMarkedDates = () => {
+    const activeDate = datePickerType === 'due' 
+      ? selectedDate 
+      : datePickerType === 'repeatStart' 
+      ? repeatStartDate 
+      : repeatEndDate;
+
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    const marks = {};
+
+    if (activeDate) {
+      const isToday = activeDate === todayStr;
+      marks[activeDate] = {
+        customStyles: {
+          container: {
+            backgroundColor: colors.primary,
+            borderRadius: 18,
+            borderWidth: isToday ? 2 : 0,
+            borderColor: isToday ? (colors.textInverse || '#ffffff') : 'transparent',
+          },
+          text: {
+            color: colors.textInverse || '#ffffff',
+            fontWeight: '900',
+            fontSize: 15,
+          }
+        }
+      };
+    }
+
+    if (!marks[todayStr]) {
+      marks[todayStr] = {
+        customStyles: {
+          container: {
+            borderWidth: 2,
+            borderColor: colors.primary,
+            borderRadius: 18,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+          },
+          text: {
+            color: colors.primary,
+            fontWeight: '900',
+            fontSize: 15,
+          }
+        }
+      };
+    }
+
+    return marks;
+  };
+
   const stripHtml = (html) => html ? html.replace(/<[^>]+>/g, '').trim() : '';
 
   useEffect(() => {
@@ -1229,6 +1279,7 @@ useEffect(() => {
             <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
               <Calendar
                 key={i18n.language}
+                markingType={'custom'}
                 firstDay={i18n.language === 'en' ? 0 : 1}
                 current={
                   datePickerType === 'due' 
@@ -1238,13 +1289,7 @@ useEffect(() => {
                     : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
                 }
                 onDayPress={(day) => handleDateSelect(day.dateString)}
-                markedDates={
-                  datePickerType === 'due' 
-                    ? (selectedDate ? { [selectedDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
-                    : datePickerType === 'repeatStart'
-                    ? (repeatStartDate ? { [repeatStartDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
-                    : (repeatEndDate ? { [repeatEndDate]: { selected: true, selectedColor: colors.primary, selectedTextColor: colors.textInverse } } : {})
-                }
+                markedDates={getCalendarMarkedDates()}
                 theme={{
                   backgroundColor: colors.bgCard,
                   calendarBackground: colors.bgCard,
@@ -1259,9 +1304,10 @@ useEffect(() => {
                   arrowColor: colors.textPrimary,
                   monthTextColor: colors.textPrimary,
                   indicatorColor: colors.primary,
-                  textDayFontWeight: '500',
+                  textDayFontWeight: '600',
+                  todayButtonFontWeight: 'bold',
                   textMonthFontWeight: 'bold',
-                  textDayHeaderFontWeight: '500',
+                  textDayHeaderFontWeight: '600',
                   textDayFontSize: 14,
                   textMonthFontSize: 16,
                   textDayHeaderFontSize: 12,

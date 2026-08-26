@@ -5,34 +5,11 @@ const https = require('https');
 const localesDir = path.join(__dirname, 'src', 'locales');
 const enFilePath = path.join(localesDir, 'en.json');
 
-const missingStrings = [
-  "Customize theme",
-  "Task Automations",
-  "Accent Color",
-  "Increase when overdue",
-  "Delete overdue after",
-  "Morning reminder",
-  "Evening reminder",
-  "Summary",
-  "Never",
-  "3 days",
-  "7 days",
-  "30 days",
-  "When overdue",
-  "Frequency",
-  "Next Workday",
-  "W1", "W2", "W3", "W4", "W5", "W6",
-  "Reschedule Date",
-  "Adjust Reminder",
-  "Randomize daily"
-];
-
-
 function translate(text, targetLang) {
   return new Promise((resolve, reject) => {
     if (targetLang === 'en') return resolve(text);
     
-    // Some minor lang mapping
+    // Minor lang mapping
     if (targetLang === 'zh') targetLang = 'zh-CN';
     
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
@@ -43,7 +20,7 @@ function translate(text, targetLang) {
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          resolve(json[0][0][0]);
+          resolve(json[0][0][0] || text);
         } catch (e) {
           resolve(text); // fallback to English on error
         }
@@ -55,7 +32,9 @@ function translate(text, targetLang) {
 }
 
 async function run() {
-  const files = fs.readdirSync(localesDir).filter(f => f.endsWith('.json'));
+  const enData = JSON.parse(fs.readFileSync(enFilePath, 'utf8'));
+  const enKeys = Object.keys(enData);
+  const files = fs.readdirSync(localesDir).filter(f => f.endsWith('.json') && f !== 'en.json');
   
   for (const file of files) {
     const filePath = path.join(localesDir, file);
@@ -63,11 +42,11 @@ async function run() {
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     
     let updated = false;
-    for (const str of missingStrings) {
-      if (!data[str]) {
-        console.log(`Translating '${str}' to ${lang}...`);
-        const translated = await translate(str, lang);
-        data[str] = translated;
+    for (const key of enKeys) {
+      if (!data[key]) {
+        console.log(`Translating '${key}' to ${lang}...`);
+        const translated = await translate(enData[key] || key, lang);
+        data[key] = translated;
         updated = true;
       }
     }
@@ -77,6 +56,7 @@ async function run() {
       console.log(`Updated ${file}`);
     }
   }
+  console.log('All translations up to date!');
 }
 
 run().catch(console.error);
