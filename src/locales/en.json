@@ -422,5 +422,20 @@
   "Override Main Automation for this Board": "Override Main Automation for this Board",
   "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.": "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.",
   "Default Reminder for New Tasks": "Default Reminder for New Tasks",
-  "Default Reminder Time": "Default Reminder Time"
+  "Default Reminder Time": "Default Reminder Time",
+  "Move Task to Board": "Move Task to Board",
+  "Move to Board": "Move to Board",
+  "Tasks to Board": "Tasks to Board",
+  "Moved to": "Moved to",
+  "Moved": "Moved",
+  "Tasks to": "Tasks to",
+  "Move backward": "Move backward",
+  "Move forward": "Move forward",
+  "Move Backward": "Move Backward",
+  "Move Forward": "Move Forward",
+  "Task moved forward": "Task moved forward",
+  "Task moved backward": "Task moved backward",
+  "Are you sure you want to move all tasks in": "Are you sure you want to move all tasks in",
+  "forward": "forward",
+  "backward": "backward"
 }

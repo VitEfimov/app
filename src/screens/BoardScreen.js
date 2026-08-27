@@ -11,6 +11,7 @@ import SnoozeModal from '../components/SnoozeModal';
 import PremiumModal from '../components/PremiumModal';
 import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
+import MoveBoardModal from '../components/MoveBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
 import Modal from 'react-native-modal';
@@ -74,6 +75,7 @@ export default function BoardScreen({ route, navigation }) {
   const [sectionOptionsConfig, setSectionOptionsConfig] = useState({ isVisible: false, section: null });
   const [boardOptionsConfig, setBoardOptionsConfig] = useState({ isVisible: false, board: null });
   const [boardAutomationModal, setBoardAutomationModal] = useState({ isVisible: false, boardId: null, boardName: '' });
+  const [isMoveBoardVisible, setMoveBoardVisible] = useState(false);
   const [sortConfig, setSortConfig] = useState({});
   const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
 
@@ -122,6 +124,21 @@ export default function BoardScreen({ route, navigation }) {
       };
     });
   }, []);
+
+  const handleBatchMoveBoard = (targetBoardId) => {
+    const selectedIds = [...selectionMode.selectedTaskIds];
+    if (selectedIds.length === 0) return;
+    
+    selectedIds.forEach(id => {
+      dispatch(updateTask({ taskId: id, boardId: targetBoardId }));
+    });
+    
+    const targetBoard = boards.find(b => b.id === targetBoardId);
+    const boardName = targetBoard ? (targetBoard.name === 'Main' ? t('Main') : targetBoard.name) : t('Board');
+    setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
+    
+    showToast(`${t('Moved')} ${selectedIds.length} ${t('Tasks to')} ${boardName}`);
+  };
 
   const handleSelectAll = () => {
     const section = sections.find(s => s.id === selectionMode.sectionId);
@@ -373,9 +390,9 @@ export default function BoardScreen({ route, navigation }) {
   const handleMoveForward = (section) => {
     setConfirmConfig({
       isVisible: true,
-      title: 'Move Forward',
-      message: `Are you sure you want to move all tasks in "${section.title}" forward?`,
-      confirmText: 'Move',
+      title: t('Move Forward'),
+      message: `${t('Are you sure you want to move all tasks in')} "${section.title}" ${t('forward')}?`,
+      confirmText: t('Move'),
       isDestructive: false,
       onConfirm: () => {
         const today = dayjs();
@@ -386,6 +403,32 @@ export default function BoardScreen({ route, navigation }) {
             case 'tomorrow': newDate = today.endOf('isoWeek').toISOString(); break;
             case 'on-this-week': newDate = today.add(1, 'week').startOf('isoWeek').toISOString(); break;
             case 'on-next-week': newDate = today.add(2, 'week').startOf('isoWeek').toISOString(); break;
+            default: return;
+        }
+        section.data.forEach(task => {
+          dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
+        });
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+      }
+    });
+  };
+
+  const handleMoveBackward = (section) => {
+    setConfirmConfig({
+      isVisible: true,
+      title: t('Move Backward'),
+      message: `${t('Are you sure you want to move all tasks in')} "${section.title}" ${t('backward')}?`,
+      confirmText: t('Move'),
+      isDestructive: false,
+      onConfirm: () => {
+        const today = dayjs();
+        let newDate;
+        switch (section.id) {
+            case 'today': newDate = today.subtract(1, 'day').toISOString(); break;
+            case 'tomorrow': newDate = today.toISOString(); break;
+            case 'on-this-week': newDate = today.add(1, 'day').toISOString(); break;
+            case 'on-next-week': newDate = today.endOf('isoWeek').toISOString(); break;
+            case 'later': newDate = today.add(1, 'week').startOf('isoWeek').toISOString(); break;
             default: return;
         }
         section.data.forEach(task => {
@@ -681,6 +724,12 @@ export default function BoardScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
 
+          {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'missed' && (
+            <TouchableOpacity testID="section_option_move_backward" accessible={true} accessibilityRole="button" accessibilityLabel="Move tasks backward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveBackward(s), 400); }}>
+              <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move backward')}</Text>
+            </TouchableOpacity>
+          )}
+
           {sectionOptionsConfig.section?.id === 'later' && (
             <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
               <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
@@ -773,6 +822,9 @@ export default function BoardScreen({ route, navigation }) {
             <TouchableOpacity testID="action_bar_all" accessible={true} accessibilityRole="button" accessibilityLabel="Select all" onPress={handleSelectAll} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
             </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_move" accessible={true} accessibilityRole="button" accessibilityLabel="Move selected" onPress={() => setMoveBoardVisible(true)} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Move')}</Text>
+            </TouchableOpacity>
             <TouchableOpacity testID="action_bar_share" accessible={true} accessibilityRole="button" accessibilityLabel="Share selected" onPress={handleShareSelected} style={styles.actionBtn}>
               <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>{t('Share')}</Text>
             </TouchableOpacity>
@@ -808,6 +860,15 @@ export default function BoardScreen({ route, navigation }) {
         isDark={colors.background === '#121212'}
         onPressEdit={(t) => { setSelectedTask(t); setDetailsVisible(true); }}
         onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
+      />
+
+      <MoveBoardModal
+        isVisible={isMoveBoardVisible}
+        onClose={() => setMoveBoardVisible(false)}
+        onSelectBoard={handleBatchMoveBoard}
+        boards={boards}
+        taskCount={selectionMode.selectedTaskIds.length}
+        colors={colors}
       />
 
       <SnoozeModal 

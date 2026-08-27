@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
 import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask } from '../features/taskSlice';
 import { useToast } from '../styles/ToastContext';
 import dayjs from 'dayjs';
@@ -57,6 +57,28 @@ const IconDelete = ({ color }) => (
   </Svg>
 );
 
+const IconFolder = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </Svg>
+);
+
+const IconMoveForward = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Polyline points="13 17 18 12 13 7" />
+    <Polyline points="6 17 11 12 6 7" />
+  </Svg>
+);
+
+const IconMoveBackward = ({ color }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Polyline points="11 17 6 12 11 7" />
+    <Polyline points="18 17 13 12 18 7" />
+  </Svg>
+);
+
+import MoveBoardModal from './MoveBoardModal';
+
 let RNShare;
 if (Platform.OS !== 'web') {
   RNShare = require('react-native-share').default;
@@ -74,6 +96,8 @@ export default function TaskQuickMenuModal({
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const { showToast } = useToast();
+  const boards = useSelector(state => state.userReducer.boards || []);
+  const [isMoveBoardVisible, setMoveBoardVisible] = React.useState(false);
 
   if (!task) return null;
 
@@ -207,9 +231,71 @@ export default function TaskQuickMenuModal({
     onClose();
   };
 
+  const handleSelectBoard = (targetBoardId) => {
+    const prevBoardId = task.boardId || 'main';
+    dispatch(updateTask({ taskId: task.id, boardId: targetBoardId }));
+    const targetBoard = boards.find(b => b.id === targetBoardId);
+    const boardName = targetBoard ? (targetBoard.name === 'Main' ? t('Main') : targetBoard.name) : t('Board');
+    
+    showToast(
+      `${t('Moved to')} ${boardName}`,
+      t('Undo'),
+      () => {
+        dispatch(updateTask({ taskId: task.id, boardId: prevBoardId, isUndo: true }));
+      }
+    );
+  };
+
+  const handleMoveTaskDate = (direction) => {
+    const today = dayjs().startOf('day');
+    const taskDate = task.completionDate ? dayjs(task.completionDate).startOf('day') : today;
+    let newDate;
+
+    if (direction === 'forward') {
+      if (taskDate.isBefore(today)) {
+        newDate = today.toISOString();
+      } else if (taskDate.isSame(today)) {
+        newDate = today.add(1, 'day').toISOString();
+      } else if (taskDate.isSame(today.add(1, 'day'))) {
+        newDate = today.endOf('isoWeek').toISOString();
+      } else if (taskDate.isBefore(today.add(1, 'week').startOf('isoWeek'))) {
+        newDate = today.add(1, 'week').startOf('isoWeek').toISOString();
+      } else {
+        newDate = today.add(2, 'week').startOf('isoWeek').toISOString();
+      }
+    } else {
+      // backward
+      if (taskDate.isAfter(today.add(1, 'week').startOf('isoWeek'))) {
+        newDate = today.add(1, 'week').startOf('isoWeek').toISOString();
+      } else if (taskDate.isAfter(today.endOf('isoWeek'))) {
+        newDate = today.endOf('isoWeek').toISOString();
+      } else if (taskDate.isAfter(today.add(1, 'day'))) {
+        newDate = today.add(1, 'day').toISOString();
+      } else if (taskDate.isSame(today.add(1, 'day'))) {
+        newDate = today.toISOString();
+      } else {
+        newDate = today.subtract(1, 'day').toISOString();
+      }
+    }
+
+    const prevDate = task.completionDate;
+    dispatch(updateTask({ taskId: task.id, completionDate: newDate }));
+    onClose();
+    showToast(
+      direction === 'forward' ? t('Task moved forward') : t('Task moved backward'),
+      t('Undo'),
+      () => {
+        dispatch(updateTask({ taskId: task.id, completionDate: prevDate, isUndo: true }));
+      }
+    );
+  };
+
   const actionItems = [
     { label: t('Edit'), icon: IconEdit, onPress: () => { onClose(); onPressEdit(task); } },
     { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
+    { label: t('Move Forward'), icon: IconMoveForward, onPress: () => handleMoveTaskDate('forward') },
+    { label: t('Move Backward'), icon: IconMoveBackward, onPress: () => handleMoveTaskDate('backward') },
+    { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 300); } },
     { label: t('Snooze'), icon: IconSnooze, onPress: () => { onClose(); onPressSnooze(task); } },
     { label: t('Duplicate'), icon: IconDuplicate, onPress: handleDuplicate },
     { label: t('Share'), icon: IconShare, onPress: handleShare },
@@ -217,6 +303,7 @@ export default function TaskQuickMenuModal({
   ];
 
   return (
+    <>
     <Modal
       isVisible={isVisible}
       onSwipeComplete={onClose}
@@ -252,6 +339,16 @@ export default function TaskQuickMenuModal({
         </ScrollView>
       </View>
     </Modal>
+    <MoveBoardModal
+      isVisible={isMoveBoardVisible}
+      onClose={() => setMoveBoardVisible(false)}
+      onSelectBoard={handleSelectBoard}
+      boards={boards}
+      currentBoardId={task?.boardId || 'main'}
+      taskCount={1}
+      colors={colors}
+    />
+    </>
   );
 }
 

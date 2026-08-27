@@ -11,6 +11,7 @@ import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
 import SnoozeModal from '../components/SnoozeModal';
 import PremiumModal from '../components/PremiumModal';
 import ConfirmModal from '../components/ConfirmModal';
+import MoveBoardModal from '../components/MoveBoardModal';
 import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +40,7 @@ export default function CalendarScreen() {
   const [selectionMode, setSelectionMode] = useState({ isActive: false, selectedTaskIds: [] });
   const [sortConfig, setSortConfig] = useState('time'); // 'time' or 'priority'
   const [collapsedBoardIds, setCollapsedBoardIds] = useState([]);
+  const [isMoveBoardVisible, setMoveBoardVisible] = useState(false);
 
   const toggleBoardCollapse = (boardId) => {
     setCollapsedBoardIds(prev =>
@@ -304,6 +306,21 @@ export default function CalendarScreen() {
   };
 
   // Prepare marked dates
+  const handleBatchMoveBoard = (targetBoardId) => {
+    const selectedIds = [...selectionMode.selectedTaskIds];
+    if (selectedIds.length === 0) return;
+    
+    selectedIds.forEach(id => {
+      dispatch(updateTask({ taskId: id, boardId: targetBoardId }));
+    });
+    
+    const targetBoard = boards.find(b => b.id === targetBoardId);
+    const boardName = targetBoard ? (targetBoard.name === 'Main' ? t('Main') : targetBoard.name) : t('Board');
+    setSelectionMode({ isActive: false, selectedTaskIds: [] });
+    
+    showToast(`${t('Moved')} ${selectedIds.length} ${t('Tasks to')} ${boardName}`);
+  };
+
   const markedDates = useMemo(() => {
     const todayStr = dayjs().format('YYYY-MM-DD');
     const marks = {};
@@ -678,6 +695,9 @@ export default function CalendarScreen() {
             <TouchableOpacity onPress={handleSelectAll} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => setMoveBoardVisible(true)} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Move')}</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleShareSelected} style={styles.actionBtn}>
               <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>{t('Share')}</Text>
             </TouchableOpacity>
@@ -702,6 +722,15 @@ export default function CalendarScreen() {
         isDestructive={confirmConfig.isDestructive}
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
         onConfirm={confirmConfig.onConfirm}
+      />
+
+      <MoveBoardModal
+        isVisible={isMoveBoardVisible}
+        onClose={() => setMoveBoardVisible(false)}
+        onSelectBoard={handleBatchMoveBoard}
+        boards={boards}
+        taskCount={selectionMode.selectedTaskIds.length}
+        colors={colors}
       />
     </View>
   );

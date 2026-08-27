@@ -152,6 +152,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const themeState = useSelector(state => state.themeReducer);
+  const boards = useSelector(state => state.userReducer.boards || []);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const scrollViewRef = useRef(null);
   const notesRef = useRef(null);
@@ -170,6 +171,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [selectedTime, setSelectedTime] = useState(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [reminder, setReminder] = useState('None');
+  const [selectedBoardId, setSelectedBoardId] = useState('main');
   const [isAlarm, setIsAlarm] = useState(false);
   const [repeatConfig, setRepeatConfig] = useState({ preset: 'None' });
   const [isRepeatModalVisible, setIsRepeatModalVisible] = useState(false);
@@ -255,6 +257,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     
     setSubtasks(task.subtasks || []);
     setPriority((task.priority || 'none').toLowerCase());
+    setSelectedBoardId(task.boardId || 'main');
     setSelectedDate(task.completionDate || '');
 
     // Saved user time or null.
@@ -455,6 +458,7 @@ useEffect(() => {
     if (selectedTime !== (task.time || '')) updates.time = selectedTime;
     if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
     if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
+    if (selectedBoardId !== (task.boardId || 'main')) updates.boardId = selectedBoardId;
     
     const initialConfig = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
     const repeatConfigChanged = JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig);
@@ -1062,27 +1066,38 @@ useEffect(() => {
 
             <View style={styles.threeColumnRow}>
               <View style={styles.column}>
+                <CustomDropdown
+                  label={t("BOARD")}
+                  value={boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))}
+                  options={boards.length > 0 ? boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id })) : [{ label: t('Main'), value: 'main' }]}
+                  onSelect={setSelectedBoardId}
+                  colors={colors}
+                  customBtnStyle={{ height: 46, borderRadius: 8 }}
+                />
+              </View>
+              <View style={styles.column}>
                 <CustomDropdown label={t("PRIORITY")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
                 <CustomDropdown label={t("REMINDER")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
-              {isPremium && (
-                <View style={styles.column}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('REPEAT')}</Text>
-                  <TouchableOpacity 
-                    style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 8 }]}
-                    onPress={() => setIsRepeatModalVisible(true)}
-                  >
-                    <Text style={{ color: colors.textPrimary }}>
-                      {repeatConfig.preset === 'custom' ? t('Custom...') : 
-                       repeatConfig.preset === 'None' ? t('None') : 
-                       repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
             </View>
+
+            {isPremium && (
+              <View style={{ marginTop: 15 }}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('REPEAT')}</Text>
+                <TouchableOpacity 
+                  style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 8 }]}
+                  onPress={() => setIsRepeatModalVisible(true)}
+                >
+                  <Text style={{ color: colors.textPrimary }}>
+                    {repeatConfig.preset === 'custom' ? t('Custom...') : 
+                     repeatConfig.preset === 'None' ? t('None') : 
+                     repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {isPremium && reminder !== 'None' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 15 }}>
