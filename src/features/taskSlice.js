@@ -105,6 +105,7 @@ const taskSlice = createSlice({
                 task.completionDate = completionDate !== undefined ? completionDate : task.completionDate;
                 task.time = time !== undefined ? time : task.time;
                 task.reminder = action.payload.reminder !== undefined ? action.payload.reminder : task.reminder;
+                if (action.payload.boardId !== undefined) task.boardId = action.payload.boardId;
                 if (action.payload.isAlarm !== undefined) task.isAlarm = action.payload.isAlarm;
                 task.notificationId = action.payload.notificationId !== undefined ? action.payload.notificationId : task.notificationId;
                 if (action.payload.recurringSeriesId !== undefined) task.recurringSeriesId = action.payload.recurringSeriesId;
@@ -143,6 +144,7 @@ const taskSlice = createSlice({
                         if (updates.priority !== undefined) updated.priority = updates.priority;
                         if (updates.time !== undefined) updated.time = updates.time;
                         if (updates.reminder !== undefined) updated.reminder = updates.reminder;
+                        if (updates.boardId !== undefined) updated.boardId = updates.boardId;
                         if (updates.isAlarm !== undefined) updated.isAlarm = updates.isAlarm;
                         if (updates.description !== undefined) {
                             updated.description = {
