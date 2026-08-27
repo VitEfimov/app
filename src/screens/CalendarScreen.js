@@ -38,6 +38,15 @@ export default function CalendarScreen() {
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
   const [selectionMode, setSelectionMode] = useState({ isActive: false, selectedTaskIds: [] });
   const [sortConfig, setSortConfig] = useState('time'); // 'time' or 'priority'
+  const [collapsedBoardIds, setCollapsedBoardIds] = useState([]);
+
+  const toggleBoardCollapse = (boardId) => {
+    setCollapsedBoardIds(prev =>
+      prev.includes(boardId)
+        ? prev.filter(id => id !== boardId)
+        : [...prev, boardId]
+    );
+  };
 
   // Custom Bottom Sheet State
   const MIN_Y = 0; // Fully expanded (covers calendar)
@@ -422,22 +431,28 @@ export default function CalendarScreen() {
 
   const groupedTasks = useMemo(() => {
     if (!selectedTasks.length) return [];
-    if (boards.length < 2) return [{ title: '', data: selectedTasks }];
+    if (boards.length < 2) return [{ id: 'main', title: '', totalCount: selectedTasks.length, data: selectedTasks }];
     
     const groups = {};
-    groups['main'] = { title: 'Main', data: [] };
+    groups['main'] = { id: 'main', title: 'Main', data: [] };
     
     selectedTasks.forEach(task => {
        const bId = task.boardId || 'main';
        if (!groups[bId]) {
           const boardName = boards.find(b => b.id === bId)?.name || 'Board';
-          groups[bId] = { title: boardName, data: [] };
+          groups[bId] = { id: bId, title: boardName, data: [] };
        }
        groups[bId].data.push(task);
     });
     
-    return Object.values(groups).filter(g => g.data.length > 0);
-  }, [selectedTasks, boards]);
+    const activeGroups = Object.values(groups).filter(g => g.data.length > 0);
+    return activeGroups.map(g => ({
+      id: g.id,
+      title: g.title,
+      totalCount: g.data.length,
+      data: collapsedBoardIds.includes(g.id) ? [] : g.data,
+    }));
+  }, [selectedTasks, boards, collapsedBoardIds]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
@@ -529,11 +544,29 @@ export default function CalendarScreen() {
                 }}
               />
             )}
-            renderSectionHeader={({ section: { title } }) => (
-              title ? (
-                <View style={[styles.sectionHeader, { backgroundColor: colors.bgCard }]}>
-                  <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>{title}</Text>
-                </View>
+            renderSectionHeader={({ section }) => (
+              section.title ? (
+                <TouchableOpacity
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Toggle ${section.title} board tasks`}
+                  style={[styles.sectionHeader, { backgroundColor: colors.bgCard, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                  onPress={() => toggleBoardCollapse(section.id)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
+                      {section.title === 'Main' ? t('Main') : section.title}
+                    </Text>
+                    <View style={{ backgroundColor: colors.surfaceContainerHigh, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 8 }}>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
+                        {section.totalCount}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 'bold' }}>
+                    {collapsedBoardIds.includes(section.id) ? '▶' : '▼'}
+                  </Text>
+                </TouchableOpacity>
               ) : null
             )}
             contentContainerStyle={styles.listContent}

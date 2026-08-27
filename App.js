@@ -208,7 +208,7 @@ function InitApp() {
               completed: false,
               priority: 'none',
               completionDate: dayjs(dateFormatted).toISOString(),
-              reminder: themeState?.defaultReminderEnabled ? (themeState?.defaultReminderTime || '09:00') : null
+              reminder: themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null
             });
           }
         }
