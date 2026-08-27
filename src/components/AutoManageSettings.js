@@ -179,7 +179,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
             </Text>
             {boardId && (
               <Text style={{ fontSize: 12, color: colors.primary, marginTop: 2, fontWeight: 'bold' }}>
-                {localSettings.overrideGlobal !== false ? t('⚡ Custom Board Automation (Overrides Main)') : t('Using Main Global Automation')}
+                {localSettings.overrideGlobal !== false ? t('Custom Board Automation (Overrides Main)') : t('Using Main Global Automation')}
               </Text>
             )}
           </View>

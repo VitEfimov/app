@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask } from '../features/taskSlice';
 import { rescheduleAllActiveTasks } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -379,6 +379,34 @@ export default function SettingsScreen({ navigation }) {
               layout="horizontal"
             />
           </View>
+          <View style={[styles.rowItem, { borderBottomWidth: 1 }]}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Default Reminder for New Tasks')}</Text>
+            <Switch
+              value={theme.defaultReminderEnabled || false}
+              onValueChange={val => dispatch(setDefaultReminderEnabled(val))}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
+            />
+          </View>
+          {theme.defaultReminderEnabled && (
+            <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+              <CustomDropdown 
+                label={t("Default Reminder Time")} 
+                value={theme.defaultReminderTime || '09:00'} 
+                options={[
+                  { label: '07:00', value: '07:00' },
+                  { label: '08:00', value: '08:00' },
+                  { label: '09:00', value: '09:00' },
+                  { label: '10:00', value: '10:00' },
+                  { label: '12:00', value: '12:00' },
+                  { label: '18:00', value: '18:00' },
+                  { label: '20:00', value: '20:00' }
+                ]} 
+                onSelect={val => dispatch(setDefaultReminderTime(val))} 
+                colors={colors}
+                layout="horizontal"
+              />
+            </View>
+          )}
           <TouchableOpacity 
             style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12 }]}
             onPress={() => {

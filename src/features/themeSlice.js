@@ -60,6 +60,10 @@ const initialState = {
   // Security
   appPin: loaded?.appPin || null,
 
+  // Default Reminder Settings for New Tasks
+  defaultReminderEnabled: loaded?.defaultReminderEnabled || false,
+  defaultReminderTime: loaded?.defaultReminderTime || '09:00',
+
   // Per-Board Automations Map
   boardAutomations: loaded?.boardAutomations || {}
 };
@@ -242,6 +246,14 @@ const themeSlice = createSlice({
     setAndroidAutoEnabled: (state, action) => {
       state.androidAutoEnabled = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setDefaultReminderEnabled: (state, action) => {
+      state.defaultReminderEnabled = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setDefaultReminderTime: (state, action) => {
+      state.defaultReminderTime = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
@@ -251,7 +263,7 @@ export const {
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
   setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
-  setShowRecurringTasksOnBoard, setAndroidAutoEnabled
+  setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime
 } = themeSlice.actions;
 
 export default themeSlice.reducer;

@@ -421,5 +421,8 @@
   "⚡ Custom Board Automation (Overrides Main)": "⚡ Custom Board Automation (Overrides Main)",
   "Using Main Global Automation": "Using Main Global Automation",
   "Override Main Automation for this Board": "Override Main Automation for this Board",
-  "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.": "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board."
+  "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.": "When enabled, custom automation rules specified for this board take priority and main global automation will not apply to tasks on this board.",
+  "Custom Board Automation (Overrides Main)": "Custom Board Automation (Overrides Main)",
+  "Default Reminder for New Tasks": "Default Reminder for New Tasks",
+  "Default Reminder Time": "Default Reminder Time"
 }

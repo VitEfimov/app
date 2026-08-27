@@ -163,24 +163,28 @@ export default function PomodoroScreen() {
     const body = localIsBreak ? 'Time to get back to work.' : 'Take a short break.';
 
     const currentSound = localIsBreak ? breakSoundKey : workSoundKey;
-    const shouldBeSilent = currentSound !== 'default';
+    // On Android, the native Pomodoro alarm channel already plays the configured audio sound.
+    // Setting isSilent = true suppresses the secondary device notification sound!
+    const shouldBeSilent = Platform.OS === 'android' || currentSound !== 'default';
 
     import('../utils/notifications').then(({ scheduleLocalNotification }) => {
-      // Pass isSilent=true ONLY if they chose a custom sound or 'none'. 
-      // If 'default', we want the system sound to play normally!
       scheduleLocalNotification(title, body, 1, shouldBeSilent);
     });
 
     if (localIsBreak) {
       dispatch(completeBreakInterval());
-      playAudio(breakSoundKey);
+      if (Platform.OS !== 'android') {
+        playAudio(breakSoundKey);
+      }
 
       if (localCompletedIntervals + 1 >= staticIntervalCountRef.current) {
         dispatch(resetTimer());
       }
     } else {
       dispatch(completeWorkInterval(pomodoro.initialTime));
-      playAudio(workSoundKey);
+      if (Platform.OS !== 'android') {
+        playAudio(workSoundKey);
+      }
     }
   };
 

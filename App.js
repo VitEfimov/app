@@ -22,7 +22,7 @@ import i18n from './src/i18n';
 import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
 import AutomaticCleanupModal from './src/components/AutomaticCleanupModal';
 import { useShareIntent } from 'expo-share-intent';
-import { addTask, updateTask } from './src/features/taskSlice';
+import { addTask, updateTask, addMultipleTasks } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
 import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId, attachNotificationDiagnostics } from './src/utils/notifications';
 import dayjs from 'dayjs';
@@ -162,6 +162,66 @@ function InitApp() {
 
       const text = shareIntent.value || shareIntent.text || shareIntent.description || '';
       if (typeof text === 'string' && text.trim().length > 0) {
+        const textLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const structuredTasks = [];
+
+        // Regex to match tabular or space-separated date entries:
+        // e.g. "23\t01\t.1988\tЖена", "24\t08\t\tБабушка", "01\t24\t\tНаталья Лысенкова", "15/05/2024 Party"
+        const lineRegex = /^(\d{1,2})[\s\t\.\/]+(\d{1,2})(?:[\s\t\.\/]+\.?(\d{2,4}))?[\s\t]+(.+)$/;
+
+        for (let i = 0; i < textLines.length; i++) {
+          const l = textLines[i];
+          const m = l.match(lineRegex);
+          if (m) {
+            let p1 = parseInt(m[1], 10);
+            let p2 = parseInt(m[2], 10);
+            let yearStr = m[3];
+            const title = m[4].trim();
+
+            let day, month;
+            if (p1 > 12 && p2 <= 12) {
+              day = p1;
+              month = p2;
+            } else if (p2 > 12 && p1 <= 12) {
+              day = p2;
+              month = p1;
+            } else {
+              day = p1;
+              month = p2;
+            }
+
+            let year = dayjs().year();
+            if (yearStr) {
+              let y = parseInt(yearStr, 10);
+              if (y < 100) y += y > 50 ? 1900 : 2000;
+              year = y;
+            }
+
+            const dObj = dayjs(`${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`);
+            let dateFormatted = dObj.isValid() ? dObj.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
+
+            structuredTasks.push({
+              id: (Date.now() + i).toString(),
+              taskname: title.slice(0, 100),
+              description: { text: '', img: '', url: '' },
+              subtasks: [],
+              completed: false,
+              priority: 'none',
+              completionDate: dayjs(dateFormatted).toISOString(),
+              reminder: themeState?.defaultReminderEnabled ? (themeState?.defaultReminderTime || '09:00') : null
+            });
+          }
+        }
+
+        if (structuredTasks.length > 0) {
+          dispatch(addMultipleTasks({ tasks: structuredTasks }));
+          resetShareIntent();
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('Board', { editTaskId: structuredTasks[0].id });
+          }
+          return;
+        }
+
         const lines = text.split('\n');
         let hasFoundSubtasks = false;
         let remainingLines = [];

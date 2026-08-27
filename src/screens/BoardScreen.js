@@ -555,9 +555,6 @@ export default function BoardScreen({ route, navigation }) {
                       styles.mainTabText, 
                       { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
                     ]}>{board.name === 'Main' ? t('Main') : board.name}</Text>
-                    {boardAutomations[board.id] && boardAutomations[board.id].overrideGlobal !== false && (
-                      <Text style={{ fontSize: 10, marginLeft: 4 }} title="Custom Board Automation Active">⚡</Text>
-                    )}
                     {(() => {
                       const count = tasks.filter(t => (t.boardId || 'main') === board.id && !t.completed).length;
                       if (count > 0) {
@@ -728,7 +725,7 @@ export default function BoardScreen({ route, navigation }) {
               }, 300);
             }}
           >
-            <Text style={[styles.optionText, { color: colors.primary, fontWeight: 'bold' }]}>⚡ {t('Board Automations')}</Text>
+            <Text style={[styles.optionText, { color: colors.primary, fontWeight: 'bold' }]}>{t('Board Automations')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Rename board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setPromptConfig({ isVisible: true, type: 'rename', targetBoard: boardOptionsConfig.board }); setBoardOptionsConfig({ isVisible: false, board: null }); }}>

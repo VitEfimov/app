@@ -223,19 +223,31 @@ const syncRecurringAutomations = (getState) => {
 };
 
 export const addTask = (payload) => async (dispatch, getState) => {
+    const state = getState();
+    const themeState = state.themeReducer;
+    if (themeState?.defaultReminderEnabled && payload?.task && !payload.task.reminder) {
+        payload.task.reminder = themeState.defaultReminderTime || '09:00';
+    }
     dispatch(addTaskSync(payload)); 
     const tasks = getState().taskReducer.tasks;
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
     syncRecurringAutomations(getState);
-    // dispatch(addTaskAsync(payload.task)); 
 };
 
 export const addMultipleTasks = (payload) => async (dispatch, getState) => {
+    const state = getState();
+    const themeState = state.themeReducer;
+    if (themeState?.defaultReminderEnabled && Array.isArray(payload?.tasks)) {
+        payload.tasks.forEach(task => {
+            if (task && !task.reminder) {
+                task.reminder = themeState.defaultReminderTime || '09:00';
+            }
+        });
+    }
     dispatch(addMultipleTasksSync(payload));
     const tasks = getState().taskReducer.tasks;
     await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
     syncRecurringAutomations(getState);
-    // dispatch(addMultipleTasksAsync(payload.tasks));
 };
 
 export const deleteTask = (payload) => async (dispatch, getState) => {
