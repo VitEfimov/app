@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import RangeNavigator from '../components/statistics/RangeNavigator';
 import FreeOverviewSection from '../components/statistics/FreeOverviewSection';
 import PremiumAnalyticsContainer from '../components/statistics/PremiumAnalyticsContainer';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function StatisticsScreen() {
   const { colors, isDark } = useTheme();
@@ -19,20 +20,21 @@ export default function StatisticsScreen() {
 
   const [viewMode, setViewMode] = useState('week'); // 'week', 'month', 'year'
   const [currentDate, setCurrentDate] = useState(dayjs());
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null });
 
   const handleClearStats = () => {
-    Alert.alert(
-      t("Clear Statistics"),
-      t("Are you sure you want to clear all your statistics? This cannot be undone."),
-      [
-        { text: t("Cancel"), style: "cancel" },
-        { 
-          text: t("Clear"), 
-          style: "destructive",
-          onPress: () => dispatch(clearStats())
-        }
-      ]
-    );
+    setConfirmConfig({
+      isVisible: true,
+      title: t("Clear Statistics"),
+      message: t("Are you sure you want to clear all your statistics? This cannot be undone."),
+      confirmText: t("Clear"),
+      cancelText: t("Cancel"),
+      isDestructive: true,
+      onConfirm: () => {
+        dispatch(clearStats());
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+      }
+    });
   };
 
   const handlePrev = () => {
@@ -91,6 +93,17 @@ export default function StatisticsScreen() {
       >
         <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Clear Statistics')}</Text>
       </TouchableOpacity>
+
+      <ConfirmModal
+        isVisible={confirmConfig.isVisible}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        isDestructive={confirmConfig.isDestructive}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
+      />
 
       <View style={{ height: 40 }} />
     </ScrollView>

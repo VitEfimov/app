@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDeviceLanguage } from '../i18n';
+import ConfirmModal from './ConfirmModal';
 
 // const PREDEFINED_COLORS = [
 //   '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
@@ -53,6 +54,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   const [tempImage, setTempImage] = useState(currentUserPicture);
   const [tempThemeMode, setTempThemeMode] = useState(currentThemeMode || 'system');
   const [tempRandomColorDaily, setTempRandomColorDaily] = useState(currentRandomColorDaily || false);
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
 
   useEffect(() => {
     if (isVisible) {
@@ -66,7 +68,14 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to upload an image.');
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Permission needed') || 'Permission needed',
+        message: t('Sorry, we need camera roll permissions to upload an image.') || 'Sorry, we need camera roll permissions to upload an image.',
+        confirmText: t('OK'),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
       return;
     }
 
@@ -106,23 +115,22 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   };
 
   const handleReset = () => {
-    Alert.alert(
-      t("Reset Defaults"),
-      t("Are you sure you want to reset all theme settings to defaults?"),
-      [
-        { text: t("Cancel"), style: "cancel" },
-        { 
-          text: t("Reset"), 
-          style: "destructive",
-          onPress: () => {
-            dispatch(resetTheme());
-            AsyncStorage.removeItem('appLanguage');
-            i18n.changeLanguage(getDeviceLanguage());
-            onClose();
-          }
-        }
-      ]
-    );
+    setConfirmConfig({
+      isVisible: true,
+      title: t("Reset Defaults"),
+      message: t("Are you sure you want to reset all theme settings to defaults?"),
+      confirmText: t("Reset"),
+      cancelText: t("Cancel"),
+      isDestructive: true,
+      hideCancel: false,
+      onConfirm: () => {
+        dispatch(resetTheme());
+        AsyncStorage.removeItem('appLanguage');
+        i18n.changeLanguage(getDeviceLanguage());
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        onClose();
+      }
+    });
   };
 
   return (
@@ -263,6 +271,17 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
             </TouchableOpacity>
           </View>
 
+          <ConfirmModal
+            isVisible={confirmConfig.isVisible}
+            title={confirmConfig.title}
+            message={confirmConfig.message}
+            confirmText={confirmConfig.confirmText}
+            cancelText={confirmConfig.cancelText}
+            isDestructive={confirmConfig.isDestructive}
+            hideCancel={confirmConfig.hideCancel}
+            onConfirm={confirmConfig.onConfirm}
+            onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
+          />
       </View>
     </Modal>
   );

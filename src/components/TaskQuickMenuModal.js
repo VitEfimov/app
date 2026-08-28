@@ -78,26 +78,24 @@ const IconMoveBackward = ({ color }) => (
 );
 
 import MoveBoardModal from './MoveBoardModal';
+import ConfirmModal from './ConfirmModal';
+import RNShare from 'react-native-share';
 
-let RNShare;
-if (Platform.OS !== 'web') {
-  RNShare = require('react-native-share').default;
-}
-
-export default function TaskQuickMenuModal({ 
-  isVisible, 
-  onClose, 
-  task, 
-  colors, 
-  isDark,
-  onPressEdit,
-  onPressSnooze
+export default function TaskQuickMenuModal({
+  isVisible,
+  onClose,
+  task,
+  onEdit,
+  onSnooze,
+  onMoveForward,
+  onMoveBackward,
 }) {
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const { showToast } = useToast();
   const boards = useSelector(state => state.userReducer.boards || []);
   const [isMoveBoardVisible, setMoveBoardVisible] = React.useState(false);
+  const [confirmConfig, setConfirmConfig] = React.useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
 
   if (!task) return null;
 
@@ -179,56 +177,73 @@ export default function TaskQuickMenuModal({
       if (attachments.length > 0 && Platform.OS !== 'web') {
         await Clipboard.setStringAsync(message);
         
-        Alert.alert(
-          t('Sharing with Attachments'),
-          t('Task text copied to clipboard! You can paste it into your message after selecting where to share.'),
-          [
-            { text: t('Cancel'), style: 'cancel' },
-            {
-              text: t('Continue'),
-              onPress: async () => {
-                try {
-                  const urlsToShare = await prepareAttachmentsForShare(attachments);
-                  
-                  if (urlsToShare.length === 0) {
-                    return;
-                  }
+        setConfirmConfig({
+          isVisible: true,
+          title: t('Sharing with Attachments'),
+          message: t('Task text copied to clipboard! You can paste it into your message after selecting where to share.'),
+          confirmText: t('Continue'),
+          cancelText: t('Cancel'),
+          hideCancel: false,
+          onConfirm: async () => {
+            setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+            try {
+              const urlsToShare = await prepareAttachmentsForShare(attachments);
+              if (urlsToShare.length === 0) return;
 
-                  requestAnimationFrame(async () => {
-                    try {
-                      if (Platform.OS === 'android') {
-                        await shareTaskAsync(message, urlsToShare);
-                      } else {
-                        await RNShare.open({
-                          urls: urlsToShare,
-                          type: '*/*',
-                          title: t('Share Task'),
-                          failOnCancel: false
-                        });
-                      }
-                    } catch (err) {
-                      if (err.message !== 'User did not share') {
-                        Alert.alert("Error sharing", err.message);
-                      }
-                    }
-                  });
+              requestAnimationFrame(async () => {
+                try {
+                  if (Platform.OS === 'android') {
+                    await shareTaskAsync(message, urlsToShare);
+                  } else {
+                    await RNShare.open({
+                      urls: urlsToShare,
+                      type: '*/*',
+                      title: t('Share Task'),
+                      failOnCancel: false
+                    });
+                  }
                 } catch (err) {
-                  Alert.alert("Error sharing", err.message);
+                  if (err.message !== 'User did not share') {
+                    setConfirmConfig({
+                      isVisible: true,
+                      title: t("Error sharing") || "Error sharing",
+                      message: err.message,
+                      confirmText: t("OK"),
+                      hideCancel: true,
+                      onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+                    });
+                  }
                 }
-              }
+              });
+            } catch (err) {
+              setConfirmConfig({
+                isVisible: true,
+                title: t("Error sharing") || "Error sharing",
+                message: err.message,
+                confirmText: t("OK"),
+                hideCancel: true,
+                onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+              });
             }
-          ]
-        );
+          }
+        });
       } else {
         await Share.share({
           message,
           title: t('Share Task')
         });
+        onClose();
       }
     } catch (error) {
-      Alert.alert(error.message);
+      setConfirmConfig({
+        isVisible: true,
+        title: t("Error") || "Error",
+        message: error.message,
+        confirmText: t("OK"),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
     }
-    onClose();
   };
 
   const handleSelectBoard = (targetBoardId) => {
@@ -347,6 +362,17 @@ export default function TaskQuickMenuModal({
       currentBoardId={task?.boardId || 'main'}
       taskCount={1}
       colors={colors}
+    />
+    <ConfirmModal
+      isVisible={confirmConfig.isVisible}
+      title={confirmConfig.title}
+      message={confirmConfig.message}
+      confirmText={confirmConfig.confirmText}
+      cancelText={confirmConfig.cancelText}
+      isDestructive={confirmConfig.isDestructive}
+      hideCancel={confirmConfig.hideCancel}
+      onConfirm={confirmConfig.onConfirm}
+      onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
     />
     </>
   );

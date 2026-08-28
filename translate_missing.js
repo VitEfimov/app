@@ -50,7 +50,7 @@ async function run() {
       const currentVal = data[key];
       const enVal = enData[key] || key;
       
-      const needsTranslation = !currentVal || (currentVal === key && lang !== 'en' && key !== 'Android Auto Integration' && key !== 'PIN');
+      const needsTranslation = !currentVal || (currentVal === key && lang !== 'en' && key !== 'PIN');
       
       if (needsTranslation) {
         console.log(`Translating '${key}' to ${lang}...`);

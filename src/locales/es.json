@@ -412,7 +412,7 @@
   "Set PIN": "Establecer PIN",
   "Enter a 4-digit PIN": "Ingrese un PIN de 4 dígitos",
   "Clear": "Claro",
-  "Android Auto Integration": "Android Auto Integration",
+  "Android Auto Integration": "Integración automática de Android",
   "Board Automation": "Automatización de tableros",
   "Board Automations": "Automatizaciones de tablero",
   "Custom Board Automation (Overrides Main)": "Automatización de tablero personalizada (Anula la principal)",
@@ -434,6 +434,6 @@
   "Are you sure you want to move all tasks in": "¿Está seguro de que desea mover todas las tareas a",
   "forward": "adelante",
   "backward": "hacia atrás",
-  "Default Reminder Option": "Default Reminder Option",
-  "Select Year": "Select Year"
+  "Default Reminder Option": "Opción de recordatorio predeterminada",
+  "Select Year": "Seleccionar año"
 }

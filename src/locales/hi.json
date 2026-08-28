@@ -412,7 +412,7 @@
   "Set PIN": "पिन सेट करें",
   "Enter a 4-digit PIN": "4 अंकों का पिन दर्ज करें",
   "Clear": "स्पष्ट",
-  "Android Auto Integration": "Android Auto Integration",
+  "Android Auto Integration": "एंड्रॉइड ऑटो एकीकरण",
   "Board Automation": "बोर्ड स्वचालन",
   "Board Automations": "बोर्ड स्वचालन",
   "Custom Board Automation (Overrides Main)": "कस्टम बोर्ड स्वचालन (मुख्य को ओवरराइड करता है)",
@@ -434,6 +434,6 @@
   "Are you sure you want to move all tasks in": "क्या आप वाकई सभी कार्यों को स्थानांतरित करना चाहते हैं?",
   "forward": "आगे",
   "backward": "पिछड़ा",
-  "Default Reminder Option": "Default Reminder Option",
-  "Select Year": "Select Year"
+  "Default Reminder Option": "डिफ़ॉल्ट अनुस्मारक विकल्प",
+  "Select Year": "वर्ष चुनें"
 }

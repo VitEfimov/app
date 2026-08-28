@@ -867,12 +867,26 @@ useEffect(() => {
         if (isAvailable) {
           await Sharing.shareAsync(uri);
         } else {
-          Alert.alert(t('Error'), t('Sharing is not available on this device'));
+          setConfirmConfig({
+            isVisible: true,
+            title: t('Error'),
+            message: t('Sharing is not available on this device'),
+            confirmText: t('OK'),
+            hideCancel: true,
+            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+          });
         }
       }
     } catch (e) {
       console.error(e);
-      Alert.alert(t('Error'), t('Could not open document.'));
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Error'),
+        message: t('Could not open document.'),
+        confirmText: t('OK'),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
     }
   };
 

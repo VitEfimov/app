@@ -94,6 +94,7 @@ export default function SettingsScreen({ navigation }) {
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [saveAlertVisible, setSaveAlertVisible] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
   const currentSoundRef = useRef(null);
 
   const languageOptions = [
@@ -214,26 +215,38 @@ export default function SettingsScreen({ navigation }) {
       dispatch(setAppPin(pin));
       setPinPromptVisible(false);
     } else {
-      Alert.alert('Invalid PIN', 'Please enter at least 4 digits.');
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Invalid PIN') || 'Invalid PIN',
+        message: t('Please enter at least 4 digits.') || 'Please enter at least 4 digits.',
+        confirmText: t('OK'),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
     }
   };
 
   const handleDeleteData = () => {
-    Alert.alert(
-      t("Delete All Data"),
-      t("Are you sure you want to clear all your tasks? This action cannot be undone."),
-      [
-        { text: t("Cancel"), style: "cancel" },
-        { 
-          text: t("Delete"), 
-          style: "destructive",
-          onPress: () => {
-            dispatch(clearTasks());
-            Alert.alert(t('Deleted'), t('All tasks have been cleared.'));
-          }
-        }
-      ]
-    );
+    setConfirmConfig({
+      isVisible: true,
+      title: t('Delete All Data'),
+      message: t('Are you sure you want to clear all your tasks? This action cannot be undone.'),
+      confirmText: t('Delete'),
+      cancelText: t('Cancel'),
+      isDestructive: true,
+      hideCancel: false,
+      onConfirm: () => {
+        dispatch(clearTasks());
+        setConfirmConfig({
+          isVisible: true,
+          title: t('Deleted'),
+          message: t('All tasks have been cleared.'),
+          confirmText: t('OK'),
+          hideCancel: true,
+          onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+        });
+      }
+    });
   };
 
   const handleSave = () => {
@@ -513,6 +526,17 @@ export default function SettingsScreen({ navigation }) {
         isVisible={isPremiumModalVisible}
         onClose={() => setPremiumModalVisible(false)}
         featureName="Android Auto Integration"
+      />
+      <ConfirmModal
+        isVisible={confirmConfig.isVisible}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        isDestructive={confirmConfig.isDestructive}
+        hideCancel={confirmConfig.hideCancel}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
       />
     </View>
   );

@@ -4,6 +4,8 @@ import { useTheme } from '../styles/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
 
+import ConfirmModal from '../components/ConfirmModal';
+
 const IconBackspace = ({ color }) => (
   <Svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none">
     <Path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" />
@@ -15,13 +17,18 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [pin, setPin] = useState('');
+  const [alertConfig, setAlertConfig] = useState({ isVisible: false, title: '', message: '' });
 
   useEffect(() => {
     if (pin.length === 4) {
       if (pin === correctPin) {
         onUnlock();
       } else {
-        Alert.alert(t('Incorrect PIN'), t('Please try again.'));
+        setAlertConfig({
+          isVisible: true,
+          title: t('Incorrect PIN'),
+          message: t('Please try again.')
+        });
         setPin('');
       }
     }
@@ -91,6 +98,16 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
           );
         })}
       </View>
+
+      <ConfirmModal
+        isVisible={alertConfig.isVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText={t('OK')}
+        hideCancel={true}
+        onConfirm={() => setAlertConfig({ isVisible: false, title: '', message: '' })}
+        onCancel={() => setAlertConfig({ isVisible: false, title: '', message: '' })}
+      />
     </View>
   );
 }

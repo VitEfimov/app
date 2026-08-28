@@ -473,7 +473,14 @@ export default function BoardScreen({ route, navigation }) {
   const handleAddBoard = () => {
     const boardLimit = isAuthenticated ? 6 : 2;
     if (boards.length >= boardLimit) {
-      Alert.alert('Limit Reached', `You have reached the maximum number of boards (${boardLimit}).`);
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Limit Reached') || 'Limit Reached',
+        message: `${t('You have reached the maximum number of boards')} (${boardLimit}).`,
+        confirmText: t('OK'),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
       return;
     }
     setPromptConfig({ isVisible: true, type: 'add', targetBoard: null });
