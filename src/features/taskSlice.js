@@ -102,6 +102,10 @@ const taskSlice = createSlice({
                 task.taskname = name !== undefined ? name : task.taskname;
                 task.priority = priority !== undefined ? priority : task.priority;
                 task.completed = completed !== undefined ? completed : task.completed;
+                if (task.completed) {
+                  task.isNagMode = false;
+                  task.escalationLevel = 'none';
+                }
                 task.completionDate = completionDate !== undefined ? completionDate : task.completionDate;
                 task.time = time !== undefined ? time : task.time;
                 task.reminder = action.payload.reminder !== undefined ? action.payload.reminder : task.reminder;

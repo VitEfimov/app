@@ -383,8 +383,16 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         </View>
 
         {/* Indicators under task name */}
-        {(hasSubtasks || hasNotes || (task.time && task.time.trim() !== '') || isRepeatingTask) ? (
+        {(hasSubtasks || hasNotes || (task.time && task.time.trim() !== '') || isRepeatingTask || (task.completionDate && dayjs(task.completionDate).year() !== dayjs().year())) ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12, paddingHorizontal: 8 }}>
+            {task.completionDate && dayjs(task.completionDate).year() !== dayjs().year() ? (
+              <View style={[styles.subtaskBadge, { backgroundColor: `${colors.primary}15`, borderColor: colors.primary, marginBottom: 0 }]}>
+                <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
+                  {dayjs(task.completionDate).format('YYYY')}
+                </Text>
+              </View>
+            ) : null}
+
             {isRepeatingTask ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                 <IconRepeat color={colors.primary} />
@@ -415,9 +423,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
       {(!hideDate && task.completionDate) ? (
         <View style={styles.metadata}>
           <Text style={[styles.date, { color: colors.textPrimary }]}>
-            {dayjs(task.completionDate).year() !== dayjs().year() 
-              ? dayjs(task.completionDate).format('MMM D, YYYY') 
-              : dayjs(task.completionDate).format('MMM D')}
+            {dayjs(task.completionDate).format('MMM D')}
           </Text>
         </View>
       ) : null}

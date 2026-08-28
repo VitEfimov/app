@@ -279,7 +279,13 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       task.repeatEndDate || ''
     );
 
-    setReminder(task.reminder || 'None');
+    let initialReminder = task.reminder || 'None';
+    if (task.isNagMode) {
+      initialReminder = 'Nag Mode (Every 10 min)';
+    } else if (task.escalationLevel === 'active') {
+      initialReminder = 'Escalating Reminder';
+    }
+    setReminder(initialReminder);
     setIsAlarm(task.isAlarm || false);
   }
 }, [isVisible, task?.id]);
@@ -481,7 +487,9 @@ useEffect(() => {
     if (isAlarmChanged) updates.isAlarm = isAlarm;
 
     if (timeChanged || dateChanged || reminderChanged || isAlarmChanged || nameChanged) {
-      if (reminder !== (task.reminder || 'None')) updates.reminder = reminder;
+      updates.reminder = reminder;
+      updates.isNagMode = reminder === 'Nag Mode (Every 10 min)';
+      updates.escalationLevel = reminder === 'Escalating Reminder' ? 'active' : 'none';
       // Schedule new notifications
       if (task.notificationId) {
         await cancelNotification(task.notificationId);
@@ -618,6 +626,16 @@ useEffect(() => {
     } else {
       onClose();
     }
+  };
+
+  const handleReminderSelect = (selectedVal) => {
+    setReminder(selectedVal);
+    let updates = { 
+      reminder: selectedVal, 
+      isNagMode: selectedVal === 'Nag Mode (Every 10 min)', 
+      escalationLevel: selectedVal === 'Escalating Reminder' ? 'active' : 'none' 
+    };
+    handleUpdate(updates);
   };
 
   const handleNameBlur = () => {
@@ -982,10 +1000,9 @@ useEffect(() => {
       isVisible={isVisible} 
       onSwipeComplete={handleClose}
       swipeDirection={scrollOffset > 0 ? undefined : ['down']}
-      swipeThreshold={200}
       onBackdropPress={handleClose}
       onBackButtonPress={handleClose}
-      propagateSwipe={false}
+      propagateSwipe={true}
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
@@ -1086,7 +1103,23 @@ useEffect(() => {
                 <CustomDropdown label={t("PRIORITY")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
-                <CustomDropdown label={t("REMINDER")} value={reminder} options={[{label: t('None'), value: 'None'}, {label: t('15 min before'), value: '15 min before'}, {label: t('30 min before'), value: '30 min before'}, {label: t('1 hr before'), value: '1 hr before'}, {label: t('1 day before'), value: '1 day before'}, {label: t('Day of'), value: 'Day of'}]} onSelect={setReminder} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown 
+                  label={t("REMINDER")} 
+                  value={reminder === 'Nag Mode (Every 10 min)' ? t('Nag Mode (Every 10 min)') : reminder === 'Escalating Reminder' ? t('Escalating Reminder') : (t(reminder) || reminder)} 
+                  options={[
+                    {label: t('None'), value: 'None'}, 
+                    {label: t('15 min before'), value: '15 min before'}, 
+                    {label: t('30 min before'), value: '30 min before'}, 
+                    {label: t('1 hr before'), value: '1 hr before'}, 
+                    {label: t('1 day before'), value: '1 day before'}, 
+                    {label: t('Day of'), value: 'Day of'},
+                    {label: t('Nag Mode (Every 10 min)'), value: 'Nag Mode (Every 10 min)'},
+                    {label: t('Escalating Reminder'), value: 'Escalating Reminder'}
+                  ]} 
+                  onSelect={handleReminderSelect} 
+                  colors={colors} 
+                  customBtnStyle={{ height: 46, borderRadius: 8 }} 
+                />
               </View>
             </View>
 
@@ -1110,30 +1143,6 @@ useEffect(() => {
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 15 }}>
                 <Switch value={isAlarm} onValueChange={setIsAlarm} trackColor={{ true: colors.primary }} />
                 <Text style={{ color: colors.textPrimary, marginLeft: 8, fontWeight: 'bold' }}>{t('Play Reminder as Alarm')}</Text>
-              </View>
-            )}
-
-            {isPremium && (
-              <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, marginTop: 15 }]}>
-                <Text style={[styles.repeatConfigTitle, { color: '#FFD700' }]}>★ {t('PRO FEATURES')}</Text>
-                
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>{t('Nag Mode (Every 10 min)')}</Text>
-                  <Switch 
-                    value={!!task.isNagMode} 
-                    onValueChange={(val) => handleUpdate({ isNagMode: val })} 
-                    trackColor={{ true: colors.primary }} 
-                  />
-                </View>
-
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>{t('Escalating Reminder')}</Text>
-                  <Switch 
-                    value={task.escalationLevel === 'active'} 
-                    onValueChange={(val) => handleUpdate({ escalationLevel: val ? 'active' : 'none' })} 
-                    trackColor={{ true: colors.primary }} 
-                  />
-                </View>
               </View>
             )}
 
