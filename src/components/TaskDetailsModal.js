@@ -183,7 +183,6 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null, hideCancel: false, cancelText: '' });
   const { generateRepeatingTasks } = useTaskRepeat();
 
-  const [datePickerType, setDatePickerType] = useState(null);
   const [selectedFullscreenImage, setSelectedFullscreenImage] = useState(null);
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
