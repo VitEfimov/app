@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask } from '../features/taskSlice';
@@ -108,6 +108,17 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   const [editName, setEditName] = useState(task.taskname);
   const [cursorSelection, setCursorSelection] = useState(null);
   const swipeableRef = useRef(null);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      if (editName.trim() !== '' && editName !== task.taskname) {
+        dispatch(updateTask({ taskId: task.id, name: editName }));
+      }
+      setIsEditing(false);
+    });
+    return () => hideSub.remove();
+  }, [isEditing, editName, task, dispatch]);
 
   const handleTextPress = () => {
     if (isSelectionMode) {
@@ -404,7 +415,9 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
       {(!hideDate && task.completionDate) ? (
         <View style={styles.metadata}>
           <Text style={[styles.date, { color: colors.textPrimary }]}>
-            {dayjs(task.completionDate).format('MMM D')}
+            {dayjs(task.completionDate).year() !== dayjs().year() 
+              ? dayjs(task.completionDate).format('MMM D, YYYY') 
+              : dayjs(task.completionDate).format('MMM D')}
           </Text>
         </View>
       ) : null}

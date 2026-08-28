@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask } from '../features/taskSlice';
 import { useToast } from '../styles/ToastContext';
+import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -91,6 +92,7 @@ export default function TaskQuickMenuModal({
   onMoveBackward,
 }) {
   const { t } = useTranslation();
+  const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const { showToast } = useToast();
   const boards = useSelector(state => state.userReducer.boards || []);

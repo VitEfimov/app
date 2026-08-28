@@ -982,9 +982,10 @@ useEffect(() => {
       isVisible={isVisible} 
       onSwipeComplete={handleClose}
       swipeDirection={scrollOffset > 0 ? undefined : ['down']}
+      swipeThreshold={200}
       onBackdropPress={handleClose}
       onBackButtonPress={handleClose}
-      propagateSwipe={true}
+      propagateSwipe={false}
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
@@ -1080,17 +1081,7 @@ useEffect(() => {
               </View>
             </View>
 
-            <View style={styles.threeColumnRow}>
-              <View style={styles.column}>
-                <CustomDropdown
-                  label={t("BOARD")}
-                  value={boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))}
-                  options={boards.length > 0 ? boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id })) : [{ label: t('Main'), value: 'main' }]}
-                  onSelect={setSelectedBoardId}
-                  colors={colors}
-                  customBtnStyle={{ height: 46, borderRadius: 8 }}
-                />
-              </View>
+            <View style={styles.twoColumnRow}>
               <View style={styles.column}>
                 <CustomDropdown label={t("PRIORITY")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
@@ -1119,6 +1110,30 @@ useEffect(() => {
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 15 }}>
                 <Switch value={isAlarm} onValueChange={setIsAlarm} trackColor={{ true: colors.primary }} />
                 <Text style={{ color: colors.textPrimary, marginLeft: 8, fontWeight: 'bold' }}>{t('Play Reminder as Alarm')}</Text>
+              </View>
+            )}
+
+            {isPremium && (
+              <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, marginTop: 15 }]}>
+                <Text style={[styles.repeatConfigTitle, { color: '#FFD700' }]}>★ {t('PRO FEATURES')}</Text>
+                
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>{t('Nag Mode (Every 10 min)')}</Text>
+                  <Switch 
+                    value={!!task.isNagMode} 
+                    onValueChange={(val) => handleUpdate({ isNagMode: val })} 
+                    trackColor={{ true: colors.primary }} 
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>{t('Escalating Reminder')}</Text>
+                  <Switch 
+                    value={task.escalationLevel === 'active'} 
+                    onValueChange={(val) => handleUpdate({ escalationLevel: val ? 'active' : 'none' })} 
+                    trackColor={{ true: colors.primary }} 
+                  />
+                </View>
               </View>
             )}
 
@@ -1309,7 +1324,7 @@ useEffect(() => {
           <View style={styles.calendarOverlay}>
             <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
               <Calendar
-                key={i18n.language}
+                key={`${datePickerType === 'due' ? (selectedDate || dayjs().format('YYYY-MM-DD')) : datePickerType === 'repeatStart' ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD')) : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))}-${i18n.language}`}
                 markingType={'custom'}
                 firstDay={i18n.language === 'en' ? 0 : 1}
                 current={
@@ -1617,26 +1632,33 @@ const styles = StyleSheet.create({
   },
   attachmentItem: {
     marginRight: 15,
+    paddingTop: 6,
+    paddingRight: 6,
     position: 'relative'
   },
   attachmentThumb: {
-    width: 80,
-    height: 80,
+    width: 72,
+    height: 72,
     borderRadius: 8,
     resizeMode: 'cover'
   },
   attachmentRemoveBtn: {
     position: 'absolute',
-    top: -5,
-    right: -5,
+    top: 0,
+    right: 0,
     backgroundColor: '#f44336',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
+    borderRadius: 11,
+    width: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff'
+    borderColor: '#fff',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   fullscreenImageOverlay: {
     flex: 1,

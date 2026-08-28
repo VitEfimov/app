@@ -236,7 +236,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         <View style={styles.modalOverlay}>
           <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
             <Calendar
-              key={i18n.language}
+              key={`${selectedDate}-${i18n.language}`}
               markingType={'custom'}
               firstDay={i18n.language === 'en' ? 0 : 1}
               current={selectedDate}

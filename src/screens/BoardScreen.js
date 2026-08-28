@@ -440,6 +440,18 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleDeleteSection = (section) => {
+    let tasksToDelete = [];
+    switch (section.id) {
+      case 'missed': tasksToDelete = missedTasks; break;
+      case 'today': tasksToDelete = todayTasks; break;
+      case 'tomorrow': tasksToDelete = tomorrowTasks; break;
+      case 'on-this-week': tasksToDelete = thisWeekTasks; break;
+      case 'on-next-week': tasksToDelete = nextWeekTasks; break;
+      case 'later': tasksToDelete = laterTasks; break;
+      case 'completed': tasksToDelete = completedTasks; break;
+      default: tasksToDelete = section.data || [];
+    }
+
     setConfirmConfig({
       isVisible: true,
       title: 'Delete All',
@@ -447,7 +459,6 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: 'Delete',
       isDestructive: true,
       onConfirm: () => {
-        const tasksToDelete = [...section.data];
         tasksToDelete.forEach(task => {
           dispatch(deleteTask({ taskId: task.id }));
         });
@@ -651,7 +662,13 @@ export default function BoardScreen({ route, navigation }) {
             task={item} 
             isSelectionMode={selectionMode.isActive}
             isSelected={selectionMode.selectedTaskIds.includes(item.id)}
-            onToggleSelect={() => toggleTaskSelection(item.id)}
+            onToggleSelect={() => {
+              if (!selectionMode.isActive) {
+                setSelectionMode({ isActive: true, sectionId: section.id, selectedTaskIds: [item.id] });
+              } else {
+                toggleTaskSelection(item.id);
+              }
+            }}
             onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
             onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
             onPress={() => {

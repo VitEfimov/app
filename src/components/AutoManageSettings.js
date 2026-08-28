@@ -157,9 +157,9 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
     <Modal
       isVisible={isVisible}
       onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      swipeThreshold={100}
-      propagateSwipe={true}
+      swipeDirection={scrollOffset > 0 ? undefined : ['down']}
+      swipeThreshold={200}
+      propagateSwipe={false}
       onBackdropPress={onClose}
       onBackButtonPress={onClose}
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}

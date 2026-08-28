@@ -478,7 +478,7 @@ export default function CalendarScreen() {
       <View onLayout={handleCalendarLayout}>
         <Calendar
           testID="task_calendar"
-          key={`${colors.bgMain}-${isDark}-${i18n.language}`}
+          key={`${selectedDate}-${colors.bgMain}-${isDark}-${i18n.language}`}
           markingType={'custom'}
           current={selectedDate}
           firstDay={i18n.language === 'en' ? 0 : 1}
@@ -572,7 +572,13 @@ export default function CalendarScreen() {
                 testIDPrefix="calendar_"
                 isSelectionMode={selectionMode.isActive}
                 isSelected={selectionMode.selectedTaskIds.includes(item.id)}
-                onToggleSelect={() => toggleTaskSelection(item.id)}
+                onToggleSelect={() => {
+                  if (!selectionMode.isActive) {
+                    setSelectionMode({ isActive: true, selectedTaskIds: [item.id] });
+                  } else {
+                    toggleTaskSelection(item.id);
+                  }
+                }}
                 onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
                 onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
                 onPress={() => {
