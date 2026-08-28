@@ -8,6 +8,7 @@ import Svg, { Path } from 'react-native-svg';
 import { Calendar } from 'react-native-calendars';
 import getFilters from '../utils/filters';
 import { useTranslation } from 'react-i18next';
+import YearPickerModal from './YearPickerModal';
 
 const IconPlus = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -27,6 +28,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   const setIsEditing = onToggle ? onToggle : setInternalIsEditing;
   const [taskName, setTaskName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isYearPickerVisible, setYearPickerVisible] = useState(false);
   const [inputHeight, setInputHeight] = useState(46);
   const inputRef = useRef(null);
   
@@ -243,6 +245,25 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
                 setShowDatePicker(false);
               }}
               markedDates={getCalendarMarkedDates()}
+              enableSwipeMonths={true}
+              renderHeader={(date) => {
+                const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
+                const monthStr = dateObj.format('MMMM YYYY');
+                return (
+                  <TouchableOpacity
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select year`}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
+                    onPress={() => setYearPickerVisible(true)}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
+                      {monthStr}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
+                  </TouchableOpacity>
+                );
+              }}
               theme={{
                 backgroundColor: colors.bgCard,
                 calendarBackground: colors.bgCard,
@@ -273,6 +294,17 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
           </View>
         </View>
       </Modal>
+
+      <YearPickerModal
+        isVisible={isYearPickerVisible}
+        onClose={() => setYearPickerVisible(false)}
+        currentYear={dayjs(selectedDate).year()}
+        onSelectYear={(year) => {
+          const newDate = dayjs(selectedDate).year(year).format('YYYY-MM-DD');
+          setSelectedDate(newDate);
+        }}
+        colors={colors}
+      />
     </React.Fragment>
   );
 }

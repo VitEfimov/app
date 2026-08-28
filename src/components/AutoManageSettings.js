@@ -218,9 +218,9 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
             <RadioButton label={t('Next Workday')} selected={autoTransferMode === 'next_workday'} onPress={() => handleUpdate({ autoTransferMode: 'next_workday' })} />
             <RadioButton label={t('Never')} selected={autoTransferMode === 'none'} onPress={() => handleUpdate({ autoTransferMode: 'none' })} />
             {(autoTransferMode === 'tomorrow' || autoTransferMode === 'next_workday' || autoTransferMode === 'today') && (
-              <View style={{ marginTop: 10, paddingHorizontal: 10 }}>
-                <Text style={[styles.subText, { color: colors.textSecondary }]}>{t('Auto-reschedule time')}</Text>
-                <TouchableOpacity onPress={() => setTimePickerTarget('autoReschedule')} style={{ paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.surfaceContainerHigh, alignSelf: 'flex-start' }}>
+              <View style={{ paddingHorizontal: 15, paddingTop: 6, paddingBottom: 10, alignItems: 'flex-start' }}>
+                <Text style={[styles.subText, { color: colors.textSecondary, marginBottom: 6 }]}>{t('Auto-reschedule time')}</Text>
+                <TouchableOpacity onPress={() => setTimePickerTarget('autoReschedule')} style={{ paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.surfaceContainerHigh }}>
                   <Text style={{ color: colors.textPrimary }}>{formatDisplayTime(autoRescheduleTime)}</Text>
                 </TouchableOpacity>
               </View>

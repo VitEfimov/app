@@ -12,6 +12,7 @@ import SnoozeModal from '../components/SnoozeModal';
 import PremiumModal from '../components/PremiumModal';
 import ConfirmModal from '../components/ConfirmModal';
 import MoveBoardModal from '../components/MoveBoardModal';
+import YearPickerModal from '../components/YearPickerModal';
 import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +42,7 @@ export default function CalendarScreen() {
   const [sortConfig, setSortConfig] = useState('time'); // 'time' or 'priority'
   const [collapsedBoardIds, setCollapsedBoardIds] = useState([]);
   const [isMoveBoardVisible, setMoveBoardVisible] = useState(false);
+  const [isYearPickerVisible, setYearPickerVisible] = useState(false);
 
   const toggleBoardCollapse = (boardId) => {
     setCollapsedBoardIds(prev =>
@@ -486,6 +488,24 @@ export default function CalendarScreen() {
           }}
           markedDates={markedDates}
           enableSwipeMonths={true}
+          renderHeader={(date) => {
+            const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
+            const monthStr = dateObj.format('MMMM YYYY');
+            return (
+              <TouchableOpacity
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`Select year`}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
+                onPress={() => setYearPickerVisible(true)}
+              >
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
+                  {monthStr}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
+              </TouchableOpacity>
+            );
+          }}
           theme={{
             backgroundColor: colors.bgMain,
             calendarBackground: colors.bgMain,
@@ -730,6 +750,17 @@ export default function CalendarScreen() {
         onSelectBoard={handleBatchMoveBoard}
         boards={boards}
         taskCount={selectionMode.selectedTaskIds.length}
+        colors={colors}
+      />
+
+      <YearPickerModal
+        isVisible={isYearPickerVisible}
+        onClose={() => setYearPickerVisible(false)}
+        currentYear={dayjs(selectedDate).year()}
+        onSelectYear={(year) => {
+          const newDate = dayjs(selectedDate).year(year).format('YYYY-MM-DD');
+          setSelectedDate(newDate);
+        }}
         colors={colors}
       />
     </View>

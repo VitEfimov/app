@@ -26,6 +26,7 @@ import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
 import { takePhotoAsync, shareTaskAsync, openDocumentAsync as nativeOpenDocumentAsync } from '../../modules/expo-task-alarm';
 import CustomDropdown from './CustomDropdown';
 import CustomRepeatModal from './CustomRepeatModal';
+import YearPickerModal from './YearPickerModal';
 import ConfirmModal from './ConfirmModal';
 import { useTranslation } from 'react-i18next';
 
@@ -167,6 +168,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [subtasks, setSubtasks] = useState(task ? (task.subtasks || []) : []);
   const [priority, setPriority] = useState('none');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerType, setDatePickerType] = useState('due');
+  const [isYearPickerVisible, setYearPickerVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -1305,6 +1308,30 @@ useEffect(() => {
                 }
                 onDayPress={(day) => handleDateSelect(day.dateString)}
                 markedDates={getCalendarMarkedDates()}
+                enableSwipeMonths={true}
+                renderHeader={(date) => {
+                  const currentDateVal = datePickerType === 'due' 
+                    ? (selectedDate || dayjs().format('YYYY-MM-DD'))
+                    : datePickerType === 'repeatStart'
+                    ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+                    : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'));
+                  const dateObj = dayjs(date ? (date.dateString || date.toString()) : currentDateVal);
+                  const monthStr = dateObj.format('MMMM YYYY');
+                  return (
+                    <TouchableOpacity
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select year`}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
+                      onPress={() => setYearPickerVisible(true)}
+                    >
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
+                        {monthStr}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
+                    </TouchableOpacity>
+                  );
+                }}
                 theme={{
                   backgroundColor: colors.bgCard,
                   calendarBackground: colors.bgCard,
@@ -1349,6 +1376,31 @@ useEffect(() => {
             </View>
           </View>
         </RNModal>
+
+        <YearPickerModal
+          isVisible={isYearPickerVisible}
+          onClose={() => setYearPickerVisible(false)}
+          currentYear={dayjs(
+            datePickerType === 'due' 
+              ? (selectedDate || dayjs().format('YYYY-MM-DD'))
+              : datePickerType === 'repeatStart'
+              ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+              : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+          ).year()}
+          onSelectYear={(year) => {
+            if (datePickerType === 'due') {
+              const newDate = dayjs(selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
+              setSelectedDate(newDate);
+            } else if (datePickerType === 'repeatStart') {
+              const newDate = dayjs(repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
+              setRepeatStartDate(newDate);
+            } else if (datePickerType === 'repeatEnd') {
+              const newDate = dayjs(repeatEndDate || repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
+              setRepeatEndDate(newDate);
+            }
+          }}
+          colors={colors}
+        />
 
         <RNModal visible={!!selectedFullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setSelectedFullscreenImage(null)}>
           <View style={styles.fullscreenImageOverlay}>
