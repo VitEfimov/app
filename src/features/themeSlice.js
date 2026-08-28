@@ -62,7 +62,7 @@ const initialState = {
 
   // Default Reminder Settings for New Tasks
   defaultReminderEnabled: loaded?.defaultReminderEnabled || false,
-  defaultReminderTime: loaded?.defaultReminderTime || '09:00',
+  defaultReminderTime: loaded?.defaultReminderTime || '15 min before',
 
   // Per-Board Automations Map
   boardAutomations: loaded?.boardAutomations || {}

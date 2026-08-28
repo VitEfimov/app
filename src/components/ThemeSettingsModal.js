@@ -202,6 +202,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
                 ))}
               </View>
 
+              {/* Accent Color custom input hidden for now
               {isPremium && (
                 <View style={styles.customColorRow}>
                   <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Accent Color')}</Text>
@@ -214,6 +215,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
                   />
                 </View>
               )}
+              */}
 
               <View style={[styles.customColorRow, { marginTop: 15 }]}>
                 <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Randomize daily')}</Text>

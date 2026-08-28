@@ -227,8 +227,8 @@ const syncRecurringAutomations = (getState) => {
 export const addTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     const themeState = state.themeReducer;
-    if (themeState?.defaultReminderEnabled && payload?.task && !payload.task.reminder) {
-        payload.task.reminder = themeState.defaultReminderTime || '09:00';
+    if (themeState?.defaultReminderEnabled && payload?.task && (!payload.task.reminder || payload.task.reminder === 'None')) {
+        payload.task.reminder = themeState.defaultReminderTime || '15 min before';
     }
     dispatch(addTaskSync(payload)); 
     const tasks = getState().taskReducer.tasks;
@@ -241,8 +241,8 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     const themeState = state.themeReducer;
     if (themeState?.defaultReminderEnabled && Array.isArray(payload?.tasks)) {
         payload.tasks.forEach(task => {
-            if (task && !task.reminder) {
-                task.reminder = themeState.defaultReminderTime || '09:00';
+            if (task && (!task.reminder || task.reminder === 'None')) {
+                task.reminder = themeState.defaultReminderTime || '15 min before';
             }
         });
     }

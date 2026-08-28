@@ -326,6 +326,33 @@ export default function SettingsScreen({ navigation }) {
         {/* Notifications Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Notifications')}</Text>
         <View style={styles.sectionGroup}>
+          <View style={[styles.rowItem, { borderBottomWidth: 1 }]}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Default Reminder for New Tasks')}</Text>
+            <Switch
+              value={theme.defaultReminderEnabled || false}
+              onValueChange={val => dispatch(setDefaultReminderEnabled(val))}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
+            />
+          </View>
+          {theme.defaultReminderEnabled && (
+            <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+              <CustomDropdown 
+                label={t("Default Reminder Option")} 
+                value={theme.defaultReminderTime ? t(theme.defaultReminderTime) : t('15 min before')} 
+                options={[
+                  { label: t('None'), value: 'None' },
+                  { label: t('15 min before'), value: '15 min before' },
+                  { label: t('30 min before'), value: '30 min before' },
+                  { label: t('1 hr before'), value: '1 hr before' },
+                  { label: t('1 day before'), value: '1 day before' },
+                  { label: t('Day of'), value: 'Day of' }
+                ]} 
+                onSelect={val => dispatch(setDefaultReminderTime(val))} 
+                colors={colors}
+                layout="horizontal"
+              />
+            </View>
+          )}
           <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
             <CustomDropdown 
               label={t("Notification Sound")} 
@@ -369,7 +396,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ false: colors.borderColor, true: colors.primary }}
             />
           </View>
-          <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+          <View style={[styles.dropdownRow, { borderBottomWidth: 0 }]}>
             <CustomDropdown 
               label={t("Default Snooze")} 
               value={defaultSnoozeTime} 
@@ -379,33 +406,20 @@ export default function SettingsScreen({ navigation }) {
               layout="horizontal"
             />
           </View>
-          <View style={[styles.rowItem, { borderBottomWidth: 1 }]}>
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Default Reminder for New Tasks')}</Text>
-            <Switch
-              value={theme.defaultReminderEnabled || false}
-              onValueChange={val => dispatch(setDefaultReminderEnabled(val))}
-              trackColor={{ false: colors.borderColor, true: colors.primary }}
-            />
-          </View>
-          {theme.defaultReminderEnabled && (
-            <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
-              <CustomDropdown 
-                label={t("Default Reminder Time")} 
-                value={theme.defaultReminderTime || '09:00'} 
-                options={[
-                  { label: '07:00', value: '07:00' },
-                  { label: '08:00', value: '08:00' },
-                  { label: '09:00', value: '09:00' },
-                  { label: '10:00', value: '10:00' },
-                  { label: '12:00', value: '12:00' },
-                  { label: '18:00', value: '18:00' },
-                  { label: '20:00', value: '20:00' }
-                ]} 
-                onSelect={val => dispatch(setDefaultReminderTime(val))} 
-                colors={colors}
-                layout="horizontal"
-              />
-            </View>
+        </View>
+
+        {/* Automation & Integrations Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
+        <View style={styles.sectionGroup}>
+          {isPremium && (
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
+              style={[styles.rowItem, { borderBottomWidth: 1 }]} 
+              onPress={() => setAutoManageModalVisible(true)}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
+              <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
+            </TouchableOpacity>
           )}
           <TouchableOpacity 
             style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12 }]}
@@ -433,23 +447,6 @@ export default function SettingsScreen({ navigation }) {
             )}
           </TouchableOpacity>
         </View>
-
-        {/* Automation Section */}
-        {isPremium && (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
-            <View style={styles.sectionGroup}>
-              <TouchableOpacity 
-                accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
-                style={[styles.rowItem, { borderBottomWidth: 0 }]} 
-                onPress={() => setAutoManageModalVisible(true)}
-              >
-                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
-                <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
 
         {/* Account Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Account')}</Text>

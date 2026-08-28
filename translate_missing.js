@@ -6,10 +6,9 @@ const localesDir = path.join(__dirname, 'src', 'locales');
 const enFilePath = path.join(localesDir, 'en.json');
 
 function translate(text, targetLang) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (targetLang === 'en') return resolve(text);
     
-    // Minor lang mapping
     if (targetLang === 'zh') targetLang = 'zh-CN';
     
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
@@ -20,12 +19,17 @@ function translate(text, targetLang) {
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          resolve(json[0][0][0] || text);
+          if (json && json[0] && Array.isArray(json[0])) {
+            const fullTranslated = json[0].map(item => item[0]).filter(Boolean).join('');
+            resolve(fullTranslated || text);
+          } else {
+            resolve(text);
+          }
         } catch (e) {
-          resolve(text); // fallback to English on error
+          resolve(text);
         }
       });
-    }).on('error', (e) => {
+    }).on('error', () => {
       resolve(text);
     });
   });
@@ -43,9 +47,14 @@ async function run() {
     
     let updated = false;
     for (const key of enKeys) {
-      if (!data[key]) {
+      const currentVal = data[key];
+      const enVal = enData[key] || key;
+      
+      const needsTranslation = !currentVal || (currentVal === key && lang !== 'en' && key !== 'Android Auto Integration' && key !== 'PIN');
+      
+      if (needsTranslation) {
         console.log(`Translating '${key}' to ${lang}...`);
-        const translated = await translate(enData[key] || key, lang);
+        const translated = await translate(enVal, lang);
         data[key] = translated;
         updated = true;
       }
