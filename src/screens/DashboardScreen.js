@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, PanResponder } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { setProgressMode } from '../features/themeSlice';
@@ -9,6 +9,8 @@ import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
 import Svg, { Circle, Path } from 'react-native-svg';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from '@react-navigation/native';
+import { processAutoManageTasks } from '../features/taskSlice';
 
 const IconLeft = ({ color }) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,6 +33,12 @@ export default function DashboardScreen({ navigation }) {
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(processAutoManageTasks());
+    }, [dispatch])
+  );
 
   const FILTERS = getFilters();
   

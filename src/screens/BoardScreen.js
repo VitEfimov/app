@@ -19,10 +19,11 @@ import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path } from 'react-native-svg';
-import { updateTask, deleteTask, addTask, deleteTasksByBoard } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed } from '../features/themeSlice';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
 
@@ -93,6 +94,12 @@ export default function BoardScreen({ route, navigation }) {
       setCollapsedSections(allSectionIds.filter(id => id !== route.params.sectionId));
     }
   }, [route?.params?.sectionId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(processAutoManageTasks());
+    }, [dispatch])
+  );
 
   useEffect(() => {
     if (route?.params?.editTaskId) {

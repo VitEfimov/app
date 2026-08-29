@@ -6,7 +6,7 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import store from './src/store';
 import AppNavigator from './src/navigation/AppNavigator';
-import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, AppState } from 'react-native';
 
 import { hydrateUserState } from './src/features/userSlice';
 import { hydrateThemeState } from './src/features/themeSlice';
@@ -439,6 +439,19 @@ function InitApp() {
       }
     };
     loadStorage();
+  }, [dispatch]);
+
+  useEffect(() => {
+    const handleAppStateChange = async (nextAppState) => {
+      if (nextAppState === 'active') {
+        const { processAutoManageTasks } = require('./src/features/taskSlice');
+        await dispatch(processAutoManageTasks());
+      }
+    };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
   }, [dispatch]);
 
   useEffect(() => {

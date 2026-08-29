@@ -324,15 +324,35 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         // Check if board has custom automation override
         const taskBoardId = task.boardId || 'main';
         const boardCustom = boardAutomations[taskBoardId];
-        const isOverride = boardCustom && boardCustom.overrideGlobal !== false;
+        const isOverride = !!(boardCustom && boardCustom.overrideGlobal === true);
 
-        const effectiveAutoTransferMode = isOverride ? boardCustom.autoTransferMode : globalSettings.autoTransferMode;
-        const effectiveIncreasePriorityWhenOverdue = isOverride ? boardCustom.increasePriorityWhenOverdue : globalSettings.increasePriorityWhenOverdue;
-        const effectivePriorityFrequency = isOverride ? boardCustom.priorityFrequency : globalSettings.priorityFrequency;
-        const effectiveRemovePriorityWhenCompleted = isOverride ? boardCustom.removePriorityWhenCompleted : globalSettings.removePriorityWhenCompleted;
-        const effectiveAutoDeleteOverdueDays = isOverride ? (boardCustom.autoDeleteOverdueDays !== undefined ? boardCustom.autoDeleteOverdueDays : 0) : globalSettings.autoDeleteOverdueDays;
-        const effectiveAutoDeleteCompletedDays = isOverride ? (boardCustom.autoDeleteCompletedDays !== undefined ? boardCustom.autoDeleteCompletedDays : 0) : globalSettings.autoDeleteCompletedDays;
-        const effectiveAutoRescheduleTime = isOverride ? (boardCustom.autoRescheduleTime || '09:00') : globalSettings.autoRescheduleTime;
+        const effectiveAutoTransferMode = (isOverride && boardCustom?.autoTransferMode !== undefined) 
+            ? boardCustom.autoTransferMode 
+            : globalSettings.autoTransferMode;
+            
+        const effectiveIncreasePriorityWhenOverdue = (isOverride && boardCustom?.increasePriorityWhenOverdue !== undefined) 
+            ? boardCustom.increasePriorityWhenOverdue 
+            : globalSettings.increasePriorityWhenOverdue;
+            
+        const effectivePriorityFrequency = (isOverride && boardCustom?.priorityFrequency !== undefined) 
+            ? boardCustom.priorityFrequency 
+            : globalSettings.priorityFrequency;
+            
+        const effectiveRemovePriorityWhenCompleted = (isOverride && boardCustom?.removePriorityWhenCompleted !== undefined) 
+            ? boardCustom.removePriorityWhenCompleted 
+            : globalSettings.removePriorityWhenCompleted;
+            
+        const effectiveAutoDeleteOverdueDays = (isOverride && boardCustom?.autoDeleteOverdueDays !== undefined) 
+            ? boardCustom.autoDeleteOverdueDays 
+            : globalSettings.autoDeleteOverdueDays;
+            
+        const effectiveAutoDeleteCompletedDays = (isOverride && boardCustom?.autoDeleteCompletedDays !== undefined) 
+            ? boardCustom.autoDeleteCompletedDays 
+            : globalSettings.autoDeleteCompletedDays;
+            
+        const effectiveAutoRescheduleTime = (isOverride && boardCustom?.autoRescheduleTime !== undefined) 
+            ? boardCustom.autoRescheduleTime 
+            : globalSettings.autoRescheduleTime;
 
         const [rescheduleHour, rescheduleMinute] = (effectiveAutoRescheduleTime || '00:00').split(':').map(Number);
         const rescheduleTimeToday = dayjs().hour(rescheduleHour || 0).minute(rescheduleMinute || 0).second(0).millisecond(0);
