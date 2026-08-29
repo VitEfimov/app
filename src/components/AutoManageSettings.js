@@ -72,7 +72,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
     if (isVisible) {
       if (boardId) {
         const boardCustom = themeState.boardAutomations?.[boardId];
-        setLocalSettings(boardCustom || { ...defaultSettings, overrideGlobal: true });
+        setLocalSettings(boardCustom || { ...themeState, overrideGlobal: false });
       } else {
         setLocalSettings(themeState || defaultSettings);
       }
@@ -178,7 +178,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
             </Text>
             {boardId && (
               <Text style={{ fontSize: 12, color: colors.primary, marginTop: 2, fontWeight: 'bold' }}>
-                {localSettings.overrideGlobal !== false ? t('Custom Board Automation (Overrides Main)') : t('Using Main Global Automation')}
+                {localSettings.overrideGlobal === true ? t('Custom Board Automation (Overrides Main)') : t('Using Main Global Automation')}
               </Text>
             )}
           </View>
@@ -199,7 +199,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
             <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer, padding: 12, marginBottom: 15, borderRadius: 10, borderWidth: 1, borderColor: colors.primary }]}>
               <SettingToggle 
                 label={t('Override Main Automation for this Board')}
-                value={localSettings.overrideGlobal !== false}
+                value={localSettings.overrideGlobal === true}
                 onValueChange={(val) => handleUpdate({ overrideGlobal: val })}
               />
               <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 6 }}>
