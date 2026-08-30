@@ -45,22 +45,31 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
   const formatDisplayTime = (timeStr) => {
     if (!timeStr || timeStr === '--:--') return '--:--';
     try {
-      const [h, m] = timeStr.split(':');
-      if (!h || !m || isNaN(h) || isNaN(m)) return timeStr;
-      
-      const is24Hour = Localization.getCalendars()[0]?.uses24hourClock ?? false;
-      let hour = parseInt(h, 10);
+      const str = String(timeStr).trim();
+      const isPmStr = /pm/i.test(str);
+      const isAmStr = /am/i.test(str);
+      const cleanStr = str.replace(/(am|pm)/i, '').trim();
+      const parts = cleanStr.split(':');
+      if (parts.length < 2) return timeStr;
+
+      let hour = parseInt(parts[0], 10);
+      let minute = parseInt(parts[1], 10);
+      if (isNaN(hour) || isNaN(minute)) return timeStr;
+
+      if (isPmStr && hour < 12) hour += 12;
+      if (isAmStr && hour === 12) hour = 0;
+
+      const is24Hour = Localization.getCalendars?.()?.[0]?.uses24hourClock ?? false;
       let ampm = '';
-      
+
       if (!is24Hour) {
         ampm = hour >= 12 ? ' PM' : ' AM';
         if (hour > 12) hour -= 12;
         if (hour === 0) hour = 12;
+        return `${hour}:${minute.toString().padStart(2, '0')}${ampm}`;
       } else {
-        hour = hour.toString().padStart(2, '0');
+        return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
       }
-      
-      return `${hour}:${m.padStart(2, '0')}${ampm}`;
     } catch {
       return timeStr;
     }
@@ -80,7 +89,15 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
   }, [isVisible, boardId, themeState]);
 
   const handleUpdate = (updates) => {
-    setLocalSettings(prev => ({ ...prev, ...updates }));
+    const updated = { ...localSettings, ...updates };
+    setLocalSettings(updated);
+    if (boardId) {
+      dispatch(setBoardAutoManageSettings({ boardId, settings: updated }));
+    } else {
+      dispatch(setAutoManageSettings(updated));
+      updateRecurringAutomations(updated, tasks);
+    }
+    dispatch(processAutoManageTasks());
   };
 
   const handleSave = () => {

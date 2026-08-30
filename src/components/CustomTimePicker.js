@@ -2450,49 +2450,34 @@ export default function CustomTimePicker({
       return;
     }
 
-    const hasValue =
-      typeof value ===
-        'string' &&
-      value.trim() !== '' &&
-      value.trim() !==
-        '--:--';
+    let selectedHour = dayjs().hour();
+    let selectedMin = dayjs().minute();
+    let pmState = false;
 
-    const parsedValue =
-      hasValue
-        ? dayjs(
-            `2000-01-01T${value}`
-          )
-        : null;
-
-    const selectedTime =
-      parsedValue?.isValid()
-        ? parsedValue
-        : dayjs();
-
-    let selectedHour =
-      selectedTime.hour();
-
-    if (!is24Hour) {
-      setIsPM(
-        selectedHour >= 12
-      );
-
-      selectedHour =
-        selectedHour % 12 ||
-        12;
+    if (typeof value === 'string' && value.trim() !== '' && value.trim() !== '--:--') {
+      const valStr = value.trim();
+      const isPmStr = /pm/i.test(valStr);
+      const isAmStr = /am/i.test(valStr);
+      const cleanStr = valStr.replace(/(am|pm)/i, '').trim();
+      const parts = cleanStr.split(':').map(n => parseInt(n, 10));
+      if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+        let h = parts[0];
+        let m = parts[1];
+        if (isPmStr && h < 12) h += 12;
+        if (isAmStr && h === 12) h = 0;
+        selectedHour = h;
+        selectedMin = m;
+      }
     }
 
-    setHour(
-      String(
-        selectedHour
-      )
-    );
+    if (!is24Hour) {
+      pmState = selectedHour >= 12;
+      selectedHour = selectedHour % 12 || 12;
+    }
 
-    setMinute(
-      selectedTime.format(
-        'mm'
-      )
-    );
+    setIsPM(pmState);
+    setHour(String(selectedHour));
+    setMinute(String(selectedMin).padStart(2, '0'));
 
     setDialMode('hour');
     setInputMode('dial');

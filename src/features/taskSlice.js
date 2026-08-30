@@ -324,7 +324,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         // Check if board has custom automation override
         const taskBoardId = task.boardId || 'main';
         const boardCustom = boardAutomations[taskBoardId];
-        const isOverride = !!(boardCustom && boardCustom.overrideGlobal === true);
+        const isOverride = !!(boardCustom && boardCustom.overrideGlobal !== false);
 
         const effectiveAutoTransferMode = (isOverride && boardCustom?.autoTransferMode !== undefined) 
             ? boardCustom.autoTransferMode 
@@ -354,8 +354,20 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
             ? boardCustom.autoRescheduleTime 
             : globalSettings.autoRescheduleTime;
 
-        const [rescheduleHour, rescheduleMinute] = (effectiveAutoRescheduleTime || '00:00').split(':').map(Number);
-        const rescheduleTimeToday = dayjs().hour(rescheduleHour || 0).minute(rescheduleMinute || 0).second(0).millisecond(0);
+        let rescheduleHour = 0;
+        let rescheduleMinute = 0;
+        if (effectiveAutoRescheduleTime) {
+            const timeStr = String(effectiveAutoRescheduleTime).trim();
+            const isPm = /pm/i.test(timeStr);
+            const isAm = /am/i.test(timeStr);
+            const cleanStr = timeStr.replace(/(am|pm)/i, '').trim();
+            const parts = cleanStr.split(':').map(n => parseInt(n, 10));
+            if (!isNaN(parts[0])) rescheduleHour = parts[0];
+            if (!isNaN(parts[1])) rescheduleMinute = parts[1];
+            if (isPm && rescheduleHour < 12) rescheduleHour += 12;
+            if (isAm && rescheduleHour === 12) rescheduleHour = 0;
+        }
+        const rescheduleTimeToday = dayjs().hour(rescheduleHour).minute(rescheduleMinute).second(0).millisecond(0);
         const effectiveToday = dayjs().isBefore(rescheduleTimeToday) ? actualToday.subtract(1, 'day') : actualToday;
 
         if (updatedTask.completed) {
@@ -370,7 +382,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                 }
             }
         } 
-        else if (taskDate.isBefore(effectiveToday)) {
+        else if (taskDate.isBefore(actualToday)) {
             const daysOverdue = actualToday.diff(taskDate, 'day');
             if (effectiveAutoDeleteOverdueDays > 0 && daysOverdue >= effectiveAutoDeleteOverdueDays) {
                 tasksToDelete.push(updatedTask.id);
