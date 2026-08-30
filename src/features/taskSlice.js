@@ -324,7 +324,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         // Check if board has custom automation override
         const taskBoardId = task.boardId || 'main';
         const boardCustom = boardAutomations[taskBoardId];
-        const isOverride = !!(boardCustom && boardCustom.overrideGlobal !== false);
+        const isOverride = !!(boardCustom && boardCustom.overrideGlobal === true);
 
         const effectiveAutoTransferMode = (isOverride && boardCustom?.autoTransferMode !== undefined) 
             ? boardCustom.autoTransferMode 

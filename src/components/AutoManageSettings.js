@@ -81,7 +81,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
     if (isVisible) {
       if (boardId) {
         const boardCustom = themeState.boardAutomations?.[boardId];
-        setLocalSettings(boardCustom || { ...themeState, overrideGlobal: false });
+        setLocalSettings(boardCustom || { ...themeState, overrideGlobal: true });
       } else {
         setLocalSettings(themeState || defaultSettings);
       }
@@ -89,7 +89,10 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
   }, [isVisible, boardId, themeState]);
 
   const handleUpdate = (updates) => {
-    const updated = { ...localSettings, ...updates };
+    let updated = { ...localSettings, ...updates };
+    if (boardId && updates.overrideGlobal === undefined) {
+      updated.overrideGlobal = true;
+    }
     setLocalSettings(updated);
     if (boardId) {
       dispatch(setBoardAutoManageSettings({ boardId, settings: updated }));
