@@ -454,7 +454,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         return task;
     });
 
-    if (tasksToDelete.length > 0 && !confirmBeforeDeletion) {
+    if (tasksToDelete.length > 0 && !globalSettings.confirmBeforeDeletion) {
         newTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
         hasChanges = true;
     }
@@ -464,7 +464,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         await AsyncStorage.setItem('tasks', JSON.stringify(newTasks));
     }
 
-    if (tasksToDelete.length > 0 && confirmBeforeDeletion) {
+    if (tasksToDelete.length > 0 && globalSettings.confirmBeforeDeletion) {
         dispatch(setPendingCleanupTaskIds(tasksToDelete));
     }
 

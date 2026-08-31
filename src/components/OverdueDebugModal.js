@@ -51,12 +51,12 @@ export default function OverdueDebugModal({ isVisible, onClose }) {
         : globalSettings.autoRescheduleTime;
 
       const taskDate = task.completionDate ? dayjs(task.completionDate).startOf('day') : null;
-      const isOverdue = taskDate ? taskDate.isBefore(actualToday) : false;
+      const isOverdue = (!task.completed && taskDate) ? taskDate.isBefore(actualToday) : false;
       const daysOverdue = (taskDate && isOverdue) ? actualToday.diff(taskDate, 'day') : 0;
       const missed = isTaskMissed(task);
 
       let calculatedTargetDate = null;
-      if (isOverdue && effectiveAutoTransferMode && effectiveAutoTransferMode !== 'none') {
+      if (!task.completed && isOverdue && effectiveAutoTransferMode && effectiveAutoTransferMode !== 'none') {
         let target = actualToday;
         if (effectiveAutoTransferMode === 'tomorrow') {
           target = target.add(1, 'day');
