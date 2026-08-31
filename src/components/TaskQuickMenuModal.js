@@ -88,6 +88,8 @@ export default function TaskQuickMenuModal({
   task,
   onEdit,
   onSnooze,
+  onPressEdit,
+  onPressSnooze,
   onMoveForward,
   onMoveBackward,
 }) {
@@ -307,13 +309,16 @@ export default function TaskQuickMenuModal({
     );
   };
 
+  const handleEditAction = onPressEdit || onEdit;
+  const handleSnoozeAction = onPressSnooze || onSnooze;
+
   const actionItems = [
-    { label: t('Edit'), icon: IconEdit, onPress: () => { onClose(); onPressEdit(task); } },
+    { label: t('Edit'), icon: IconEdit, onPress: () => { onClose(); if (typeof handleEditAction === 'function') handleEditAction(task); } },
     { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
     { label: t('Move Forward'), icon: IconMoveForward, onPress: () => handleMoveTaskDate('forward') },
     { label: t('Move Backward'), icon: IconMoveBackward, onPress: () => handleMoveTaskDate('backward') },
     { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 300); } },
-    { label: t('Snooze'), icon: IconSnooze, onPress: () => { onClose(); onPressSnooze(task); } },
+    { label: t('Snooze'), icon: IconSnooze, onPress: () => { onClose(); if (typeof handleSnoozeAction === 'function') handleSnoozeAction(task); } },
     { label: t('Duplicate'), icon: IconDuplicate, onPress: handleDuplicate },
     { label: t('Share'), icon: IconShare, onPress: handleShare },
     { label: t('Delete'), icon: IconDelete, onPress: handleDelete, danger: true },

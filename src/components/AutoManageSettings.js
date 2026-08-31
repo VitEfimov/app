@@ -9,7 +9,6 @@ import { processAutoManageTasks } from '../features/taskSlice';
 import { updateRecurringAutomations } from '../utils/notifications';
 import CustomDropdown from './CustomDropdown';
 import CustomTimePicker from './CustomTimePicker';
-import OverdueDebugModal from './OverdueDebugModal';
 import * as Localization from 'expo-localization';
 
 export default function AutoManageSettings({ isVisible, onClose, boardId, boardName }) {
@@ -24,7 +23,6 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
   const [scrollViewHeight, setScrollViewHeight] = useState(0);
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const [timePickerTarget, setTimePickerTarget] = useState(null);
-  const [isDebugModalVisible, setDebugModalVisible] = useState(false);
 
   const defaultSettings = {
     overrideGlobal: true,
@@ -364,13 +362,6 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
             
           </View>
           
-          <TouchableOpacity 
-            onPress={() => setDebugModalVisible(true)}
-            style={{ marginTop: 15, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: '#ff9800', backgroundColor: 'rgba(255, 152, 0, 0.1)', alignItems: 'center' }}
-          >
-            <Text style={{ color: '#ff9800', fontWeight: 'bold', fontSize: 13 }}>🐛 Debug Overdue & Automation States</Text>
-          </TouchableOpacity>
-
           <View style={{ height: 30 }} />
           
           <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
@@ -403,11 +394,6 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
             }}
           />
         )}
-
-        <OverdueDebugModal 
-          isVisible={isDebugModalVisible}
-          onClose={() => setDebugModalVisible(false)}
-        />
       </View>
     </Modal>
   );
