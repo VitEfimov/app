@@ -208,6 +208,8 @@ function InitApp() {
               completed: false,
               priority: 'none',
               completionDate: dayjs(dateFormatted).toISOString(),
+              isShared: true,
+              doNotOverrideDate: true,
               reminder: themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null
             });
           }
@@ -366,7 +368,9 @@ function InitApp() {
           completed: false,
           priority: priority,
           completionDate: dayjs(completionDate).toISOString(),
-          time: taskTime
+          time: taskTime,
+          isShared: true,
+          doNotOverrideDate: true
         }
       }));
       resetShareIntent();

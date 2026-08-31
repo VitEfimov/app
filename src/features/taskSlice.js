@@ -426,7 +426,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                     }
                 }
                 
-                if (effectiveAutoTransferMode && effectiveAutoTransferMode !== 'none') {
+                if (effectiveAutoTransferMode && effectiveAutoTransferMode !== 'none' && !task.isShared && !task.doNotOverrideDate) {
                     // If we are auto-transferring an overdue task, immediately bump its priority 
                     // (since it won't be able to accumulate daysOverdue).
                     if (effectiveIncreasePriorityWhenOverdue && !priorityDidIncrease && updatedTask.priority !== 'high') {
