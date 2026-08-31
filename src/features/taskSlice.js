@@ -307,7 +307,8 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         autoDeleteOverdueDays: themeState.autoDeleteOverdueDays !== undefined ? themeState.autoDeleteOverdueDays : 0,
         autoDeleteCompletedDays: themeState.autoDeleteCompletedDays !== undefined ? themeState.autoDeleteCompletedDays : 0,
         confirmBeforeDeletion: themeState.confirmBeforeDeletion !== undefined ? themeState.confirmBeforeDeletion : true,
-        autoRescheduleTime: themeState.autoRescheduleTime || '09:00'
+        autoRescheduleTime: themeState.autoRescheduleTime || '00:00',
+        rescheduleTransferredReminders: themeState.rescheduleTransferredReminders !== undefined ? themeState.rescheduleTransferredReminders : true
     };
     
     const actualToday = dayjs().startOf('day');
@@ -353,6 +354,10 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         const effectiveAutoRescheduleTime = (isOverride && boardCustom?.autoRescheduleTime !== undefined) 
             ? boardCustom.autoRescheduleTime 
             : globalSettings.autoRescheduleTime;
+
+        const effectiveRescheduleReminders = (isOverride && boardCustom?.rescheduleTransferredReminders !== undefined)
+            ? boardCustom.rescheduleTransferredReminders
+            : globalSettings.rescheduleTransferredReminders;
 
         let rescheduleHour = 0;
         let rescheduleMinute = 0;
@@ -442,6 +447,26 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                         }
                     }
                     updatedTask.completionDate = targetDate.toISOString();
+                    if (effectiveRescheduleReminders !== false && !updatedTask.completed) {
+                        try {
+                            const { scheduleTaskReminder } = require('../utils/notifications');
+                            const reminderValue = updatedTask.reminder || (themeState.defaultReminderEnabled ? themeState.defaultReminderTime : 'None');
+                            if (updatedTask.time || (reminderValue && reminderValue !== 'None')) {
+                                scheduleTaskReminder(
+                                    updatedTask.taskname,
+                                    reminderValue,
+                                    targetDate.format('YYYY-MM-DD'),
+                                    updatedTask.time,
+                                    updatedTask.id,
+                                    !!updatedTask.isAlarm,
+                                    themeState,
+                                    { isNagMode: updatedTask.isNagMode, escalationLevel: updatedTask.escalationLevel }
+                                );
+                            }
+                        } catch (e) {
+                            console.warn('Failed to reschedule notification on auto-transfer:', e);
+                        }
+                    }
                     taskChanged = true;
                 }
             }

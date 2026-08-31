@@ -33,13 +33,14 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
     autoDeleteOverdueDays: 0,
     autoDeleteCompletedDays: 0,
     confirmBeforeDeletion: true,
+    rescheduleTransferredReminders: true,
     morningReminder: false,
     morningReminderTime: '08:00',
     eveningReminder: false,
     eveningReminderTime: '20:00',
     summaryReminder: false,
     summaryReminderTime: '09:00',
-    autoRescheduleTime: '09:00'
+    autoRescheduleTime: '00:00'
   };
 
   const formatDisplayTime = (timeStr) => {
@@ -131,13 +132,14 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
     autoDeleteOverdueDays = 0,
     autoDeleteCompletedDays = 0,
     confirmBeforeDeletion = true,
+    rescheduleTransferredReminders = true,
     morningReminder = false,
     morningReminderTime = '08:00',
     eveningReminder = false,
     eveningReminderTime = '20:00',
     summaryReminder = false,
     summaryReminderTime = '09:00',
-    autoRescheduleTime = '09:00'
+    autoRescheduleTime = '00:00'
   } = localSettings;
 
   const SettingToggle = ({ label, value, onValueChange }) => (
@@ -244,6 +246,15 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
                 </TouchableOpacity>
               </View>
             )}
+
+            <SettingToggle 
+              label={t('Reschedule Reminders & Alarms')} 
+              value={rescheduleTransferredReminders !== false} 
+              onValueChange={(val) => handleUpdate({ rescheduleTransferredReminders: val })} 
+            />
+            <Text style={{ color: colors.textSecondary, fontSize: 12, paddingHorizontal: 15, paddingBottom: 10, lineHeight: 16 }}>
+              {t('Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.')}
+            </Text>
           </View>
           
           <Text style={[styles.groupHeader, { color: colors.textSecondary, marginTop: 15 }]}>{t('Priority Automation')}</Text>
@@ -352,13 +363,23 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
               value={summaryReminder} 
               onValueChange={(val) => handleUpdate({ summaryReminder: val })} 
             />
-            {summaryReminder && (
-              <View style={{ paddingHorizontal: 15, paddingBottom: 10, alignItems: 'flex-start' }}>
-                <TouchableOpacity onPress={() => setTimePickerTarget('summary')} style={{ paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.surfaceContainerHigh }}>
-                  <Text style={{ color: colors.textPrimary }}>{formatDisplayTime(summaryReminderTime)}</Text>
+            {autoTransferMode !== 'none' && (
+              <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
+                <TouchableOpacity onPress={() => setTimePickerTarget('autoReschedule')} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.surfaceContainerHigh }}>
+                  <Text style={{ color: colors.textPrimary, fontSize: 13 }}>{t('Reschedule time:')}</Text>
+                  <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 14 }}>{formatDisplayTime(autoRescheduleTime)}</Text>
                 </TouchableOpacity>
               </View>
             )}
+
+            <SettingToggle 
+              label={t('Reschedule Reminders & Alarms')} 
+              value={rescheduleTransferredReminders !== false} 
+              onValueChange={(val) => handleUpdate({ rescheduleTransferredReminders: val })} 
+            />
+            <Text style={{ color: colors.textSecondary, fontSize: 12, paddingHorizontal: 15, paddingBottom: 10, lineHeight: 16 }}>
+              {t('Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.')}
+            </Text>
             
           </View>
           

@@ -435,5 +435,7 @@
   "forward": "avant",
   "backward": "en arrière",
   "Default Reminder Option": "Option de rappel par défaut",
-  "Select Year": "Sélectionnez l'année"
+  "Select Year": "Sélectionnez l'année",
+  "Reschedule Reminders & Alarms": "Replanifier les rappels et alarmes",
+  "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Replanifier automatiquement les notifications push et alarmes pour les tâches transférées vers une nouvelle date."
 }

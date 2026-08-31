@@ -28,7 +28,7 @@ const initialState = {
   calendarPanePosition: loaded?.calendarPanePosition || null,
   progressMode: loaded?.progressMode || 'daily',
   defaultSnoozeTime: loaded?.defaultSnoozeTime || 30,
-  autoRescheduleTime: loaded?.autoRescheduleTime || '09:00',
+  autoRescheduleTime: loaded?.autoRescheduleTime || '00:00',
   isBoardsCollapsed: loaded?.isBoardsCollapsed || false,
   randomColorDaily: loaded?.randomColorDaily || false,
   lastRandomColorDate: loaded?.lastRandomColorDate || null,
@@ -42,6 +42,7 @@ const initialState = {
   autoDeleteOverdueDays: loaded?.autoDeleteOverdueDays !== undefined ? loaded.autoDeleteOverdueDays : 0,
   autoDeleteCompletedDays: loaded?.autoDeleteCompletedDays !== undefined ? loaded.autoDeleteCompletedDays : 0,
   confirmBeforeDeletion: loaded?.confirmBeforeDeletion !== undefined ? loaded.confirmBeforeDeletion : true,
+  rescheduleTransferredReminders: loaded?.rescheduleTransferredReminders !== undefined ? loaded.rescheduleTransferredReminders : true,
   
   // Reminders
   morningReminder: loaded?.morningReminder || false,
