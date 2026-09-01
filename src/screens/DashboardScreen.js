@@ -31,6 +31,7 @@ export default function DashboardScreen({ navigation }) {
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
+  const boards = useSelector(state => state.userReducer.boards || []);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
 
