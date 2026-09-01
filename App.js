@@ -450,6 +450,9 @@ function InitApp() {
       if (nextAppState === 'active') {
         const { processAutoManageTasks } = require('./src/features/taskSlice');
         await dispatch(processAutoManageTasks());
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        const { flushPendingTaskSaves } = require('./src/features/taskSlice');
+        await flushPendingTaskSaves();
       }
     };
     const subscription = AppState.addEventListener('change', handleAppStateChange);

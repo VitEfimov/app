@@ -98,9 +98,8 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  const theme = useSelector(state => state.themeReducer);
-  const taskNameWrap = theme?.taskNameWrap || 'nowrap';
-  const fontSizeSetting = theme?.fontSize || 'normal';
+  const taskNameWrap = useSelector(state => state.themeReducer?.taskNameWrap || 'nowrap');
+  const fontSizeSetting = useSelector(state => state.themeReducer?.fontSize || 'normal');
 
   const titleFontSize = fontSizeSetting === 'small' ? 13 : fontSizeSetting === 'big' ? 18 : 15;
 

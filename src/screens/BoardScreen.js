@@ -308,11 +308,12 @@ export default function BoardScreen({ route, navigation }) {
   }, [boardTasks, showRecurringTasksOnBoard]);
 
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks } = useMemo(() => {
-    const FILTERS = getFilters();
+    const now = dayjs();
+    const FILTERS = getFilters(now);
 
     const sortTasks = (tasksArr, sectionId) => {
       const sortBy = sortConfig[sectionId] || 'time';
-      return tasksArr.sort((a, b) => {
+      return [...tasksArr].sort((a, b) => {
         if (sortBy === 'priority') {
           const pValues = { high: 3, medium: 2, low: 1, none: 0 };
           const pA = pValues[a.priority?.toLowerCase()] || 0;
@@ -320,8 +321,8 @@ export default function BoardScreen({ route, navigation }) {
           if (pA !== pB) return pB - pA; // Higher priority first
         }
 
-        const dayA = a.completionDate ? dayjs(a.completionDate).format('YYYY-MM-DD') : '9999-12-31';
-        const dayB = b.completionDate ? dayjs(b.completionDate).format('YYYY-MM-DD') : '9999-12-31';
+        const dayA = a.completionDate ? a.completionDate.substring(0, 10) : '9999-12-31';
+        const dayB = b.completionDate ? b.completionDate.substring(0, 10) : '9999-12-31';
         const dateCompare = dayA.localeCompare(dayB);
         if (dateCompare !== 0) return dateCompare;
         
@@ -337,12 +338,12 @@ export default function BoardScreen({ route, navigation }) {
     };
 
     return {
-      todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task) && !hiddenRecurringTaskIds.has(task.id)), 'today'),
+      todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task, now) && !hiddenRecurringTaskIds.has(task.id)), 'today'),
       tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'tomorrow'),
       thisWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') && !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'on-this-week'),
       nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'on-next-week'),
       laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'later'),
-      missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task)), 'missed'),
+      missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task, now)), 'missed'),
       completedTasks: sortTasks(boardTasks.filter(task => task.completed), 'completed')
     };
   }, [boardTasks, sortConfig, hiddenRecurringTaskIds]);

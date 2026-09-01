@@ -13,4 +13,14 @@ config.resolver.blockList = exclusionList([
   /.*\/modules\/expo-task-alarm\/package\/.*/
 ]);
 
+config.transformer = {
+  ...config.transformer,
+  getTransformOptions: async () => ({
+    transform: {
+      experimentalImportSupport: false,
+      inlineRequires: true,
+    },
+  }),
+};
+
 module.exports = config;

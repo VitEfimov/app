@@ -217,15 +217,55 @@ const taskSlice = createSlice({
 
 export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, updateTaskSync, updateRecurringSeriesSync, deleteRecurringSeriesSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds } = taskSlice.actions;
 
-const syncRecurringAutomations = (getState) => {
-    try {
-        const state = getState();
-        const themeState = state.themeReducer;
-        const tasks = state.taskReducer.tasks;
-        updateRecurringAutomations(themeState, tasks);
-    } catch (e) {
-        // Silently catch in case of issues
+let saveStorageTimeout = null;
+let lastTasksToSave = null;
+let syncAutomationsTimeout = null;
+
+export const persistTasksToStorage = (tasks) => {
+    lastTasksToSave = tasks;
+    if (saveStorageTimeout) {
+        clearTimeout(saveStorageTimeout);
     }
+    saveStorageTimeout = setTimeout(async () => {
+        try {
+            if (lastTasksToSave) {
+                await AsyncStorage.setItem('tasks', JSON.stringify(lastTasksToSave));
+            }
+        } catch (e) {
+            console.error('Error saving tasks to AsyncStorage:', e);
+        }
+    }, 200);
+};
+
+export const flushPendingTaskSaves = async (getState) => {
+    if (saveStorageTimeout) {
+        clearTimeout(saveStorageTimeout);
+        saveStorageTimeout = null;
+    }
+    try {
+        const tasks = getState ? getState().taskReducer.tasks : lastTasksToSave;
+        if (tasks) {
+            await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+    } catch (e) {
+        console.error('Error flushing tasks to storage:', e);
+    }
+};
+
+const syncRecurringAutomations = (getState) => {
+    if (syncAutomationsTimeout) {
+        clearTimeout(syncAutomationsTimeout);
+    }
+    syncAutomationsTimeout = setTimeout(() => {
+        try {
+            const state = getState();
+            const themeState = state.themeReducer;
+            const tasks = state.taskReducer.tasks;
+            updateRecurringAutomations(themeState, tasks);
+        } catch (e) {
+            // Silently catch in case of issues
+        }
+    }, 400);
 };
 
 export const addTask = (payload) => async (dispatch, getState) => {
@@ -236,7 +276,7 @@ export const addTask = (payload) => async (dispatch, getState) => {
     }
     dispatch(addTaskSync(payload)); 
     const tasks = getState().taskReducer.tasks;
-    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
 };
 
@@ -252,44 +292,42 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     }
     dispatch(addMultipleTasksSync(payload));
     const tasks = getState().taskReducer.tasks;
-    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
 };
 
 export const deleteTask = (payload) => async (dispatch, getState) => {
     dispatch(deleteTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
-    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
-    // dispatch(deleteTaskAsync(payload.taskId));
 };
 
 export const deleteTasksByBoard = (boardId) => async (dispatch, getState) => {
     dispatch(deleteTasksByBoardSync({ boardId }));
     const tasks = getState().taskReducer.tasks;
-    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
 };
 
 export const updateTask = (payload) => async (dispatch, getState) => {
     dispatch(updateTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
-    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
-    // dispatch(updateTaskAsync(payload));
 };
 
 export const updateRecurringSeries = (payload) => async (dispatch, getState) => {
     dispatch(updateRecurringSeriesSync(payload));
     const tasks = getState().taskReducer.tasks;
-    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
 };
 
 export const deleteRecurringSeries = (payload) => async (dispatch, getState) => {
     dispatch(deleteRecurringSeriesSync(payload));
     const tasks = getState().taskReducer.tasks;
-    await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+    persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
 };
 
@@ -493,7 +531,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
 
     if (hasChanges) {
         dispatch(hydrateTaskState(newTasks));
-        await AsyncStorage.setItem('tasks', JSON.stringify(newTasks));
+        persistTasksToStorage(newTasks);
     }
 
     if (tasksToDelete.length > 0 && globalSettings.confirmBeforeDeletion) {
@@ -510,7 +548,7 @@ export const executePendingCleanup = () => async (dispatch, getState) => {
         const currentTasks = state.taskReducer.tasks;
         const finalTasks = currentTasks.filter(t => !tasksToDelete.includes(t.id));
         dispatch(hydrateTaskState(finalTasks));
-        await AsyncStorage.setItem('tasks', JSON.stringify(finalTasks));
+        persistTasksToStorage(finalTasks);
         syncRecurringAutomations(getState);
     }
     dispatch(clearPendingCleanupTaskIds());
