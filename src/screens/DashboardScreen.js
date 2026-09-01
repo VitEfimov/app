@@ -27,7 +27,7 @@ const IconRight = ({ color }) => (
 dayjs.extend(isSameOrBefore);
 
 export default function DashboardScreen({ navigation }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
