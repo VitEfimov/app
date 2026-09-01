@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
@@ -368,6 +369,24 @@ export default function BoardScreen({ route, navigation }) {
     }
   }, [route?.params?.sectionId]);
 
+  const flattenedData = useMemo(() => {
+    const result = [];
+    sections.forEach(section => {
+      result.push({ type: 'header', section });
+      if (section.data && section.data.length > 0) {
+        section.data.forEach(task => {
+          result.push({ type: 'task', task, section });
+        });
+      }
+      result.push({ type: 'footer', section });
+    });
+    return result;
+  }, [sections]);
+
+  const stickyHeaderIndices = useMemo(() => {
+    return flattenedData.map((item, index) => item.type === 'header' ? index : -1).filter(i => i !== -1);
+  }, [flattenedData]);
+
   const handleCompleteSection = (section) => {
     setConfirmConfig({
       isVisible: true,
@@ -662,39 +681,44 @@ export default function BoardScreen({ route, navigation }) {
 
       </Animated.View>
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item, section }) => (
-          <TaskRow 
-            task={item} 
-            isSelectionMode={selectionMode.isActive}
-            isSelected={selectionMode.selectedTaskIds.includes(item.id)}
-            onToggleSelect={() => {
-              if (!selectionMode.isActive) {
-                setSelectionMode({ isActive: true, sectionId: section.id, selectedTaskIds: [item.id] });
-              } else {
-                toggleTaskSelection(item.id);
-              }
-            }}
-            onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
-            onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
-            onPress={() => {
-              setSelectedTask(item);
-              setDetailsVisible(true);
-            }}
-          />
-        )}
-        renderSectionHeader={renderSectionHeader}
-        renderSectionFooter={renderSectionFooter}
+      <FlashList
+        data={flattenedData}
+        keyExtractor={(item, index) => item.type === 'task' ? `task_${item.task.id}` : `${item.type}_${item.section.id}_${index}`}
+        getItemType={(item) => item.type}
+        renderItem={({ item }) => {
+          if (item.type === 'header') return renderSectionHeader({ section: item.section });
+          if (item.type === 'footer') return renderSectionFooter({ section: item.section });
+          if (item.type === 'task') {
+            const task = item.task;
+            const section = item.section;
+            return (
+              <TaskRow 
+                task={task} 
+                isSelectionMode={selectionMode.isActive}
+                isSelected={selectionMode.selectedTaskIds.includes(task.id)}
+                onToggleSelect={() => {
+                  if (!selectionMode.isActive) {
+                    setSelectionMode({ isActive: true, sectionId: section.id, selectedTaskIds: [task.id] });
+                  } else {
+                    toggleTaskSelection(task.id);
+                  }
+                }}
+                onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
+                onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
+                onPress={() => {
+                  setSelectedTask(task);
+                  setDetailsVisible(true);
+                }}
+              />
+            );
+          }
+          return null;
+        }}
         extraData={[collapsedSections, activeAddSectionId, tasks.length, colors]}
         contentContainerStyle={styles.listContent}
-        stickySectionHeadersEnabled={true}
+        stickyHeaderIndices={stickyHeaderIndices}
         keyboardShouldPersistTaps="handled"
-        initialNumToRender={15}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        removeClippedSubviews={Platform.OS === 'ios'}
+        estimatedItemSize={70}
       />
 
       <TaskDetailsModal 

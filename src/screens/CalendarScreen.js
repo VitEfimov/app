@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, FlatList, SectionList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share } from 'react-native';
+import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
 import { useTheme } from '../styles/ThemeContext';
@@ -328,7 +329,7 @@ export default function CalendarScreen() {
     const marks = {};
     tasks.forEach(task => {
       if (task.completionDate) {
-        const dateStr = dayjs(task.completionDate).format('YYYY-MM-DD');
+        const dateStr = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         if (!marks[dateStr]) {
           marks[dateStr] = { tasks: [] };
         }
@@ -340,7 +341,7 @@ export default function CalendarScreen() {
     Object.keys(marks).forEach(dateStr => {
       const dayTasks = marks[dateStr].tasks;
       const allCompleted = dayTasks.every(t => t.completed);
-      const anyMissed = dayTasks.some(t => !t.completed && dayjs(t.completionDate).isBefore(dayjs(), 'day'));
+      const anyMissed = dayTasks.some(t => !t.completed && (t.dateString || (typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : '')) < todayStr);
       const anyNotes = dayTasks.some(t => !t.completed && t.description?.text && t.description.text.trim() !== '');
 
       let dotColor = colors.primary;
@@ -423,7 +424,8 @@ export default function CalendarScreen() {
   const selectedTasks = useMemo(() => {
     const filteredTasks = tasks.filter(task => {
       if (!task.completionDate) return false;
-      return dayjs(task.completionDate).format('YYYY-MM-DD') === selectedDate;
+      const d = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+      return d === selectedDate;
     });
     
     return filteredTasks.sort((a, b) => {
@@ -472,6 +474,19 @@ export default function CalendarScreen() {
       data: collapsedBoardIds.includes(g.id) ? [] : g.data,
     }));
   }, [selectedTasks, boards, collapsedBoardIds]);
+
+  const flattenedData = useMemo(() => {
+    const result = [];
+    groupedTasks.forEach(group => {
+      result.push({ type: 'header', group });
+      if (group.data && group.data.length > 0) {
+        group.data.forEach(task => {
+          result.push({ type: 'task', task, group });
+        });
+      }
+    });
+    return result;
+  }, [groupedTasks]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
@@ -560,61 +575,67 @@ export default function CalendarScreen() {
         </View>
 
         {groupedTasks.length > 0 ? (
-          <SectionList
+          <FlashList
             style={{ flex: 1 }}
-            sections={groupedTasks}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <TaskRow 
-                task={item} 
-                hideDate={true} 
-                disableInlineEdit={true} 
-                testIDPrefix="calendar_"
-                isSelectionMode={selectionMode.isActive}
-                isSelected={selectionMode.selectedTaskIds.includes(item.id)}
-                onToggleSelect={() => {
-                  if (!selectionMode.isActive) {
-                    setSelectionMode({ isActive: true, selectedTaskIds: [item.id] });
-                  } else {
-                    toggleTaskSelection(item.id);
-                  }
-                }}
-                onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
-                onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
-                onPress={() => {
-                  setSelectedTask(item);
-                  setDetailsVisible(true);
-                }}
-              />
-            )}
-            renderSectionHeader={({ section }) => (
-              section.title ? (
-                <TouchableOpacity
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Toggle ${section.title} board tasks`}
-                  style={[styles.sectionHeader, { backgroundColor: colors.bgCard, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
-                  onPress={() => toggleBoardCollapse(section.id)}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
-                      {section.title === 'Main' ? t('Main') : section.title}
-                    </Text>
-                    <View style={{ backgroundColor: colors.surfaceContainerHigh, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 8 }}>
-                      <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
-                        {section.totalCount}
+            data={flattenedData}
+            keyExtractor={(item, index) => item.type === 'task' ? `cal_task_${item.task.id}` : `cal_header_${item.group.id}_${index}`}
+            getItemType={(item) => item.type}
+            renderItem={({ item }) => {
+              if (item.type === 'header') {
+                const section = item.group;
+                return section.title ? (
+                  <TouchableOpacity
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Toggle ${section.title} board tasks`}
+                    style={[styles.sectionHeader, { backgroundColor: colors.bgCard, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                    onPress={() => toggleBoardCollapse(section.id)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
+                        {section.title === 'Main' ? t('Main') : section.title}
                       </Text>
+                      <View style={{ backgroundColor: colors.surfaceContainerHigh, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 8 }}>
+                        <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
+                          {section.totalCount}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 'bold' }}>
-                    {collapsedBoardIds.includes(section.id) ? '▶' : '▼'}
-                  </Text>
-                </TouchableOpacity>
-              ) : null
-            )}
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 'bold' }}>
+                      {collapsedBoardIds.includes(section.id) ? '▶' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null;
+              }
+              if (item.type === 'task') {
+                return (
+                  <TaskRow 
+                    task={item.task} 
+                    hideDate={true} 
+                    disableInlineEdit={true} 
+                    testIDPrefix="calendar_"
+                    isSelectionMode={selectionMode.isActive}
+                    isSelected={selectionMode.selectedTaskIds.includes(item.task.id)}
+                    onToggleSelect={() => {
+                      if (!selectionMode.isActive) {
+                        setSelectionMode({ isActive: true, selectedTaskIds: [item.task.id] });
+                      } else {
+                        toggleTaskSelection(item.task.id);
+                      }
+                    }}
+                    onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
+                    onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
+                    onPress={() => {
+                      setSelectedTask(item.task);
+                      setDetailsVisible(true);
+                    }}
+                  />
+                );
+              }
+              return null;
+            }}
             contentContainerStyle={styles.listContent}
-            initialNumToRender={10}
-            stickySectionHeadersEnabled={false}
+            estimatedItemSize={70}
           />
         ) : (
           <View style={styles.emptyContainer}>

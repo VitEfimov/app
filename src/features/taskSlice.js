@@ -77,15 +77,29 @@ const taskSlice = createSlice({
     initialState,
     reducers: {
         hydrateTaskState: (state, action) => {
-            state.tasks = action.payload;
+            state.tasks = action.payload.map(t => {
+                if (t.completionDate && !t.dateString) {
+                    return { ...t, dateString: typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD') };
+                }
+                return t;
+            });
         },
         addTaskSync(state, action) {
             const { task } = action.payload;
+            if (task.completionDate && !task.dateString) {
+                task.dateString = typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : dayjs(task.completionDate).format('YYYY-MM-DD');
+            }
             state.tasks.push(task); 
         },
         addMultipleTasksSync(state, action) {
             const { tasks } = action.payload;
-            state.tasks.push(...tasks);
+            const updatedTasks = tasks.map(t => {
+                if (t.completionDate && !t.dateString) {
+                    return { ...t, dateString: typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD') };
+                }
+                return t;
+            });
+            state.tasks.push(...updatedTasks);
         },
         deleteTaskSync(state, action) {
              const { taskId } = action.payload;
@@ -106,7 +120,10 @@ const taskSlice = createSlice({
                   task.isNagMode = false;
                   task.escalationLevel = 'none';
                 }
-                task.completionDate = completionDate !== undefined ? completionDate : task.completionDate;
+                if (completionDate !== undefined) {
+                    task.completionDate = completionDate;
+                    task.dateString = completionDate ? (typeof completionDate === 'string' ? completionDate.split('T')[0] : dayjs(completionDate).format('YYYY-MM-DD')) : null;
+                }
                 task.time = time !== undefined ? time : task.time;
                 task.reminder = action.payload.reminder !== undefined ? action.payload.reminder : task.reminder;
                 if (action.payload.boardId !== undefined) task.boardId = action.payload.boardId;
@@ -169,6 +186,11 @@ const taskSlice = createSlice({
                         if (updates.repeatFrequency !== undefined) updated.repeatFrequency = updates.repeatFrequency;
                         if (updates.repeatStartDate !== undefined) updated.repeatStartDate = updates.repeatStartDate;
                         if (updates.repeatEndDate !== undefined) updated.repeatEndDate = updates.repeatEndDate;
+                        if (updated.completionDate) {
+                            updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
+                        } else {
+                            updated.dateString = null;
+                        }
                         updated.lastUpdatedDate = new Date().toISOString();
                         return updated;
                     }
@@ -209,7 +231,12 @@ const taskSlice = createSlice({
             .addCase(fetchTasks.pending, (state) => { state.loading = true; })
             .addCase(fetchTasks.fulfilled, (state, action) => {
                 state.loading = false;
-                state.tasks = action.payload;
+                state.tasks = action.payload.map(t => {
+                    if (t.completionDate && !t.dateString) {
+                        return { ...t, dateString: typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD') };
+                    }
+                    return t;
+                });
             })
             .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; });
     }

@@ -3,37 +3,45 @@ import isoWeek from 'dayjs/plugin/isoWeek';
 
 dayjs.extend(isoWeek);
 
-export function isTaskMissed(task, refNow) {
+export function isTaskMissed(task, refNow, refNowDateStr) {
     if (task.completed) return false;
     if (!task.completionDate) return false;
+    
     const now = refNow || dayjs();
-    const taskDate = dayjs(task.completionDate);
-    if (taskDate.isBefore(now, 'day')) return true;
-    if (taskDate.isSame(now, 'day') && task.time && task.time !== 'None' && task.time !== '--:--') {
+    const nowDateStr = refNowDateStr || now.format('YYYY-MM-DD');
+    const taskDateStr = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+
+    if (taskDateStr < nowDateStr) return true;
+    if (taskDateStr === nowDateStr && task.time && task.time !== 'None' && task.time !== '--:--') {
         const [hours, minutes] = task.time.split(':').map(Number);
         if (!isNaN(hours) && !isNaN(minutes)) {
-            const taskDateTime = now.hour(hours).minute(minutes).second(0);
-            if (taskDateTime.isBefore(now)) return true;
+            const nowTimeStr = now.format('HH:mm');
+            const formattedTaskTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            if (formattedTaskTime < nowTimeStr) return true;
         }
     }
     return false;
 }
 
-export function isTaskToday(task, refNow) {
+export function isTaskToday(task, refNow, refNowDateStr) {
     if (task.completed) return false;
     if (!task.completionDate) return false;
+    
     const now = refNow || dayjs();
-    if (!dayjs(task.completionDate).isSame(now, 'day')) return false;
-    return !isTaskMissed(task, now);
+    const nowDateStr = refNowDateStr || now.format('YYYY-MM-DD');
+    const taskDateStr = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+    
+    if (taskDateStr !== nowDateStr) return false;
+    return !isTaskMissed(task, now, nowDateStr);
 }
 
 export default function getFilters(refNow) {
     const now = refNow || dayjs();
     return {
-        today: now.startOf('day'),
-        tomorrow: now.add(1, 'day').startOf('day'),
-        'on-this-week': now.endOf('isoWeek'),
-        'on-next-week': now.add(1, 'week').startOf('day').endOf('isoWeek'),
-        later: now.add(2, 'week').startOf('day')
+        today: now.startOf('day').format('YYYY-MM-DD'),
+        tomorrow: now.add(1, 'day').startOf('day').format('YYYY-MM-DD'),
+        'on-this-week': now.endOf('isoWeek').format('YYYY-MM-DD'),
+        'on-next-week': now.add(1, 'week').startOf('day').endOf('isoWeek').format('YYYY-MM-DD'),
+        later: now.add(2, 'week').startOf('day').format('YYYY-MM-DD')
     };
 }

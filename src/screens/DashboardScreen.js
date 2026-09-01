@@ -40,24 +40,30 @@ export default function DashboardScreen({ navigation }) {
     }, [dispatch])
   );
 
-  const FILTERS = getFilters();
-  
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
+    const now = dayjs();
+    const nowDateStr = now.format('YYYY-MM-DD');
+    const FILTERS = getFilters(now);
+
     return {
-      todayTasks: tasks.filter(task => isTaskToday(task)),
-      tomorrowTasks: tasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed),
-      thisWeekTasks: tasks.filter(task =>
-        !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') &&
-        !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
-        dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed
-      ),
-      nextWeekTasks: tasks.filter(task =>
-        !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') &&
-        dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') &&
-        dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed
-      ),
-      laterTasks: tasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed),
-      missedTasks: tasks.filter(task => isTaskMissed(task))
+      todayTasks: tasks.filter(task => isTaskToday(task, now, nowDateStr)),
+      tomorrowTasks: tasks.filter(task => {
+        const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+        return d === FILTERS.tomorrow && !task.completed;
+      }),
+      thisWeekTasks: tasks.filter(task => {
+        const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+        return d > FILTERS.today && d !== FILTERS.tomorrow && d <= FILTERS['on-this-week'] && !task.completed;
+      }),
+      nextWeekTasks: tasks.filter(task => {
+        const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+        return d > FILTERS['on-this-week'] && d <= FILTERS['on-next-week'] && !task.completed;
+      }),
+      laterTasks: tasks.filter(task => {
+        const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+        return d > FILTERS['on-next-week'] && !task.completed;
+      }),
+      missedTasks: tasks.filter(task => isTaskMissed(task, now, nowDateStr))
     };
   }, [tasks]);
 
@@ -111,21 +117,30 @@ export default function DashboardScreen({ navigation }) {
     
     let cTotal = 0;
     let cCompleted = 0;
+    
+    const nowDateStr = dayjs().format('YYYY-MM-DD');
 
     if (progressMode === 'daily') {
-      const dueTodayAll = tasks.filter(task => dayjs(task.completionDate).isSame(dayjs(), 'day'));
+      const dueTodayAll = tasks.filter(task => {
+        const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+        return d === nowDateStr;
+      });
       cCompleted = dueTodayAll.filter(t => t.completed).length;
       cTotal = dueTodayAll.length;
     } else if (progressMode === 'active') {
-      const completedToday = tasks.filter(task => task.completed && dayjs(task.completionDate).isSame(dayjs(), 'day'));
+      const completedToday = tasks.filter(task => {
+        if (!task.completed) return false;
+        const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+        return d === nowDateStr;
+      });
       cCompleted = completedToday.length;
       cTotal = tot + cCompleted;
     } else if (progressMode === 'weekly') {
-      const startOfWeek = dayjs().startOf('week');
-      const endOfWeek = dayjs().endOf('week');
+      const startOfWeekStr = dayjs().startOf('week').format('YYYY-MM-DD');
+      const endOfWeekStr = dayjs().endOf('week').format('YYYY-MM-DD');
       const dueThisWeekAll = tasks.filter(task => {
-        const d = dayjs(task.completionDate);
-        return !d.isBefore(startOfWeek, 'day') && !d.isAfter(endOfWeek, 'day');
+        const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+        return d >= startOfWeekStr && d <= endOfWeekStr;
       });
       cCompleted = dueThisWeekAll.filter(t => t.completed).length;
       cTotal = dueThisWeekAll.length;
