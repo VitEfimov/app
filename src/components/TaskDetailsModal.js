@@ -1043,7 +1043,7 @@ useEffect(() => {
             keyboardShouldPersistTaps="handled"
           >
             
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0 }]}>{t('TASK NAME')}</Text>
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0 }]}>{t('Task name')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel="Toggle task completion"
@@ -1069,7 +1069,7 @@ useEffect(() => {
 
             <View style={styles.twoColumnRow}>
               <View style={styles.column}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('DUE DATE')}</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Due date')}</Text>
                 <TouchableOpacity 
                   accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : 'Not set'}`}
                   style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
@@ -1083,7 +1083,7 @@ useEffect(() => {
               </View>
               <View style={styles.column}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('TIME')}</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Time')}</Text>
                 </View>
                 <TouchableOpacity 
                   accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
@@ -1100,11 +1100,11 @@ useEffect(() => {
 
             <View style={styles.twoColumnRow}>
               <View style={styles.column}>
-                <CustomDropdown label={t("PRIORITY")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown label={t("Priority")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
               </View>
               <View style={styles.column}>
                 <CustomDropdown 
-                  label={t("REMINDER")} 
+                  label={t("Reminder")} 
                   value={reminder === 'Nag Mode (Every 10 min)' ? t('Nag Mode (Every 10 min)') : reminder === 'Escalating Reminder' ? t('Escalating Reminder') : (t(reminder) || reminder)} 
                   options={[
                     {label: t('None'), value: 'None'}, 
@@ -1125,7 +1125,7 @@ useEffect(() => {
 
             {isPremium && (
               <View style={{ marginTop: 15 }}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('REPEAT')}</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
                 <TouchableOpacity 
                   style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 8 }]}
                   onPress={() => setIsRepeatModalVisible(true)}
@@ -1148,10 +1148,10 @@ useEffect(() => {
 
             {repeatConfig.preset !== 'None' && (
               <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}>
-                <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('REPEAT CONFIGURATION')}</Text>
+                <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('Repeat configuration')}</Text>
                 <View style={styles.twoColumnRow}>
                   <View style={styles.column}>
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>{t('FROM')}</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>{t('From')}</Text>
                     <TouchableOpacity 
                       style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
                       onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
@@ -1163,7 +1163,7 @@ useEffect(() => {
                     </TouchableOpacity>
                   </View>
                   <View style={styles.column}>
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>{t('TO')}</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>{t('To')}</Text>
                     <TouchableOpacity 
                       style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
                       onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
@@ -1197,7 +1197,7 @@ useEffect(() => {
             )}
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
-              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('NOTES & ATTACHMENTS')}</Text>
+              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('Notes & attachments')}</Text>
               {isPremium && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
                   <TouchableOpacity 
@@ -1253,7 +1253,7 @@ useEffect(() => {
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 10 }}>
-              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('SUBTASKS')}</Text>
+              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('Subtasks')}</Text>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel="Add new subtask"
                 onPress={addSubtask} hitSlop={{top:10,bottom:10,left:10,right:10}}
@@ -1513,11 +1513,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   label: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 6,
     marginTop: 20,
-    letterSpacing: 1,
   },
   input: {
     borderWidth: 1,

@@ -3,29 +3,45 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import { selectStreaks } from '../../features/statsSelectors';
+import Svg, { Path, Circle } from 'react-native-svg';
+
+const IconCheck = ({ color }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M20 6L9 17l-5-5" />
+  </Svg>
+);
+
+const IconTimer = ({ color }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="13" r="8" />
+    <Path d="M12 9v4l2 2M12 2v2M4 4l2 2" />
+  </Svg>
+);
+
+const IconFlame = ({ color }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  </Svg>
+);
 
 export default function StreaksCard({ colors }) {
   const { t } = useTranslation();
   const streaksData = useSelector(selectStreaks);
 
-  const renderStreakItem = (title, data, icon, accentColor) => {
+  const renderStreakItem = (title, data, IconComponent, accentColor) => {
     // Only show if there's an actual streak to show
     if (data.longest === 0) return null;
     
     return (
       <View style={styles.streakRow}>
         <View style={[styles.iconBox, { backgroundColor: `${accentColor}20` }]}>
-          <Text style={styles.icon}>{icon}</Text>
+          <IconComponent color={accentColor} />
         </View>
         <View style={styles.streakInfo}>
           <Text style={[styles.streakTitle, { color: colors.textPrimary }]}>{title}</Text>
           <Text style={[styles.streakSub, { color: colors.textSecondary }]}>
-            {t('Longest')}: {data.longest} {t('days')}
+            {t('Best')}: {data.longest} {t('days')} · {t('Current')}: {data.current}
           </Text>
-        </View>
-        <View style={styles.currentStreak}>
-          <Text style={[styles.currentValue, { color: accentColor }]}>{data.current}</Text>
-          <Text style={[styles.currentLabel, { color: colors.textSecondary }]}>{t('days')}</Text>
         </View>
       </View>
     );
@@ -51,9 +67,9 @@ export default function StreaksCard({ colors }) {
       <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Streaks & Records')}</Text>
       
       <View style={styles.streaksList}>
-        {renderStreakItem(t("Task Completion"), streaksData.taskStreak, "✅", colors.primary)}
-        {renderStreakItem(t("Focus Sessions"), streaksData.focusStreak, "🍅", "#ff9800")}
-        {renderStreakItem(t("Productive Days"), streaksData.productiveStreak, "🔥", "#f44336")}
+        {renderStreakItem(t("Task Completion"), streaksData.taskStreak, IconCheck, colors.primary)}
+        {renderStreakItem(t("Focus Sessions"), streaksData.focusStreak, IconTimer, "#ff9800")}
+        {renderStreakItem(t("Productive Days"), streaksData.productiveStreak, IconFlame, "#f44336")}
       </View>
     </View>
   );
@@ -111,18 +127,7 @@ const styles = StyleSheet.create({
     marginBottom: 4
   },
   streakSub: {
-    fontSize: 12
-  },
-  currentStreak: {
-    alignItems: 'center',
-    minWidth: 50
-  },
-  currentValue: {
-    fontSize: 22,
-    fontWeight: 'bold'
-  },
-  currentLabel: {
-    fontSize: 10,
-    textTransform: 'uppercase'
+    fontSize: 13,
+    marginTop: 2
   }
 });

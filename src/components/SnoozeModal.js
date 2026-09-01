@@ -256,23 +256,31 @@ export default function SnoozeModal({
           ))}
 
           {/* Premium Section */}
-          <View style={styles.premiumSection}>
-            <Text style={[styles.premiumHeader, { color: '#FFD700' }]}>★ {t('PRO FEATURES')}</Text>
-            <TouchableOpacity style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handlePremiumAction('nag')}>
-              <View style={styles.actionIconContainer}>
-                <IconBell color={colors.textPrimary} />
-              </View>
-              <Text style={[styles.optionLabel, { color: colors.textPrimary, flex: 1 }]}>{t('Nag Mode (Every 10 min)')}</Text>
-              {task.isNagMode && <Text style={{color: '#4caf50', fontWeight:'bold'}}>ON</Text>}
+          {isPremium ? (
+            <View style={styles.premiumSection}>
+              <TouchableOpacity style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handlePremiumAction('nag')}>
+                <View style={styles.actionIconContainer}>
+                  <IconBell color={colors.textPrimary} />
+                </View>
+                <Text style={[styles.optionLabel, { color: colors.textPrimary, flex: 1 }]}>{t('Nag Mode (Every 10 min)')}</Text>
+                {task.isNagMode && <Text style={{color: '#4caf50', fontWeight:'bold'}}>ON</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handlePremiumAction('escalating')}>
+                <View style={styles.actionIconContainer}>
+                  <IconTrendingUp color={colors.textPrimary} />
+                </View>
+                <Text style={[styles.optionLabel, { color: colors.textPrimary, flex: 1 }]}>{t('Escalating Reminder')}</Text>
+                {task.escalationLevel === 'active' && <Text style={{color: '#4caf50', fontWeight:'bold'}}>ON</Text>}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.proUpsellRow} 
+              onPress={() => onOpenPremiumModal(t('Advanced Snoozing'))}
+            >
+              <Text style={[styles.proUpsellText, { color: colors.primary }]}>✦ {t('More options with Pro')} →</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handlePremiumAction('escalating')}>
-              <View style={styles.actionIconContainer}>
-                <IconTrendingUp color={colors.textPrimary} />
-              </View>
-              <Text style={[styles.optionLabel, { color: colors.textPrimary, flex: 1 }]}>{t('Escalating Reminder')}</Text>
-              {task.escalationLevel === 'active' && <Text style={{color: '#4caf50', fontWeight:'bold'}}>ON</Text>}
-            </TouchableOpacity>
-          </View>
+          )}
         </ScrollView>
       </View>
     </Modal>
@@ -343,15 +351,16 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
   premiumSection: {
-    marginTop: 20,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(128,128,128,0.2)'
+    marginTop: 10,
   },
-  premiumHeader: {
-    fontSize: 12,
+  proUpsellRow: {
+    marginTop: 10,
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  proUpsellText: {
+    fontSize: 15,
     fontWeight: 'bold',
-    marginBottom: 5,
-    marginLeft: 5
   }
 });

@@ -104,6 +104,9 @@ export default function GoalProgressCard({ colors }) {
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               {t('Set productivity goals to track your progress.')}
             </Text>
+            <TouchableOpacity style={[styles.ctaButton, { backgroundColor: colors.primary }]} onPress={() => handleOpenSetup()}>
+              <Text style={styles.ctaButtonText}>{t('+ Set a goal')}</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.goalsList}>
@@ -224,6 +227,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     lineHeight: 20
+  },
+  ctaButton: {
+    marginTop: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  ctaButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14
   },
   goalsList: {
     gap: 15

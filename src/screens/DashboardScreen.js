@@ -110,10 +110,22 @@ export default function DashboardScreen({ navigation }) {
     })
   ).current;
 
+  const [filterType, setFilterType] = useState('all'); // 'all', 'tasks', 'birthdays'
+
+  const filteredTasks = useMemo(() => {
+    const birthdayBoardIds = boards.filter(b => b.name.toLowerCase().includes('birthday')).map(b => b.id);
+    return tasks.filter(task => {
+      const isBirthday = task.taskname.toLowerCase().includes('birthday') || birthdayBoardIds.includes(task.boardId || 'main');
+      if (filterType === 'tasks') return !isBirthday;
+      if (filterType === 'birthdays') return isBirthday;
+      return true; // 'all'
+    });
+  }, [tasks, filterType, boards]);
+
   const { uncompletedTasks, totalTasks, completedTasks, calcTotal, calcCompleted } = useMemo(() => {
-    const uncomp = tasks.filter(task => !task.completed);
+    const uncomp = filteredTasks.filter(task => !task.completed);
     const tot = uncomp.length;
-    const comp = tasks.filter(task => task.completed).length;
+    const comp = filteredTasks.filter(task => task.completed).length;
     
     let cTotal = 0;
     let cCompleted = 0;
@@ -121,14 +133,14 @@ export default function DashboardScreen({ navigation }) {
     const nowDateStr = dayjs().format('YYYY-MM-DD');
 
     if (progressMode === 'daily') {
-      const dueTodayAll = tasks.filter(task => {
+      const dueTodayAll = filteredTasks.filter(task => {
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d === nowDateStr;
       });
       cCompleted = dueTodayAll.filter(t => t.completed).length;
       cTotal = dueTodayAll.length;
     } else if (progressMode === 'active') {
-      const completedToday = tasks.filter(task => {
+      const completedToday = filteredTasks.filter(task => {
         if (!task.completed) return false;
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d === nowDateStr;
@@ -138,7 +150,7 @@ export default function DashboardScreen({ navigation }) {
     } else if (progressMode === 'weekly') {
       const startOfWeekStr = dayjs().startOf('week').format('YYYY-MM-DD');
       const endOfWeekStr = dayjs().endOf('week').format('YYYY-MM-DD');
-      const dueThisWeekAll = tasks.filter(task => {
+      const dueThisWeekAll = filteredTasks.filter(task => {
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d >= startOfWeekStr && d <= endOfWeekStr;
       });
@@ -146,11 +158,11 @@ export default function DashboardScreen({ navigation }) {
       cTotal = dueThisWeekAll.length;
     } else {
       cCompleted = comp;
-      cTotal = tasks.length;
+      cTotal = filteredTasks.length;
     }
 
     return { uncompletedTasks: uncomp, totalTasks: tot, completedTasks: comp, calcTotal: cTotal, calcCompleted: cCompleted };
-  }, [tasks, progressMode]);
+  }, [filteredTasks, progressMode]);
 
   const completionPercentage = calcTotal > 0 ? Math.round((calcCompleted / calcTotal) * 100) : (progressMode === 'daily' || progressMode === 'weekly' ? 100 : 0);
   const currentFill = Math.max(0, Math.min(100, 100 - completionPercentage)); 
@@ -183,7 +195,7 @@ export default function DashboardScreen({ navigation }) {
     >
       <View style={styles.catInfo}>
         <Text style={[styles.catTitle, { color: colors.textPrimary }]}>{title}</Text>
-        <Text style={[styles.catSub, { color: colors.textSecondary }]}>{sub}</Text>
+        {sub ? <Text style={[styles.catSub, { color: colors.textSecondary }]}>{sub}</Text> : null}
       </View>
       <Text style={[styles.catNum, { color: colors.textPrimary }]}>{num}</Text>
     </TouchableOpacity>
@@ -207,6 +219,19 @@ export default function DashboardScreen({ navigation }) {
           </Text>
         </View>
 
+        {/* Filter Chips */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 20 }}>
+          <TouchableOpacity onPress={() => setFilterType('all')} style={[styles.filterChip, filterType === 'all' && { backgroundColor: colors.primary }]}>
+            <Text style={{ color: filterType === 'all' ? '#fff' : colors.textSecondary, fontWeight: 'bold', fontSize: 13 }}>{t('All')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setFilterType('tasks')} style={[styles.filterChip, filterType === 'tasks' && { backgroundColor: colors.primary }]}>
+            <Text style={{ color: filterType === 'tasks' ? '#fff' : colors.textSecondary, fontWeight: 'bold', fontSize: 13 }}>{t('Tasks')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setFilterType('birthdays')} style={[styles.filterChip, filterType === 'birthdays' && { backgroundColor: colors.primary }]}>
+            <Text style={{ color: filterType === 'birthdays' ? '#fff' : colors.textSecondary, fontWeight: 'bold', fontSize: 13 }}>{t('Birthdays')}</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <TouchableOpacity onPress={handlePrevMode} hitSlop={{top:20, bottom:20, left:20, right:20}} style={{ marginRight: 10 }}>
             <IconLeft color={colors.textSecondary} />
@@ -217,7 +242,7 @@ export default function DashboardScreen({ navigation }) {
           <Svg width="100" height="100" viewBox="0 0 100 100">
             <Circle 
               cx="50" cy="50" r="40" 
-              stroke={colors.surfaceContainer} 
+              stroke={isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'} 
               strokeWidth="10" 
               fill="none" 
             />
@@ -233,7 +258,8 @@ export default function DashboardScreen({ navigation }) {
             />
           </Svg>
           <View style={styles.progressTextInner}>
-            <Text style={[styles.percent, { color: colors.textPrimary }]}>{completionPercentage}%</Text>
+            <Text style={[styles.percent, { color: colors.textPrimary }]}>{calcCompleted}/{calcTotal}</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{completionPercentage}%</Text>
           </View>
         </View>
           <View style={[styles.progressInfo, { paddingLeft: 10, flex: 1 }]} importantForAccessibility="no-hide-descendants">
@@ -263,14 +289,14 @@ export default function DashboardScreen({ navigation }) {
 
       {/* Categories */}
       <View style={styles.categoriesGrid}>
-        <CategoryCard title={t("Tasks")} sub={t("all uncompleted")} num={totalTasks} color="#4caf50" sectionId={null} />
-        <CategoryCard title={t("Completed")} sub={t("done")} num={completedTasks} color="#4caf50" sectionId="completed" />
-        <CategoryCard title={t("Today")} sub={t("due today")} num={todayTasks.length} color="#ff9800" sectionId="today" />
-        <CategoryCard title={t("Tomorrow")} sub={t("coming up")} num={tomorrowTasks.length} color="#2196f3" sectionId="tomorrow" />
-        <CategoryCard title={t("This week")} sub={t("this week")} num={thisWeekTasks.length} color="#9c27b0" sectionId="on-this-week" />
-        <CategoryCard title={t("Next week")} sub={t("next week")} num={nextWeekTasks.length} color="#009688" sectionId="on-next-week" />
-        <CategoryCard title={t("Upcoming")} sub={t("future")} num={laterTasks.length} color="#d84315" sectionId="later" />
-        <CategoryCard title={t("Missed")} sub={t("overdue")} num={missedTasks.length} color="#f44336" sectionId="missed" />
+        <CategoryCard title={t("Tasks")} sub={undefined} num={totalTasks} color="#4caf50" sectionId={null} />
+        <CategoryCard title={t("Completed")} sub={undefined} num={completedTasks} color="#4caf50" sectionId="completed" />
+        <CategoryCard title={t("Today")} sub={undefined} num={todayTasks.length} color="#ff9800" sectionId="today" />
+        <CategoryCard title={t("Tomorrow")} sub={undefined} num={tomorrowTasks.length} color="#2196f3" sectionId="tomorrow" />
+        <CategoryCard title={t("This week")} sub={undefined} num={thisWeekTasks.length} color="#9c27b0" sectionId="on-this-week" />
+        <CategoryCard title={t("Next week")} sub={undefined} num={nextWeekTasks.length} color="#009688" sectionId="on-next-week" />
+        <CategoryCard title={t("Upcoming")} sub={undefined} num={laterTasks.length} color="#d84315" sectionId="later" />
+        <CategoryCard title={t("Missed")} sub={undefined} num={missedTasks.length} color="#f44336" sectionId="missed" />
       </View>
       
 
@@ -311,12 +337,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   percent: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   label: {
-    fontSize: 10,
-    textTransform: 'uppercase',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  filterChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(128,128,128,0.1)',
+    marginHorizontal: 5
   },
   progressInfo: {
     flex: 1,
