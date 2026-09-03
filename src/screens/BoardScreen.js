@@ -715,7 +715,7 @@ export default function BoardScreen({ route, navigation }) {
           }
           return null;
         }}
-        extraData={[collapsedSections, activeAddSectionId, tasks.length, colors]}
+        extraData={[collapsedSections, activeAddSectionId, tasks, colors, activeBoardId, boardTasks.length]}
         contentContainerStyle={styles.listContent}
         stickyHeaderIndices={stickyHeaderIndices}
         keyboardShouldPersistTaps="handled"

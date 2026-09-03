@@ -578,6 +578,7 @@ export default function CalendarScreen() {
           <FlashList
             style={{ flex: 1 }}
             data={flattenedData}
+            extraData={[collapsedBoardIds, selectionMode.selectedTaskIds, selectionMode.isActive, colors, flattenedData.length]}
             keyExtractor={(item, index) => item.type === 'task' ? `cal_task_${item.task.id}` : `cal_header_${item.group.id}_${index}`}
             getItemType={(item) => item.type}
             renderItem={({ item }) => {
