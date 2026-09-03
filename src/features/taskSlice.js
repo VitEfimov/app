@@ -78,10 +78,13 @@ const taskSlice = createSlice({
     reducers: {
         hydrateTaskState: (state, action) => {
             state.tasks = action.payload.map(t => {
-                if (t.completionDate && !t.dateString) {
-                    return { ...t, dateString: typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD') };
+                const updated = { ...t };
+                if (updated.completionDate) {
+                    updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
+                } else {
+                    updated.dateString = null;
                 }
-                return t;
+                return updated;
             });
         },
         addTaskSync(state, action) {
@@ -232,10 +235,13 @@ const taskSlice = createSlice({
             .addCase(fetchTasks.fulfilled, (state, action) => {
                 state.loading = false;
                 state.tasks = action.payload.map(t => {
-                    if (t.completionDate && !t.dateString) {
-                        return { ...t, dateString: typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD') };
+                    const updated = { ...t };
+                    if (updated.completionDate) {
+                        updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
+                    } else {
+                        updated.dateString = null;
                     }
-                    return t;
+                    return updated;
                 });
             })
             .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; });
@@ -519,6 +525,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                         }
                     }
                     updatedTask.completionDate = targetDate.toISOString();
+                    updatedTask.dateString = typeof updatedTask.completionDate === 'string' ? updatedTask.completionDate.split('T')[0] : targetDate.format('YYYY-MM-DD');
                     if (effectiveRescheduleReminders !== false && !updatedTask.completed) {
                         try {
                             const { scheduleTaskReminder } = require('../utils/notifications');

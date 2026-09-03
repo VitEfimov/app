@@ -378,7 +378,9 @@ export default function BoardScreen({ route, navigation }) {
           result.push({ type: 'task', task, section });
         });
       }
-      result.push({ type: 'footer', section });
+      if (section.id !== 'completed' && section.id !== 'missed' && !collapsedSections.includes(section.id)) {
+        result.push({ type: 'footer', section });
+      }
     });
     return result;
   }, [sections]);
@@ -579,7 +581,6 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const renderSectionFooter = ({ section }) => {
-    if (section.id === 'completed' || section.id === 'missed' || collapsedSections.includes(section.id)) return null;
     return (
       <InlineAddTask 
         sectionId={section.id} 
