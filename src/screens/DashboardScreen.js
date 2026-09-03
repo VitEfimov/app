@@ -112,17 +112,14 @@ export default function DashboardScreen({ navigation }) {
     })
   ).current;
 
-  const [filterType, setFilterType] = useState('all'); // 'all', 'tasks', 'birthdays'
+  const [filterType, setFilterType] = useState('all'); // 'all' or boardId
 
   const filteredTasks = useMemo(() => {
-    const birthdayBoardIds = boards.filter(b => b.name.toLowerCase().includes('birthday')).map(b => b.id);
     return tasks.filter(task => {
-      const isBirthday = task.taskname.toLowerCase().includes('birthday') || birthdayBoardIds.includes(task.boardId || 'main');
-      if (filterType === 'tasks') return !isBirthday;
-      if (filterType === 'birthdays') return isBirthday;
-      return true; // 'all'
+      if (filterType === 'all') return true;
+      return (task.boardId || 'main') === filterType;
     });
-  }, [tasks, filterType, boards]);
+  }, [tasks, filterType]);
 
   const { uncompletedTasks, totalTasks, completedTasks, calcTotal, calcCompleted } = useMemo(() => {
     const uncomp = filteredTasks.filter(task => !task.completed);
@@ -184,17 +181,8 @@ export default function DashboardScreen({ navigation }) {
       accessible={true} accessibilityRole="button" accessibilityLabel={`${title} category, ${sub}, ${num} tasks`}
       activeOpacity={0.8}
       onPress={() => {
-        let targetBoardId = null;
-        if (filterType === 'birthdays') {
-          const bId = boards.find(b => b.name.toLowerCase().includes('birthday'))?.id;
-          if (bId) targetBoardId = bId;
-        } else if (filterType === 'tasks') {
-          const mainId = boards.find(b => b.id === 'main')?.id || 'main';
-          targetBoardId = mainId;
-        }
-
-        if (targetBoardId) {
-          dispatch(setActiveBoardId(targetBoardId));
+        if (filterType !== 'all') {
+          dispatch(setActiveBoardId(filterType));
         }
 
         if (sectionId) {
@@ -235,16 +223,19 @@ export default function DashboardScreen({ navigation }) {
         </View>
 
         {/* Filter Chips */}
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 20 }}>
-          <TouchableOpacity onPress={() => setFilterType('all')} style={[styles.filterChip, filterType === 'all' && { backgroundColor: colors.primary }]}>
-            <Text style={{ color: filterType === 'all' ? '#fff' : colors.textSecondary, fontWeight: 'bold', fontSize: 13 }}>{t('All')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setFilterType('tasks')} style={[styles.filterChip, filterType === 'tasks' && { backgroundColor: colors.primary }]}>
-            <Text style={{ color: filterType === 'tasks' ? '#fff' : colors.textSecondary, fontWeight: 'bold', fontSize: 13 }}>{t('Tasks')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setFilterType('birthdays')} style={[styles.filterChip, filterType === 'birthdays' && { backgroundColor: colors.primary }]}>
-            <Text style={{ color: filterType === 'birthdays' ? '#fff' : colors.textSecondary, fontWeight: 'bold', fontSize: 13 }}>{t('Birthdays')}</Text>
-          </TouchableOpacity>
+        <View style={{ marginBottom: 20 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 10, flexGrow: 1, justifyContent: boards.length < 3 ? 'center' : 'flex-start' }}>
+            <TouchableOpacity onPress={() => setFilterType('all')} style={[styles.filterChip, filterType === 'all' && { backgroundColor: colors.primary }]}>
+              <Text style={{ color: filterType === 'all' ? '#fff' : colors.textSecondary, fontWeight: 'bold', fontSize: 13 }}>{t('All')}</Text>
+            </TouchableOpacity>
+            {boards.map(board => (
+              <TouchableOpacity key={board.id} onPress={() => setFilterType(board.id)} style={[styles.filterChip, filterType === board.id && { backgroundColor: colors.primary }]}>
+                <Text style={{ color: filterType === board.id ? '#fff' : colors.textSecondary, fontWeight: 'bold', fontSize: 13 }}>
+                  {board.name === 'Main' ? t('Tasks') : board.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
