@@ -684,7 +684,7 @@ export default function BoardScreen({ route, navigation }) {
 
       <FlashList
         data={flattenedData}
-        keyExtractor={(item, index) => item.type === 'task' ? `task_${item.task.id}` : `${item.type}_${item.section.id}_${index}`}
+        keyExtractor={(item, index) => item.type === 'task' ? `task_${item.task.id}_${item.section.id}_${index}` : `${item.type}_${item.section.id}_${index}`}
         getItemType={(item) => item.type}
         renderItem={({ item }) => {
           if (item.type === 'header') return renderSectionHeader({ section: item.section });

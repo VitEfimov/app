@@ -11,6 +11,7 @@ import TaskDetailsModal from '../components/TaskDetailsModal';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { processAutoManageTasks } from '../features/taskSlice';
+import { setActiveBoardId } from '../features/userSlice';
 
 const IconLeft = ({ color }) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -183,6 +184,19 @@ export default function DashboardScreen({ navigation }) {
       accessible={true} accessibilityRole="button" accessibilityLabel={`${title} category, ${sub}, ${num} tasks`}
       activeOpacity={0.8}
       onPress={() => {
+        let targetBoardId = null;
+        if (filterType === 'birthdays') {
+          const bId = boards.find(b => b.name.toLowerCase().includes('birthday'))?.id;
+          if (bId) targetBoardId = bId;
+        } else if (filterType === 'tasks') {
+          const mainId = boards.find(b => b.id === 'main')?.id || 'main';
+          targetBoardId = mainId;
+        }
+
+        if (targetBoardId) {
+          dispatch(setActiveBoardId(targetBoardId));
+        }
+
         if (sectionId) {
           navigation.navigate('Board', { sectionId });
         } else {
