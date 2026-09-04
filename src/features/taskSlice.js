@@ -378,7 +378,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         autoDeleteOverdueDays: themeState.autoDeleteOverdueDays !== undefined ? themeState.autoDeleteOverdueDays : 0,
         autoDeleteCompletedDays: themeState.autoDeleteCompletedDays !== undefined ? themeState.autoDeleteCompletedDays : 0,
         confirmBeforeDeletion: themeState.confirmBeforeDeletion !== undefined ? themeState.confirmBeforeDeletion : true,
-        autoRescheduleTime: themeState.autoRescheduleTime || '00:00',
+        autoRescheduleTime: (themeState.autoRescheduleTime && themeState.autoRescheduleTime !== '00:00') ? themeState.autoRescheduleTime : '23:59',
         rescheduleTransferredReminders: themeState.rescheduleTransferredReminders !== undefined ? themeState.rescheduleTransferredReminders : true
     };
     
@@ -422,7 +422,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
             ? boardCustom.autoDeleteCompletedDays 
             : globalSettings.autoDeleteCompletedDays;
             
-        const effectiveAutoRescheduleTime = (isOverride && boardCustom?.autoRescheduleTime !== undefined) 
+        const effectiveAutoRescheduleTime = (isOverride && boardCustom?.autoRescheduleTime && boardCustom?.autoRescheduleTime !== '00:00') 
             ? boardCustom.autoRescheduleTime 
             : globalSettings.autoRescheduleTime;
 
@@ -430,9 +430,9 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
             ? boardCustom.rescheduleTransferredReminders
             : globalSettings.rescheduleTransferredReminders;
 
-        let rescheduleHour = 0;
-        let rescheduleMinute = 0;
-        if (effectiveAutoRescheduleTime) {
+        let rescheduleHour = 23;
+        let rescheduleMinute = 59;
+        if (effectiveAutoRescheduleTime && effectiveAutoRescheduleTime !== '00:00') {
             const timeStr = String(effectiveAutoRescheduleTime).trim();
             const isPm = /pm/i.test(timeStr);
             const isAm = /am/i.test(timeStr);
@@ -444,12 +444,10 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
             if (isAm && rescheduleHour === 12) rescheduleHour = 0;
         }
 
-        const hasTaskTime = !!(task.time && task.time !== 'None' && task.time !== '--:--');
         const rescheduleTimeToday = dayjs().hour(rescheduleHour).minute(rescheduleMinute).second(0).millisecond(0);
         
-        // Tasks WITH a due time reschedule at the user's chosen autoRescheduleTime cutoff (e.g. 9:00 PM)
-        // Tasks WITHOUT a due time reschedule at default 12:00 AM (00:00) when the new day starts (taskDate.isBefore(actualToday))
-        const isPastCutoffToday = hasTaskTime && taskDate.isSame(actualToday) && dayjs().isAfter(rescheduleTimeToday);
+        // Tasks on today are only past cutoff if current time is after the user's chosen autoRescheduleTime cutoff (default 23:59)
+        const isPastCutoffToday = taskDate.isSame(actualToday) && dayjs().isAfter(rescheduleTimeToday);
         const isOverdueOrPastCutoff = taskDate.isBefore(actualToday) || isPastCutoffToday;
 
         if (updatedTask.completed) {
@@ -516,12 +514,20 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                     }
 
                     let targetDate = actualToday;
-                    if (effectiveAutoTransferMode === 'tomorrow' || (effectiveAutoTransferMode === 'today' && isPastCutoffToday)) {
+                    const isCurrentCutoffPassed = dayjs().isAfter(rescheduleTimeToday);
+
+                    if (effectiveAutoTransferMode === 'today') {
+                        if (isCurrentCutoffPassed) {
+                            targetDate = targetDate.add(1, 'day');
+                        }
+                    } else if (effectiveAutoTransferMode === 'tomorrow') {
                         targetDate = targetDate.add(1, 'day');
                     } else if (effectiveAutoTransferMode === 'next_workday') {
-                        targetDate = targetDate.add(1, 'day');
-                        while (targetDate.day() === 0 || targetDate.day() === 6) {
+                        if (isCurrentCutoffPassed || targetDate.day() === 0 || targetDate.day() === 6) {
                             targetDate = targetDate.add(1, 'day');
+                            while (targetDate.day() === 0 || targetDate.day() === 6) {
+                                targetDate = targetDate.add(1, 'day');
+                            }
                         }
                     }
                     updatedTask.completionDate = targetDate.toISOString();

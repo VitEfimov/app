@@ -109,11 +109,12 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
 
     const newTask = {
       id: new Date().getTime().toString(),
-      boardId: activeBoardId,
+      boardId: activeBoardId || 'main',
       taskname: taskName,
-      creationDate: new Date().toLocaleDateString(),
+      creationDate: new Date().toISOString(),
       lastUpdatedDate: null,
       completionDate: dayjs(selectedDate).toISOString(),
+      dateString: dayjs(selectedDate).format('YYYY-MM-DD'),
       priority: 'none',
       completed: false,
       description: { text: '', img: '', url: '' }

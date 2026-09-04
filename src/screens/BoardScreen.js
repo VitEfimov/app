@@ -385,6 +385,17 @@ export default function BoardScreen({ route, navigation }) {
     return result;
   }, [sections]);
 
+  const boardCounts = useMemo(() => {
+    const counts = {};
+    tasks.forEach(t => {
+      if (!t.completed) {
+        const bId = t.boardId || 'main';
+        counts[bId] = (counts[bId] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [tasks]);
+
   const stickyHeaderIndices = useMemo(() => {
     return flattenedData.map((item, index) => item.type === 'header' ? index : -1).filter(i => i !== -1);
   }, [flattenedData]);
@@ -645,7 +656,7 @@ export default function BoardScreen({ route, navigation }) {
                       { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
                     ]}>{board.name === 'Main' ? t('Main') : board.name}</Text>
                     {(() => {
-                      const count = tasks.filter(t => (t.boardId || 'main') === board.id && !t.completed).length;
+                      const count = boardCounts[board.id] || 0;
                       if (count > 0) {
                         return (
                           <View style={{
@@ -684,8 +695,8 @@ export default function BoardScreen({ route, navigation }) {
 
       <FlashList
         data={flattenedData}
-        keyExtractor={(item, index) => item.type === 'task' ? `task_${item.task.id}_${item.section.id}_${index}` : `${item.type}_${item.section.id}_${index}`}
-        getItemType={(item) => item.type}
+        keyExtractor={(item) => item.type === 'task' ? `task_${item.task.id}_${item.section.id}` : `${item.type}_${item.section.id}`}
+        getItemType={(item) => item.type === 'task' ? 'task' : `${item.type}_${item.section.id}`}
         renderItem={({ item }) => {
           if (item.type === 'header') return renderSectionHeader({ section: item.section });
           if (item.type === 'footer') return renderSectionFooter({ section: item.section });
@@ -715,7 +726,7 @@ export default function BoardScreen({ route, navigation }) {
           }
           return null;
         }}
-        extraData={[collapsedSections, activeAddSectionId, tasks, colors, activeBoardId, boardTasks.length]}
+        extraData={[collapsedSections, activeAddSectionId, tasks, colors, activeBoardId, boardTasks.length, flattenedData.length]}
         contentContainerStyle={styles.listContent}
         stickyHeaderIndices={stickyHeaderIndices}
         keyboardShouldPersistTaps="handled"
