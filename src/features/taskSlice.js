@@ -446,9 +446,8 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
 
         const rescheduleTimeToday = dayjs().hour(rescheduleHour).minute(rescheduleMinute).second(0).millisecond(0);
         
-        // Tasks on today are only past cutoff if current time is after the user's chosen autoRescheduleTime cutoff (default 23:59)
-        const isPastCutoffToday = taskDate.isSame(actualToday) && dayjs().isAfter(rescheduleTimeToday);
-        const isOverdueOrPastCutoff = taskDate.isBefore(actualToday) || isPastCutoffToday;
+        // Auto-transfer of uncompleted tasks only applies to tasks strictly in the past (before today)
+        const isOverdueOrPastCutoff = taskDate.isBefore(actualToday);
 
         if (updatedTask.completed) {
             if (effectiveRemovePriorityWhenCompleted && updatedTask.priority !== 'none') {

@@ -118,6 +118,7 @@ const initialState = {
     isGuest: loadIsGuestFromLocalStorage(),
     boards: loadBoardsFromLocalStorage(),
     activeBoardId: 'main',
+    dashboardFilterType: 'all',
     layoutVersion: loadLayoutVersionFromLocalStorage(),
 };
 
@@ -133,6 +134,7 @@ const userSlice = createSlice({
             state.isGuest = false;
             state.boards = loadBoardsFromLocalStorage();
             state.activeBoardId = 'main';
+            state.dashboardFilterType = 'all';
             AsyncStorage.removeItem('isGuest');
         },
         continueAsGuest: (state) => {
@@ -149,6 +151,10 @@ const userSlice = createSlice({
         },
         setActiveBoardId: (state, action) => {
             state.activeBoardId = action.payload;
+        },
+        setDashboardFilterType: (state, action) => {
+            state.dashboardFilterType = action.payload;
+            AsyncStorage.setItem('dashboardFilterType', action.payload);
         },
         toggleLayoutVersion: (state) => {
             state.layoutVersion = state.layoutVersion === 'v1' ? 'v2' : 'v1';
@@ -254,5 +260,5 @@ const userSlice = createSlice({
     }
 });
 
-export const { hydrateUserState, logout, continueAsGuest, updateUserTheme, updateShowWeather, setActiveBoardId, toggleLayoutVersion } = userSlice.actions;
+export const { hydrateUserState, logout, continueAsGuest, updateUserTheme, updateShowWeather, setActiveBoardId, setDashboardFilterType, toggleLayoutVersion } = userSlice.actions;
 export default userSlice.reducer;

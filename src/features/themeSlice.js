@@ -28,7 +28,7 @@ const initialState = {
   calendarPanePosition: loaded?.calendarPanePosition || null,
   progressMode: loaded?.progressMode || 'daily',
   defaultSnoozeTime: loaded?.defaultSnoozeTime || 30,
-  autoRescheduleTime: loaded?.autoRescheduleTime || '00:00',
+  autoRescheduleTime: loaded?.autoRescheduleTime || '23:59',
   isBoardsCollapsed: loaded?.isBoardsCollapsed || false,
   randomColorDaily: loaded?.randomColorDaily || false,
   lastRandomColorDate: loaded?.lastRandomColorDate || null,

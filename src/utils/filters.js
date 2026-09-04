@@ -5,12 +5,17 @@ dayjs.extend(isoWeek);
 
 export function getTaskDateStr(task) {
     if (!task) return '';
-    if (task.dateString) return task.dateString;
-    if (!task.completionDate) return '';
-    if (typeof task.completionDate === 'string') {
-        return task.completionDate.split('T')[0];
+    const dateVal = task.completionDate || task.dateString;
+    if (!dateVal) return '';
+    
+    if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+        return dateVal;
     }
-    const parsed = dayjs(task.completionDate);
+    if (typeof dateVal === 'string' && dateVal.includes('T')) {
+        const part = dateVal.split('T')[0];
+        if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+    }
+    const parsed = dayjs(dateVal);
     return parsed.isValid() ? parsed.format('YYYY-MM-DD') : '';
 }
 
@@ -23,16 +28,7 @@ export function isTaskMissed(task, refNow, refNowDateStr) {
     const now = refNow || dayjs();
     const nowDateStr = refNowDateStr || now.format('YYYY-MM-DD');
 
-    if (taskDateStr < nowDateStr) return true;
-    if (taskDateStr === nowDateStr && task.time && task.time !== 'None' && task.time !== '--:--') {
-        const [hours, minutes] = task.time.split(':').map(Number);
-        if (!isNaN(hours) && !isNaN(minutes)) {
-            const nowTimeStr = now.format('HH:mm');
-            const formattedTaskTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-            if (formattedTaskTime < nowTimeStr) return true;
-        }
-    }
-    return false;
+    return taskDateStr < nowDateStr;
 }
 
 export function isTaskToday(task, refNow, refNowDateStr) {
@@ -42,11 +38,10 @@ export function isTaskToday(task, refNow, refNowDateStr) {
     const nowDateStr = refNowDateStr || now.format('YYYY-MM-DD');
     const taskDateStr = getTaskDateStr(task);
     
-    // Tasks without a completionDate default to Today so they are never lost/missing
-    if (!task.completionDate || !taskDateStr) return true;
+    // Tasks without any date default to Today so they are never lost/missing
+    if (!task.completionDate && !task.dateString) return true;
     
-    if (taskDateStr !== nowDateStr) return false;
-    return !isTaskMissed(task, now, nowDateStr);
+    return taskDateStr === nowDateStr;
 }
 
 export default function getFilters(refNow) {

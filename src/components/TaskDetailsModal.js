@@ -1123,21 +1123,19 @@ useEffect(() => {
               </View>
             </View>
 
-            {isPremium && (
-              <View style={{ marginTop: 15 }}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
-                <TouchableOpacity 
-                  style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 8 }]}
-                  onPress={() => setIsRepeatModalVisible(true)}
-                >
-                  <Text style={{ color: colors.textPrimary }}>
-                    {repeatConfig.preset === 'custom' ? t('Custom...') : 
-                     repeatConfig.preset === 'None' ? t('None') : 
-                     repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <View style={{ marginTop: 15 }}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
+              <TouchableOpacity 
+                style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 8 }]}
+                onPress={() => setIsRepeatModalVisible(true)}
+              >
+                <Text style={{ color: colors.textPrimary }}>
+                  {repeatConfig.preset === 'custom' ? t('Custom...') : 
+                   repeatConfig.preset === 'None' ? t('None') : 
+                   (t(repeatConfig.preset) || repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {isPremium && reminder !== 'None' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 15 }}>

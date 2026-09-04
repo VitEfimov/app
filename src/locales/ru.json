@@ -435,5 +435,6 @@
   "forward": "на более позднюю дату",
   "backward": "на более раннюю дату",
   "Default Reminder Option": "Вариант напоминания по умолчанию",
-  "Select Year": "Выбрать год"
+  "Select Year": "Выбрать год",
+  "Date unchanged. You can change the date on the edit task page.": "Дата не изменилась. Вы можете изменить дату на странице редактирования."
 }

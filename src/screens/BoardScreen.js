@@ -361,14 +361,6 @@ export default function BoardScreen({ route, navigation }) {
     ];
   }, [missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, collapsedSections, t]);
 
-  React.useEffect(() => {
-    if (route?.params?.sectionId) {
-      setCollapsedSections(allSectionIds.filter(id => id !== route.params.sectionId));
-    } else {
-      setCollapsedSections(['tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed']);
-    }
-  }, [route?.params?.sectionId]);
-
   const flattenedData = useMemo(() => {
     const result = [];
     sections.forEach(section => {
@@ -400,7 +392,22 @@ export default function BoardScreen({ route, navigation }) {
     return flattenedData.map((item, index) => item.type === 'header' ? index : -1).filter(i => i !== -1);
   }, [flattenedData]);
 
+  const getSectionTasks = useCallback((section) => {
+    if (!section) return [];
+    switch (section.id) {
+      case 'missed': return missedTasks;
+      case 'today': return todayTasks;
+      case 'tomorrow': return tomorrowTasks;
+      case 'on-this-week': return thisWeekTasks;
+      case 'on-next-week': return nextWeekTasks;
+      case 'later': return laterTasks;
+      case 'completed': return completedTasks;
+      default: return section.data || [];
+    }
+  }, [missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks]);
+
   const handleCompleteSection = (section) => {
+    const tasksToComplete = getSectionTasks(section);
     setConfirmConfig({
       isVisible: true,
       title: 'Complete All',
@@ -408,7 +415,6 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: 'Complete',
       isDestructive: false,
       onConfirm: () => {
-        const tasksToComplete = [...section.data];
         tasksToComplete.forEach(task => {
           dispatch(updateTask({ taskId: task.id, completed: true }));
         });
@@ -428,6 +434,8 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleMoveForward = (section) => {
+    const targetTasks = getSectionTasks(section);
+    if (!targetTasks || targetTasks.length === 0) return;
     setConfirmConfig({
       isVisible: true,
       title: t('Move Forward'),
@@ -435,25 +443,38 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: t('Move'),
       isDestructive: false,
       onConfirm: () => {
-        const today = dayjs();
+        const today = dayjs().startOf('day');
         let newDate;
         switch (section.id) {
             case 'missed': newDate = today.toISOString(); break;
             case 'today': newDate = today.add(1, 'day').toISOString(); break;
-            case 'tomorrow': newDate = today.endOf('isoWeek').toISOString(); break;
+            case 'tomorrow': newDate = today.add(2, 'day').toISOString(); break;
             case 'on-this-week': newDate = today.add(1, 'week').startOf('isoWeek').toISOString(); break;
             case 'on-next-week': newDate = today.add(2, 'week').startOf('isoWeek').toISOString(); break;
-            default: return;
+            default: newDate = today.add(1, 'week').toISOString(); break;
         }
-        section.data.forEach(task => {
-          dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
+        const newDateStr = dayjs(newDate).format('YYYY-MM-DD');
+        let movedCount = 0;
+        targetTasks.forEach(task => {
+          const prevDateStr = task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : '';
+          if (prevDateStr !== newDateStr) {
+            dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
+            movedCount++;
+          }
         });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        if (movedCount === 0) {
+          showToast(t('Date unchanged. You can change the date on the edit task page.'));
+        } else {
+          showToast(`${movedCount} ${t('tasks moved forward')}`);
+        }
       }
     });
   };
 
   const handleMoveBackward = (section) => {
+    const targetTasks = getSectionTasks(section);
+    if (!targetTasks || targetTasks.length === 0) return;
     setConfirmConfig({
       isVisible: true,
       title: t('Move Backward'),
@@ -461,36 +482,38 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: t('Move'),
       isDestructive: false,
       onConfirm: () => {
-        const today = dayjs();
+        const today = dayjs().startOf('day');
         let newDate;
         switch (section.id) {
+            case 'missed': newDate = today.subtract(2, 'day').toISOString(); break;
             case 'today': newDate = today.subtract(1, 'day').toISOString(); break;
             case 'tomorrow': newDate = today.toISOString(); break;
             case 'on-this-week': newDate = today.add(1, 'day').toISOString(); break;
             case 'on-next-week': newDate = today.endOf('isoWeek').toISOString(); break;
             case 'later': newDate = today.add(1, 'week').startOf('isoWeek').toISOString(); break;
-            default: return;
+            default: newDate = today.subtract(1, 'day').toISOString(); break;
         }
-        section.data.forEach(task => {
-          dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
+        const newDateStr = dayjs(newDate).format('YYYY-MM-DD');
+        let movedCount = 0;
+        targetTasks.forEach(task => {
+          const prevDateStr = task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : '';
+          if (prevDateStr !== newDateStr) {
+            dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
+            movedCount++;
+          }
         });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        if (movedCount === 0) {
+          showToast(t('Date unchanged. You can change the date on the edit task page.'));
+        } else {
+          showToast(`${movedCount} ${t('tasks moved backward')}`);
+        }
       }
     });
   };
 
   const handleDeleteSection = (section) => {
-    let tasksToDelete = [];
-    switch (section.id) {
-      case 'missed': tasksToDelete = missedTasks; break;
-      case 'today': tasksToDelete = todayTasks; break;
-      case 'tomorrow': tasksToDelete = tomorrowTasks; break;
-      case 'on-this-week': tasksToDelete = thisWeekTasks; break;
-      case 'on-next-week': tasksToDelete = nextWeekTasks; break;
-      case 'later': tasksToDelete = laterTasks; break;
-      case 'completed': tasksToDelete = completedTasks; break;
-      default: tasksToDelete = section.data || [];
-    }
+    const tasksToDelete = getSectionTasks(section);
 
     setConfirmConfig({
       isVisible: true,
@@ -695,6 +718,7 @@ export default function BoardScreen({ route, navigation }) {
 
       <FlashList
         data={flattenedData}
+        extraData={[activeBoardId, tasks, collapsedSections, sortConfig, isBoardsCollapsed, activeAddSectionId, selectionMode, flattenedData]}
         keyExtractor={(item) => item.type === 'task' ? `task_${item.task.id}_${item.section.id}` : `${item.type}_${item.section.id}`}
         getItemType={(item) => item.type === 'task' ? 'task' : `${item.type}_${item.section.id}`}
         renderItem={({ item }) => {
@@ -726,9 +750,8 @@ export default function BoardScreen({ route, navigation }) {
           }
           return null;
         }}
-        extraData={[collapsedSections, activeAddSectionId, tasks, colors, activeBoardId, boardTasks.length, flattenedData.length]}
         contentContainerStyle={styles.listContent}
-        stickyHeaderIndices={stickyHeaderIndices}
+        stickyHeaderIndices={Platform.OS === 'web' ? undefined : stickyHeaderIndices}
         keyboardShouldPersistTaps="handled"
         estimatedItemSize={70}
       />

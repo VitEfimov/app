@@ -80,7 +80,11 @@ const IconMoveBackward = ({ color }) => (
 
 import MoveBoardModal from './MoveBoardModal';
 import ConfirmModal from './ConfirmModal';
-import RNShare from 'react-native-share';
+
+let RNShare;
+if (Platform.OS !== 'web') {
+  RNShare = require('react-native-share').default;
+}
 
 export default function TaskQuickMenuModal({
   isVisible,
@@ -292,9 +296,20 @@ export default function TaskQuickMenuModal({
         newDate = today.add(1, 'day').toISOString();
       } else if (taskDate.isSame(today.add(1, 'day'))) {
         newDate = today.toISOString();
-      } else {
+      } else if (taskDate.isSame(today)) {
         newDate = today.subtract(1, 'day').toISOString();
+      } else {
+        newDate = taskDate.subtract(1, 'day').toISOString();
       }
+    }
+
+    const prevDateStr = task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : '';
+    const newDateStr = dayjs(newDate).format('YYYY-MM-DD');
+
+    if (prevDateStr === newDateStr) {
+      onClose();
+      showToast(t('Date unchanged. You can change the date on the edit task page.'));
+      return;
     }
 
     const prevDate = task.completionDate;

@@ -86,7 +86,8 @@ function InitApp() {
   const [ready, setReady] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [pendingNotificationPayload, setPendingNotificationPayload] = useState(null);
-  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+  const shareIntentResult = Platform.OS !== 'web' ? useShareIntent() : null;
+  const { hasShareIntent, shareIntent, resetShareIntent } = shareIntentResult || {};
   const themeReducer = useSelector(state => state.themeReducer);
 
   useEffect(() => {
@@ -409,6 +410,9 @@ function InitApp() {
 
         const boardsJson = await AsyncStorage.getItem('boards');
         if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
+
+        const dashboardFilterType = await AsyncStorage.getItem('dashboardFilterType');
+        if (dashboardFilterType) dispatch(hydrateUserState({ dashboardFilterType }));
 
         const pomodoroJson = await AsyncStorage.getItem('pomodoro');
         if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));

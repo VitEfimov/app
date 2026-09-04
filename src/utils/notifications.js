@@ -495,6 +495,7 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 dayjs.extend(customParseFormat);
 export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false, themeState = {}, advancedOptions = {}) {
+  if (Platform.OS === 'web') return [];
   DevLogger.info(`scheduleTaskReminder called for task: ${taskName}`, { reminderValue, completionDateStr, timeStr, isAlarm });
   if (!completionDateStr) {
     DevLogger.warn(`scheduleTaskReminder: No completionDateStr provided, aborting`);
@@ -594,6 +595,7 @@ export async function scheduleExactTaskReminder(
   category = 'task_reminder',
   themeState = {}
 ) {
+  if (Platform.OS === 'web') return null;
   const targetDate = dayjs(targetDateObj);
   DevLogger.info(`scheduleExactTaskReminder for: ${taskName}`, { targetDate: targetDate.format(), isAlarm, category });
 
@@ -699,6 +701,7 @@ export async function scheduleLocalNotification(
   seconds = 3,
   isSilent = false
 ) {
+  if (Platform.OS === 'web') return null;
   try {
     if (Platform.OS === 'android') {
       // Use v2 to force Android to create a fresh channel with these settings
@@ -721,7 +724,7 @@ export async function scheduleLocalNotification(
           body,
           sound: isSilent ? null : 'default',
           // Use LOW priority to match channel importance
-          priority: isSilent ? Notifications.AndroidNotificationPriority.LOW : Notifications.AndroidNotificationPriority.MAX,
+          priority: isSilent ? Notifications.AndroidNotificationPriority.LOW : Notifications.AndroidImportance.MAX,
         },
 
         trigger: {
@@ -762,6 +765,7 @@ export async function scheduleLocalNotification(
 }
 
 export async function cancelNotification(notificationIds) {
+  if (Platform.OS === 'web') return;
   if (notificationIds) {
     const ids = Array.isArray(notificationIds) ? notificationIds : [notificationIds];
     for (const id of ids) {

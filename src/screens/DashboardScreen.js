@@ -11,7 +11,7 @@ import TaskDetailsModal from '../components/TaskDetailsModal';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { processAutoManageTasks } from '../features/taskSlice';
-import { setActiveBoardId } from '../features/userSlice';
+import { setActiveBoardId, setDashboardFilterType } from '../features/userSlice';
 
 const IconLeft = ({ color }) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -33,8 +33,13 @@ export default function DashboardScreen({ navigation }) {
   const dispatch = useDispatch();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || []);
+  const filterType = useSelector(state => state.userReducer.dashboardFilterType || 'all');
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
+
+  const setFilterType = useCallback((newFilter) => {
+    dispatch(setDashboardFilterType(newFilter));
+  }, [dispatch]);
 
   useFocusEffect(
     useCallback(() => {
@@ -42,32 +47,39 @@ export default function DashboardScreen({ navigation }) {
     }, [dispatch])
   );
 
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      if (filterType === 'all') return true;
+      return (task.boardId || 'main') === filterType;
+    });
+  }, [tasks, filterType]);
+
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
     const now = dayjs();
     const nowDateStr = now.format('YYYY-MM-DD');
     const FILTERS = getFilters(now);
 
     return {
-      todayTasks: tasks.filter(task => isTaskToday(task, now, nowDateStr)),
-      tomorrowTasks: tasks.filter(task => {
+      todayTasks: filteredTasks.filter(task => isTaskToday(task, now, nowDateStr)),
+      tomorrowTasks: filteredTasks.filter(task => {
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d === FILTERS.tomorrow && !task.completed;
       }),
-      thisWeekTasks: tasks.filter(task => {
+      thisWeekTasks: filteredTasks.filter(task => {
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d > FILTERS.today && d !== FILTERS.tomorrow && d <= FILTERS['on-this-week'] && !task.completed;
       }),
-      nextWeekTasks: tasks.filter(task => {
+      nextWeekTasks: filteredTasks.filter(task => {
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d > FILTERS['on-this-week'] && d <= FILTERS['on-next-week'] && !task.completed;
       }),
-      laterTasks: tasks.filter(task => {
+      laterTasks: filteredTasks.filter(task => {
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d > FILTERS['on-next-week'] && !task.completed;
       }),
-      missedTasks: tasks.filter(task => isTaskMissed(task, now, nowDateStr))
+      missedTasks: filteredTasks.filter(task => isTaskMissed(task, now, nowDateStr))
     };
-  }, [tasks]);
+  }, [filteredTasks]);
 
   const progressMode = useSelector(state => state.themeReducer.progressMode) || 'daily';
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
@@ -111,15 +123,6 @@ export default function DashboardScreen({ navigation }) {
       },
     })
   ).current;
-
-  const [filterType, setFilterType] = useState('all'); // 'all' or boardId
-
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      if (filterType === 'all') return true;
-      return (task.boardId || 'main') === filterType;
-    });
-  }, [tasks, filterType]);
 
   const { uncompletedTasks, totalTasks, completedTasks, calcTotal, calcCompleted } = useMemo(() => {
     const uncomp = filteredTasks.filter(task => !task.completed);
