@@ -13,6 +13,7 @@ import PremiumModal from '../components/PremiumModal';
 import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
 import MoveBoardModal from '../components/MoveBoardModal';
+import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
 import Modal from 'react-native-modal';
@@ -72,6 +73,7 @@ export default function BoardScreen({ route, navigation }) {
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
   const [premiumFeatureName, setPremiumFeatureName] = useState('');
   
+  const [isCreateBoardVisible, setCreateBoardVisible] = useState(false);
   const [promptConfig, setPromptConfig] = useState({ isVisible: false, type: null, targetBoard: null });
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
   const [sectionOptionsConfig, setSectionOptionsConfig] = useState({ isVisible: false, section: null });
@@ -308,7 +310,11 @@ export default function BoardScreen({ route, navigation }) {
     return hiddenIds;
   }, [boardTasks, showRecurringTasksOnBoard]);
 
-  const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks } = useMemo(() => {
+  const activeBoard = useMemo(() => {
+    return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
+  }, [boards, activeBoardId]);
+
+  const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks, todoTasks, upcomingBirthdayTasks, needToBuyTasks } = useMemo(() => {
     const now = dayjs();
     const FILTERS = getFilters(now);
 
@@ -319,7 +325,7 @@ export default function BoardScreen({ route, navigation }) {
           const pValues = { high: 3, medium: 2, low: 1, none: 0 };
           const pA = pValues[a.priority?.toLowerCase()] || 0;
           const pB = pValues[b.priority?.toLowerCase()] || 0;
-          if (pA !== pB) return pB - pA; // Higher priority first
+          if (pA !== pB) return pB - pA;
         }
 
         const dayA = a.completionDate ? a.completionDate.substring(0, 10) : '9999-12-31';
@@ -338,6 +344,9 @@ export default function BoardScreen({ route, navigation }) {
       });
     };
 
+    const boardUncompleted = sortTasks(boardTasks.filter(t => !t.completed), 'today');
+    const boardCompleted = sortTasks(boardTasks.filter(t => t.completed), 'completed');
+
     return {
       todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task, now) && !hiddenRecurringTaskIds.has(task.id)), 'today'),
       tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'tomorrow'),
@@ -345,11 +354,35 @@ export default function BoardScreen({ route, navigation }) {
       nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'on-next-week'),
       laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'later'),
       missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task, now)), 'missed'),
-      completedTasks: sortTasks(boardTasks.filter(task => task.completed), 'completed')
+      completedTasks: boardCompleted,
+      todoTasks: boardUncompleted,
+      upcomingBirthdayTasks: boardUncompleted,
+      needToBuyTasks: boardUncompleted
     };
   }, [boardTasks, sortConfig, hiddenRecurringTaskIds]);
 
   const sections = useMemo(() => {
+    if (activeBoard.type === 'simple_list') {
+      return [
+        { id: 'today', title: t('To-Do') || 'To-Do', data: collapsedSections.includes('today') ? [] : todoTasks, count: todoTasks.length, color: '#10B981' },
+        ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed') || 'Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
+      ];
+    }
+
+    if (activeBoard.type === 'birthdays') {
+      return [
+        { id: 'today', title: t('Upcoming Birthdays') || 'Upcoming Birthdays', data: collapsedSections.includes('today') ? [] : upcomingBirthdayTasks, count: upcomingBirthdayTasks.length, color: '#EC4899' },
+        ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Past / Completed') || 'Past / Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
+      ];
+    }
+
+    if (activeBoard.type === 'shopping') {
+      return [
+        { id: 'today', title: t('Need to Buy') || 'Need to Buy', data: collapsedSections.includes('today') ? [] : needToBuyTasks, count: needToBuyTasks.length, color: '#F59E0B' },
+        ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Purchased') || 'Purchased', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
+      ];
+    }
+
     return [
       ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
       { id: 'today', title: t('Today'), data: collapsedSections.includes('today') ? [] : todayTasks, count: todayTasks.length, color: '#ff9800' },
@@ -359,7 +392,7 @@ export default function BoardScreen({ route, navigation }) {
       { id: 'later', title: t('Upcoming'), data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
       ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed'), data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4caf50' }] : []),
     ];
-  }, [missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, collapsedSections, t]);
+  }, [activeBoard.type, missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, todoTasks, upcomingBirthdayTasks, needToBuyTasks, collapsedSections, t]);
 
   const flattenedData = useMemo(() => {
     const result = [];
@@ -557,7 +590,16 @@ export default function BoardScreen({ route, navigation }) {
       });
       return;
     }
-    setPromptConfig({ isVisible: true, type: 'add', targetBoard: null });
+    setCreateBoardVisible(true);
+  };
+
+  const handleCreateBoardSubmit = ({ name, type }) => {
+    if (name && name.trim()) {
+      const id = new Date().getTime().toString();
+      dispatch(addBoardAsync({ id, name: name.trim(), type: type || 'standard' }));
+      dispatch(setActiveBoardId(id));
+    }
+    setCreateBoardVisible(false);
   };
 
   const handleBoardOptions = (board) => {
@@ -665,6 +707,7 @@ export default function BoardScreen({ route, navigation }) {
                 {boards.map(board => (
                   <TouchableOpacity 
                     key={board.id} 
+                    testID={`board_tab_${board.id}`}
                     accessible={true} accessibilityRole="tab" accessibilityLabel={`Board ${board.name === 'Main' ? t('Main') : board.name}`} accessibilityState={{ selected: activeBoardId === board.id }}
                     style={[
                       styles.mainTab, 
@@ -959,6 +1002,13 @@ export default function BoardScreen({ route, navigation }) {
         onSelectBoard={handleBatchMoveBoard}
         boards={boards}
         taskCount={selectionMode.selectedTaskIds.length}
+        colors={colors}
+      />
+
+      <CreateBoardModal
+        isVisible={isCreateBoardVisible}
+        onClose={() => setCreateBoardVisible(false)}
+        onSubmit={handleCreateBoardSubmit}
         colors={colors}
       />
 

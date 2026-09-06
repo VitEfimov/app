@@ -39,3 +39,8 @@ yarn-error.*
 /ios
 /android
 /task
+
+# Playwright
+test-results/
+playwright-report/
+

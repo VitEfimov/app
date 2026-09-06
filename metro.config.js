@@ -5,12 +5,15 @@ const config = getDefaultConfig(__dirname);
 
 config.resolver.assetExts.push('ogg', 'wav');
 
-// Exclude Android build directories to prevent Out Of Memory (OOM) errors in Metro
+// Exclude Android build directories and Playwright test artifacts to prevent Metro file watcher errors
 config.resolver.blockList = exclusionList([
   /.*\/android\/build\/.*/,
   /.*\/android\/\.gradle\/.*/,
   /.*\/ios\/build\/.*/,
-  /.*\/modules\/expo-task-alarm\/package\/.*/
+  /.*\/modules\/expo-task-alarm\/package\/.*/,
+  /.*\/test-results\/.*/,
+  /.*\/playwright-report\/.*/,
+  /.*\/e2e\/.*/
 ]);
 
 config.transformer = {

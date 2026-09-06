@@ -35,6 +35,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
+  const boards = useSelector(state => state.userReducer.boards || []);
   const { t, i18n } = useTranslation();
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
@@ -107,6 +108,8 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   const handleAdd = () => {
     if (!taskName.trim()) return;
 
+    const activeBoard = boards.find(b => b.id === activeBoardId);
+
     const newTask = {
       id: new Date().getTime().toString(),
       boardId: activeBoardId || 'main',
@@ -117,7 +120,8 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       dateString: dayjs(selectedDate).format('YYYY-MM-DD'),
       priority: 'none',
       completed: false,
-      description: { text: '', img: '', url: '' }
+      description: { text: '', img: '', url: '' },
+      ...(activeBoard?.type === 'birthdays' ? { repeat: 'yearly', repeatUntil: dayjs(selectedDate).add(10, 'year').toISOString() } : {})
     };
 
     dispatch(addTask({ task: newTask }));

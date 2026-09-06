@@ -20,6 +20,7 @@ export default function PromptModal({ isVisible, title, message, defaultValue = 
           {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
           
           <TextInput
+            testID="prompt_input"
             style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: colors.bgMain }]}
             value={value}
             onChangeText={setValue}
@@ -34,7 +35,7 @@ export default function PromptModal({ isVisible, title, message, defaultValue = 
             <TouchableOpacity style={styles.btn} onPress={onCancel}>
               <Text style={[styles.btnText, { color: colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btn} onPress={() => onSubmit(value)}>
+            <TouchableOpacity testID="prompt_submit_btn" style={styles.btn} onPress={() => onSubmit(value)}>
               <Text style={[styles.btnText, { color: colors.primary, fontWeight: 'bold' }]}>{submitText}</Text>
             </TouchableOpacity>
           </View>

@@ -57,6 +57,7 @@ export default function MoveBoardModal({
             return (
               <TouchableOpacity
                 key={b.id}
+                testID={`move_board_option_${b.id}`}
                 style={[styles.boardRow, { borderBottomColor: colors.borderColor }]}
                 onPress={() => {
                   onSelectBoard(b.id);

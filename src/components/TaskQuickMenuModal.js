@@ -362,6 +362,7 @@ export default function TaskQuickMenuModal({
           {actionItems.map((item, index) => (
             <TouchableOpacity 
               key={index} 
+              testID={`quick_menu_action_${item.label.toLowerCase().replace(/\s+/g, '_')}`}
               style={[styles.actionRow, { borderBottomColor: colors.borderColor }]} 
               onPress={item.onPress}
             >

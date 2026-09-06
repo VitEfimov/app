@@ -427,6 +427,22 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         </View>
       ) : null}
 
+      {onPressMore && (
+        <TouchableOpacity
+          testID={`task_more_btn_${testIDPrefix}${task.id}`}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel={`More options for ${task.taskname}`}
+          style={{ paddingHorizontal: 8, paddingVertical: 4, marginLeft: 4 }}
+          onPress={(e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            onPressMore(task);
+          }}
+        >
+          <Text style={{ color: colors.textSecondary, fontSize: 16, fontWeight: 'bold' }}>⋮</Text>
+        </TouchableOpacity>
+      )}
+
     </TouchableOpacity>
     </Swipeable>
   );

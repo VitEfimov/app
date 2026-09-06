@@ -12,7 +12,7 @@ const loadIsGuestFromLocalStorage = () => false;
 
 const loadLayoutVersionFromLocalStorage = () => "v1";
 
-const loadBoardsFromLocalStorage = () => [{ id: 'main', name: 'Main' }];
+const loadBoardsFromLocalStorage = () => [{ id: 'main', name: 'Main', type: 'standard' }];
 
 /* --- VERCEL BACKEND THUNKS (COMMENTED OUT FOR LOCAL-ONLY MODE) ---
 export const checkAuth = createAsyncThunk('user/checkAuth', async (_, thunkAPI) => {
@@ -97,8 +97,8 @@ export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, 
 });
 --- */
 
-export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name }, thunkAPI) => {
-    return { id, name };
+export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name, type = 'standard', color }, thunkAPI) => {
+    return { id, name, type, color };
 });
 
 export const renameBoardAsync = createAsyncThunk('user/renameBoard', async ({ id, name }, thunkAPI) => {
@@ -230,8 +230,8 @@ const userSlice = createSlice({
             })
             --- */
             .addCase(addBoardAsync.pending, (state, action) => {
-                const { id, name } = action.meta.arg;
-                state.boards.push({ id, name });
+                const { id, name, type = 'standard', color } = action.meta.arg;
+                state.boards.push({ id, name, type, color });
                 AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
             .addCase(addBoardAsync.fulfilled, (state, action) => {
