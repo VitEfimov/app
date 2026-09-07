@@ -20,7 +20,7 @@ import Modal from 'react-native-modal';
 import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed } from '../features/themeSlice';
@@ -39,6 +39,14 @@ dayjs.extend(isSameOrBefore);
 const IconChevronDown = ({ color, isCollapsed }) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: [{ rotate: isCollapsed ? '-90deg' : '0deg' }] }}>
     <Path d="M6 9l6 6 6-6" />
+  </Svg>
+);
+
+const IconMoreHorizontal = ({ color }) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="1.5" fill={color} />
+    <Circle cx="19" cy="12" r="1.5" fill={color} />
+    <Circle cx="5" cy="12" r="1.5" fill={color} />
   </Svg>
 );
 
@@ -257,7 +265,7 @@ export default function BoardScreen({ route, navigation }) {
   const boardTasks = useMemo(() => tasks.filter(task => (task.boardId || 'main') === activeBoardId), [tasks, activeBoardId]);
   
   const hiddenRecurringTaskIds = useMemo(() => {
-    if (showRecurringTasksOnBoard) return new Set();
+    if (showRecurringTasksOnBoard || activeBoard.type === 'birthdays') return new Set();
 
     // Group uncompleted tasks by recurringSeriesId
     const seriesMap = new Map();
@@ -308,7 +316,7 @@ export default function BoardScreen({ route, navigation }) {
     });
 
     return hiddenIds;
-  }, [boardTasks, showRecurringTasksOnBoard]);
+  }, [boardTasks, showRecurringTasksOnBoard, activeBoard.type]);
 
   const activeBoard = useMemo(() => {
     return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
@@ -368,13 +376,6 @@ export default function BoardScreen({ route, navigation }) {
         ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
         { id: 'today', title: t('List') || 'List', data: collapsedSections.includes('today') ? [] : listUncompleted, count: listUncompleted.length, color: '#10B981' },
         ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed') || 'Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
-      ];
-    }
-
-    if (activeBoard.type === 'birthdays') {
-      return [
-        { id: 'today', title: t('Upcoming Birthdays') || 'Upcoming Birthdays', data: collapsedSections.includes('today') ? [] : upcomingBirthdayTasks, count: upcomingBirthdayTasks.length, color: '#EC4899' },
-        ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Past / Completed') || 'Past / Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
       ];
     }
 
@@ -645,7 +646,7 @@ export default function BoardScreen({ route, navigation }) {
           style={styles.ellipsisBtn} 
           onPress={() => handleMenuPress(section)}
         >
-          <Text style={[styles.ellipsisText, { color: colors.textSecondary }]}>⋮</Text>
+          <IconMoreHorizontal color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     );
@@ -766,9 +767,11 @@ export default function BoardScreen({ route, navigation }) {
           if (item.type === 'task') {
             const task = item.task;
             const section = item.section;
+            const isListBoard = activeBoard.type === 'simple_list' || activeBoard.type === 'shopping';
             return (
               <TaskRow 
                 task={task} 
+                hideDate={isListBoard}
                 isSelectionMode={selectionMode.isActive}
                 isSelected={selectionMode.selectedTaskIds.includes(task.id)}
                 onToggleSelect={() => {
@@ -779,7 +782,7 @@ export default function BoardScreen({ route, navigation }) {
                   }
                 }}
                 onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
-                onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
+                onPressMore={isListBoard ? undefined : ((t) => { setSelectedTask(t); setQuickMenuVisible(true); })}
                 onPress={() => {
                   setSelectedTask(task);
                   setDetailsVisible(true);
@@ -826,53 +829,73 @@ export default function BoardScreen({ route, navigation }) {
             {t('Options for')} {sectionOptionsConfig.section?.title}
           </Text>
           
-          <TouchableOpacity testID="section_option_sort_time" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Time" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Time')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity testID="section_option_sort_priority" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Priority" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Priority')}</Text>
-          </TouchableOpacity>
+          {(activeBoard.type === 'simple_list' || activeBoard.type === 'shopping') ? (
+            <>
+              {sectionOptionsConfig.section?.id !== 'completed' && (
+                <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
+                  <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
+                </TouchableOpacity>
+              )}
 
-          {isPremium && (
-            <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
-              setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
-              setSectionOptionsConfig({ isVisible: false, section: null }); 
-            }}>
-              <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
-            </TouchableOpacity>
+              <TouchableOpacity testID="section_option_delete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Delete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleDeleteSection(s), 400); }}>
+                <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete all')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity testID="section_option_cancel" style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}>
+                <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity testID="section_option_sort_time" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Time" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+                <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Time')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="section_option_sort_priority" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Priority" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
+                <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Priority')}</Text>
+              </TouchableOpacity>
+
+              {isPremium && (
+                <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+                  setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
+                  setSectionOptionsConfig({ isVisible: false, section: null }); 
+                }}>
+                  <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
+                </TouchableOpacity>
+              )}
+              
+              {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
+                <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
+                  <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
+                </TouchableOpacity>
+              )}
+
+              {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
+                <TouchableOpacity testID="section_option_move_forward" accessible={true} accessibilityRole="button" accessibilityLabel="Move tasks forward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveForward(s), 400); }}>
+                  <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move forward')}</Text>
+                </TouchableOpacity>
+              )}
+
+              {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'missed' && (
+                <TouchableOpacity testID="section_option_move_backward" accessible={true} accessibilityRole="button" accessibilityLabel="Move tasks backward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveBackward(s), 400); }}>
+                  <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move backward')}</Text>
+                </TouchableOpacity>
+              )}
+
+              {sectionOptionsConfig.section?.id === 'later' && (
+                <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
+                  <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity testID="section_option_delete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Delete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleDeleteSection(s), 400); }}>
+                <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete all')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity testID="section_option_cancel" style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}>
+                <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
+              </TouchableOpacity>
+            </>
           )}
-          
-          {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
-            <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
-              <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
-            </TouchableOpacity>
-          )}
-
-          {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'later' && (
-            <TouchableOpacity testID="section_option_move_forward" accessible={true} accessibilityRole="button" accessibilityLabel="Move tasks forward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveForward(s), 400); }}>
-              <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move forward')}</Text>
-            </TouchableOpacity>
-          )}
-
-          {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'missed' && (
-            <TouchableOpacity testID="section_option_move_backward" accessible={true} accessibilityRole="button" accessibilityLabel="Move tasks backward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveBackward(s), 400); }}>
-              <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move backward')}</Text>
-            </TouchableOpacity>
-          )}
-
-          {sectionOptionsConfig.section?.id === 'later' && (
-            <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
-              <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity testID="section_option_delete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Delete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleDeleteSection(s), 400); }}>
-            <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete all')}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity testID="section_option_cancel" style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}>
-            <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
-          </TouchableOpacity>
         </View>
       </Modal>
 
