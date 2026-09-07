@@ -362,9 +362,11 @@ export default function BoardScreen({ route, navigation }) {
   }, [boardTasks, sortConfig, hiddenRecurringTaskIds]);
 
   const sections = useMemo(() => {
-    if (activeBoard.type === 'simple_list') {
+    if (activeBoard.type === 'simple_list' || activeBoard.type === 'shopping') {
+      const listUncompleted = todoTasks.filter(t => !missedTasks.some(m => m.id === t.id));
       return [
-        { id: 'today', title: t('To-Do') || 'To-Do', data: collapsedSections.includes('today') ? [] : todoTasks, count: todoTasks.length, color: '#10B981' },
+        ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
+        { id: 'today', title: t('List') || 'List', data: collapsedSections.includes('today') ? [] : listUncompleted, count: listUncompleted.length, color: '#10B981' },
         ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed') || 'Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
       ];
     }
@@ -373,13 +375,6 @@ export default function BoardScreen({ route, navigation }) {
       return [
         { id: 'today', title: t('Upcoming Birthdays') || 'Upcoming Birthdays', data: collapsedSections.includes('today') ? [] : upcomingBirthdayTasks, count: upcomingBirthdayTasks.length, color: '#EC4899' },
         ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Past / Completed') || 'Past / Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
-      ];
-    }
-
-    if (activeBoard.type === 'shopping') {
-      return [
-        { id: 'today', title: t('Need to Buy') || 'Need to Buy', data: collapsedSections.includes('today') ? [] : needToBuyTasks, count: needToBuyTasks.length, color: '#F59E0B' },
-        ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Purchased') || 'Purchased', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
       ];
     }
 
@@ -760,6 +755,7 @@ export default function BoardScreen({ route, navigation }) {
       </Animated.View>
 
       <FlashList
+        key={activeBoardId}
         data={flattenedData}
         extraData={[activeBoardId, tasks, collapsedSections, sortConfig, isBoardsCollapsed, activeAddSectionId, selectionMode, flattenedData]}
         keyExtractor={(item) => item.type === 'task' ? `task_${item.task.id}_${item.section.id}` : `${item.type}_${item.section.id}`}

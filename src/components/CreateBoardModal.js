@@ -23,12 +23,6 @@ const IconGift = ({ color }) => (
   </Svg>
 );
 
-const IconShopping = ({ color }) => (
-  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />
-  </Svg>
-);
-
 export default function CreateBoardModal({
   isVisible,
   onClose,
@@ -50,9 +44,9 @@ export default function CreateBoardModal({
     },
     {
       id: 'simple_list',
-      title: t('Simple List') || 'Simple List',
+      title: t('List (checklist)') || 'List (checklist)',
       badge: t('Clean List') || 'Clean List',
-      desc: t('Quick date-free checklist with To-Do & Completed sections.') || 'Quick date-free checklist with To-Do & Completed sections.',
+      desc: t('Quick date-free checklist with List & Completed sections.') || 'Quick date-free checklist with List & Completed sections.',
       Icon: IconList,
       accentColor: '#10B981',
     },
@@ -63,14 +57,6 @@ export default function CreateBoardModal({
       desc: t('Track birthdays & events with automatic 10-year annual reminders.') || 'Track birthdays & events with automatic 10-year annual reminders.',
       Icon: IconGift,
       accentColor: '#EC4899',
-    },
-    {
-      id: 'shopping',
-      title: t('Shopping List') || 'Shopping List',
-      badge: t('Checklist') || 'Checklist',
-      desc: t('Quick shopping list with Need to Buy & Purchased sections.') || 'Quick shopping list with Need to Buy & Purchased sections.',
-      Icon: IconShopping,
-      accentColor: '#F59E0B',
     },
   ];
 
@@ -208,7 +194,7 @@ const styles = StyleSheet.create({
     paddingTop: 15,
     paddingBottom: 30,
     paddingHorizontal: 20,
-    maxHeight: '85%',
+    maxHeight: '95%',
   },
   dragHandle: {
     width: 40,
@@ -240,7 +226,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   templateList: {
-    maxHeight: 280,
+    maxHeight: 360,
     marginBottom: 20,
   },
   card: {

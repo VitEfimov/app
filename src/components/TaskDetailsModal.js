@@ -265,8 +265,11 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     // Saved user time or null.
     setSelectedTime(task.time || null);
 
-    let config = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
+    let config = task.repeatConfig || { preset: task.repeatFrequency || (task.repeat === 'yearly' ? 'every_year' : 'None') };
     if (typeof config === 'string') config = JSON.parse(config);
+    if ((!config || !config.preset || config.preset === 'None') && (task.repeat === 'yearly' || task.repeatFrequency === 'Every year')) {
+      config = { preset: 'every_year' };
+    }
     setRepeatConfig(config);
 
     setRepeatStartDate(

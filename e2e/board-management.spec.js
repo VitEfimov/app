@@ -117,7 +117,7 @@ test.describe('Board Management', () => {
     }
   });
 
-  test('should create a Simple List board with To-Do section', async () => {
+  test('should create a List (checklist) board with List section', async () => {
     const addBoardBtn = page.getByRole('button', { name: 'Add new board' }).first();
     if (await addBoardBtn.isVisible()) {
       await addBoardBtn.click();
@@ -135,31 +135,33 @@ test.describe('Board Management', () => {
       const listTab = page.locator('[data-testid^="board_tab_"]').filter({ hasText: 'Quick Notes' }).first();
       await expect(listTab).toBeAttached();
 
-      const todoHeader = page.getByTestId('section_title_today');
-      await expect(todoHeader).toBeVisible();
+      const listHeader = page.getByTestId('section_title_today');
+      await expect(listHeader).toBeVisible();
+      await expect(listHeader).toHaveText('List');
     }
   });
 
-  test('should create a Shopping List board with Need to Buy section', async () => {
-    const addBoardBtn = page.getByRole('button', { name: 'Add new board' }).first();
-    if (await addBoardBtn.isVisible()) {
-      await addBoardBtn.click();
+  test('should accurately render section titles when switching between boards with and without missed tasks', async () => {
+    const mainTab = page.locator('[data-testid^="board_tab_"]').filter({ hasText: 'Main' }).first();
+    await mainTab.click();
 
-      const promptInput = page.getByTestId('prompt_input');
-      await promptInput.fill('Groceries');
+    await createTask(page, 'today', 'Switch Header Task');
 
-      const shoppingTypeCard = page.getByTestId('create_board_type_shopping');
-      if (await shoppingTypeCard.isVisible()) {
-        await shoppingTypeCard.click();
-      }
+    const moreBtn = page.locator('[data-testid^="task_more_btn_"]').first();
+    await moreBtn.click();
+    await page.getByTestId('quick_menu_action_move_backward').click();
 
-      await page.getByTestId('prompt_submit_btn').click();
+    await expect(page.getByTestId('section_title_missed')).toBeVisible();
 
-      const shopTab = page.locator('[data-testid^="board_tab_"]').filter({ hasText: 'Groceries' }).first();
-      await expect(shopTab).toBeAttached();
+    const bdayTab = page.locator('[data-testid^="board_tab_"]').filter({ hasText: 'Birthdays' }).first();
+    if (await bdayTab.isVisible()) {
+      await bdayTab.click();
 
-      const shopHeader = page.getByTestId('section_title_today');
-      await expect(shopHeader).toBeVisible();
+      await mainTab.click();
+
+      const missedTitle = page.getByTestId('section_title_missed');
+      await expect(missedTitle).toBeVisible();
+      await expect(missedTitle).toHaveText('Missed tasks');
     }
   });
 });

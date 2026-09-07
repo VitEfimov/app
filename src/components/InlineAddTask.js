@@ -121,7 +121,13 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       priority: 'none',
       completed: false,
       description: { text: '', img: '', url: '' },
-      ...(activeBoard?.type === 'birthdays' ? { repeat: 'yearly', repeatUntil: dayjs(selectedDate).add(10, 'year').toISOString() } : {})
+      ...(activeBoard?.type === 'birthdays' ? {
+        repeat: 'yearly',
+        repeatFrequency: 'Every year',
+        repeatConfig: { preset: 'every_year' },
+        repeatStartDate: dayjs(selectedDate).format('YYYY-MM-DD'),
+        repeatEndDate: dayjs(selectedDate).add(10, 'year').format('YYYY-MM-DD')
+      } : {})
     };
 
     dispatch(addTask({ task: newTask }));
