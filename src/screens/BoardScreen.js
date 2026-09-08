@@ -263,9 +263,13 @@ export default function BoardScreen({ route, navigation }) {
 
   // Group tasks
   const boardTasks = useMemo(() => tasks.filter(task => (task.boardId || 'main') === activeBoardId), [tasks, activeBoardId]);
-  
+
+  const activeBoard = useMemo(() => {
+    return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
+  }, [boards, activeBoardId]);
+
   const hiddenRecurringTaskIds = useMemo(() => {
-    if (showRecurringTasksOnBoard || activeBoard.type === 'birthdays') return new Set();
+    if (showRecurringTasksOnBoard || activeBoard?.type === 'birthdays') return new Set();
 
     // Group uncompleted tasks by recurringSeriesId
     const seriesMap = new Map();
@@ -316,11 +320,7 @@ export default function BoardScreen({ route, navigation }) {
     });
 
     return hiddenIds;
-  }, [boardTasks, showRecurringTasksOnBoard, activeBoard.type]);
-
-  const activeBoard = useMemo(() => {
-    return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
-  }, [boards, activeBoardId]);
+  }, [boardTasks, showRecurringTasksOnBoard, activeBoard]);
 
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks, todoTasks, upcomingBirthdayTasks, needToBuyTasks } = useMemo(() => {
     const now = dayjs();
@@ -370,7 +370,7 @@ export default function BoardScreen({ route, navigation }) {
   }, [boardTasks, sortConfig, hiddenRecurringTaskIds]);
 
   const sections = useMemo(() => {
-    if (activeBoard.type === 'simple_list' || activeBoard.type === 'shopping') {
+    if (activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping') {
       const listUncompleted = todoTasks.filter(t => !missedTasks.some(m => m.id === t.id));
       return [
         ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
@@ -767,7 +767,7 @@ export default function BoardScreen({ route, navigation }) {
           if (item.type === 'task') {
             const task = item.task;
             const section = item.section;
-            const isListBoard = activeBoard.type === 'simple_list' || activeBoard.type === 'shopping';
+            const isListBoard = activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping';
             return (
               <TaskRow 
                 task={task} 
@@ -829,7 +829,7 @@ export default function BoardScreen({ route, navigation }) {
             {t('Options for')} {sectionOptionsConfig.section?.title}
           </Text>
           
-          {(activeBoard.type === 'simple_list' || activeBoard.type === 'shopping') ? (
+          {(activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping') ? (
             <>
               {sectionOptionsConfig.section?.id !== 'completed' && (
                 <TouchableOpacity testID="section_option_complete_all" accessible={true} accessibilityRole="button" accessibilityLabel="Complete all tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleCompleteSection(s), 400); }}>
