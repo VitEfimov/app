@@ -793,7 +793,7 @@ export default function BoardScreen({ route, navigation }) {
           return null;
         }}
         contentContainerStyle={styles.listContent}
-        stickyHeaderIndices={Platform.OS === 'web' ? undefined : stickyHeaderIndices}
+        stickyHeaderIndices={undefined}
         keyboardShouldPersistTaps="handled"
         estimatedItemSize={70}
       />

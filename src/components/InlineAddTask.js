@@ -10,6 +10,8 @@ import getFilters from '../utils/filters';
 import { useTranslation } from 'react-i18next';
 import YearPickerModal from './YearPickerModal';
 
+import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
+
 const IconPlus = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M12 5v14M5 12h14" />
@@ -23,6 +25,7 @@ const IconCalendar = ({ color }) => (
 );
 
 export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDetails }) {
+  const { generateRepeatingTasks } = useTaskRepeat();
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const isEditing = isActive !== undefined ? isActive : internalIsEditing;
   const setIsEditing = onToggle ? onToggle : setInternalIsEditing;
@@ -109,6 +112,8 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     if (!taskName.trim()) return;
 
     const activeBoard = boards.find(b => b.id === activeBoardId);
+    const startDateStr = dayjs(selectedDate).format('YYYY-MM-DD');
+    const endDateStr = dayjs(selectedDate).add(10, 'year').format('YYYY-MM-DD');
 
     const newTask = {
       id: new Date().getTime().toString(),
@@ -117,7 +122,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       creationDate: new Date().toISOString(),
       lastUpdatedDate: null,
       completionDate: dayjs(selectedDate).toISOString(),
-      dateString: dayjs(selectedDate).format('YYYY-MM-DD'),
+      dateString: startDateStr,
       priority: 'none',
       completed: false,
       description: { text: '', img: '', url: '' },
@@ -125,12 +130,33 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         repeat: 'yearly',
         repeatFrequency: 'Every year',
         repeatConfig: { preset: 'every_year' },
-        repeatStartDate: dayjs(selectedDate).format('YYYY-MM-DD'),
-        repeatEndDate: dayjs(selectedDate).add(10, 'year').format('YYYY-MM-DD')
+        repeatStartDate: startDateStr,
+        repeatEndDate: endDateStr
       } : {})
     };
 
     dispatch(addTask({ task: newTask }));
+
+    if (activeBoard?.type === 'birthdays') {
+      generateRepeatingTasks(
+        newTask,
+        {
+          name: taskName,
+          priority: 'none',
+          time: null,
+          reminder: 'None',
+          isAlarm: false,
+          description: { text: '', img: '', url: '' },
+          subtasks: []
+        },
+        {
+          preset: 'every_year',
+          startDate: startDateStr,
+          endDate: endDateStr
+        }
+      );
+    }
+
     setTaskName('');
     setSelectedDate(getCompletionDate(sectionId));
     setIsEditing(false);

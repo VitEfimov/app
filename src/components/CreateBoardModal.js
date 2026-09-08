@@ -44,7 +44,7 @@ export default function CreateBoardModal({
     },
     {
       id: 'simple_list',
-      title: t('List (checklist)') || 'List (checklist)',
+      title: t('List') || 'List',
       badge: t('Clean List') || 'Clean List',
       desc: t('Quick date-free checklist with List & Completed sections.') || 'Quick date-free checklist with List & Completed sections.',
       Icon: IconList,
@@ -52,7 +52,7 @@ export default function CreateBoardModal({
     },
     {
       id: 'birthdays',
-      title: t('Birthdays & Events') || 'Birthdays & Events',
+      title: t('Events') || 'Events',
       badge: t('Auto-Repeat 10 yrs') || 'Auto-Repeat 10 yrs',
       desc: t('Track birthdays & events with automatic 10-year annual reminders.') || 'Track birthdays & events with automatic 10-year annual reminders.',
       Icon: IconGift,
