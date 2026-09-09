@@ -18,39 +18,25 @@ async function createTask(page, sectionId, taskName) {
 }
 
 test.describe('Board Management', () => {
-  test.describe.configure({ mode: 'serial' });
-
+  let context;
   let page;
 
-  test.beforeAll(async ({ browser }) => {
-    page = await browser.newPage();
-    await page.addInitScript(() => {
+  test.beforeEach(async ({ browser }) => {
+    context = await browser.newContext();
+    await context.addInitScript(() => {
       window.localStorage.clear();
       window.localStorage.setItem('isGuest', 'true');
     });
+    page = await context.newPage();
     await page.goto('/', { waitUntil: 'load', timeout: 60000 });
     const boardTab = page.getByTestId('tab_board');
-    await boardTab.waitFor({ state: 'visible', timeout: 30000 });
-  });
-
-  test.afterAll(async () => {
-    await page.close();
-  });
-
-  test.afterEach(async ({}, testInfo) => {
-    const name = testInfo.title.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    await page.screenshot({ path: `e2e/screenshots/${name}.png` });
-  });
-
-  test.beforeEach(async () => {
-    await page.evaluate(() => {
-      window.localStorage.clear();
-      window.localStorage.setItem('isGuest', 'true');
-    });
-    const boardTab = page.getByTestId('tab_board');
-    await boardTab.waitFor({ state: 'visible', timeout: 10000 });
+    await boardTab.waitFor({ state: 'visible', timeout: 15000 });
     await boardTab.click();
-    await page.waitForSelector('[data-testid="section_title_today"]', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="section_title_today"]', { timeout: 15000 });
+  });
+
+  test.afterEach(async () => {
+    await context.close();
   });
 
   test('should create a new board tab and switch active boards', async () => {

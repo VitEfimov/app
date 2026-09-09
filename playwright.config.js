@@ -23,7 +23,7 @@ module.exports = defineConfig({
   webServer: {
     command: 'npx serve -s dist -l 8089',
     url: 'http://127.0.0.1:8089',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 30000,
   },
   projects: [

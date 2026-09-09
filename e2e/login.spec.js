@@ -4,24 +4,17 @@ test.describe('Login Screen & Authentication Flow', () => {
   let context;
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     context = await browser.newContext();
+    await context.addInitScript(() => {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    });
     page = await context.newPage();
     await page.goto('/', { waitUntil: 'load', timeout: 60000 });
-
-    const settingsTab = page.getByTestId('tab_settings');
-    if (await settingsTab.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await settingsTab.click();
-      const logoutBtn = page.getByTestId('logout_btn');
-      await logoutBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      if (await logoutBtn.isVisible().catch(() => false)) {
-        await logoutBtn.click();
-        await page.waitForTimeout(1000);
-      }
-    }
   });
 
-  test.afterAll(async () => {
+  test.afterEach(async () => {
     await context.close();
   });
 
