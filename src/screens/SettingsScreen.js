@@ -68,6 +68,8 @@ import PromptModal from '../components/PromptModal';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { logoutUser, logout } from '../features/userSlice';
+
 export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
@@ -76,6 +78,13 @@ export default function SettingsScreen({ navigation }) {
   const theme = useSelector(state => state.themeReducer);
   const tasks = useSelector(state => state.taskReducer.tasks);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
+  const userState = useSelector(state => state.userReducer);
+  const { isAuthenticated, isGuest, userEmail } = userState || {};
+
+  const handleLogout = () => {
+    dispatch(logoutUser());
+    dispatch(logout());
+  };
   
   const taskNameWrap = theme.taskNameWrap || 'wrap';
   const fontSize = theme.fontSize || 'normal';
@@ -469,8 +478,12 @@ export default function SettingsScreen({ navigation }) {
               <IconUser color={colors.primary} />
             </View>
             <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, { color: colors.textPrimary }]}>{t('User Profile')}</Text>
-              <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>user@example.com</Text>
+              <Text style={[styles.profileName, { color: colors.textPrimary }]}>
+                {isAuthenticated ? (userEmail || t('User Profile')) : t('Guest Mode')}
+              </Text>
+              <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+                {isAuthenticated ? (userEmail || 'Logged In') : 'Local Storage Mode'}
+              </Text>
             </View>
           </View>
           <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 15 }]}>
@@ -481,6 +494,16 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ false: colors.borderColor, true: colors.primary }}
             />
           </View>
+
+          <TouchableOpacity 
+            testID="logout_btn"
+            accessible={true} accessibilityRole="button" accessibilityLabel="Logout"
+            style={[styles.logoutBtn, { borderColor: colors.borderColor, marginBottom: 12 }]} 
+            onPress={handleLogout}
+          >
+            <Text style={[styles.logoutBtnText, { color: colors.textPrimary }]}>{t('Logout') || 'Logout'}</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"
             style={[styles.deleteBtn, { backgroundColor: colors.danger || '#c62828' }]} onPress={handleDeleteData}
@@ -639,6 +662,16 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: {
     color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  logoutBtn: {
+    borderWidth: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  logoutBtnText: {
     fontWeight: 'bold',
     fontSize: 16,
   }

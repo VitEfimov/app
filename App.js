@@ -5,6 +5,7 @@ import './src/i18n';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import store from './src/store';
+if (typeof window !== 'undefined') window.__store = store;
 import AppNavigator from './src/navigation/AppNavigator';
 import { View, Text, ActivityIndicator, TouchableOpacity, AppState } from 'react-native';
 
@@ -42,7 +43,8 @@ if (typeof queueMicrotask === 'undefined') {
 }
 
 // Configure Axios for remote Vercel backend
-// axios.defaults.baseURL = 'https://task-manager-v2-indol.vercel.app';
+axios.defaults.baseURL = process.env.EXPO_PUBLIC_API_URL || 'https://task-manager-v2-indol.vercel.app';
+axios.defaults.withCredentials = true;
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -120,6 +122,73 @@ function InitApp() {
   useEffect(() => {
     const removeDiagnostics = attachNotificationDiagnostics();
     return removeDiagnostics;
+  }, []);
+
+  useEffect(() => {
+    const loadStorage = async () => {
+      try {
+        await registerBackgroundFetchAsync();
+
+        const isGuestVal = await AsyncStorage.getItem('isGuest');
+        console.log("[InitApp Debug] isGuestVal from storage:", isGuestVal);
+        if (isGuestVal === 'true') {
+          const { continueAsGuest } = require('./src/features/userSlice');
+          dispatch(continueAsGuest());
+        } else {
+          const { checkAuth } = require('./src/features/userSlice');
+          const authRes = await dispatch(checkAuth());
+          console.log("[InitApp Debug] checkAuth result:", authRes);
+        }
+
+        const theme = await AsyncStorage.getItem('customTheme');
+        if (theme) {
+          let themeData = JSON.parse(theme);
+          
+          if (themeData.randomColorDaily) {
+            const today = dayjs().format('YYYY-MM-DD');
+            if (themeData.lastRandomColorDate !== today) {
+              const PREDEFINED_COLORS = [
+                '#C62828', '#AD1457', '#8E24AA', '#5E35B1', '#1E88E5',
+                '#00897B', '#2E7D32', '#6B8E6B', '#C0CA33', '#F9A825', '#FB8C00', '#455A64'
+              ];
+              themeData.sourceColor = PREDEFINED_COLORS[Math.floor(Math.random() * PREDEFINED_COLORS.length)];
+              themeData.lastRandomColorDate = today;
+              await AsyncStorage.setItem('customTheme', JSON.stringify(themeData));
+            }
+          }
+          
+          dispatch(hydrateThemeState(themeData));
+        }
+
+        const boardsJson = await AsyncStorage.getItem('boards');
+        if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
+
+        const dashboardFilterType = await AsyncStorage.getItem('dashboardFilterType');
+        if (dashboardFilterType) dispatch(hydrateUserState({ dashboardFilterType }));
+
+        const pomodoroJson = await AsyncStorage.getItem('pomodoro');
+        if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));
+
+        const appLanguage = await AsyncStorage.getItem('appLanguage');
+        if (appLanguage) {
+          i18n.changeLanguage(appLanguage);
+        }
+
+        const statsJson = await AsyncStorage.getItem('stats');
+        if (statsJson) dispatch(hydrateStatsState(JSON.parse(statsJson)));
+
+        const entitlementJson = await AsyncStorage.getItem('entitlement');
+        if (entitlementJson) dispatch(hydrateEntitlementState(JSON.parse(entitlementJson)));
+
+        // Load tasks from Vercel remote DB or local storage
+        await dispatch(fetchTasks());
+      } catch (e) {
+        console.error("Initialization failed", e);
+      } finally {
+        setReady(true);
+      }
+    };
+    loadStorage();
   }, []);
 
   useEffect(() => {
@@ -383,71 +452,6 @@ function InitApp() {
       }
     }
   }, [hasShareIntent, shareIntent, ready, dispatch, resetShareIntent]);
-
-  useEffect(() => {
-    const loadStorage = async () => {
-      try {
-        await registerBackgroundFetchAsync();
-        const theme = await AsyncStorage.getItem('customTheme');
-        if (theme) {
-          let themeData = JSON.parse(theme);
-          
-          if (themeData.randomColorDaily) {
-            const today = dayjs().format('YYYY-MM-DD');
-            if (themeData.lastRandomColorDate !== today) {
-              const PREDEFINED_COLORS = [
-                '#C62828', '#AD1457', '#8E24AA', '#5E35B1', '#1E88E5',
-                '#00897B', '#2E7D32', '#6B8E6B', '#C0CA33', '#F9A825', '#FB8C00', '#455A64'
-              ];
-              themeData.sourceColor = PREDEFINED_COLORS[Math.floor(Math.random() * PREDEFINED_COLORS.length)];
-              themeData.lastRandomColorDate = today;
-              await AsyncStorage.setItem('customTheme', JSON.stringify(themeData));
-            }
-          }
-          
-          dispatch(hydrateThemeState(themeData));
-        }
-
-        const boardsJson = await AsyncStorage.getItem('boards');
-        if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
-
-        const dashboardFilterType = await AsyncStorage.getItem('dashboardFilterType');
-        if (dashboardFilterType) dispatch(hydrateUserState({ dashboardFilterType }));
-
-        const pomodoroJson = await AsyncStorage.getItem('pomodoro');
-        if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));
-
-        const appLanguage = await AsyncStorage.getItem('appLanguage');
-        if (appLanguage) {
-          i18n.changeLanguage(appLanguage);
-        }
-
-        const statsJson = await AsyncStorage.getItem('stats');
-        if (statsJson) dispatch(hydrateStatsState(JSON.parse(statsJson)));
-
-        const entitlementJson = await AsyncStorage.getItem('entitlement');
-        if (entitlementJson) dispatch(hydrateEntitlementState(JSON.parse(entitlementJson)));
-
-        // Load tasks from local storage
-        await dispatch(fetchTasks()).unwrap();
-
-        // Process any automatic task transfers / deletions based on settings
-        const { processAutoManageTasks } = require('./src/features/taskSlice');
-        await dispatch(processAutoManageTasks());
-
-        const currentThemeState = store.getState().themeReducer;
-        const currentTasks = store.getState().taskReducer.tasks;
-        await registerForPushNotificationsAsync(currentThemeState);
-        const { updateRecurringAutomations } = require('./src/utils/notifications');
-        await updateRecurringAutomations(currentThemeState, currentTasks);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setReady(true);
-      }
-    };
-    loadStorage();
-  }, [dispatch]);
 
   useEffect(() => {
     const handleAppStateChange = async (nextAppState) => {

@@ -1,24 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser, registerUser, continueAsGuest } from '../features/userSlice';
 import { useTheme } from '../styles/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.userReducer);
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    const loadRememberedUser = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('rememberedUser');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.email) setEmail(parsed.email);
+          if (parsed.rememberMe !== undefined) setRememberMe(parsed.rememberMe);
+        }
+      } catch (e) {
+        // Silently catch
+      }
+    };
+    loadRememberedUser();
+  }, []);
 
   const handleSubmit = () => {
+    if (!email.trim() || !password.trim()) return;
     if (isLogin) {
-      dispatch(loginUser({ email, password, rememberMe }));
+      dispatch(loginUser({ email: email.trim(), password, rememberMe }));
     } else {
-      dispatch(registerUser({ email, password }));
+      dispatch(registerUser({ email: email.trim(), password }));
     }
   };
 
@@ -44,9 +64,10 @@ export default function LoginScreen() {
       textAlign: 'center',
     },
     errorText: {
-      color: colors.danger,
+      color: colors.danger || '#EF4444',
       marginBottom: 15,
       textAlign: 'center',
+      fontWeight: '600',
     },
     input: {
       backgroundColor: colors.surfaceContainer,
@@ -64,8 +85,8 @@ export default function LoginScreen() {
       marginBottom: 20,
     },
     checkbox: {
-      width: 20,
-      height: 20,
+      width: 22,
+      height: 22,
       borderWidth: 2,
       borderColor: colors.primary,
       borderRadius: 4,
@@ -75,12 +96,14 @@ export default function LoginScreen() {
       backgroundColor: rememberMe ? colors.primary : 'transparent',
     },
     checkboxTick: {
-      color: colors.textInverse,
+      color: colors.textInverse || '#FFF',
       fontSize: 14,
       fontWeight: 'bold',
     },
     checkboxLabel: {
       color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '500',
     },
     primaryButton: {
       backgroundColor: colors.primary,
@@ -90,7 +113,7 @@ export default function LoginScreen() {
       marginBottom: 15,
     },
     primaryButtonText: {
-      color: colors.textInverse,
+      color: colors.textInverse || '#FFF',
       fontWeight: 'bold',
       fontSize: 16,
     },
@@ -122,13 +145,14 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.formContainer}>
-        <Text style={styles.title}>{isLogin ? 'Login to TaskManager' : 'Register Account'}</Text>
+        <Text style={styles.title}>{isLogin ? t('Login to TaskManager') || 'Login to TaskManager' : t('Register Account') || 'Register Account'}</Text>
         
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={styles.errorText}>{typeof error === 'string' ? error : JSON.stringify(error)}</Text> : null}
 
         <TextInput
+          testID="login_email_input"
           style={styles.input}
-          placeholder="Email"
+          placeholder={t('Email') || 'Email'}
           placeholderTextColor={colors.textSecondary}
           value={email}
           onChangeText={setEmail}
@@ -137,8 +161,9 @@ export default function LoginScreen() {
         />
 
         <TextInput
+          testID="login_password_input"
           style={styles.input}
-          placeholder="Password"
+          placeholder={t('Password') || 'Password'}
           placeholderTextColor={colors.textSecondary}
           value={password}
           onChangeText={setPassword}
@@ -147,6 +172,7 @@ export default function LoginScreen() {
 
         {isLogin && (
           <TouchableOpacity 
+            testID="remember_me_checkbox"
             style={styles.checkboxContainer} 
             activeOpacity={0.7}
             onPress={() => setRememberMe(!rememberMe)}
@@ -154,32 +180,34 @@ export default function LoginScreen() {
             <View style={styles.checkbox}>
               {rememberMe && <Text style={styles.checkboxTick}>✓</Text>}
             </View>
-            <Text style={styles.checkboxLabel}>Remember Me</Text>
+            <Text style={styles.checkboxLabel}>{t('Remember Me') || 'Remember Me'}</Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity 
+          testID="login_submit_btn"
           style={styles.primaryButton} 
           onPress={handleSubmit}
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color={colors.textInverse} />
+            <ActivityIndicator color={colors.textInverse || '#FFF'} />
           ) : (
-            <Text style={styles.primaryButtonText}>{isLogin ? 'Login' : 'Register'}</Text>
+            <Text style={styles.primaryButtonText}>{isLogin ? t('Login') || 'Login' : t('Register') || 'Register'}</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity 
+          testID="guest_login_btn"
           style={styles.secondaryButton} 
           onPress={() => dispatch(continueAsGuest())}
         >
-          <Text style={styles.secondaryButtonText}>Continue without login</Text>
+          <Text style={styles.secondaryButtonText}>{t('Continue without login') || 'Continue without login'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
           <Text style={styles.toggleText}>
-            {isLogin ? "Don't have an account? Register" : "Already have an account? Login"}
+            {isLogin ? t("Don't have an account? Register") || "Don't have an account? Register" : t("Already have an account? Login") || "Already have an account? Login"}
           </Text>
         </TouchableOpacity>
       </View>

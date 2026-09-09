@@ -1,20 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
-// import axios from 'axios';
-import { clearTasks } from './taskSlice';
+import axios from 'axios';
 
 const loadThemeFromLocalStorage = () => "light";
-
 const loadShowWeatherFromLocalStorage = () => false;
-
 const loadIsGuestFromLocalStorage = () => false;
-
 const loadLayoutVersionFromLocalStorage = () => "v1";
-
 const loadBoardsFromLocalStorage = () => [{ id: 'main', name: 'Main', type: 'standard' }];
 
-/* --- VERCEL BACKEND THUNKS (COMMENTED OUT FOR LOCAL-ONLY MODE) ---
 export const checkAuth = createAsyncThunk('user/checkAuth', async (_, thunkAPI) => {
     try {
         const response = await axios.get('/api/auth/me', { withCredentials: true });
@@ -27,9 +20,15 @@ export const checkAuth = createAsyncThunk('user/checkAuth', async (_, thunkAPI) 
 export const loginUser = createAsyncThunk('user/login', async ({ email, password, rememberMe }, thunkAPI) => {
     try {
         const response = await axios.post('/api/auth/login', { email, password, rememberMe }, { withCredentials: true });
+        if (rememberMe) {
+            await AsyncStorage.setItem('rememberedUser', JSON.stringify({ email, rememberMe: true }));
+        } else {
+            await AsyncStorage.removeItem('rememberedUser');
+        }
         return response.data;
     } catch (err) {
-        return thunkAPI.rejectWithValue(err.response?.data?.message || err.message);
+        const msg = err.response?.data?.message || (err.message === 'Network Error' ? 'Network / CORS Error: Cross-origin requests from localhost are blocked by backend CORS policy.' : err.message);
+        return thunkAPI.rejectWithValue(msg);
     }
 });
 
@@ -38,7 +37,8 @@ export const registerUser = createAsyncThunk('user/register', async ({ email, pa
         const response = await axios.post('/api/auth/register', { email, password }, { withCredentials: true });
         return response.data;
     } catch (err) {
-        return thunkAPI.rejectWithValue(err.response?.data?.message || err.message);
+        const msg = err.response?.data?.message || (err.message === 'Network Error' ? 'Network / CORS Error: Cross-origin requests from localhost are blocked by backend CORS policy.' : err.message);
+        return thunkAPI.rejectWithValue(msg);
     }
 });
 
@@ -54,10 +54,13 @@ export const updateThemeAsync = createAsyncThunk('user/updateTheme', async (them
 export const logoutUser = createAsyncThunk('user/logout', async (_, thunkAPI) => {
     try {
         await axios.post('/api/auth/logout', {}, { withCredentials: true });
-        thunkAPI.dispatch(clearTasks());
     } catch (err) {
-        return thunkAPI.rejectWithValue(err.response?.data?.message || err.message);
+        // Silently catch network error on logout
     }
+    await AsyncStorage.removeItem('isGuest');
+    await AsyncStorage.removeItem('rememberedUser');
+    thunkAPI.dispatch({ type: 'task/clearTasks' });
+    return true;
 });
 
 export const changePassword = createAsyncThunk('user/changePassword', async ({ currentPassword, newPassword }, thunkAPI) => {
@@ -69,48 +72,47 @@ export const changePassword = createAsyncThunk('user/changePassword', async ({ c
     }
 });
 
-export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name }, thunkAPI) => {
-    const state = thunkAPI.getState().userReducer;
-    if (state.isAuthenticated) {
-        const response = await axios.post('/api/boards', { id, name }, { withCredentials: true });
-        return response.data;
-    }
-    return { id, name };
-});
-
-export const renameBoardAsync = createAsyncThunk('user/renameBoard', async ({ id, name }, thunkAPI) => {
-    const state = thunkAPI.getState().userReducer;
-    if (state.isAuthenticated) {
-        const response = await axios.put(`/api/boards/${id}`, { name }, { withCredentials: true });
-        return response.data;
-    }
-    return { id, name };
-});
-
-export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, thunkAPI) => {
-    const state = thunkAPI.getState().userReducer;
-    if (state.isAuthenticated) {
-        await axios.delete(`/api/boards/${id}`, { withCredentials: true });
-        return id;
-    }
-    return id;
-});
---- */
-
 export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name, type = 'standard', color }, thunkAPI) => {
+    const state = thunkAPI.getState().userReducer;
+    if (state.isAuthenticated) {
+        try {
+            const response = await axios.post('/api/boards', { id, name, type, color }, { withCredentials: true });
+            return response.data;
+        } catch (e) {
+            // Optimistic fallback
+        }
+    }
     return { id, name, type, color };
 });
 
 export const renameBoardAsync = createAsyncThunk('user/renameBoard', async ({ id, name }, thunkAPI) => {
+    const state = thunkAPI.getState().userReducer;
+    if (state.isAuthenticated) {
+        try {
+            const response = await axios.put(`/api/boards/${id}`, { name }, { withCredentials: true });
+            return response.data;
+        } catch (e) {
+            // Optimistic fallback
+        }
+    }
     return { id, name };
 });
 
 export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, thunkAPI) => {
+    const state = thunkAPI.getState().userReducer;
+    if (state.isAuthenticated) {
+        try {
+            await axios.delete(`/api/boards/${id}`, { withCredentials: true });
+        } catch (e) {
+            // Optimistic fallback
+        }
+    }
     return id;
 });
 
 const initialState = {
-    isAuthenticated: true, // DEFAULT TO TRUE FOR OFFLINE MODE
+    isAuthenticated: false,
+    userEmail: null,
     loading: false,
     error: null,
     theme: loadThemeFromLocalStorage(),
@@ -131,14 +133,17 @@ const userSlice = createSlice({
         },
         logout: (state) => {
             state.isAuthenticated = false;
+            state.userEmail = null;
             state.isGuest = false;
             state.boards = loadBoardsFromLocalStorage();
             state.activeBoardId = 'main';
             state.dashboardFilterType = 'all';
             AsyncStorage.removeItem('isGuest');
+            AsyncStorage.removeItem('rememberedUser');
         },
         continueAsGuest: (state) => {
             state.isGuest = true;
+            state.isAuthenticated = false;
             AsyncStorage.setItem('isGuest', 'true');
         },
         updateUserTheme: (state, action) => {
@@ -163,12 +168,15 @@ const userSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            /* --- VERCEL BACKEND REDUCERS (COMMENTED OUT) ---
             .addCase(checkAuth.pending, (state) => { state.loading = true; state.error = null; })
             .addCase(checkAuth.fulfilled, (state, action) => {
                 state.loading = false;
                 state.isAuthenticated = true;
-                if (action.payload?.boards) {
+                state.isGuest = false;
+                if (action.payload?.email) {
+                    state.userEmail = action.payload.email;
+                }
+                if (action.payload?.boards && Array.isArray(action.payload.boards) && action.payload.boards.length > 0) {
                     state.boards = action.payload.boards;
                 }
                 if (action.payload?.theme) {
@@ -178,13 +186,17 @@ const userSlice = createSlice({
             })
             .addCase(checkAuth.rejected, (state) => {
                 state.loading = false;
-                state.isAuthenticated = false;
+                // If not guest, stay unauthenticated
             })
             .addCase(loginUser.pending, (state) => { state.loading = true; state.error = null; })
             .addCase(loginUser.fulfilled, (state, action) => {
                 state.loading = false;
                 state.isAuthenticated = true;
-                if (action.payload?.boards) {
+                state.isGuest = false;
+                if (action.payload?.email) {
+                    state.userEmail = action.payload.email;
+                }
+                if (action.payload?.boards && Array.isArray(action.payload.boards) && action.payload.boards.length > 0) {
                     state.boards = action.payload.boards;
                 }
                 if (action.payload?.theme) {
@@ -200,7 +212,11 @@ const userSlice = createSlice({
             .addCase(registerUser.fulfilled, (state, action) => {
                 state.loading = false;
                 state.isAuthenticated = true;
-                if (action.payload?.boards) {
+                state.isGuest = false;
+                if (action.payload?.email) {
+                    state.userEmail = action.payload.email;
+                }
+                if (action.payload?.boards && Array.isArray(action.payload.boards) && action.payload.boards.length > 0) {
                     state.boards = action.payload.boards;
                 }
                 if (action.payload?.theme) {
@@ -223,25 +239,21 @@ const userSlice = createSlice({
             })
             .addCase(logoutUser.fulfilled, (state) => {
                 state.isAuthenticated = false;
+                state.userEmail = null;
                 state.isGuest = false;
                 state.boards = loadBoardsFromLocalStorage();
                 state.activeBoardId = 'main';
-                AsyncStorage.removeItem('isGuest');
             })
-            --- */
             .addCase(addBoardAsync.pending, (state, action) => {
                 const { id, name, type = 'standard', color } = action.meta.arg;
-                state.boards.push({ id, name, type, color });
+                if (!state.boards.find(b => b.id === id)) {
+                    state.boards.push({ id, name, type, color });
+                }
                 AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
             .addCase(addBoardAsync.fulfilled, (state, action) => {
-                // Already added optimistically
-            })
-            .addCase(addBoardAsync.rejected, (state, action) => {
-                const { id } = action.meta.arg;
-                state.boards = state.boards.filter(b => b.id !== id);
-                if (state.activeBoardId === id) {
-                    state.activeBoardId = 'main';
+                if (action.payload?.boards) {
+                    state.boards = action.payload.boards;
                 }
                 AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
@@ -262,3 +274,4 @@ const userSlice = createSlice({
 
 export const { hydrateUserState, logout, continueAsGuest, updateUserTheme, updateShowWeather, setActiveBoardId, setDashboardFilterType, toggleLayoutVersion } = userSlice.actions;
 export default userSlice.reducer;
+

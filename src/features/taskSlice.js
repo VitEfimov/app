@@ -5,62 +5,68 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations } from '../utils/notifications';
+import axios from 'axios';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
-// import axios from 'axios';
-
-/* --- VERCEL BACKEND THUNKS (COMMENTED OUT FOR LOCAL-ONLY MODE) ---
-export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_) => {
-    const response = await axios.get('/api/tasks', { withCredentials: true });
-    return response.data;
-});
-
-export const addTaskAsync = createAsyncThunk('task/addTaskAsync', async (task) => {
-    const response = await axios.post('/api/tasks', task, { withCredentials: true });
-    return response.data;
-});
-
-export const addMultipleTasksAsync = createAsyncThunk('task/addMultipleTasksAsync', async (tasks) => {
-    const response = await axios.post('/api/tasks/bulk', { tasks }, { withCredentials: true });
-    return response.data;
-});
-
-export const updateTaskAsync = createAsyncThunk('task/updateTaskAsync', async (updateData) => {
-    const { taskId, name, priority, completed, description, completionDate, time } = updateData;
-
-    const payload = {};
-    if (name !== undefined) payload.taskname = name;
-    if (priority !== undefined) payload.priority = priority;
-    if (completed !== undefined) payload.completed = completed;
-    if (completionDate !== undefined) payload.completionDate = completionDate;
-    if (time !== undefined) payload.time = time;
-    if (updateData.reminder !== undefined) payload.reminder = updateData.reminder;
-    if (updateData.notificationId !== undefined) payload.notificationId = updateData.notificationId;
-    if (description !== undefined) {
-        payload.description = { text: description.text || '', img: description.img || '', url: description.url || '' };
+export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI) => {
+    const state = thunkAPI.getState();
+    const isAuthenticated = state.userReducer?.isAuthenticated;
+    if (isAuthenticated) {
+        try {
+            const response = await axios.get('/api/tasks', { withCredentials: true });
+            if (Array.isArray(response.data)) {
+                await AsyncStorage.setItem('tasks', JSON.stringify(response.data));
+                return response.data;
+            }
+        } catch (err) {
+            console.warn("Failed to fetch tasks from remote Vercel DB, using local storage fallback:", err.message);
+        }
     }
-    payload.lastUpdatedDate = new Date().toISOString();
-
-    await axios.put(`/api/tasks/${taskId}`, payload, { withCredentials: true });
-    
-    return { taskId, payload };
-});
-
-export const deleteTaskAsync = createAsyncThunk('task/deleteTaskAsync', async (taskId) => {
-    await axios.delete(`/api/tasks/${taskId}`, { withCredentials: true });
-    return taskId;
-});
---- */
-
-export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_) => {
     try {
         const tasksJson = await AsyncStorage.getItem('tasks');
         return tasksJson ? JSON.parse(tasksJson) : [];
     } catch (e) {
         return [];
     }
+});
+
+export const addTaskAsync = createAsyncThunk('task/addTaskAsync', async (task, thunkAPI) => {
+    try {
+        const response = await axios.post('/api/tasks', task, { withCredentials: true });
+        return response.data;
+    } catch (err) {
+        return task;
+    }
+});
+
+export const addMultipleTasksAsync = createAsyncThunk('task/addMultipleTasksAsync', async (tasks, thunkAPI) => {
+    try {
+        const response = await axios.post('/api/tasks/bulk', { tasks }, { withCredentials: true });
+        return response.data;
+    } catch (err) {
+        return tasks;
+    }
+});
+
+export const updateTaskAsync = createAsyncThunk('task/updateTaskAsync', async (updateData, thunkAPI) => {
+    try {
+        const { taskId, payload } = updateData;
+        await axios.put(`/api/tasks/${taskId}`, payload, { withCredentials: true });
+        return { taskId, payload };
+    } catch (err) {
+        return updateData;
+    }
+});
+
+export const deleteTaskAsync = createAsyncThunk('task/deleteTaskAsync', async (taskId, thunkAPI) => {
+    try {
+        await axios.delete(`/api/tasks/${taskId}`, { withCredentials: true });
+    } catch (err) {
+        // Fallback
+    }
+    return taskId;
 });
 
 const loadGuestTasksFromLocalStorage = () => [];
@@ -311,6 +317,9 @@ export const addTask = (payload) => async (dispatch, getState) => {
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
+    if (state.userReducer?.isAuthenticated && payload?.task) {
+        dispatch(addTaskAsync(payload.task));
+    }
 };
 
 export const addMultipleTasks = (payload) => async (dispatch, getState) => {
@@ -327,13 +336,20 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
+    if (state.userReducer?.isAuthenticated && Array.isArray(payload?.tasks)) {
+        dispatch(addMultipleTasksAsync(payload.tasks));
+    }
 };
 
 export const deleteTask = (payload) => async (dispatch, getState) => {
+    const state = getState();
     dispatch(deleteTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
+    if (state.userReducer?.isAuthenticated && payload?.taskId) {
+        dispatch(deleteTaskAsync(payload.taskId));
+    }
 };
 
 export const deleteTasksByBoard = (boardId) => async (dispatch, getState) => {
@@ -344,10 +360,14 @@ export const deleteTasksByBoard = (boardId) => async (dispatch, getState) => {
 };
 
 export const updateTask = (payload) => async (dispatch, getState) => {
+    const state = getState();
     dispatch(updateTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks);
     syncRecurringAutomations(getState);
+    if (state.userReducer?.isAuthenticated && payload?.taskId) {
+        dispatch(updateTaskAsync({ taskId: payload.taskId, payload }));
+    }
 };
 
 export const updateRecurringSeries = (payload) => async (dispatch, getState) => {
