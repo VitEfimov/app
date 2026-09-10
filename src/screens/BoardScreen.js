@@ -261,8 +261,23 @@ export default function BoardScreen({ route, navigation }) {
     setDetailsVisible(true);
   }, []);
 
+  const mainBoardId = useMemo(() => boards[0]?.id || 'main', [boards]);
+
   // Group tasks
-  const boardTasks = useMemo(() => tasks.filter(task => (task.boardId || 'main') === activeBoardId), [tasks, activeBoardId]);
+  const boardTasks = useMemo(() => {
+    return tasks.map(t => {
+      const updated = { ...t };
+      if (!updated.id && updated._id) updated.id = updated._id;
+      if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
+      return updated;
+    }).filter(task => {
+      const isMainBoard = (activeBoardId === 'main' || activeBoardId === 'tasks' || activeBoardId === mainBoardId);
+      if (isMainBoard) {
+        return !task.boardId || task.boardId === 'main' || task.boardId === 'tasks' || task.boardId === mainBoardId;
+      }
+      return task.boardId === activeBoardId;
+    });
+  }, [tasks, activeBoardId, mainBoardId]);
 
   const activeBoard = useMemo(() => {
     return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };

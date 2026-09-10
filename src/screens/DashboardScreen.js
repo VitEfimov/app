@@ -47,12 +47,23 @@ export default function DashboardScreen({ navigation }) {
     }, [dispatch])
   );
 
+  const mainBoardId = useMemo(() => boards[0]?.id || 'main', [boards]);
+
   const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
+    return tasks.map(t => {
+      const updated = { ...t };
+      if (!updated.id && updated._id) updated.id = updated._id;
+      if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
+      return updated;
+    }).filter(task => {
       if (filterType === 'all') return true;
-      return (task.boardId || 'main') === filterType;
+      const isMainFilter = (filterType === 'main' || filterType === 'tasks' || filterType === mainBoardId);
+      if (isMainFilter) {
+        return !task.boardId || task.boardId === 'main' || task.boardId === 'tasks' || task.boardId === mainBoardId;
+      }
+      return task.boardId === filterType;
     });
-  }, [tasks, filterType]);
+  }, [tasks, filterType, mainBoardId]);
 
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
     const now = dayjs();

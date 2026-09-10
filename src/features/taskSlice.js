@@ -85,6 +85,8 @@ const taskSlice = createSlice({
         hydrateTaskState: (state, action) => {
             state.tasks = action.payload.map(t => {
                 const updated = { ...t };
+                if (!updated.id && updated._id) updated.id = updated._id;
+                if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
                 if (updated.completionDate) {
                     updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
                 } else {
@@ -242,6 +244,8 @@ const taskSlice = createSlice({
                 state.loading = false;
                 state.tasks = action.payload.map(t => {
                     const updated = { ...t };
+                    if (!updated.id && updated._id) updated.id = updated._id;
+                    if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
                     if (updated.completionDate) {
                         updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
                     } else {
