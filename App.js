@@ -130,11 +130,23 @@ function InitApp() {
         await registerBackgroundFetchAsync();
 
         const isGuestVal = await AsyncStorage.getItem('isGuest');
-        console.log("[InitApp Debug] isGuestVal from storage:", isGuestVal);
+        const rememberedVal = await AsyncStorage.getItem('rememberedUser');
+        console.log("[InitApp Debug] isGuestVal from storage:", isGuestVal, "rememberedVal:", rememberedVal);
         if (isGuestVal === 'true') {
           const { continueAsGuest } = require('./src/features/userSlice');
           dispatch(continueAsGuest());
         } else {
+          if (rememberedVal) {
+            try {
+              const remUser = JSON.parse(rememberedVal);
+              if (remUser && remUser.rememberMe && remUser.email) {
+                const { hydrateUserState } = require('./src/features/userSlice');
+                dispatch(hydrateUserState({ isAuthenticated: true, userEmail: remUser.email, isGuest: false }));
+              }
+            } catch (e) {
+              console.error("Failed to parse rememberedUser", e);
+            }
+          }
           const { checkAuth } = require('./src/features/userSlice');
           const authRes = await dispatch(checkAuth());
           console.log("[InitApp Debug] checkAuth result:", authRes);
