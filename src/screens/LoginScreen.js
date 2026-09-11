@@ -200,7 +200,11 @@ export default function LoginScreen() {
         <TouchableOpacity 
           testID="guest_login_btn"
           style={styles.secondaryButton} 
-          onPress={() => dispatch(continueAsGuest())}
+          onPress={() => {
+            dispatch(continueAsGuest());
+            const { fetchTasks } = require('../features/taskSlice');
+            dispatch(fetchTasks());
+          }}
         >
           <Text style={styles.secondaryButtonText}>{t('Continue without login') || 'Continue without login'}</Text>
         </TouchableOpacity>

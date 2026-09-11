@@ -10,26 +10,105 @@ import axios from 'axios';
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
+export const getTaskStorageKey = (state) => {
+    const userState = state?.userReducer || state;
+    if (userState?.isAuthenticated && userState?.userEmail) {
+        return `tasks_${userState.userEmail.toLowerCase().trim()}`;
+    }
+    if (userState?.isGuest) {
+        return 'tasks_guest';
+    }
+    return 'tasks';
+};
+
+const mergeTasks = (currentTasks = [], incomingTasks = []) => {
+    const taskMap = new Map();
+    (currentTasks || []).forEach(t => {
+        if (t) {
+            const normalized = { ...t };
+            if (!normalized.id && normalized._id) normalized.id = normalized._id;
+            if (!normalized.boardId && normalized.board_id) normalized.boardId = normalized.board_id;
+            const key = normalized.id || `${normalized.taskname}_${normalized.completionDate}_${normalized.boardId}`;
+            taskMap.set(key, normalized);
+        }
+    });
+    (incomingTasks || []).forEach(t => {
+        if (t) {
+            const normalized = { ...t };
+            if (!normalized.id && normalized._id) normalized.id = normalized._id;
+            if (!normalized.boardId && normalized.board_id) normalized.boardId = normalized.board_id;
+            const key = normalized.id || `${normalized.taskname}_${normalized.completionDate}_${normalized.boardId}`;
+            const existing = taskMap.get(key);
+            taskMap.set(key, { ...(existing || {}), ...normalized });
+        }
+    });
+    return Array.from(taskMap.values());
+};
+
 export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI) => {
     const state = thunkAPI.getState();
-    const isAuthenticated = state.userReducer?.isAuthenticated;
+    const userState = state.userReducer;
+    const isAuthenticated = userState?.isAuthenticated;
+    
+    const taskKey = getTaskStorageKey(state);
+
+    let localTasks = [];
+    try {
+        const tasksJson = (await AsyncStorage.getItem(taskKey)) || (await AsyncStorage.getItem('tasks'));
+        if (tasksJson) localTasks = JSON.parse(tasksJson);
+    } catch (e) {}
+
+    if (state.taskReducer?.tasks?.length > 0) {
+        localTasks = mergeTasks(localTasks, state.taskReducer.tasks);
+    }
+
     if (isAuthenticated) {
         try {
             const response = await axios.get('/api/tasks', { withCredentials: true });
             if (Array.isArray(response.data)) {
-                await AsyncStorage.setItem('tasks', JSON.stringify(response.data));
-                return response.data;
+                const remoteTasks = response.data.map(t => {
+                    const updated = { ...t };
+                    if (!updated.id && updated._id) updated.id = updated._id;
+                    if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
+                    return updated;
+                });
+
+                const remoteIds = new Set(remoteTasks.map(t => t.id || t._id));
+                const remoteKeys = new Set(remoteTasks.map(t => `${t.taskname}_${t.completionDate}_${t.boardId}`));
+                
+                const unsyncedTasks = localTasks.filter(t => {
+                    if (!t) return false;
+                    const key = `${t.taskname}_${t.completionDate}_${t.boardId}`;
+                    return !remoteIds.has(t.id) && !remoteKeys.has(key);
+                });
+
+                if (unsyncedTasks.length > 0) {
+                    try {
+                        await axios.post('/api/tasks/bulk', { tasks: unsyncedTasks }, { withCredentials: true });
+                    } catch (bulkErr) {
+                        for (const task of unsyncedTasks) {
+                            try {
+                                await axios.post('/api/tasks', task, { withCredentials: true });
+                            } catch (singleErr) {
+                                console.warn("Failed to sync single task to DB:", task.taskname, singleErr.message);
+                            }
+                        }
+                    }
+                }
+
+                const mergedTasks = mergeTasks(localTasks, remoteTasks);
+                await AsyncStorage.setItem(taskKey, JSON.stringify(mergedTasks));
+                await AsyncStorage.setItem('tasks', JSON.stringify(mergedTasks));
+                return mergedTasks;
             }
         } catch (err) {
             console.warn("Failed to fetch tasks from remote Vercel DB, using local storage fallback:", err.message);
         }
     }
-    try {
-        const tasksJson = await AsyncStorage.getItem('tasks');
-        return tasksJson ? JSON.parse(tasksJson) : [];
-    } catch (e) {
-        return [];
-    }
+
+    await AsyncStorage.setItem(taskKey, JSON.stringify(localTasks));
+    await AsyncStorage.setItem('tasks', JSON.stringify(localTasks));
+    return localTasks;
 });
 
 export const addTaskAsync = createAsyncThunk('task/addTaskAsync', async (task, thunkAPI) => {
@@ -264,7 +343,7 @@ let saveStorageTimeout = null;
 let lastTasksToSave = null;
 let syncAutomationsTimeout = null;
 
-export const persistTasksToStorage = (tasks) => {
+export const persistTasksToStorage = (tasks, getState) => {
     lastTasksToSave = tasks;
     if (saveStorageTimeout) {
         clearTimeout(saveStorageTimeout);
@@ -272,6 +351,11 @@ export const persistTasksToStorage = (tasks) => {
     saveStorageTimeout = setTimeout(async () => {
         try {
             if (lastTasksToSave) {
+                let key = 'tasks';
+                if (getState) {
+                    key = getTaskStorageKey(getState());
+                }
+                await AsyncStorage.setItem(key, JSON.stringify(lastTasksToSave));
                 await AsyncStorage.setItem('tasks', JSON.stringify(lastTasksToSave));
             }
         } catch (e) {
@@ -288,6 +372,8 @@ export const flushPendingTaskSaves = async (getState) => {
     try {
         const tasks = getState ? getState().taskReducer.tasks : lastTasksToSave;
         if (tasks) {
+            const key = getState ? getTaskStorageKey(getState()) : 'tasks';
+            await AsyncStorage.setItem(key, JSON.stringify(tasks));
             await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
         }
     } catch (e) {

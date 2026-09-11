@@ -110,6 +110,39 @@ export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, 
     return id;
 });
 
+const mergeBoards = (currentBoards = [], incomingBoards = []) => {
+    const boardMap = new Map();
+    (currentBoards || []).forEach(b => {
+        if (b && (b.id || b.name)) {
+            const key = b.id || b.name;
+            boardMap.set(key, b);
+        }
+    });
+    (incomingBoards || []).forEach(b => {
+        if (b && (b.id || b.name)) {
+            const key = b.id || b.name;
+            const existing = boardMap.get(key) || boardMap.get(b.id);
+            boardMap.set(b.id || key, { ...(existing || {}), ...b });
+        }
+    });
+    return Array.from(boardMap.values());
+};
+
+const syncUnsyncedBoards = async (mergedBoards = [], remoteBoards = []) => {
+    const remoteIds = new Set((remoteBoards || []).map(b => b.id || b._id));
+    const remoteNames = new Set((remoteBoards || []).map(b => b.name));
+    for (const b of mergedBoards) {
+        if (b && (b.id || b.name) && !remoteIds.has(b.id) && !remoteNames.has(b.name)) {
+            try {
+                await axios.post('/api/boards', { id: b.id, name: b.name, type: b.type, color: b.color }, { withCredentials: true });
+            } catch (err) {
+                console.warn("Failed to sync local board to DB:", b.name, err.message);
+            }
+        }
+    }
+};
+
+
 const initialState = {
     isAuthenticated: false,
     userEmail: null,
@@ -129,7 +162,11 @@ const userSlice = createSlice({
     initialState,
     reducers: {
         hydrateUserState: (state, action) => {
-            return { ...state, ...action.payload };
+            const newState = { ...state, ...action.payload };
+            if (action.payload && action.payload.boards && Array.isArray(action.payload.boards)) {
+                newState.boards = mergeBoards(state.boards, action.payload.boards);
+            }
+            return newState;
         },
         logout: (state) => {
             state.isAuthenticated = false;
@@ -176,9 +213,11 @@ const userSlice = createSlice({
                 if (action.payload?.email) {
                     state.userEmail = action.payload.email;
                 }
-                if (action.payload?.boards && Array.isArray(action.payload.boards) && action.payload.boards.length > 0) {
-                    state.boards = action.payload.boards;
-                }
+                const remoteBoards = action.payload?.boards || [];
+                const merged = mergeBoards(state.boards, remoteBoards);
+                state.boards = merged;
+                AsyncStorage.setItem('boards', JSON.stringify(merged));
+                syncUnsyncedBoards(merged, remoteBoards);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);
@@ -196,9 +235,11 @@ const userSlice = createSlice({
                 if (action.payload?.email) {
                     state.userEmail = action.payload.email;
                 }
-                if (action.payload?.boards && Array.isArray(action.payload.boards) && action.payload.boards.length > 0) {
-                    state.boards = action.payload.boards;
-                }
+                const remoteBoards = action.payload?.boards || [];
+                const merged = mergeBoards(state.boards, remoteBoards);
+                state.boards = merged;
+                AsyncStorage.setItem('boards', JSON.stringify(merged));
+                syncUnsyncedBoards(merged, remoteBoards);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);
@@ -216,9 +257,11 @@ const userSlice = createSlice({
                 if (action.payload?.email) {
                     state.userEmail = action.payload.email;
                 }
-                if (action.payload?.boards && Array.isArray(action.payload.boards) && action.payload.boards.length > 0) {
-                    state.boards = action.payload.boards;
-                }
+                const remoteBoards = action.payload?.boards || [];
+                const merged = mergeBoards(state.boards, remoteBoards);
+                state.boards = merged;
+                AsyncStorage.setItem('boards', JSON.stringify(merged));
+                syncUnsyncedBoards(merged, remoteBoards);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);
@@ -252,10 +295,15 @@ const userSlice = createSlice({
                 AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
             .addCase(addBoardAsync.fulfilled, (state, action) => {
-                if (action.payload?.boards) {
-                    state.boards = action.payload.boards;
+                if (action.payload?.boards && Array.isArray(action.payload.boards)) {
+                    const merged = mergeBoards(state.boards, action.payload.boards);
+                    state.boards = merged;
+                    AsyncStorage.setItem('boards', JSON.stringify(merged));
+                } else if (action.payload && action.payload.id) {
+                    const merged = mergeBoards(state.boards, [action.payload]);
+                    state.boards = merged;
+                    AsyncStorage.setItem('boards', JSON.stringify(merged));
                 }
-                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
             .addCase(renameBoardAsync.fulfilled, (state, action) => {
                 const board = state.boards.find(b => b.id === action.payload.id);
