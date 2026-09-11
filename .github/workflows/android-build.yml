@@ -9,6 +9,7 @@ on:
       - optimization
       - task_flow
       - feature/freemium-strategy
+      - free_v1
   workflow_dispatch: # Allows manual trigger from the Actions tab
 
 jobs:

@@ -931,19 +931,21 @@ export default function BoardScreen({ route, navigation }) {
             {t('What would you like to do?')}
           </Text>
           
-          <TouchableOpacity 
-            accessible={true} accessibilityRole="button" accessibilityLabel="Board automations" 
-            style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} 
-            onPress={() => { 
-              const board = boardOptionsConfig.board;
-              setBoardOptionsConfig({ isVisible: false, board: null }); 
-              setTimeout(() => {
-                setBoardAutomationModal({ isVisible: true, boardId: board.id, boardName: board.name });
-              }, 300);
-            }}
-          >
-            <Text style={[styles.optionText, { color: colors.primary, fontWeight: 'bold' }]}>{t('Board Automations')}</Text>
-          </TouchableOpacity>
+          {isPremium && (
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Board automations" 
+              style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} 
+              onPress={() => { 
+                const board = boardOptionsConfig.board;
+                setBoardOptionsConfig({ isVisible: false, board: null }); 
+                setTimeout(() => {
+                  setBoardAutomationModal({ isVisible: true, boardId: board.id, boardName: board.name });
+                }, 300);
+              }}
+            >
+              <Text style={[styles.optionText, { color: colors.primary, fontWeight: 'bold' }]}>{t('Board Automations')}</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Rename board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setPromptConfig({ isVisible: true, type: 'rename', targetBoard: boardOptionsConfig.board }); setBoardOptionsConfig({ isVisible: false, board: null }); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Rename')}</Text>

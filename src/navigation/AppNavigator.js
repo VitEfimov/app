@@ -117,7 +117,6 @@ const linking = {
 };
 
 export default function AppNavigator() {
-  const { isAuthenticated, isGuest } = useSelector((state) => state.userReducer);
   const { colors, isDark } = useTheme();
 
   const MyTheme = {
@@ -138,13 +137,7 @@ export default function AppNavigator() {
         backgroundColor={colors.bgHeader} 
         barStyle={isDark ? 'light-content' : 'dark-content'} 
       />
-      {isAuthenticated || isGuest ? (
-        <TabNavigator />
-      ) : (
-        <Stack.Navigator>
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        </Stack.Navigator>
-      )}
+      <TabNavigator />
     </NavigationContainer>
   );
 }

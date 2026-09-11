@@ -275,12 +275,6 @@ export default function SettingsScreen({ navigation }) {
             <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('App preferences & account')}</Text>
           </View>
           <TouchableOpacity 
-            style={[styles.saveBtn, { backgroundColor: isPremium ? '#FFD700' : '#888', marginRight: 10 }]} 
-            onPress={() => dispatch(toggleDevPremium())}
-          >
-            <Text style={styles.saveBtnText} numberOfLines={1} adjustsFontSizeToFit>{isPremium ? 'PRO' : 'UPGRADE'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Save settings"
             style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
           >
@@ -348,32 +342,36 @@ export default function SettingsScreen({ navigation }) {
         {/* Notifications Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Notifications')}</Text>
         <View style={styles.sectionGroup}>
-          <View style={[styles.rowItem, { borderBottomWidth: 1 }]}>
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Default Reminder for New Tasks')}</Text>
-            <Switch
-              value={theme.defaultReminderEnabled || false}
-              onValueChange={val => dispatch(setDefaultReminderEnabled(val))}
-              trackColor={{ false: colors.borderColor, true: colors.primary }}
-            />
-          </View>
-          {theme.defaultReminderEnabled && (
-            <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
-              <CustomDropdown 
-                label={t("Default Reminder Option")} 
-                value={theme.defaultReminderTime ? t(theme.defaultReminderTime) : t('15 min before')} 
-                options={[
-                  { label: t('None'), value: 'None' },
-                  { label: t('15 min before'), value: '15 min before' },
-                  { label: t('30 min before'), value: '30 min before' },
-                  { label: t('1 hr before'), value: '1 hr before' },
-                  { label: t('1 day before'), value: '1 day before' },
-                  { label: t('Day of'), value: 'Day of' }
-                ]} 
-                onSelect={val => dispatch(setDefaultReminderTime(val))} 
-                colors={colors}
-                layout="horizontal"
-              />
-            </View>
+          {isPremium && (
+            <>
+              <View style={[styles.rowItem, { borderBottomWidth: 1 }]}>
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Default Reminder for New Tasks')}</Text>
+                <Switch
+                  value={theme.defaultReminderEnabled || false}
+                  onValueChange={val => dispatch(setDefaultReminderEnabled(val))}
+                  trackColor={{ false: colors.borderColor, true: colors.primary }}
+                />
+              </View>
+              {theme.defaultReminderEnabled && (
+                <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+                  <CustomDropdown 
+                    label={t("Default Reminder Option")} 
+                    value={theme.defaultReminderTime ? t(theme.defaultReminderTime) : t('15 min before')} 
+                    options={[
+                      { label: t('None'), value: 'None' },
+                      { label: t('15 min before'), value: '15 min before' },
+                      { label: t('30 min before'), value: '30 min before' },
+                      { label: t('1 hr before'), value: '1 hr before' },
+                      { label: t('1 day before'), value: '1 day before' },
+                      { label: t('Day of'), value: 'Day of' }
+                    ]} 
+                    onSelect={val => dispatch(setDefaultReminderTime(val))} 
+                    colors={colors}
+                    layout="horizontal"
+                  />
+                </View>
+              )}
+            </>
           )}
           <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
             <CustomDropdown 
@@ -431,44 +429,29 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
         {/* Automation & Integrations Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
-        <View style={styles.sectionGroup}>
-          {isPremium && (
-            <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
-              style={[styles.rowItem, { borderBottomWidth: 1 }]} 
-              onPress={() => setAutoManageModalVisible(true)}
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
-              <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity 
-            style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12 }]}
-            onPress={() => {
-              if (!isPremium) setPremiumModalVisible(true);
-            }}
-            activeOpacity={isPremium ? 1 : 0.7}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Android Auto Integration') || 'Android Auto Integration'}</Text>
-              {!isPremium && (
-                <View style={{ backgroundColor: '#FFD700', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 8 }}>
-                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#000' }}>PRO 🔒</Text>
-                </View>
-              )}
+        {isPremium && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
+            <View style={styles.sectionGroup}>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
+                style={[styles.rowItem, { borderBottomWidth: 1 }]} 
+                onPress={() => setAutoManageModalVisible(true)}
+              >
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
+                <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
+              </TouchableOpacity>
+              <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12 }]}>
+                <Text style={[styles.rowLabel, { color: colors.textPrimary, flex: 1, marginRight: 10 }]}>{t('Android Auto Integration') || 'Android Auto Integration'}</Text>
+                <Switch
+                  value={theme.androidAutoEnabled !== false}
+                  onValueChange={val => dispatch(setAndroidAutoEnabled(val))}
+                  trackColor={{ false: colors.borderColor, true: colors.primary }}
+                />
+              </View>
             </View>
-            {isPremium ? (
-              <Switch
-                value={theme.androidAutoEnabled !== false}
-                onValueChange={val => dispatch(setAndroidAutoEnabled(val))}
-                trackColor={{ false: colors.borderColor, true: colors.primary }}
-              />
-            ) : (
-              <Text style={{ color: colors.textSecondary, fontSize: 14 }}>{'>'}</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+          </>
+        )}
 
         {/* Account Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Account')}</Text>
@@ -479,10 +462,10 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { color: colors.textPrimary }]}>
-                {isAuthenticated ? (userEmail || t('User Profile')) : t('Guest Mode')}
+                {t('Device Storage') || 'Device Storage'}
               </Text>
               <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
-                {isAuthenticated ? (userEmail || 'Logged In') : 'Local Storage Mode'}
+                {t('Local Storage Mode') || 'Local Storage Mode'}
               </Text>
             </View>
           </View>
@@ -494,15 +477,6 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ false: colors.borderColor, true: colors.primary }}
             />
           </View>
-
-          <TouchableOpacity 
-            testID="logout_btn"
-            accessible={true} accessibilityRole="button" accessibilityLabel="Logout"
-            style={[styles.logoutBtn, { borderColor: colors.borderColor, marginBottom: 12 }]} 
-            onPress={handleLogout}
-          >
-            <Text style={[styles.logoutBtnText, { color: colors.textPrimary }]}>{t('Logout') || 'Logout'}</Text>
-          </TouchableOpacity>
 
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"

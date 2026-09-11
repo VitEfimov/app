@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const loadThemeFromLocalStorage = () => "light";
 const loadShowWeatherFromLocalStorage = () => false;
-const loadIsGuestFromLocalStorage = () => false;
+const loadIsGuestFromLocalStorage = () => true;
 const loadLayoutVersionFromLocalStorage = () => "v1";
 const loadBoardsFromLocalStorage = () => [{ id: 'main', name: 'Main', type: 'standard' }];
 

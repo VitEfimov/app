@@ -36,7 +36,9 @@ const PREDEFINED_COLORS = [
 const FREE_COLORS = [
   '#2E7D32', // Dark Green
   '#1E88E5', // Blue
-  '#FB8C00'  // Orange
+  '#FB8C00', // Orange
+  '#8E24AA', // Purple
+  '#455A64'  // Slate
 ];
 
 export default function ThemeSettingsModal({ isVisible, onClose }) {
