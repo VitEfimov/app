@@ -21,7 +21,7 @@ const entitlementSlice = createSlice({
   initialState,
   reducers: {
     hydrateEntitlementState: (state, action) => {
-      return { ...state, ...action.payload };
+      return { ...state, ...action.payload, isPremium: false, purchaseStatus: 'free' };
     },
     setPremiumStatus: (state, action) => {
       state.isPremium = action.payload;

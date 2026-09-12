@@ -28,6 +28,7 @@ import CustomDropdown from './CustomDropdown';
 import CustomRepeatModal from './CustomRepeatModal';
 import YearPickerModal from './YearPickerModal';
 import ConfirmModal from './ConfirmModal';
+import PremiumModal from './PremiumModal';
 import { useTranslation } from 'react-i18next';
 
 const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style }, ref) => {
@@ -183,6 +184,8 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null, hideCancel: false, cancelText: '' });
   const { generateRepeatingTasks } = useTaskRepeat();
 
+  const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
+  const [premiumFeatureName, setPremiumFeatureName] = useState('');
   const [selectedFullscreenImage, setSelectedFullscreenImage] = useState(null);
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
@@ -917,6 +920,11 @@ useEffect(() => {
   };
 
   const addSubtask = () => {
+    if (!isPremium && subtasks.length >= 5) {
+      setPremiumFeatureName('Unlimited Subtasks');
+      setPremiumModalVisible(true);
+      return;
+    }
     const newSubtasks = [...subtasks, { id: Date.now().toString(), text: '', completed: false }];
     setSubtasks(newSubtasks);
   };
@@ -1130,7 +1138,14 @@ useEffect(() => {
               <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
               <TouchableOpacity 
                 style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 8 }]}
-                onPress={() => setIsRepeatModalVisible(true)}
+                onPress={() => {
+                  if (!isPremium) {
+                    setPremiumFeatureName('Recurring Tasks');
+                    setPremiumModalVisible(true);
+                  } else {
+                    setIsRepeatModalVisible(true);
+                  }
+                }}
               >
                 <Text style={{ color: colors.textPrimary }}>
                   {repeatConfig.preset === 'custom' ? t('Custom...') : 
@@ -1327,6 +1342,12 @@ useEffect(() => {
           onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
           onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
           onConfirm={confirmConfig.onConfirm}
+        />
+
+        <PremiumModal
+          isVisible={isPremiumModalVisible}
+          onClose={() => setPremiumModalVisible(false)}
+          featureName={premiumFeatureName}
         />
 
 

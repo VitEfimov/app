@@ -589,7 +589,7 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleAddBoard = () => {
-    const boardLimit = isAuthenticated ? 6 : 2;
+    const boardLimit = isPremium ? 10 : 2;
     if (boards.length >= boardLimit) {
       setConfirmConfig({
         isVisible: true,
