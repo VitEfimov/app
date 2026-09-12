@@ -581,6 +581,9 @@ export default function CalendarScreen() {
             extraData={[collapsedBoardIds, selectionMode.selectedTaskIds, selectionMode.isActive, colors, flattenedData.length]}
             keyExtractor={(item, index) => item.type === 'task' ? `cal_task_${item.task.id}` : `cal_header_${item.group.id}_${index}`}
             getItemType={(item) => item.type}
+            overrideItemLayout={(layout, item) => {
+              layout.size = item.type === 'header' ? 36 : 65;
+            }}
             renderItem={({ item }) => {
               if (item.type === 'header') {
                 const section = item.group;
@@ -636,7 +639,8 @@ export default function CalendarScreen() {
               return null;
             }}
             contentContainerStyle={styles.listContent}
-            estimatedItemSize={70}
+            estimatedItemSize={65}
+            drawDistance={800}
           />
         ) : (
           <View style={styles.emptyContainer}>
