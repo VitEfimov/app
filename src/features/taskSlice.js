@@ -23,25 +23,35 @@ export const getTaskStorageKey = (state) => {
 
 const mergeTasks = (currentTasks = [], incomingTasks = []) => {
     const taskMap = new Map();
-    (currentTasks || []).forEach(t => {
-        if (t) {
-            const normalized = { ...t };
-            if (!normalized.id && normalized._id) normalized.id = normalized._id;
-            if (!normalized.boardId && normalized.board_id) normalized.boardId = normalized.board_id;
-            const key = normalized.id || `${normalized.taskname}_${normalized.completionDate}_${normalized.boardId}`;
-            taskMap.set(key, normalized);
+    const idMap = new Map();
+
+    const processTask = (t) => {
+        if (!t) return;
+        const normalized = { ...t };
+        if (!normalized.id && normalized._id) normalized.id = normalized._id;
+        if (!normalized.boardId && normalized.board_id) normalized.boardId = normalized.board_id;
+        
+        const existingId = normalized.id || normalized._id;
+        if (existingId && idMap.has(existingId)) {
+            const existingKey = idMap.get(existingId);
+            const existing = taskMap.get(existingKey) || {};
+            const merged = { ...existing, ...normalized };
+            taskMap.set(existingKey, merged);
+            return;
         }
-    });
-    (incomingTasks || []).forEach(t => {
-        if (t) {
-            const normalized = { ...t };
-            if (!normalized.id && normalized._id) normalized.id = normalized._id;
-            if (!normalized.boardId && normalized.board_id) normalized.boardId = normalized.board_id;
-            const key = normalized.id || `${normalized.taskname}_${normalized.completionDate}_${normalized.boardId}`;
-            const existing = taskMap.get(key);
-            taskMap.set(key, { ...(existing || {}), ...normalized });
+
+        const key = normalized.id || `${normalized.taskname}_${normalized.boardId || 'main'}`;
+        const existing = taskMap.get(key);
+        const merged = { ...(existing || {}), ...normalized };
+        taskMap.set(key, merged);
+        if (existingId) {
+            idMap.set(existingId, key);
         }
-    });
+    };
+
+    (currentTasks || []).forEach(processTask);
+    (incomingTasks || []).forEach(processTask);
+
     return Array.from(taskMap.values());
 };
 
@@ -74,12 +84,12 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
                 });
 
                 const remoteIds = new Set(remoteTasks.map(t => t.id || t._id));
-                const remoteKeys = new Set(remoteTasks.map(t => `${t.taskname}_${t.completionDate}_${t.boardId}`));
+                const remoteKeys = new Set(remoteTasks.map(t => `${(t.taskname || '').trim().toLowerCase()}_${t.boardId || 'main'}`));
                 
                 const unsyncedTasks = localTasks.filter(t => {
                     if (!t) return false;
-                    const key = `${t.taskname}_${t.completionDate}_${t.boardId}`;
-                    return !remoteIds.has(t.id) && !remoteKeys.has(key);
+                    const key = `${(t.taskname || '').trim().toLowerCase()}_${t.boardId || 'main'}`;
+                    return !remoteIds.has(t.id) && !remoteIds.has(t._id) && !remoteKeys.has(key);
                 });
 
                 if (unsyncedTasks.length > 0) {
@@ -114,9 +124,9 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
 export const addTaskAsync = createAsyncThunk('task/addTaskAsync', async (task, thunkAPI) => {
     try {
         const response = await axios.post('/api/tasks', task, { withCredentials: true });
-        return response.data;
+        return { tempId: task.id, serverTask: response.data };
     } catch (err) {
-        return task;
+        return { tempId: task.id, task };
     }
 });
 
@@ -193,7 +203,7 @@ const taskSlice = createSlice({
         },
         deleteTaskSync(state, action) {
              const { taskId } = action.payload;
-             state.tasks = state.tasks.filter(t => t.id !== taskId);
+             state.tasks = state.tasks.filter(t => t.id !== taskId && t._id !== taskId);
         },
         deleteTasksByBoardSync(state, action) {
             const { boardId } = action.payload;
@@ -201,7 +211,7 @@ const taskSlice = createSlice({
         },
         updateTaskSync(state, action) {
             const { taskId, name, priority, completed, description, completionDate, time, subtasks } = action.payload;
-            const task = state.tasks.find(task => task.id === taskId);
+            const task = state.tasks.find(t => t.id === taskId || t._id === taskId);
             if (task) {
                 task.taskname = name !== undefined ? name : task.taskname;
                 task.priority = priority !== undefined ? priority : task.priority;
@@ -333,7 +343,18 @@ const taskSlice = createSlice({
                     return updated;
                 });
             })
-            .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; });
+            .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; })
+            .addCase(addTaskAsync.fulfilled, (state, action) => {
+                if (action.payload?.serverTask) {
+                    const { tempId, serverTask } = action.payload;
+                    const serverId = serverTask._id || serverTask.id;
+                    const existingTask = state.tasks.find(t => t.id === tempId || t._id === tempId);
+                    if (existingTask && serverId) {
+                        existingTask.id = serverId;
+                        existingTask._id = serverId;
+                    }
+                }
+            });
     }
 });
 

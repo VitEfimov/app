@@ -775,7 +775,22 @@ export default function BoardScreen({ route, navigation }) {
         data={flattenedData}
         extraData={[activeBoardId, tasks, collapsedSections, sortConfig, isBoardsCollapsed, activeAddSectionId, selectionMode, flattenedData]}
         keyExtractor={(item) => item.type === 'task' ? `task_${item.task.id}_${item.section.id}` : `${item.type}_${item.section.id}`}
-        getItemType={(item) => item.type === 'task' ? 'task' : `${item.type}_${item.section.id}`}
+        getItemType={(item) => item.type}
+        overrideItemLayout={(layout, item) => {
+          switch (item.type) {
+            case 'header':
+              layout.size = 44;
+              break;
+            case 'footer':
+              layout.size = 46;
+              break;
+            case 'task':
+              layout.size = 65;
+              break;
+            default:
+              layout.size = 60;
+          }
+        }}
         renderItem={({ item }) => {
           if (item.type === 'header') return renderSectionHeader({ section: item.section });
           if (item.type === 'footer') return renderSectionFooter({ section: item.section });
@@ -810,7 +825,8 @@ export default function BoardScreen({ route, navigation }) {
         contentContainerStyle={styles.listContent}
         stickyHeaderIndices={undefined}
         keyboardShouldPersistTaps="handled"
-        estimatedItemSize={70}
+        estimatedItemSize={65}
+        drawDistance={800}
       />
 
       <TaskDetailsModal 
