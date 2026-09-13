@@ -93,6 +93,7 @@ export default function CreateBoardModal({
               backgroundColor: colors.bgMain,
               color: colors.textPrimary,
               borderColor: colors.borderColor,
+              marginBottom: 20,
             },
           ]}
           placeholder={t('Board Name (e.g. Birthdays, Groceries)') || 'Board Name'}
@@ -101,59 +102,6 @@ export default function CreateBoardModal({
           onChangeText={setBoardName}
           autoFocus={true}
         />
-
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-          {t('Select Board Type') || 'Select Board Type'}
-        </Text>
-
-        <ScrollView style={styles.templateList} showsVerticalScrollIndicator={false}>
-          {templates.map((tmpl) => {
-            const isSelected = selectedType === tmpl.id;
-            const Icon = tmpl.Icon;
-
-            return (
-              <TouchableOpacity
-                key={tmpl.id}
-                testID={`create_board_type_${tmpl.id}`}
-                activeOpacity={0.7}
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: isSelected ? `${tmpl.accentColor}12` : colors.bgMain,
-                    borderColor: isSelected ? tmpl.accentColor : colors.borderColor,
-                  },
-                ]}
-                onPress={() => setSelectedType(tmpl.id)}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardTitleRow}>
-                    <View
-                      style={[
-                        styles.iconWrapper,
-                        { backgroundColor: isSelected ? tmpl.accentColor : `${colors.textSecondary}20` },
-                      ]}
-                    >
-                      <Icon color={isSelected ? '#FFF' : colors.textPrimary} />
-                    </View>
-                    <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>{tmpl.title}</Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.badge,
-                      { backgroundColor: isSelected ? `${tmpl.accentColor}25` : `${colors.textSecondary}15` },
-                    ]}
-                  >
-                    <Text style={[styles.badgeText, { color: isSelected ? tmpl.accentColor : colors.textSecondary }]}>
-                      {tmpl.badge}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{tmpl.desc}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
 
         <View style={styles.buttonRow}>
           <TouchableOpacity

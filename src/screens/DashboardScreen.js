@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, PanResponder } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { setProgressMode } from '../features/themeSlice';
@@ -49,6 +49,20 @@ export default function DashboardScreen({ navigation }) {
 
   const mainBoardId = useMemo(() => boards[0]?.id || 'main', [boards]);
 
+  const validBoardIds = useMemo(() => {
+    const set = new Set(boards.map(b => b.id));
+    set.add('main');
+    set.add('tasks');
+    if (mainBoardId) set.add(mainBoardId);
+    return set;
+  }, [boards, mainBoardId]);
+
+  useEffect(() => {
+    if (filterType !== 'all' && !validBoardIds.has(filterType)) {
+      setFilterType('all');
+    }
+  }, [filterType, validBoardIds, setFilterType]);
+
   const filteredTasks = useMemo(() => {
     return tasks.map(t => {
       const updated = { ...t };
@@ -56,14 +70,17 @@ export default function DashboardScreen({ navigation }) {
       if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
       return updated;
     }).filter(task => {
+      const bId = task.boardId || 'main';
+      if (!validBoardIds.has(bId)) return false;
+
       if (filterType === 'all') return true;
       const isMainFilter = (filterType === 'main' || filterType === 'tasks' || filterType === mainBoardId);
       if (isMainFilter) {
-        return !task.boardId || task.boardId === 'main' || task.boardId === 'tasks' || task.boardId === mainBoardId;
+        return bId === 'main' || bId === 'tasks' || bId === mainBoardId;
       }
-      return task.boardId === filterType;
+      return bId === filterType;
     });
-  }, [tasks, filterType, mainBoardId]);
+  }, [tasks, filterType, mainBoardId, validBoardIds]);
 
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
     const now = dayjs();

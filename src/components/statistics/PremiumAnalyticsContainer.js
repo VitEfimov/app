@@ -25,34 +25,6 @@ const LockedCard = ({ title, colors, onPress }) => (
 
 export default function PremiumAnalyticsContainer({ colors, isDark, currentDate, viewMode }) {
   const { t } = useTranslation();
-  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
-  
-  const [isModalVisible, setModalVisible] = useState(false);
-  const [selectedFeature, setSelectedFeature] = useState('');
-
-  const handleOpenPremium = (feature) => {
-    setSelectedFeature(feature);
-    setModalVisible(true);
-  };
-
-  if (!isPremium) {
-    return (
-      <View style={styles.container}>
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Productivity Analytics')}</Text>
-        
-        <LockedCard title={t("Productivity Score")} colors={colors} onPress={() => handleOpenPremium(t("Productivity Score"))} />
-        <LockedCard title={t("Monthly Trends")} colors={colors} onPress={() => handleOpenPremium(t("Monthly Trends"))} />
-        <LockedCard title={t("Activity Heat Map")} colors={colors} onPress={() => handleOpenPremium(t("Activity Heat Map"))} />
-        <LockedCard title={t("Streaks & Records")} colors={colors} onPress={() => handleOpenPremium(t("Streaks & Records"))} />
-        
-        <PremiumModal 
-          isVisible={isModalVisible} 
-          onClose={() => setModalVisible(false)} 
-          featureName={selectedFeature} 
-        />
-      </View>
-    );
-  }
 
   // Phase 4 & 5: Interactive Premium Components
   return (

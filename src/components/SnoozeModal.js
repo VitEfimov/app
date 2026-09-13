@@ -246,40 +246,34 @@ export default function SnoozeModal({
             </TouchableOpacity>
           ))}
 
-          {activeTab === 'reminder' && reminderOptions.map((opt, i) => (
-            <TouchableOpacity key={i} style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handleSnoozeReminder(opt.mode)}>
-              <View style={styles.actionIconContainer}>
-                <opt.icon color={colors.textPrimary} />
-              </View>
-              <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {activeTab === 'reminder' && (
+            <>
+              {reminderOptions.map((opt, i) => (
+                <TouchableOpacity key={i} style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handleSnoozeReminder(opt.mode)}>
+                  <View style={styles.actionIconContainer}>
+                    <opt.icon color={colors.textPrimary} />
+                  </View>
+                  <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
 
-          {/* Premium Section */}
-          {isPremium ? (
-            <View style={styles.premiumSection}>
-              <TouchableOpacity style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handlePremiumAction('nag')}>
-                <View style={styles.actionIconContainer}>
-                  <IconBell color={colors.textPrimary} />
-                </View>
-                <Text style={[styles.optionLabel, { color: colors.textPrimary, flex: 1 }]}>{t('Nag Mode (Every 10 min)')}</Text>
-                {task.isNagMode && <Text style={{color: '#4caf50', fontWeight:'bold'}}>ON</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handlePremiumAction('escalating')}>
-                <View style={styles.actionIconContainer}>
-                  <IconTrendingUp color={colors.textPrimary} />
-                </View>
-                <Text style={[styles.optionLabel, { color: colors.textPrimary, flex: 1 }]}>{t('Escalating Reminder')}</Text>
-                {task.escalationLevel === 'active' && <Text style={{color: '#4caf50', fontWeight:'bold'}}>ON</Text>}
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity 
-              style={styles.proUpsellRow} 
-              onPress={() => onOpenPremiumModal(t('Advanced Snoozing'))}
-            >
-              <Text style={[styles.proUpsellText, { color: colors.primary }]}>✦ {t('More options with Pro')} →</Text>
-            </TouchableOpacity>
+              <View style={styles.premiumSection}>
+                <TouchableOpacity style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handlePremiumAction('nag')}>
+                  <View style={styles.actionIconContainer}>
+                    <IconBell color={colors.textPrimary} />
+                  </View>
+                  <Text style={[styles.optionLabel, { color: colors.textPrimary, flex: 1 }]}>{t('Nag Mode (Every 10 min)')}</Text>
+                  {task.isNagMode && <Text style={{color: '#4caf50', fontWeight:'bold'}}>ON</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handlePremiumAction('escalating')}>
+                  <View style={styles.actionIconContainer}>
+                    <IconTrendingUp color={colors.textPrimary} />
+                  </View>
+                  <Text style={[styles.optionLabel, { color: colors.textPrimary, flex: 1 }]}>{t('Escalating Reminder')}</Text>
+                  {task.escalationLevel === 'active' && <Text style={{color: '#4caf50', fontWeight:'bold'}}>ON</Text>}
+                </TouchableOpacity>
+              </View>
+            </>
           )}
         </ScrollView>
       </View>

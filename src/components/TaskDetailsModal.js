@@ -668,10 +668,32 @@ useEffect(() => {
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
   const handleAttachPhoto = () => {
+    if (!isPremium) {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Pro Feature'),
+        message: t('Photo & camera attachments are available in the Pro version.'),
+        confirmText: t('OK'),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
+      return;
+    }
     launchCamera();
   };
 
   const handleAttachDocument = () => {
+    if (!isPremium) {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Pro Feature'),
+        message: t('File & document attachments are available in the Pro version.'),
+        confirmText: t('OK'),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
+      return;
+    }
     requestAnimationFrame(() => pickDocument());
   };
 
@@ -920,11 +942,6 @@ useEffect(() => {
   };
 
   const addSubtask = () => {
-    if (!isPremium && subtasks.length >= 5) {
-      setPremiumFeatureName('Unlimited Subtasks');
-      setPremiumModalVisible(true);
-      return;
-    }
     const newSubtasks = [...subtasks, { id: Date.now().toString(), text: '', completed: false }];
     setSubtasks(newSubtasks);
   };
@@ -1055,10 +1072,10 @@ useEffect(() => {
           >
             
             <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0 }]}>{t('Task name')}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel="Toggle task completion"
-                onPress={toggleComplete} style={{ marginTop: 12 }}
+                onPress={toggleComplete} style={{ justifyContent: 'center' }}
               >
                 {task.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />}
               </TouchableOpacity>
@@ -1066,7 +1083,7 @@ useEffect(() => {
               <TextInput
                 testID="task_details_name_input"
                 accessible={true} accessibilityLabel="Task Name"
-                style={[styles.input, { flex: 1, color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, minHeight: 46 }]}
+                style={[styles.input, { flex: 1, color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, minHeight: 48, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 }]}
                 value={taskName}
                 onChangeText={setTaskName}
                 onBlur={handleNameBlur}
@@ -1074,16 +1091,16 @@ useEffect(() => {
                 placeholderTextColor={colors.textSecondary}
                 multiline={true}
                 scrollEnabled={false}
-                textAlignVertical="top"
+                textAlignVertical="center"
               />
             </View>
 
-            <View style={styles.twoColumnRow}>
+            <View style={[styles.twoColumnRow, { marginBottom: 16 }]}>
               <View style={styles.column}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Due date')}</Text>
                 <TouchableOpacity 
                   accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : 'Not set'}`}
-                  style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
+                  style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 48, borderRadius: 12 }]}
                   onPress={() => { setDatePickerType('due'); setShowDatePicker(true); }}
                 >
                   <IconCalendar color={colors.textPrimary} />
@@ -1098,7 +1115,7 @@ useEffect(() => {
                 </View>
                 <TouchableOpacity 
                   accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
-                  style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
+                  style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 48, borderRadius: 12 }]}
                   onPress={() => setShowTimePicker(true)}
                 >
                   <IconClock color={colors.textPrimary} />
@@ -1109,9 +1126,9 @@ useEffect(() => {
               </View>
             </View>
 
-            <View style={styles.twoColumnRow}>
+            <View style={[styles.twoColumnRow, { marginBottom: 16 }]}>
               <View style={styles.column}>
-                <CustomDropdown label={t("Priority")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 46, borderRadius: 8 }} />
+                <CustomDropdown label={t("Priority")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 48, borderRadius: 12 }} />
               </View>
               <View style={styles.column}>
                 <CustomDropdown 
@@ -1129,22 +1146,17 @@ useEffect(() => {
                   ]} 
                   onSelect={handleReminderSelect} 
                   colors={colors} 
-                  customBtnStyle={{ height: 46, borderRadius: 8 }} 
+                  customBtnStyle={{ height: 48, borderRadius: 12 }} 
                 />
               </View>
             </View>
 
-            <View style={{ marginTop: 15 }}>
+            <View style={{ marginBottom: 16 }}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
               <TouchableOpacity 
-                style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 8 }]}
+                style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 48, borderRadius: 12 }]}
                 onPress={() => {
-                  if (!isPremium) {
-                    setPremiumFeatureName('Recurring Tasks');
-                    setPremiumModalVisible(true);
-                  } else {
-                    setIsRepeatModalVisible(true);
-                  }
+                  setIsRepeatModalVisible(true);
                 }}
               >
                 <Text style={{ color: colors.textPrimary }}>
@@ -1155,21 +1167,21 @@ useEffect(() => {
               </TouchableOpacity>
             </View>
 
-            {isPremium && reminder !== 'None' && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 15 }}>
+            {reminder !== 'None' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                 <Switch value={isAlarm} onValueChange={setIsAlarm} trackColor={{ true: colors.primary }} />
-                <Text style={{ color: colors.textPrimary, marginLeft: 8, fontWeight: 'bold' }}>{t('Play Reminder as Alarm')}</Text>
+                <Text style={{ color: colors.textPrimary, marginLeft: 10, fontWeight: '600', fontSize: 14 }}>{t('Play Reminder as Alarm')}</Text>
               </View>
             )}
 
             {repeatConfig.preset !== 'None' && (
-              <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}>
+              <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, borderRadius: 12, marginBottom: 16, padding: 14 }]}>
                 <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('Repeat configuration')}</Text>
                 <View style={styles.twoColumnRow}>
                   <View style={styles.column}>
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>{t('From')}</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('From')}</Text>
                     <TouchableOpacity 
-                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
+                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 44, borderRadius: 10 }]}
                       onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
                     >
                       <IconCalendar color={colors.textPrimary} />
@@ -1179,9 +1191,9 @@ useEffect(() => {
                     </TouchableOpacity>
                   </View>
                   <View style={styles.column}>
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>{t('To')}</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('To')}</Text>
                     <TouchableOpacity 
-                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter }]}
+                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 44, borderRadius: 10 }]}
                       onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
                     >
                       <IconCalendar color={colors.textPrimary} />
@@ -1212,32 +1224,30 @@ useEffect(() => {
               />
             )}
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('Notes & attachments')}</Text>
-              {isPremium && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-                  <TouchableOpacity 
-                    accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
-                    onPress={handleAttachPhoto} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                  >
-                    <IconCamera color={colors.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    accessible={true} accessibilityRole="button" accessibilityLabel="Add Document"
-                    onPress={handleAttachDocument} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                  >
-                    <IconAttachment color={colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+                <TouchableOpacity 
+                  accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
+                  onPress={handleAttachPhoto} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                >
+                  <IconCamera color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  accessible={true} accessibilityRole="button" accessibilityLabel="Add Document"
+                  onPress={handleAttachDocument} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                >
+                  <IconAttachment color={colors.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 100 }]}>
+            <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 110, borderRadius: 12, marginBottom: 16 }]}>
               <MemoizedNotesInput
                 ref={notesRef}
                 initialValue={notes}
                 placeholder={t("Add extra details or notes...")}
                 placeholderTextColor={colors.textSecondary}
-                style={{ flex: 1, padding: 15, color: colors.textPrimary, fontSize: 15 }}
+                style={{ flex: 1, padding: 14, color: colors.textPrimary, fontSize: 15 }}
               />
               
               {attachments.length > 0 && (
@@ -1268,28 +1278,31 @@ useEffect(() => {
               )}
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('Subtasks')}</Text>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel="Add new subtask"
                 onPress={addSubtask} hitSlop={{top:10,bottom:10,left:10,right:10}}
               >
-                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('+ Add Subtask')}</Text>
+                <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 14 }}>{t('+ Add Subtask')}</Text>
               </TouchableOpacity>
             </View>
             
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: 10 }}>
               {subtasks.map((subtask) => (
-                <View key={subtask.id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View key={subtask.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <TouchableOpacity 
                     accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: subtask.completed }} accessibilityLabel="Toggle subtask completion"
-                    onPress={() => toggleSubtask(subtask.id)} style={{ marginTop: 2 }}
+                    onPress={() => toggleSubtask(subtask.id)} style={{ justifyContent: 'center' }}
                   >
                     {subtask.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />}
                   </TouchableOpacity>
                   <TextInput
                     accessible={true} accessibilityLabel="Subtask text"
-                    style={[{ flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 2 }, subtask.completed && { textDecorationLine: 'line-through', opacity: 0.5 }]}
+                    style={[
+                      { flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: surfaceLighter, borderColor: colors.borderColor, borderWidth: 1 }, 
+                      subtask.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
+                    ]}
                     value={subtask.text}
                     onChangeText={(text) => updateSubtask(subtask.id, text)}
                     placeholder={t("Subtask...")}
@@ -1299,7 +1312,7 @@ useEffect(() => {
                   />
                   <TouchableOpacity 
                     accessible={true} accessibilityRole="button" accessibilityLabel="Delete subtask"
-                    onPress={() => removeSubtask(subtask.id)} style={{ padding: 4 }}
+                    onPress={() => removeSubtask(subtask.id)} style={{ padding: 6 }}
                   >
                     <IconClose color={colors.textSecondary} />
                   </TouchableOpacity>
@@ -1307,12 +1320,12 @@ useEffect(() => {
               ))}
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 30 }}>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 28, marginBottom: 10 }}>
               <TouchableOpacity 
                 testID="task_details_delete_btn_bottom"
                 accessible={true} accessibilityRole="button" accessibilityLabel="Delete task"
                 onPress={handleDelete} 
-                style={{ flex: 1, padding: 15, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 8, alignItems: 'center' }}
+                style={{ flex: 1, height: 50, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}
               >
                 <Text style={{ color: '#f44336', fontWeight: 'bold', fontSize: 16 }}>{t('Delete')}</Text>
               </TouchableOpacity>
@@ -1320,7 +1333,7 @@ useEffect(() => {
               <TouchableOpacity 
                 testID="task_details_save_btn_bottom"
                 onPress={handleSave} 
-                style={{ flex: 1, padding: 15, backgroundColor: colors.primary, borderRadius: 8, alignItems: 'center' }}
+                style={{ flex: 1, height: 50, backgroundColor: colors.primary, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}
               >
                 <Text style={{ color: colors.textInverse, fontWeight: 'bold', fontSize: 16 }}>{t('Save Changes')}</Text>
               </TouchableOpacity>
@@ -1538,7 +1551,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     marginBottom: 6,
-    marginTop: 20,
+    marginTop: 0,
   },
   input: {
     borderWidth: 1,

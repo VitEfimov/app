@@ -133,10 +133,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   verticalLabel: {
-    fontSize: 12,
-    marginBottom: 8,
-    marginTop: 20,
-    letterSpacing: 1,
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 6,
+    marginTop: 0,
   },
   dropdownBtn: {
     flexDirection: 'row',
