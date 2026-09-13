@@ -814,20 +814,8 @@ export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, upda
   }
 }
 
-export async function updateRecurringAutomations(themeState, tasks = []) {
+export async function updateRecurringAutomations(themeState, tasks = [], isPremium = false) {
   if (Platform.OS === 'web') return;
-  const {
-    morningReminder, morningReminderTime,
-    eveningReminder, eveningReminderTime,
-    summaryReminder, summaryReminderTime
-  } = themeState || {};
-
-  const notificationSound = themeState?.notificationSound || 'default';
-  const vibrationEnabled = themeState?.vibrationEnabled !== false;
-  const channelId = getChannelId(false, notificationSound, vibrationEnabled);
-
-  // Ensure channel exists
-  await configureAndroidNotificationChannels(notificationSound, 'default', vibrationEnabled);
 
   try {
     // Cancel existing automations
@@ -840,6 +828,23 @@ export async function updateRecurringAutomations(themeState, tasks = []) {
   } catch (error) {
     DevLogger.error('Failed to cancel existing automations', error);
   }
+
+  if (!isPremium) {
+    return;
+  }
+
+  const {
+    morningReminder, morningReminderTime,
+    eveningReminder, eveningReminderTime,
+    summaryReminder, summaryReminderTime
+  } = themeState || {};
+
+  const notificationSound = themeState?.notificationSound || 'default';
+  const vibrationEnabled = themeState?.vibrationEnabled !== false;
+  const channelId = getChannelId(false, notificationSound, vibrationEnabled);
+
+  // Ensure channel exists
+  await configureAndroidNotificationChannels(notificationSound, 'default', vibrationEnabled);
 
   // Helper to find the absolute next occurrence of a time, with an optional day offset
   const getNextOccurrence = (hour, minute, daysOffset = 0) => {

@@ -74,12 +74,13 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
                 });
 
                 const remoteIds = new Set(remoteTasks.map(t => t.id || t._id));
-                const remoteKeys = new Set(remoteTasks.map(t => `${t.taskname}_${t.completionDate}_${t.boardId}`));
+                const remoteKeys = new Set(remoteTasks.map(t => `${(t.taskname || '').trim().toLowerCase()}_${t.boardId || 'main'}`));
                 
                 const unsyncedTasks = localTasks.filter(t => {
                     if (!t) return false;
-                    const key = `${t.taskname}_${t.completionDate}_${t.boardId}`;
-                    return !remoteIds.has(t.id) && !remoteKeys.has(key);
+                    const isLocalDraft = t.isLocalDraft || (t.id && String(t.id).startsWith('temp_')) || !t._id;
+                    const key = `${(t.taskname || '').trim().toLowerCase()}_${t.boardId || 'main'}`;
+                    return isLocalDraft && !remoteIds.has(t.id) && !remoteIds.has(t._id) && !remoteKeys.has(key);
                 });
 
                 if (unsyncedTasks.length > 0) {
@@ -390,7 +391,8 @@ const syncRecurringAutomations = (getState) => {
             const state = getState();
             const themeState = state.themeReducer;
             const tasks = state.taskReducer.tasks;
-            updateRecurringAutomations(themeState, tasks);
+            const isPremium = state.entitlementReducer?.isPremium;
+            updateRecurringAutomations(themeState, tasks, isPremium);
         } catch (e) {
             // Silently catch in case of issues
         }
@@ -406,7 +408,7 @@ export const addTask = (payload) => async (dispatch, getState) => {
     }
     dispatch(addTaskSync(payload)); 
     const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks);
+    persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
     if (state.userReducer?.isAuthenticated && payload?.task) {
         dispatch(addTaskAsync(payload.task));
@@ -426,7 +428,7 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     }
     dispatch(addMultipleTasksSync(payload));
     const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks);
+    persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
     if (state.userReducer?.isAuthenticated && Array.isArray(payload?.tasks)) {
         dispatch(addMultipleTasksAsync(payload.tasks));
@@ -437,7 +439,7 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     dispatch(deleteTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks);
+    persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
     if (state.userReducer?.isAuthenticated && payload?.taskId) {
         dispatch(deleteTaskAsync(payload.taskId));
@@ -447,7 +449,7 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
 export const deleteTasksByBoard = (boardId) => async (dispatch, getState) => {
     dispatch(deleteTasksByBoardSync({ boardId }));
     const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks);
+    persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
 };
 
@@ -455,7 +457,7 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     dispatch(updateTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks);
+    persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
     if (state.userReducer?.isAuthenticated && payload?.taskId) {
         dispatch(updateTaskAsync({ taskId: payload.taskId, payload }));
@@ -465,14 +467,14 @@ export const updateTask = (payload) => async (dispatch, getState) => {
 export const updateRecurringSeries = (payload) => async (dispatch, getState) => {
     dispatch(updateRecurringSeriesSync(payload));
     const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks);
+    persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
 };
 
 export const deleteRecurringSeries = (payload) => async (dispatch, getState) => {
     dispatch(deleteRecurringSeriesSync(payload));
     const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks);
+    persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
 };
 

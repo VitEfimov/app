@@ -112,8 +112,10 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     if (!taskName.trim()) return;
 
     const activeBoard = boards.find(b => b.id === activeBoardId);
+    const isEventsBoard = activeBoard?.type === 'birthdays' || activeBoard?.type === 'events' || (activeBoard?.name && activeBoard.name.toLowerCase() === 'events');
     const startDateStr = dayjs(selectedDate).format('YYYY-MM-DD');
     const endDateStr = dayjs(selectedDate).add(10, 'year').format('YYYY-MM-DD');
+    const seriesId = isEventsBoard ? ('series_' + Date.now().toString() + Math.random().toString(36).substr(2, 9)) : undefined;
 
     const newTask = {
       id: new Date().getTime().toString(),
@@ -126,18 +128,20 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       priority: 'none',
       completed: false,
       description: { text: '', img: '', url: '' },
-      ...(activeBoard?.type === 'birthdays' ? {
+      ...(isEventsBoard ? {
         repeat: 'yearly',
         repeatFrequency: 'Every year',
         repeatConfig: { preset: 'every_year' },
         repeatStartDate: startDateStr,
-        repeatEndDate: endDateStr
+        repeatEndDate: endDateStr,
+        recurringSeriesId: seriesId,
+        isRecurring: true
       } : {})
     };
 
     dispatch(addTask({ task: newTask }));
 
-    if (activeBoard?.type === 'birthdays') {
+    if (isEventsBoard) {
       generateRepeatingTasks(
         newTask,
         {
