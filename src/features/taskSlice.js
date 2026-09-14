@@ -45,10 +45,31 @@ const mergeTasks = (currentTasks = [], incomingTasks = []) => {
     return Array.from(taskMap.values());
 };
 
+export const purgeOrphanedTasks = (tasks = [], boards = []) => {
+    if (!Array.isArray(tasks) || tasks.length === 0) return [];
+    if (!Array.isArray(boards) || boards.length === 0) return tasks;
+    const validSet = new Set(['main', 'tasks']);
+    boards.forEach(b => {
+        if (b.id) validSet.add(String(b.id));
+        if (b._id) validSet.add(String(b._id));
+        if (b.name) validSet.add(String(b.name).toLowerCase());
+    });
+
+    return tasks.filter(t => {
+        if (!t) return false;
+        const rawBId = t.boardId || t.board_id;
+        if (!rawBId || rawBId === 'main' || rawBId === 'tasks') return true;
+        const strId = String(rawBId);
+        const lowerName = String(rawBId).toLowerCase();
+        return validSet.has(strId) || validSet.has(lowerName);
+    });
+};
+
 export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI) => {
     const state = thunkAPI.getState();
     const userState = state.userReducer;
     const isAuthenticated = userState?.isAuthenticated;
+    const boards = userState?.boards || [];
     
     const taskKey = getTaskStorageKey(state);
 
@@ -62,23 +83,7 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
         localTasks = mergeTasks(localTasks, state.taskReducer.tasks);
     }
 
-    const boards = state.userReducer?.boards || [];
-    if (boards.length > 0) {
-        const validBoardSet = new Set(['main', 'tasks']);
-        boards.forEach(b => {
-            if (b.id) validBoardSet.add(b.id);
-            if (b._id) validBoardSet.add(b._id);
-            if (b.name) validBoardSet.add(b.name);
-        });
-        localTasks = localTasks.filter(t => {
-            if (!t) return false;
-            const bId = t.boardId || t.board_id;
-            if (bId && bId !== 'main' && bId !== 'tasks' && !validBoardSet.has(bId)) {
-                return false;
-            }
-            return true;
-        });
-    }
+    localTasks = purgeOrphanedTasks(localTasks, boards);
 
     if (isAuthenticated) {
         try {
@@ -96,7 +101,7 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
                 
                 const unsyncedTasks = localTasks.filter(t => {
                     if (!t) return false;
-                    const isLocalDraft = t.isLocalDraft || (t.id && String(t.id).startsWith('temp_')) || !t._id;
+                    const isLocalDraft = t.isLocalDraft === true || (t.id && String(t.id).startsWith('temp_'));
                     const key = `${(t.taskname || '').trim().toLowerCase()}_${t.boardId || 'main'}`;
                     return isLocalDraft && !remoteIds.has(t.id) && !remoteIds.has(t._id) && !remoteKeys.has(key);
                 });
@@ -115,7 +120,7 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
                     }
                 }
 
-                const mergedTasks = mergeTasks(localTasks, remoteTasks);
+                const mergedTasks = purgeOrphanedTasks(mergeTasks(unsyncedTasks, remoteTasks), boards);
                 await AsyncStorage.setItem(taskKey, JSON.stringify(mergedTasks));
                 await AsyncStorage.setItem('tasks', JSON.stringify(mergedTasks));
                 return mergedTasks;
@@ -214,13 +219,31 @@ const taskSlice = createSlice({
              const { taskId } = action.payload;
              state.tasks = state.tasks.filter(t => t.id !== taskId);
         },
+        purgeOrphanedTasksSync(state, action) {
+            const boards = action.payload || [];
+            if (Array.isArray(boards) && boards.length > 0) {
+                state.tasks = purgeOrphanedTasks(state.tasks, boards);
+            }
+        },
         deleteTasksByBoardSync(state, action) {
-            const { boardId, boardName } = typeof action.payload === 'object' ? action.payload : { boardId: action.payload };
+            let targetId = null;
+            let targetName = null;
+            const payload = action.payload;
+            if (typeof payload === 'object' && payload !== null) {
+                const bObj = (payload.boardId && typeof payload.boardId === 'object') ? payload.boardId : payload;
+                targetId = bObj.boardId || bObj.id || null;
+                targetName = bObj.boardName || bObj.name || null;
+                if (!targetId && typeof bObj === 'string') targetId = bObj;
+            } else if (payload) {
+                targetId = String(payload);
+            }
+
             state.tasks = state.tasks.filter(t => {
                 const bId = t.boardId || t.board_id;
                 if (!bId || bId === 'main' || bId === 'tasks') return true;
-                if (bId === boardId) return false;
-                if (boardName && bId === boardName) return false;
+                const strBId = String(bId);
+                if (targetId && strBId === String(targetId)) return false;
+                if (targetName && strBId.toLowerCase() === String(targetName).toLowerCase()) return false;
                 return true;
             });
         },
@@ -371,7 +394,7 @@ const taskSlice = createSlice({
     }
 });
 
-export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, updateTaskSync, updateRecurringSeriesSync, deleteRecurringSeriesSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds } = taskSlice.actions;
+export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, purgeOrphanedTasksSync, updateTaskSync, updateRecurringSeriesSync, deleteRecurringSeriesSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds } = taskSlice.actions;
 
 let saveStorageTimeout = null;
 let lastTasksToSave = null;
@@ -479,8 +502,15 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
     }
 };
 
-export const deleteTasksByBoard = (boardId) => async (dispatch, getState) => {
-    dispatch(deleteTasksByBoardSync({ boardId }));
+export const deleteTasksByBoard = (payload) => async (dispatch, getState) => {
+    dispatch(deleteTasksByBoardSync(payload));
+    const tasks = getState().taskReducer.tasks;
+    persistTasksToStorage(tasks, getState);
+    syncRecurringAutomations(getState);
+};
+
+export const purgeOrphanedTasksThunk = (boards) => async (dispatch, getState) => {
+    dispatch(purgeOrphanedTasksSync(boards));
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);

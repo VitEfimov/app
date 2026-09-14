@@ -10,7 +10,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
-import { processAutoManageTasks } from '../features/taskSlice';
+import { processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
 import { setActiveBoardId, setDashboardFilterType } from '../features/userSlice';
 
 const IconLeft = ({ color }) => (
@@ -66,7 +66,10 @@ export default function DashboardScreen({ navigation }) {
     if (filterType !== 'all' && !validBoardIds.has(filterType)) {
       setFilterType('all');
     }
-  }, [filterType, validBoardIds, setFilterType]);
+    if (boards && boards.length > 0) {
+      dispatch(purgeOrphanedTasksThunk(boards));
+    }
+  }, [filterType, validBoardIds, setFilterType, boards, dispatch]);
 
   const filteredTasks = useMemo(() => {
     return tasks.map(t => {
@@ -91,32 +94,82 @@ export default function DashboardScreen({ navigation }) {
     });
   }, [tasks, filterType, mainBoardId, validBoardIds, boards]);
 
+  const showRecurringTasksOnBoard = useSelector(state => state.themeReducer.showRecurringTasksOnBoard || false);
+
+  const hiddenRecurringTaskIds = useMemo(() => {
+    if (showRecurringTasksOnBoard) return new Set();
+
+    const seriesMap = new Map();
+    filteredTasks.forEach(task => {
+      if (!task.recurringSeriesId || task.completed) return;
+      const seriesId = task.recurringSeriesId;
+      if (!seriesMap.has(seriesId)) {
+        seriesMap.set(seriesId, []);
+      }
+      seriesMap.get(seriesId).push(task);
+    });
+
+    const hiddenIds = new Set();
+
+    seriesMap.forEach(taskList => {
+      taskList.sort((a, b) => {
+        const dayA = a.completionDate ? dayjs(a.completionDate).valueOf() : Infinity;
+        const dayB = b.completionDate ? dayjs(b.completionDate).valueOf() : Infinity;
+        if (dayA !== dayB) return dayA - dayB;
+        if (a.time && b.time) return a.time.localeCompare(b.time);
+        if (a.time && !b.time) return -1;
+        if (!a.time && b.time) return 1;
+        return parseInt(a.id || '0') - parseInt(b.id || '0');
+      });
+
+      let hasFoundFirstActiveNonMissed = false;
+
+      taskList.forEach(task => {
+        if (isTaskMissed(task)) {
+          return;
+        }
+
+        if (!hasFoundFirstActiveNonMissed) {
+          hasFoundFirstActiveNonMissed = true;
+        } else {
+          hiddenIds.add(task.id);
+        }
+      });
+    });
+
+    return hiddenIds;
+  }, [filteredTasks, showRecurringTasksOnBoard]);
+
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
     const now = dayjs();
     const nowDateStr = now.format('YYYY-MM-DD');
     const FILTERS = getFilters(now);
 
     return {
-      todayTasks: filteredTasks.filter(task => isTaskToday(task, now, nowDateStr)),
+      todayTasks: filteredTasks.filter(task => !hiddenRecurringTaskIds.has(task.id) && isTaskToday(task, now, nowDateStr)),
       tomorrowTasks: filteredTasks.filter(task => {
+        if (hiddenRecurringTaskIds.has(task.id)) return false;
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d === FILTERS.tomorrow && !task.completed;
       }),
       thisWeekTasks: filteredTasks.filter(task => {
+        if (hiddenRecurringTaskIds.has(task.id)) return false;
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d > FILTERS.today && d !== FILTERS.tomorrow && d <= FILTERS['on-this-week'] && !task.completed;
       }),
       nextWeekTasks: filteredTasks.filter(task => {
+        if (hiddenRecurringTaskIds.has(task.id)) return false;
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d > FILTERS['on-this-week'] && d <= FILTERS['on-next-week'] && !task.completed;
       }),
       laterTasks: filteredTasks.filter(task => {
+        if (hiddenRecurringTaskIds.has(task.id)) return false;
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d > FILTERS['on-next-week'] && !task.completed;
       }),
       missedTasks: filteredTasks.filter(task => isTaskMissed(task, now, nowDateStr))
     };
-  }, [filteredTasks]);
+  }, [filteredTasks, hiddenRecurringTaskIds]);
 
   const progressMode = useSelector(state => state.themeReducer.progressMode) || 'daily';
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);

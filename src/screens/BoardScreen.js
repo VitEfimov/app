@@ -21,7 +21,7 @@ import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed } from '../features/themeSlice';
 import { useTranslation } from 'react-i18next';
@@ -122,6 +122,12 @@ export default function BoardScreen({ route, navigation }) {
       navigation.setParams({ editTaskId: undefined });
     }
   }, [route?.params?.editTaskId, tasks, navigation]);
+
+  useEffect(() => {
+    if (boards && boards.length > 0) {
+      dispatch(purgeOrphanedTasksThunk(boards));
+    }
+  }, [boards, dispatch]);
 
   const toggleSection = (sectionId) => {
     if (collapsedSections.includes(sectionId)) {
@@ -265,19 +271,31 @@ export default function BoardScreen({ route, navigation }) {
 
   // Group tasks
   const boardTasks = useMemo(() => {
+    const validSet = new Set(['main', 'tasks']);
+    boards.forEach(b => {
+      if (b.id) validSet.add(String(b.id));
+      if (b._id) validSet.add(String(b._id));
+      if (b.name) validSet.add(String(b.name).toLowerCase());
+    });
+
     return tasks.map(t => {
       const updated = { ...t };
       if (!updated.id && updated._id) updated.id = updated._id;
       if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
       return updated;
     }).filter(task => {
+      const rawBId = task.boardId;
+      if (rawBId && rawBId !== 'main' && rawBId !== 'tasks' && !validSet.has(String(rawBId)) && !validSet.has(String(rawBId).toLowerCase())) {
+        return false;
+      }
+
       const isMainBoard = (activeBoardId === 'main' || activeBoardId === 'tasks' || activeBoardId === mainBoardId);
       if (isMainBoard) {
-        return !task.boardId || task.boardId === 'main' || task.boardId === 'tasks' || task.boardId === mainBoardId;
+        return !rawBId || rawBId === 'main' || rawBId === 'tasks' || rawBId === mainBoardId;
       }
-      return task.boardId === activeBoardId;
+      return rawBId === activeBoardId;
     });
-  }, [tasks, activeBoardId, mainBoardId]);
+  }, [tasks, activeBoardId, mainBoardId, boards]);
 
   const activeBoard = useMemo(() => {
     return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
@@ -423,14 +441,25 @@ export default function BoardScreen({ route, navigation }) {
 
   const boardCounts = useMemo(() => {
     const counts = {};
+    const validSet = new Set(['main', 'tasks']);
+    boards.forEach(b => {
+      if (b.id) validSet.add(String(b.id));
+      if (b._id) validSet.add(String(b._id));
+      if (b.name) validSet.add(String(b.name).toLowerCase());
+    });
+
     tasks.forEach(t => {
       if (!t.completed) {
-        const bId = t.boardId || 'main';
+        const rawBId = t.boardId || t.board_id;
+        if (rawBId && rawBId !== 'main' && rawBId !== 'tasks' && !validSet.has(String(rawBId)) && !validSet.has(String(rawBId).toLowerCase())) {
+          return;
+        }
+        const bId = rawBId || 'main';
         counts[bId] = (counts[bId] || 0) + 1;
       }
     });
     return counts;
-  }, [tasks]);
+  }, [tasks, boards]);
 
   const stickyHeaderIndices = useMemo(() => {
     return flattenedData.map((item, index) => item.type === 'header' ? index : -1).filter(i => i !== -1);
