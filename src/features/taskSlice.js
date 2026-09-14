@@ -662,10 +662,10 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
     const actualToday = dayjs().startOf('day');
 
     let hasChanges = false;
-    let newTasks = [...tasks];
+    let processedTasks = [];
     let tasksToDelete = [];
     
-    newTasks = newTasks.map(task => {
+    for (const task of tasks) {
         let updatedTask = { ...task };
         let taskChanged = false;
         const taskDate = dayjs(task.completionDate).startOf('day');
@@ -837,10 +837,13 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         
         if (taskChanged) {
             hasChanges = true;
-            return updatedTask;
+            processedTasks.push(updatedTask);
+        } else {
+            processedTasks.push(task);
         }
-        return task;
-    });
+    }
+
+    let newTasks = processedTasks;
 
     if (tasksToDelete.length > 0) {
         for (const id of tasksToDelete) {
