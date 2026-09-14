@@ -501,10 +501,22 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     DevLogger.warn(`scheduleTaskReminder: No completionDateStr provided, aborting`);
     return [];
   }
+  
+  if (taskId) {
+    await cancelNotification(null, taskId);
+  }
+
   const ids = [];
 
   let targetDate = dayjs(completionDateStr);
   if (!targetDate.isValid()) return [];
+
+  const hasReminder = reminderValue && reminderValue !== 'None';
+  
+  // If reminder is 'None' and isAlarm is false, do not schedule any reminder unless explicitly asked
+  if (!hasReminder && !isAlarm && !advancedOptions.isNagMode && advancedOptions.escalationLevel !== 'active') {
+    return [];
+  }
 
   if (timeStr) {
     const dateOnly = targetDate.format('YYYY-MM-DD');
@@ -764,7 +776,7 @@ export async function scheduleLocalNotification(
   }
 }
 
-export async function cancelNotification(notificationIds) {
+export async function cancelNotification(notificationIds, taskId = null) {
   if (Platform.OS === 'web') return;
   if (notificationIds) {
     const ids = Array.isArray(notificationIds) ? notificationIds : [notificationIds];
@@ -779,9 +791,28 @@ export async function cancelNotification(notificationIds) {
             await cancelPomodoroAlarm(id.replace('pomodoro_alarm_', ''));
           }
         } else {
-          await Notifications.cancelScheduledNotificationAsync(id);
+          try {
+            await Notifications.cancelScheduledNotificationAsync(id);
+          } catch (e) {}
         }
       }
+    }
+  }
+
+  const targetId = taskId || (typeof notificationIds === 'string' && !notificationIds.startsWith('native_') && !notificationIds.startsWith('pomodoro_') ? notificationIds : null);
+  if (targetId) {
+    try {
+      if (Platform.OS === 'android') {
+        await cancelAlarm(targetId);
+      }
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      for (const item of scheduled) {
+        if (item.content?.data?.taskId === targetId) {
+          await Notifications.cancelScheduledNotificationAsync(item.identifier);
+        }
+      }
+    } catch (err) {
+      // Silently catch errors during notification cleanup
     }
   }
 }
@@ -791,12 +822,12 @@ export { schedulePomodoroAlarm, cancelPomodoroAlarm };
 export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, updateTaskAction) {
   for (const task of tasks) {
     if (task.completed) continue;
-    if (task.notificationId && task.notificationId.length > 0) {
-      await cancelNotification(task.notificationId);
-      
+    await cancelNotification(task.notificationId, task.id);
+    
+    if (task.reminder && task.reminder !== 'None') {
       const notifIds = await scheduleTaskReminder(
         task.taskname,
-        task.reminder || 'None',
+        task.reminder,
         task.completionDate,
         task.time,
         task.id,
@@ -810,6 +841,8 @@ export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, upda
       } else {
         dispatch(updateTaskAction({ taskId: task.id, notificationId: [] }));
       }
+    } else {
+      dispatch(updateTaskAction({ taskId: task.id, notificationId: [] }));
     }
   }
 }

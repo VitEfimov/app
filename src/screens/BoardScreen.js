@@ -17,7 +17,7 @@ import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
 import Modal from 'react-native-modal';
-import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
+import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -390,10 +390,10 @@ export default function BoardScreen({ route, navigation }) {
 
     return {
       todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task, now) && !hiddenRecurringTaskIds.has(task.id)), 'today'),
-      tomorrowTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'tomorrow'),
-      thisWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSameOrBefore(FILTERS.today, 'day') && !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-this-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'on-this-week'),
-      nextWeekTasks: sortTasks(boardTasks.filter(task => !dayjs(task.completionDate).isSame(FILTERS.tomorrow, 'day') && dayjs(task.completionDate).isAfter(FILTERS['on-this-week'], 'day') && dayjs(task.completionDate).isSameOrBefore(FILTERS['on-next-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'on-next-week'),
-      laterTasks: sortTasks(boardTasks.filter(task => dayjs(task.completionDate).isAfter(FILTERS['on-next-week'], 'day') && !task.completed && !hiddenRecurringTaskIds.has(task.id)), 'later'),
+      tomorrowTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) === FILTERS.tomorrow), 'tomorrow'),
+      thisWeekTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) > FILTERS.tomorrow && getTaskDateStr(task) <= FILTERS['on-this-week']), 'on-this-week'),
+      nextWeekTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) > FILTERS['on-this-week'] && getTaskDateStr(task) <= FILTERS['on-next-week']), 'on-next-week'),
+      laterTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) > FILTERS['on-next-week']), 'later'),
       missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task, now)), 'missed'),
       completedTasks: boardCompleted,
       todoTasks: boardUncompleted,
