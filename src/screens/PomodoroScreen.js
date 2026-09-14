@@ -51,10 +51,13 @@ const IconSettings = ({ color }) => (
 );
 
 const SOUND_MAP = {
+  'Pisk.mp3': require('../../assets/audio/Pisk.mp3'),
+  'Tucktuck.mp3': require('../../assets/audio/Tucktuck.mp3'),
   'alarm_02.mp3': require('../../assets/audio/alarm_02.mp3'),
   'bass_alarm.mp3': require('../../assets/audio/bass_alarm.mp3'),
   'bell.mp3': require('../../assets/audio/bell.mp3'),
   'bell01.mp3': require('../../assets/audio/bell01.mp3'),
+  'bonjo.mp3': require('../../assets/audio/bonjo.mp3'),
   'cellos_pizz.mp3': require('../../assets/audio/cellos_pizz.mp3'),
   'cellos_pizzdgg.mp3': require('../../assets/audio/cellos_pizzdgg.mp3'),
   'cellos_pizzedf.mp3': require('../../assets/audio/cellos_pizzedf.mp3'),

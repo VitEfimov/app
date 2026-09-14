@@ -63,10 +63,13 @@
         "expo-notifications",
         {
           "sounds": [
+            "./assets/audio/Pisk.mp3",
+            "./assets/audio/Tucktuck.mp3",
             "./assets/audio/alarm_02.mp3",
             "./assets/audio/bass_alarm.mp3",
             "./assets/audio/bell.mp3",
             "./assets/audio/bell01.mp3",
+            "./assets/audio/bonjo.mp3",
             "./assets/audio/cellos_pizz.mp3",
             "./assets/audio/cellos_pizzdgg.mp3",
             "./assets/audio/cellos_pizzedf.mp3",
