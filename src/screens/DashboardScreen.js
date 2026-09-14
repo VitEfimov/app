@@ -50,9 +50,14 @@ export default function DashboardScreen({ navigation }) {
   const mainBoardId = useMemo(() => boards[0]?.id || 'main', [boards]);
 
   const validBoardIds = useMemo(() => {
-    const set = new Set(boards.map(b => b.id));
+    const set = new Set();
     set.add('main');
     set.add('tasks');
+    boards.forEach(b => {
+      if (b.id) set.add(b.id);
+      if (b._id) set.add(b._id);
+      if (b.name) set.add(b.name);
+    });
     if (mainBoardId) set.add(mainBoardId);
     return set;
   }, [boards, mainBoardId]);
@@ -70,17 +75,21 @@ export default function DashboardScreen({ navigation }) {
       if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
       return updated;
     }).filter(task => {
-      const bId = task.boardId || 'main';
-      if (!validBoardIds.has(bId)) return false;
+      const rawBoardId = task.boardId;
+      if (rawBoardId && rawBoardId !== 'main' && rawBoardId !== 'tasks' && !validBoardIds.has(rawBoardId)) {
+        return false;
+      }
+
+      const effectiveBoardId = rawBoardId || 'main';
 
       if (filterType === 'all') return true;
       const isMainFilter = (filterType === 'main' || filterType === 'tasks' || filterType === mainBoardId);
       if (isMainFilter) {
-        return bId === 'main' || bId === 'tasks' || bId === mainBoardId;
+        return effectiveBoardId === 'main' || effectiveBoardId === 'tasks' || effectiveBoardId === mainBoardId;
       }
-      return bId === filterType;
+      return effectiveBoardId === filterType || (boards.find(b => b.id === filterType)?.name === effectiveBoardId);
     });
-  }, [tasks, filterType, mainBoardId, validBoardIds]);
+  }, [tasks, filterType, mainBoardId, validBoardIds, boards]);
 
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
     const now = dayjs();

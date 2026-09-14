@@ -963,7 +963,7 @@ export default function BoardScreen({ route, navigation }) {
                 isDestructive: true,
                 onConfirm: () => {
                   dispatch(deleteBoardAsync(board.id));
-                  dispatch(deleteTasksByBoard(board.id));
+                  dispatch(deleteTasksByBoard({ boardId: board.id, boardName: board.name }));
                   setConfirmConfig(prev => ({ ...prev, isVisible: false }));
                 }
               });

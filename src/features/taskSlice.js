@@ -62,6 +62,24 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
         localTasks = mergeTasks(localTasks, state.taskReducer.tasks);
     }
 
+    const boards = state.userReducer?.boards || [];
+    if (boards.length > 0) {
+        const validBoardSet = new Set(['main', 'tasks']);
+        boards.forEach(b => {
+            if (b.id) validBoardSet.add(b.id);
+            if (b._id) validBoardSet.add(b._id);
+            if (b.name) validBoardSet.add(b.name);
+        });
+        localTasks = localTasks.filter(t => {
+            if (!t) return false;
+            const bId = t.boardId || t.board_id;
+            if (bId && bId !== 'main' && bId !== 'tasks' && !validBoardSet.has(bId)) {
+                return false;
+            }
+            return true;
+        });
+    }
+
     if (isAuthenticated) {
         try {
             const response = await axios.get('/api/tasks', { withCredentials: true });
@@ -197,8 +215,14 @@ const taskSlice = createSlice({
              state.tasks = state.tasks.filter(t => t.id !== taskId);
         },
         deleteTasksByBoardSync(state, action) {
-            const { boardId } = action.payload;
-            state.tasks = state.tasks.filter(t => (t.boardId || 'main') !== boardId);
+            const { boardId, boardName } = typeof action.payload === 'object' ? action.payload : { boardId: action.payload };
+            state.tasks = state.tasks.filter(t => {
+                const bId = t.boardId || t.board_id;
+                if (!bId || bId === 'main' || bId === 'tasks') return true;
+                if (bId === boardId) return false;
+                if (boardName && bId === boardName) return false;
+                return true;
+            });
         },
         updateTaskSync(state, action) {
             const { taskId, name, priority, completed, description, completionDate, time, subtasks } = action.payload;
@@ -334,7 +358,16 @@ const taskSlice = createSlice({
                     return updated;
                 });
             })
-            .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; });
+            .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; })
+            .addCase('user/deleteBoard/fulfilled', (state, action) => {
+                const deletedBoardId = action.payload;
+                if (deletedBoardId) {
+                    state.tasks = state.tasks.filter(t => {
+                        const bId = t.boardId || t.board_id;
+                        return bId !== deletedBoardId;
+                    });
+                }
+            });
     }
 });
 
