@@ -803,11 +803,12 @@ export async function cancelNotification(notificationIds, taskId = null) {
   if (targetId) {
     try {
       if (Platform.OS === 'android') {
-        await cancelAlarm(targetId);
+        await cancelAlarm(String(targetId));
       }
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       for (const item of scheduled) {
-        if (item.content?.data?.taskId === targetId) {
+        const itemTaskId = item.content?.data?.taskId;
+        if (itemTaskId !== undefined && itemTaskId !== null && String(itemTaskId) === String(targetId)) {
           await Notifications.cancelScheduledNotificationAsync(item.identifier);
         }
       }

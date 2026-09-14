@@ -51,8 +51,8 @@ const IconSettings = ({ color }) => (
 );
 
 const SOUND_MAP = {
-  'Pisk.mp3': require('../../assets/audio/Pisk.mp3'),
-  'Tucktuck.mp3': require('../../assets/audio/Tucktuck.mp3'),
+  'pisk.mp3': require('../../assets/audio/pisk.mp3'),
+  'tucktuck.mp3': require('../../assets/audio/tucktuck.mp3'),
   'alarm_02.mp3': require('../../assets/audio/alarm_02.mp3'),
   'bass_alarm.mp3': require('../../assets/audio/bass_alarm.mp3'),
   'bell.mp3': require('../../assets/audio/bell.mp3'),

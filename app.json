@@ -63,8 +63,8 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/audio/Pisk.mp3",
-            "./assets/audio/Tucktuck.mp3",
+            "./assets/audio/pisk.mp3",
+            "./assets/audio/tucktuck.mp3",
             "./assets/audio/alarm_02.mp3",
             "./assets/audio/bass_alarm.mp3",
             "./assets/audio/bell.mp3",

@@ -4,7 +4,7 @@ import { Platform, Alert } from 'react-native';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import { updateRecurringAutomations } from '../utils/notifications';
+import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
 import axios from 'axios';
 
 dayjs.extend(isSameOrBefore);
@@ -459,8 +459,28 @@ export const addTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     const themeState = state.themeReducer;
     const isPremium = state.entitlementReducer?.isPremium;
-    if (isPremium && themeState?.defaultReminderEnabled && payload?.task && (!payload.task.reminder || payload.task.reminder === 'None')) {
-        payload.task.reminder = themeState.defaultReminderTime || '15 min before';
+    if (payload?.task) {
+        if (isPremium && themeState?.defaultReminderEnabled && (!payload.task.reminder || payload.task.reminder === 'None')) {
+            payload.task.reminder = themeState.defaultReminderTime || '15 min before';
+        }
+        if (payload.task.reminder && payload.task.reminder !== 'None' && payload.task.completionDate && !payload.task.completed) {
+            try {
+                const notifIds = await scheduleTaskReminder(
+                    payload.task.taskname,
+                    payload.task.reminder,
+                    payload.task.completionDate,
+                    payload.task.time,
+                    payload.task.id,
+                    !!payload.task.isAlarm,
+                    themeState
+                );
+                if (notifIds && notifIds.length > 0) {
+                    payload.task.notificationId = notifIds;
+                }
+            } catch (e) {
+                console.warn('Failed to schedule reminder on addTask:', e);
+            }
+        }
     }
     dispatch(addTaskSync(payload)); 
     const tasks = getState().taskReducer.tasks;
@@ -475,12 +495,30 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     const state = getState();
     const themeState = state.themeReducer;
     const isPremium = state.entitlementReducer?.isPremium;
-    if (isPremium && themeState?.defaultReminderEnabled && Array.isArray(payload?.tasks)) {
-        payload.tasks.forEach(task => {
-            if (task && (!task.reminder || task.reminder === 'None')) {
-                task.reminder = themeState.defaultReminderTime || '15 min before';
+    if (Array.isArray(payload?.tasks)) {
+        for (const task of payload.tasks) {
+            if (task) {
+                if (isPremium && themeState?.defaultReminderEnabled && (!task.reminder || task.reminder === 'None')) {
+                    task.reminder = themeState.defaultReminderTime || '15 min before';
+                }
+                if (task.reminder && task.reminder !== 'None' && task.completionDate && !task.completed) {
+                    try {
+                        const notifIds = await scheduleTaskReminder(
+                            task.taskname,
+                            task.reminder,
+                            task.completionDate,
+                            task.time,
+                            task.id,
+                            !!task.isAlarm,
+                            themeState
+                        );
+                        if (notifIds && notifIds.length > 0) {
+                            task.notificationId = notifIds;
+                        }
+                    } catch (e) {}
+                }
             }
-        });
+        }
     }
     dispatch(addMultipleTasksSync(payload));
     const tasks = getState().taskReducer.tasks;
@@ -493,19 +531,37 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
 
 export const deleteTask = (payload) => async (dispatch, getState) => {
     const state = getState();
+    const taskId = payload?.taskId || (typeof payload === 'string' ? payload : null);
+    if (taskId) {
+        const existingTask = state.taskReducer.tasks.find(t => t && String(t.id) === String(taskId));
+        if (existingTask) {
+            await cancelNotification(existingTask.notificationId, existingTask.id);
+        } else {
+            await cancelNotification(null, taskId);
+        }
+    }
     dispatch(deleteTaskSync(payload));
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
-    if (state.userReducer?.isAuthenticated && payload?.taskId) {
-        dispatch(deleteTaskAsync(payload.taskId));
+    if (state.userReducer?.isAuthenticated && taskId) {
+        dispatch(deleteTaskAsync(taskId));
     }
 };
 
 export const deleteTasksByBoard = (payload) => async (dispatch, getState) => {
+    const state = getState();
+    const tasks = state.taskReducer.tasks || [];
+    let targetId = payload?.boardId || (typeof payload === 'string' ? payload : null);
+    if (targetId) {
+        const affected = tasks.filter(t => t && String(t.boardId || t.board_id) === String(targetId));
+        for (const t of affected) {
+            await cancelNotification(t.notificationId, t.id);
+        }
+    }
     dispatch(deleteTasksByBoardSync(payload));
-    const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks, getState);
+    const newTasks = getState().taskReducer.tasks;
+    persistTasksToStorage(newTasks, getState);
     syncRecurringAutomations(getState);
 };
 
@@ -518,7 +574,33 @@ export const purgeOrphanedTasksThunk = (boards) => async (dispatch, getState) =>
 
 export const updateTask = (payload) => async (dispatch, getState) => {
     const state = getState();
+    const taskId = payload?.taskId;
+    const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id) === String(taskId)) : null;
+
     dispatch(updateTaskSync(payload));
+    const updatedTask = taskId ? getState().taskReducer.tasks.find(t => t && String(t.id) === String(taskId)) : null;
+
+    if (updatedTask) {
+        if (updatedTask.completed) {
+            await cancelNotification(updatedTask.notificationId, updatedTask.id);
+        } else if (existingTask && existingTask.completed && !updatedTask.completed && updatedTask.reminder && updatedTask.reminder !== 'None') {
+            try {
+                const notifIds = await scheduleTaskReminder(
+                    updatedTask.taskname,
+                    updatedTask.reminder,
+                    updatedTask.completionDate,
+                    updatedTask.time,
+                    updatedTask.id,
+                    !!updatedTask.isAlarm,
+                    state.themeReducer
+                );
+                if (notifIds && notifIds.length > 0) {
+                    dispatch(updateTaskSync({ taskId: updatedTask.id, notificationId: notifIds }));
+                }
+            } catch (e) {}
+        }
+    }
+
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
@@ -535,6 +617,22 @@ export const updateRecurringSeries = (payload) => async (dispatch, getState) => 
 };
 
 export const deleteRecurringSeries = (payload) => async (dispatch, getState) => {
+    const state = getState();
+    const { seriesId, fromDate } = payload || {};
+    if (seriesId) {
+        const fromDay = fromDate ? dayjs(fromDate).startOf('day') : null;
+        const affected = (state.taskReducer.tasks || []).filter(t => {
+            if (t && t.recurringSeriesId === seriesId) {
+                if (!fromDay) return true;
+                const taskDay = t.completionDate ? dayjs(t.completionDate).startOf('day') : null;
+                return taskDay && (taskDay.isSame(fromDay, 'day') || taskDay.isAfter(fromDay));
+            }
+            return false;
+        });
+        for (const t of affected) {
+            await cancelNotification(t.notificationId, t.id);
+        }
+    }
     dispatch(deleteRecurringSeriesSync(payload));
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
@@ -712,10 +810,9 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                     updatedTask.dateString = typeof updatedTask.completionDate === 'string' ? updatedTask.completionDate.split('T')[0] : targetDate.format('YYYY-MM-DD');
                     if (effectiveRescheduleReminders !== false && !updatedTask.completed) {
                         try {
-                            const { scheduleTaskReminder } = require('../utils/notifications');
                             const reminderValue = updatedTask.reminder || (themeState.defaultReminderEnabled ? themeState.defaultReminderTime : 'None');
                             if (updatedTask.time || (reminderValue && reminderValue !== 'None')) {
-                                scheduleTaskReminder(
+                                const newNotifIds = await scheduleTaskReminder(
                                     updatedTask.taskname,
                                     reminderValue,
                                     targetDate.format('YYYY-MM-DD'),
@@ -725,6 +822,9 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                                     themeState,
                                     { isNagMode: updatedTask.isNagMode, escalationLevel: updatedTask.escalationLevel }
                                 );
+                                if (newNotifIds && newNotifIds.length > 0) {
+                                    updatedTask.notificationId = newNotifIds;
+                                }
                             }
                         } catch (e) {
                             console.warn('Failed to reschedule notification on auto-transfer:', e);
@@ -742,9 +842,17 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         return task;
     });
 
-    if (tasksToDelete.length > 0 && !globalSettings.confirmBeforeDeletion) {
-        newTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
-        hasChanges = true;
+    if (tasksToDelete.length > 0) {
+        for (const id of tasksToDelete) {
+            const t = tasks.find(item => item && String(item.id) === String(id));
+            if (t) {
+                await cancelNotification(t.notificationId, t.id);
+            }
+        }
+        if (!globalSettings.confirmBeforeDeletion) {
+            newTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
+            hasChanges = true;
+        }
     }
 
     if (hasChanges) {
@@ -764,6 +872,12 @@ export const executePendingCleanup = () => async (dispatch, getState) => {
     const tasksToDelete = state.taskReducer.pendingCleanupTaskIds;
     if (tasksToDelete && tasksToDelete.length > 0) {
         const currentTasks = state.taskReducer.tasks;
+        for (const id of tasksToDelete) {
+            const task = currentTasks.find(t => t && String(t.id) === String(id));
+            if (task) {
+                await cancelNotification(task.notificationId, task.id);
+            }
+        }
         const finalTasks = currentTasks.filter(t => !tasksToDelete.includes(t.id));
         dispatch(hydrateTaskState(finalTasks));
         persistTasksToStorage(finalTasks);

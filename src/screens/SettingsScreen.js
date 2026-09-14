@@ -15,8 +15,8 @@ import PremiumModal from '../components/PremiumModal';
 import { Audio } from 'expo-av';
 
 const SOUND_ASSETS = {
-  'Pisk.mp3': require('../../assets/audio/Pisk.mp3'),
-  'Tucktuck.mp3': require('../../assets/audio/Tucktuck.mp3'),
+  'pisk.mp3': require('../../assets/audio/pisk.mp3'),
+  'tucktuck.mp3': require('../../assets/audio/tucktuck.mp3'),
   'alarm_02.mp3': require('../../assets/audio/alarm_02.mp3'),
   'bass_alarm.mp3': require('../../assets/audio/bass_alarm.mp3'),
   'bell.mp3': require('../../assets/audio/bell.mp3'),
@@ -151,8 +151,8 @@ export default function SettingsScreen({ navigation }) {
   const soundOptions = [
     { label: t('Device Default'), value: 'default' },
     { label: t('Bonjo'), value: 'bonjo.mp3' },
-    { label: t('Pisk'), value: 'Pisk.mp3' },
-    { label: t('Tucktuck'), value: 'Tucktuck.mp3' },
+    { label: t('Pisk'), value: 'pisk.mp3' },
+    { label: t('Tucktuck'), value: 'tucktuck.mp3' },
     { label: t('Alarm 02'), value: 'alarm_02.mp3' },
     { label: t('Bass Alarm'), value: 'bass_alarm.mp3' },
     { label: t('Bell'), value: 'bell.mp3' },
