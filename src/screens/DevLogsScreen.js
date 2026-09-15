@@ -28,7 +28,7 @@ import {
 import { updateTask, processAutoManageTasks } from '../features/taskSlice';
 import * as Notifications from 'expo-notifications';
 import dayjs from 'dayjs';
-import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr } from '../utils/filters';
+import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming } from '../utils/filters';
 import Svg, { Path } from 'react-native-svg';
 
 const IconRefresh = ({ color }) => (
@@ -98,7 +98,7 @@ export default function DevLogsScreen() {
     const now = dayjs();
     const FILTERS = getFilters(now);
     const upcoming = tasks.filter(
-      (t) => !t.completed && getTaskDateStr(t) > FILTERS['on-next-week']
+      (t) => isTaskUpcoming(t, now)
     ).length;
     const hasNotif = tasks.filter(
       (t) => !t.completed && t.notificationId && t.notificationId.length > 0

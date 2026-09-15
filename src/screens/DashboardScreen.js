@@ -5,7 +5,7 @@ import { setProgressMode } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import getFilters, { isTaskToday, isTaskMissed } from '../utils/filters';
+import getFilters, { isTaskToday, isTaskMissed, isTaskUpcoming, isTaskOnBoard } from '../utils/filters';
 import Svg, { Circle, Path } from 'react-native-svg';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import { useTranslation } from 'react-i18next';
@@ -77,22 +77,8 @@ export default function DashboardScreen({ navigation }) {
       if (!updated.id && updated._id) updated.id = updated._id;
       if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
       return updated;
-    }).filter(task => {
-      const rawBoardId = task.boardId;
-      if (rawBoardId && rawBoardId !== 'main' && rawBoardId !== 'tasks' && !validBoardIds.has(rawBoardId)) {
-        return false;
-      }
-
-      const effectiveBoardId = rawBoardId || 'main';
-
-      if (filterType === 'all') return true;
-      const isMainFilter = (filterType === 'main' || filterType === 'tasks' || filterType === mainBoardId);
-      if (isMainFilter) {
-        return effectiveBoardId === 'main' || effectiveBoardId === 'tasks' || effectiveBoardId === mainBoardId;
-      }
-      return effectiveBoardId === filterType || (boards.find(b => b.id === filterType)?.name === effectiveBoardId);
-    });
-  }, [tasks, filterType, mainBoardId, validBoardIds, boards]);
+    }).filter(task => isTaskOnBoard(task, filterType, mainBoardId, boards));
+  }, [tasks, filterType, mainBoardId, boards]);
 
   const showRecurringTasksOnBoard = useSelector(state => state.themeReducer.showRecurringTasksOnBoard || false);
 
@@ -164,8 +150,7 @@ export default function DashboardScreen({ navigation }) {
       }),
       laterTasks: filteredTasks.filter(task => {
         if (hiddenRecurringTaskIds.has(task.id)) return false;
-        const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
-        return d > FILTERS['on-next-week'] && !task.completed;
+        return isTaskUpcoming(task, now);
       }),
       missedTasks: filteredTasks.filter(task => isTaskMissed(task, now, nowDateStr))
     };

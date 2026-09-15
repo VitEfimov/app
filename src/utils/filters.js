@@ -44,6 +44,53 @@ export function isTaskToday(task, refNow, refNowDateStr) {
     return taskDateStr === nowDateStr;
 }
 
+export function isTaskUpcoming(task, refNow) {
+    if (!task || task.completed) return false;
+    const taskDateStr = getTaskDateStr(task);
+    if (!taskDateStr) return true;
+    const now = refNow || dayjs();
+    const filters = getFilters(now);
+    return taskDateStr > filters['on-next-week'];
+}
+
+export function isTaskOnBoard(task, activeBoardId, mainBoardId, boards = []) {
+    if (!task) return false;
+    
+    const rawBId = task.boardId || task.board_id;
+    const effectiveTargetId = activeBoardId || 'all';
+    
+    if (effectiveTargetId === 'all') return true;
+
+    const mainId = mainBoardId || (boards[0]?.id || 'main');
+    const isTargetMain = (effectiveTargetId === 'main' || effectiveTargetId === 'tasks' || effectiveTargetId === mainId);
+    
+    if (isTargetMain) {
+        if (!rawBId || rawBId === 'main' || rawBId === 'tasks' || rawBId === mainId) return true;
+        if (boards.length > 0 && boards[0]) {
+            const firstB = boards[0];
+            if (String(rawBId) === String(firstB.id) || (firstB._id && String(rawBId) === String(firstB._id)) || (firstB.name && String(rawBId).toLowerCase() === String(firstB.name).toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    const targetBoard = boards.find(b => 
+        String(b.id) === String(effectiveTargetId) || 
+        (b._id && String(b._id) === String(effectiveTargetId)) ||
+        (b.name && String(b.name).toLowerCase() === String(effectiveTargetId).toLowerCase())
+    );
+
+    if (String(rawBId) === String(effectiveTargetId)) return true;
+    if (targetBoard) {
+        if (targetBoard.id && String(rawBId) === String(targetBoard.id)) return true;
+        if (targetBoard._id && String(rawBId) === String(targetBoard._id)) return true;
+        if (targetBoard.name && String(rawBId).toLowerCase() === String(targetBoard.name).toLowerCase()) return true;
+    }
+
+    return false;
+}
+
 export default function getFilters(refNow) {
     const now = refNow || dayjs();
     return {
@@ -54,4 +101,5 @@ export default function getFilters(refNow) {
         later: now.add(2, 'week').startOf('day').format('YYYY-MM-DD')
     };
 }
+
 

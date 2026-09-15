@@ -17,7 +17,7 @@ import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
 import Modal from 'react-native-modal';
-import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr } from '../utils/filters';
+import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -271,30 +271,12 @@ export default function BoardScreen({ route, navigation }) {
 
   // Group tasks
   const boardTasks = useMemo(() => {
-    const validSet = new Set(['main', 'tasks']);
-    boards.forEach(b => {
-      if (b.id) validSet.add(String(b.id));
-      if (b._id) validSet.add(String(b._id));
-      if (b.name) validSet.add(String(b.name).toLowerCase());
-    });
-
     return tasks.map(t => {
       const updated = { ...t };
       if (!updated.id && updated._id) updated.id = updated._id;
       if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
       return updated;
-    }).filter(task => {
-      const rawBId = task.boardId;
-      if (rawBId && rawBId !== 'main' && rawBId !== 'tasks' && !validSet.has(String(rawBId)) && !validSet.has(String(rawBId).toLowerCase())) {
-        return false;
-      }
-
-      const isMainBoard = (activeBoardId === 'main' || activeBoardId === 'tasks' || activeBoardId === mainBoardId);
-      if (isMainBoard) {
-        return !rawBId || rawBId === 'main' || rawBId === 'tasks' || rawBId === mainBoardId;
-      }
-      return rawBId === activeBoardId;
-    });
+    }).filter(task => isTaskOnBoard(task, activeBoardId, mainBoardId, boards));
   }, [tasks, activeBoardId, mainBoardId, boards]);
 
   const activeBoard = useMemo(() => {
@@ -393,7 +375,7 @@ export default function BoardScreen({ route, navigation }) {
       tomorrowTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) === FILTERS.tomorrow), 'tomorrow'),
       thisWeekTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) > FILTERS.tomorrow && getTaskDateStr(task) <= FILTERS['on-this-week']), 'on-this-week'),
       nextWeekTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) > FILTERS['on-this-week'] && getTaskDateStr(task) <= FILTERS['on-next-week']), 'on-next-week'),
-      laterTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) > FILTERS['on-next-week']), 'later'),
+      laterTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && isTaskUpcoming(task, now)), 'later'),
       missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task, now)), 'missed'),
       completedTasks: boardCompleted,
       todoTasks: boardUncompleted,
@@ -441,25 +423,12 @@ export default function BoardScreen({ route, navigation }) {
 
   const boardCounts = useMemo(() => {
     const counts = {};
-    const validSet = new Set(['main', 'tasks']);
     boards.forEach(b => {
-      if (b.id) validSet.add(String(b.id));
-      if (b._id) validSet.add(String(b._id));
-      if (b.name) validSet.add(String(b.name).toLowerCase());
-    });
-
-    tasks.forEach(t => {
-      if (!t.completed) {
-        const rawBId = t.boardId || t.board_id;
-        if (rawBId && rawBId !== 'main' && rawBId !== 'tasks' && !validSet.has(String(rawBId)) && !validSet.has(String(rawBId).toLowerCase())) {
-          return;
-        }
-        const bId = rawBId || 'main';
-        counts[bId] = (counts[bId] || 0) + 1;
-      }
+      const bId = b.id;
+      counts[bId] = tasks.filter(t => !t.completed && isTaskOnBoard(t, bId, mainBoardId, boards)).length;
     });
     return counts;
-  }, [tasks, boards]);
+  }, [tasks, boards, mainBoardId]);
 
   const stickyHeaderIndices = useMemo(() => {
     return flattenedData.map((item, index) => item.type === 'header' ? index : -1).filter(i => i !== -1);
