@@ -97,7 +97,7 @@ export default function BoardScreen({ route, navigation }) {
     if (route?.params?.sectionId) {
       return allSectionIds.filter(id => id !== route.params.sectionId);
     }
-    return ['tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed'];
+    return ['completed'];
   });
 
   useEffect(() => {
