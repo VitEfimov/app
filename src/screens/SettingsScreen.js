@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask } from '../features/taskSlice';
-import { rescheduleAllActiveTasks } from '../utils/notifications';
+import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
 import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
@@ -203,7 +203,12 @@ export default function SettingsScreen({ navigation }) {
         currentSoundRef.current = null;
       }
       if (soundFilename === 'default') {
-        return; // Don't try to preview system default sound directly via expo-av
+        if (Platform.OS === 'android') {
+          testAndroidDefaultNotification();
+        } else {
+          scheduleLocalNotification(t('Sound Preview'), t('Device Default Sound'), 1, false);
+        }
+        return;
       }
       const asset = SOUND_ASSETS[soundFilename];
       if (asset) {

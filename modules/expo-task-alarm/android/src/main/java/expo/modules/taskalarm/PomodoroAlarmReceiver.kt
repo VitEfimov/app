@@ -47,7 +47,6 @@ class PomodoroAlarmReceiver : BroadcastReceiver() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(pendingLaunchIntent)
             .setAutoCancel(true)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
             
         notification.flags = notification.flags or android.app.Notification.FLAG_INSISTENT

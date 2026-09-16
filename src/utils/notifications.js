@@ -301,16 +301,15 @@ export async function configureAndroidNotificationChannels(
 
 export async function configurePomodoroChannel(soundName, isBreak) {
   if (Platform.OS !== 'android') return null;
-  const baseName = getSoundBasename(soundName, true);
+  const baseName = soundName === 'default' ? 'default' : getSoundBasename(soundName, true);
   const type = isBreak ? 'break' : 'work';
-  const channelId = `pomodoro_${type}_${baseName}_v1`;
+  const channelId = `pomodoro_${type}_${baseName}_v2`;
 
   try {
     await Notifications.setNotificationChannelAsync(channelId, {
       name: `Pomodoro ${isBreak ? 'Break' : 'Work'} Alarm`,
       description: 'Pomodoro timer completion alarm',
       importance: Notifications.AndroidImportance.MAX,
-      // We don't need to check for 'default' here because getSoundBasename(soundName, true) guarantees it will be mapped to a real file.
       sound: baseName === 'none' ? null : baseName,
       enableVibrate: true,
       vibrationPattern: VIBRATION_PRESETS.alarm,

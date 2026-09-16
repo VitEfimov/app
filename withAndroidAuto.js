@@ -52,6 +52,29 @@ module.exports = function withAndroidAuto(config) {
         });
       }
 
+      if (!application.service) {
+        application.service = [];
+      }
+
+      const hasCarService = application.service.some(
+        (s) => s.$?.['android:name'] === '.TaskFlowCarService' || s.$?.['android:name'] === 'com.vitvalef.app.TaskFlowCarService'
+      );
+
+      if (!hasCarService) {
+        application.service.push({
+          $: {
+            'android:name': '.TaskFlowCarService',
+            'android:exported': 'true',
+          },
+          'intent-filter': [
+            {
+              action: [{ $: { 'android:name': 'androidx.car.app.CarAppService' } }],
+              category: [{ $: { 'android:name': 'androidx.car.app.category.POI' } }],
+            },
+          ],
+        });
+      }
+
       const mainActivity = application.activity?.find(
         (act) => act.$?.['android:name'] === '.MainActivity'
       );

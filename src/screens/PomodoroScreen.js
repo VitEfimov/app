@@ -294,15 +294,13 @@ export default function PomodoroScreen() {
           <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Pomodoro')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('Stay focused, take breaks')}</Text>
         </View>
-        {isPremium && (
-          <TouchableOpacity 
-            style={[styles.settingsBtn, { backgroundColor: colors.surfaceContainer }]}
-            onPress={() => dispatch(togglePomodoroSettings(true))}
-          >
-            <IconSettings color={colors.textPrimary} />
-            <Text style={[styles.settingsText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity 
+          style={[styles.settingsBtn, { backgroundColor: colors.surfaceContainer }]}
+          onPress={() => dispatch(togglePomodoroSettings(true))}
+        >
+          <IconSettings color={colors.textPrimary} />
+          <Text style={[styles.settingsText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.timerCard, { backgroundColor: colors.bgCard }]}>
