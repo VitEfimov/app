@@ -1226,20 +1226,22 @@ useEffect(() => {
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('Notes & attachments')}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-                <TouchableOpacity 
-                  accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
-                  onPress={handleAttachPhoto} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                >
-                  <IconCamera color={colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  accessible={true} accessibilityRole="button" accessibilityLabel="Add Document"
-                  onPress={handleAttachDocument} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                >
-                  <IconAttachment color={colors.primary} />
-                </TouchableOpacity>
-              </View>
+              {isPremium && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+                  <TouchableOpacity 
+                    accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
+                    onPress={handleAttachPhoto} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                  >
+                    <IconCamera color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    accessible={true} accessibilityRole="button" accessibilityLabel="Add Document"
+                    onPress={handleAttachDocument} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                  >
+                    <IconAttachment color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
             <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 110, borderRadius: 12, marginBottom: 16 }]}>
               <MemoizedNotesInput

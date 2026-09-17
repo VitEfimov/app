@@ -84,21 +84,15 @@ module.exports = function withAndroidAuto(config) {
           mainActivity['intent-filter'] = [];
         }
 
-        // Add Android Auto Category PROJECTION_DEF to LAUNCHER intent-filter
+        // Ensure Android Auto Category PROJECTION_DEF is not on MainActivity (which causes keyboard driving lockout)
         const mainFilter = mainActivity['intent-filter'].find((filter) =>
           filter.action?.some((a) => a.$?.['android:name'] === 'android.intent.action.MAIN')
         );
 
-        if (mainFilter) {
-          if (!mainFilter.category) mainFilter.category = [];
-          const hasProjectionCategory = mainFilter.category.some(
-            (c) => c.$?.['android:name'] === 'com.google.android.gms.car.category.CATEGORY_PROJECTION_DEF'
+        if (mainFilter && mainFilter.category) {
+          mainFilter.category = mainFilter.category.filter(
+            (c) => c.$?.['android:name'] !== 'com.google.android.gms.car.category.CATEGORY_PROJECTION_DEF'
           );
-          if (!hasProjectionCategory) {
-            mainFilter.category.push({
-              $: { 'android:name': 'com.google.android.gms.car.category.CATEGORY_PROJECTION_DEF' },
-            });
-          }
         }
 
         // Add image/media SEND intent-filter if missing
