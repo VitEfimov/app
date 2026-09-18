@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useDispatch, useSelector } from 'react-redux';
@@ -103,48 +103,43 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
 
   const titleFontSize = fontSizeSetting === 'small' ? 13 : fontSizeSetting === 'big' ? 18 : 15;
 
+  const taskTitleText = task?.taskname || task?.name || '';
+
   const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(task.taskname);
+  const [editName, setEditName] = useState(taskTitleText);
   const [cursorSelection, setCursorSelection] = useState(null);
   const swipeableRef = useRef(null);
 
-  useEffect(() => {
-    if (!isEditing) return;
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-      if (editName.trim() !== '' && editName !== task.taskname) {
-        dispatch(updateTask({ taskId: task.id, name: editName }));
-      }
-      setIsEditing(false);
-    });
-    return () => hideSub.remove();
-  }, [isEditing, editName, task, dispatch]);
-
-  const handleTextPress = () => {
-    if (isSelectionMode) {
-      if (onToggleSelect) onToggleSelect();
-      return;
-    }
-    if (disableInlineEdit) {
-      if (onPress) onPress();
-      return;
-    }
-    setEditName(task.taskname);
-    setCursorSelection({ start: task.taskname.length, end: task.taskname.length });
-    setIsEditing(true);
-  };
-
-  const closeSwipeable = () => {
+  const closeSwipeable = useCallback(() => {
     if (swipeableRef.current) {
       swipeableRef.current.close();
     }
-  };
+  }, []);
 
-  const handleSwipeComplete = () => {
+  const handleToggleComplete = useCallback(() => {
+    if (!task) return;
+    const newCompletedState = !task.completed;
+    dispatch(updateTask({
+      taskId: task.id,
+      completed: newCompletedState
+    }));
+    
+    showToast(
+      newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
+      t('Undo'),
+      () => {
+        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState, isUndo: true }));
+      }
+    );
+  }, [task, dispatch, showToast, t]);
+
+  const handleSwipeComplete = useCallback(() => {
     closeSwipeable();
     handleToggleComplete();
-  };
+  }, [closeSwipeable, handleToggleComplete]);
 
-  const handleSwipeDelete = () => {
+  const handleSwipeDelete = useCallback(() => {
+    if (!task) return;
     closeSwipeable();
     dispatch(deleteTask({ taskId: task.id }));
     showToast(
@@ -154,19 +149,20 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         dispatch(addTask({ task, isUndo: true }));
       }
     );
-  };
+  }, [closeSwipeable, dispatch, task, showToast, t]);
 
-  const handleSwipeSnooze = () => {
+  const handleSwipeSnooze = useCallback(() => {
     closeSwipeable();
-    if (onPressSnooze) onPressSnooze(task);
-  };
+    if (onPressSnooze && task) onPressSnooze(task);
+  }, [closeSwipeable, onPressSnooze, task]);
 
-  const handleSwipeMore = () => {
+  const handleSwipeMore = useCallback(() => {
     closeSwipeable();
-    if (onPressMore) onPressMore(task);
-  };
+    if (onPressMore && task) onPressMore(task);
+  }, [closeSwipeable, onPressMore, task]);
 
-  const renderLeftActions = (progress, dragX) => {
+  const renderLeftActions = useCallback((progress, dragX) => {
+    if (!dragX || typeof dragX.interpolate !== 'function') return null;
     const scale = dragX.interpolate({
       inputRange: [0, 100],
       outputRange: [0, 1],
@@ -180,9 +176,10 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         </Animated.View>
       </View>
     );
-  };
+  }, [colors.surfaceContainer, colors.textPrimary, t]);
 
-  const renderRightActions = (progress, dragX) => {
+  const renderRightActions = useCallback((progress, dragX) => {
+    if (!dragX || typeof dragX.interpolate !== 'function') return null;
     const scale = dragX.interpolate({
       inputRange: [-100, 0],
       outputRange: [1, 0],
@@ -207,7 +204,23 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         </TouchableOpacity>
       </View>
     );
-  };
+  }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.textPrimary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore]);
+
+  const handleTextPress = useCallback(() => {
+    if (isSelectionMode) {
+      if (onToggleSelect) onToggleSelect();
+      return;
+    }
+    if (disableInlineEdit) {
+      if (onPress) onPress();
+      return;
+    }
+    setEditName(taskTitleText);
+    setCursorSelection({ start: taskTitleText.length, end: taskTitleText.length });
+    setIsEditing(true);
+  }, [isSelectionMode, onToggleSelect, disableInlineEdit, onPress, taskTitleText]);
+
+  if (!task) return null;
 
   const formatDisplayTime = (timeStr) => {
     if (!timeStr || timeStr === '--:--') return '--:--';
@@ -240,21 +253,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
     }
   };
 
-  const handleToggleComplete = () => {
-    const newCompletedState = !task.completed;
-    dispatch(updateTask({
-      taskId: task.id,
-      completed: newCompletedState
-    }));
-    
-    showToast(
-      newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
-      t('Undo'),
-      () => {
-        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState, isUndo: true }));
-      }
-    );
-  };
+
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
@@ -337,7 +336,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
           {isEditing ? (
             <View style={{ position: 'relative', flexShrink: 1, justifyContent: 'center' }}>
               <Text
-                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
+                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 2}
                 style={[
                   styles.title,
                   { color: 'transparent', fontSize: titleFontSize, flexShrink: 1 }
@@ -367,7 +366,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
             <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
               <Text
                 testID="task_name_text"
-                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 3}
+                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 2}
                 ellipsizeMode="tail"
                 style={[
                   styles.title,

@@ -102,4 +102,64 @@ export default function getFilters(refNow) {
     };
 }
 
+export const DAY_SECTIONS = {
+    MISSED: 'missed',
+    TODAY: 'today',
+    TOMORROW: 'tomorrow',
+    THIS_WEEK: 'on-this-week',
+    NEXT_WEEK: 'on-next-week',
+    LATER: 'later',
+    COMPLETED: 'completed'
+};
+
+export const PRIORITY_SCORES = { high: 3, medium: 2, low: 1, none: 0 };
+
+export function getDateThresholds(refNow) {
+    const now = refNow || dayjs();
+    return {
+        today: now.format('YYYY-MM-DD'),
+        tomorrow: now.add(1, 'day').format('YYYY-MM-DD'),
+        thisWeek: now.endOf('isoWeek').format('YYYY-MM-DD'),
+        nextWeek: now.add(1, 'week').startOf('day').endOf('isoWeek').format('YYYY-MM-DD')
+    };
+}
+
+export function classifyTaskDate(taskDateStr, thresholds, hasDate = true) {
+    if (!hasDate) return DAY_SECTIONS.TODAY;
+    if (taskDateStr < thresholds.today) return DAY_SECTIONS.MISSED;
+    if (taskDateStr === thresholds.today) return DAY_SECTIONS.TODAY;
+    if (taskDateStr === thresholds.tomorrow) return DAY_SECTIONS.TOMORROW;
+    if (taskDateStr <= thresholds.thisWeek) return DAY_SECTIONS.THIS_WEEK;
+    if (taskDateStr <= thresholds.nextWeek) return DAY_SECTIONS.NEXT_WEEK;
+    return DAY_SECTIONS.LATER;
+}
+
+export function compareTasks(aItem, bItem, sortBy = 'time') {
+    const a = aItem.task || aItem;
+    const b = bItem.task || bItem;
+    
+    if (sortBy === 'priority') {
+        const pA = aItem.priorityScore !== undefined ? aItem.priorityScore : (PRIORITY_SCORES[a.priority?.toLowerCase()] || 0);
+        const pB = bItem.priorityScore !== undefined ? bItem.priorityScore : (PRIORITY_SCORES[b.priority?.toLowerCase()] || 0);
+        if (pA !== pB) return pB - pA;
+    }
+
+    const dayA = aItem.dateStr || (a.completionDate ? a.completionDate.substring(0, 10) : '9999-12-31');
+    const dayB = bItem.dateStr || (b.completionDate ? b.completionDate.substring(0, 10) : '9999-12-31');
+    const dateCompare = dayA.localeCompare(dayB);
+    if (dateCompare !== 0) return dateCompare;
+    
+    const hasTimeA = !!a.time;
+    const hasTimeB = !!b.time;
+    
+    if (hasTimeA && !hasTimeB) return -1;
+    if (!hasTimeA && hasTimeB) return 1;
+    if (hasTimeA && hasTimeB) return a.time.localeCompare(b.time);
+    
+    const idA = aItem.idNum !== undefined ? aItem.idNum : parseInt(a.id || '0');
+    const idB = bItem.idNum !== undefined ? bItem.idNum : parseInt(b.id || '0');
+    return idA - idB;
+}
+
+
 

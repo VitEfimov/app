@@ -17,7 +17,7 @@ import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
 import Modal from 'react-native-modal';
-import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard } from '../utils/filters';
+import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard, getDateThresholds, classifyTaskDate, compareTasks, PRIORITY_SCORES } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -68,11 +68,7 @@ export default function BoardScreen({ route, navigation }) {
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || [{ id: 'main', name: 'Main' }]);
   const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
-  const isAuthenticated = useSelector(state => state.userReducer.isAuthenticated);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
-  
-  const themeState = useSelector(state => state.themeReducer);
-  const boardAutomations = useSelector(state => state.themeReducer.boardAutomations || {});
 
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
@@ -279,130 +275,168 @@ export default function BoardScreen({ route, navigation }) {
     setDetailsVisible(true);
   }, []);
 
+  const handleSnoozePress = useCallback((task) => {
+    setSelectedTask(task);
+    setSnoozeVisible(true);
+  }, []);
+
+  const handleQuickMenuPress = useCallback((task) => {
+    setSelectedTask(task);
+    setQuickMenuVisible(true);
+  }, []);
+
+  const handleToggleSelectTask = useCallback((taskId, sectionId) => {
+    setSelectionMode(prev => {
+      if (!prev.isActive) {
+        return { isActive: true, sectionId, selectedTaskIds: [taskId] };
+      }
+      const exists = prev.selectedTaskIds.includes(taskId);
+      const newSelected = exists
+        ? prev.selectedTaskIds.filter(id => id !== taskId)
+        : [...prev.selectedTaskIds, taskId];
+      return {
+        ...prev,
+        selectedTaskIds: newSelected,
+        isActive: newSelected.length > 0 ? prev.isActive : false
+      };
+    });
+  }, []);
+
   const mainBoardId = useMemo(() => boards[0]?.id || 'main', [boards]);
 
-  // Group tasks
+  // Group tasks for current active board
   const boardTasks = useMemo(() => {
-    return tasks.map(t => {
-      const updated = { ...t };
-      if (!updated.id && updated._id) updated.id = updated._id;
-      if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
-      return updated;
-    }).filter(task => isTaskOnBoard(task, activeBoardId, mainBoardId, boards));
+    return tasks.filter(task => task && isTaskOnBoard(task, activeBoardId, mainBoardId, boards));
   }, [tasks, activeBoardId, mainBoardId, boards]);
 
   const activeBoard = useMemo(() => {
     return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
   }, [boards, activeBoardId]);
 
+  // Single-pass O(N) deduplication of recurring tasks (eliminates per-series sorting allocations)
   const hiddenRecurringTaskIds = useMemo(() => {
     if (showRecurringTasksOnBoard || activeBoard?.type === 'birthdays') return new Set();
 
-    // Group uncompleted tasks by recurringSeriesId
-    const seriesMap = new Map();
-
-    boardTasks.forEach(task => {
-      if (task.completed) return;
-      const seriesId = task.recurringSeriesId;
-      if (!seriesId) return;
-
-      if (!seriesMap.has(seriesId)) {
-        seriesMap.set(seriesId, []);
-      }
-      seriesMap.get(seriesId).push(task);
-    });
-
+    const earliestSeriesMap = new Map();
     const hiddenIds = new Set();
+    const todayStr = dayjs().format('YYYY-MM-DD');
 
-    seriesMap.forEach(taskList => {
-      // Sort tasks in this series chronologically
-      taskList.sort((a, b) => {
-        const dayA = a.completionDate ? dayjs(a.completionDate).valueOf() : Infinity;
-        const dayB = b.completionDate ? dayjs(b.completionDate).valueOf() : Infinity;
-        if (dayA !== dayB) return dayA - dayB;
-        if (a.time && b.time) return a.time.localeCompare(b.time);
-        if (a.time && !b.time) return -1;
-        if (!a.time && b.time) return 1;
-        return parseInt(a.id || '0') - parseInt(b.id || '0');
-      });
+    for (const task of boardTasks) {
+      if (task.completed || !task.recurringSeriesId) continue;
+      const dateStr = getTaskDateStr(task);
+      if (dateStr && dateStr < todayStr) continue; // Missed tasks remain visible in Missed section
 
-      // Missed tasks are always shown in Missed section
-      // Among the non-missed uncompleted tasks, show only the first (earliest upcoming) one
-      let hasFoundFirstActiveNonMissed = false;
+      const seriesId = task.recurringSeriesId;
+      const existing = earliestSeriesMap.get(seriesId);
 
-      taskList.forEach(task => {
-        if (isTaskMissed(task)) {
-          // Missed task is NOT hidden (stays visible on board in missed section)
-          return;
-        }
+      if (!existing) {
+        earliestSeriesMap.set(seriesId, { task, dateStr: dateStr || '9999-12-31' });
+      } else {
+        const taskVal = dateStr || '9999-12-31';
+        const existingVal = existing.dateStr;
 
-        if (!hasFoundFirstActiveNonMissed) {
-          // This is the earliest upcoming/today active task in the series -> show it
-          hasFoundFirstActiveNonMissed = true;
+        if (taskVal < existingVal) {
+          hiddenIds.add(existing.task.id);
+          earliestSeriesMap.set(seriesId, { task, dateStr: taskVal });
         } else {
-          // Subsequent upcoming tasks in the series are hidden until this one is completed or missed
           hiddenIds.add(task.id);
         }
-      });
-    });
+      }
+    }
 
     return hiddenIds;
   }, [boardTasks, showRecurringTasksOnBoard, activeBoard]);
 
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks, todoTasks, upcomingBirthdayTasks, needToBuyTasks } = useMemo(() => {
-    const now = dayjs();
-    const FILTERS = getFilters(now);
+    const thresholds = getDateThresholds();
 
-    const sortTasks = (tasksArr, sectionId) => {
-      const sortBy = sortConfig[sectionId] || 'time';
-      return [...tasksArr].sort((a, b) => {
-        if (sortBy === 'priority') {
-          const pValues = { high: 3, medium: 2, low: 1, none: 0 };
-          const pA = pValues[a.priority?.toLowerCase()] || 0;
-          const pB = pValues[b.priority?.toLowerCase()] || 0;
-          if (pA !== pB) return pB - pA;
-        }
-
-        const dayA = a.completionDate ? a.completionDate.substring(0, 10) : '9999-12-31';
-        const dayB = b.completionDate ? b.completionDate.substring(0, 10) : '9999-12-31';
-        const dateCompare = dayA.localeCompare(dayB);
-        if (dateCompare !== 0) return dateCompare;
-        
-        const hasTimeA = !!a.time;
-        const hasTimeB = !!b.time;
-        
-        if (hasTimeA && !hasTimeB) return -1;
-        if (!hasTimeA && hasTimeB) return 1;
-        if (hasTimeA && hasTimeB) return a.time.localeCompare(b.time);
-        
-        return parseInt(a.id || '0') - parseInt(b.id || '0');
-      });
+    const buckets = {
+      missed: [],
+      today: [],
+      tomorrow: [],
+      'on-this-week': [],
+      'on-next-week': [],
+      later: [],
+      completed: [],
+      todo: []
     };
 
-    const boardUncompleted = sortTasks(boardTasks.filter(t => !t.completed), 'today');
-    const boardCompleted = sortTasks(boardTasks.filter(t => t.completed), 'completed');
+    const processedTasks = boardTasks.map(task => {
+      const hasDate = !!(task.completionDate || task.dateString);
+      const dateStr = getTaskDateStr(task);
+      const priorityScore = PRIORITY_SCORES[task.priority?.toLowerCase()] || 0;
+      const idNum = parseInt(task.id || '0');
+      return {
+        task,
+        dateStr,
+        hasDate,
+        priorityScore,
+        idNum,
+        isCompleted: !!task.completed
+      };
+    });
+
+    for (const item of processedTasks) {
+      const task = item.task;
+      if (item.isCompleted) {
+        buckets.completed.push(item);
+      } else {
+        buckets.todo.push(item);
+        if (hiddenRecurringTaskIds.has(task.id)) continue;
+
+        const section = classifyTaskDate(item.dateStr, thresholds, item.hasDate);
+        if (buckets[section]) {
+          buckets[section].push(item);
+        }
+      }
+    }
+
+    const sortBucket = (arr, sectionId) => {
+      const sortBy = sortConfig[sectionId] || 'time';
+      return [...arr].sort((a, b) => compareTasks(a, b, sortBy)).map(item => item.task);
+    };
+
+    const isCompletedCollapsed = collapsedSections.includes('completed');
+
+    const sortedToday = sortBucket(buckets.today, 'today');
+    const sortedTomorrow = sortBucket(buckets.tomorrow, 'tomorrow');
+    const sortedThisWeek = sortBucket(buckets['on-this-week'], 'on-this-week');
+    const sortedNextWeek = sortBucket(buckets['on-next-week'], 'on-next-week');
+    const sortedLater = sortBucket(buckets.later, 'later');
+    const sortedMissed = sortBucket(buckets.missed, 'missed');
+    const sortedCompleted = isCompletedCollapsed ? [] : sortBucket(buckets.completed, 'completed');
+    const sortedTodo = sortBucket(buckets.todo, 'today');
+    const completedCount = buckets.completed.length;
 
     return {
-      todayTasks: sortTasks(boardTasks.filter(task => isTaskToday(task, now) && !hiddenRecurringTaskIds.has(task.id)), 'today'),
-      tomorrowTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) === FILTERS.tomorrow), 'tomorrow'),
-      thisWeekTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) > FILTERS.tomorrow && getTaskDateStr(task) <= FILTERS['on-this-week']), 'on-this-week'),
-      nextWeekTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && getTaskDateStr(task) > FILTERS['on-this-week'] && getTaskDateStr(task) <= FILTERS['on-next-week']), 'on-next-week'),
-      laterTasks: sortTasks(boardTasks.filter(task => !task.completed && !hiddenRecurringTaskIds.has(task.id) && isTaskUpcoming(task, now)), 'later'),
-      missedTasks: sortTasks(boardTasks.filter(task => isTaskMissed(task, now)), 'missed'),
-      completedTasks: boardCompleted,
-      todoTasks: boardUncompleted,
-      upcomingBirthdayTasks: boardUncompleted,
-      needToBuyTasks: boardUncompleted
+      todayTasks: sortedToday,
+      tomorrowTasks: sortedTomorrow,
+      thisWeekTasks: sortedThisWeek,
+      nextWeekTasks: sortedNextWeek,
+      laterTasks: sortedLater,
+      missedTasks: sortedMissed,
+      completedTasks: sortedCompleted,
+      completedCount,
+      todoTasks: sortedTodo,
+      upcomingBirthdayTasks: sortedTodo,
+      needToBuyTasks: sortedTodo
     };
-  }, [boardTasks, sortConfig, hiddenRecurringTaskIds]);
+  }, [boardTasks, sortConfig, hiddenRecurringTaskIds, collapsedSections]);
+
+  const { completedCount } = useMemo(() => {
+    return { completedCount: boardTasks.filter(t => t && t.completed).length };
+  }, [boardTasks]);
 
   const sections = useMemo(() => {
+    const isCompletedCollapsed = collapsedSections.includes('completed');
+    const actualCompletedCount = completedTasks.length > 0 ? completedTasks.length : completedCount;
+
     if (activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping') {
       const listUncompleted = todoTasks.filter(t => !missedTasks.some(m => m.id === t.id));
       return [
         ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
         { id: 'today', title: t('List') || 'List', data: collapsedSections.includes('today') ? [] : listUncompleted, count: listUncompleted.length, color: '#10B981' },
-        ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed') || 'Completed', data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4CAF50' }] : [])
+        ...(actualCompletedCount > 0 ? [{ id: 'completed', title: t('Completed') || 'Completed', data: isCompletedCollapsed ? [] : completedTasks, count: actualCompletedCount, color: '#4CAF50' }] : [])
       ];
     }
 
@@ -413,9 +447,9 @@ export default function BoardScreen({ route, navigation }) {
       { id: 'on-this-week', title: t('This week'), data: collapsedSections.includes('on-this-week') ? [] : thisWeekTasks, count: thisWeekTasks.length, color: '#9c27b0' },
       { id: 'on-next-week', title: t('Next week'), data: collapsedSections.includes('on-next-week') ? [] : nextWeekTasks, count: nextWeekTasks.length, color: '#009688' },
       { id: 'later', title: t('Upcoming'), data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
-      ...(completedTasks.length > 0 ? [{ id: 'completed', title: t('Completed'), data: collapsedSections.includes('completed') ? [] : completedTasks, count: completedTasks.length, color: '#4caf50' }] : []),
+      ...(actualCompletedCount > 0 ? [{ id: 'completed', title: t('Completed'), data: isCompletedCollapsed ? [] : completedTasks, count: actualCompletedCount, color: '#4caf50' }] : []),
     ];
-  }, [activeBoard.type, missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, todoTasks, upcomingBirthdayTasks, needToBuyTasks, collapsedSections, t]);
+  }, [activeBoard.type, missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, completedCount, todoTasks, upcomingBirthdayTasks, needToBuyTasks, collapsedSections, t]);
 
   const flattenedData = useMemo(() => {
     const result = [];
@@ -455,7 +489,7 @@ export default function BoardScreen({ route, navigation }) {
       case 'on-this-week': return thisWeekTasks;
       case 'on-next-week': return nextWeekTasks;
       case 'later': return laterTasks;
-      case 'completed': return completedTasks;
+      case 'completed': return completedTasks.length > 0 ? completedTasks : boardTasks.filter(t => t && t.completed);
       default: return section.data || [];
     }
   }, [missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks]);
@@ -694,6 +728,8 @@ export default function BoardScreen({ route, navigation }) {
     );
   };
 
+  const selectedTaskIdsSet = useMemo(() => new Set(selectionMode.selectedTaskIds), [selectionMode.selectedTaskIds]);
+
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1, backgroundColor: colors.bgMain }} 
@@ -783,9 +819,9 @@ export default function BoardScreen({ route, navigation }) {
       <FlashList
         key={activeBoardId}
         data={flattenedData}
-        extraData={[activeBoardId, tasks, collapsedSections, sortConfig, isBoardsCollapsed, activeAddSectionId, selectionMode, flattenedData]}
-        keyExtractor={(item) => item.type === 'task' ? `task_${item.task.id}_${item.section.id}` : `${item.type}_${item.section.id}`}
-        getItemType={(item) => item.type === 'task' ? 'task' : `${item.type}_${item.section.id}`}
+        extraData={[activeBoardId, tasks, collapsedSections, sortConfig, isBoardsCollapsed, activeAddSectionId, selectionMode.isActive, selectedTaskIdsSet, flattenedData]}
+        keyExtractor={(item) => item.type === 'task' ? `task_${item.task?.id || ''}_${item.section?.id || ''}` : `${item.type}_${item.section?.id || ''}`}
+        getItemType={(item) => item.type}
         renderItem={({ item }) => {
           if (item.type === 'header') return renderSectionHeader({ section: item.section });
           if (item.type === 'footer') return renderSectionFooter({ section: item.section });
@@ -798,20 +834,11 @@ export default function BoardScreen({ route, navigation }) {
                 task={task} 
                 hideDate={isListBoard}
                 isSelectionMode={selectionMode.isActive}
-                isSelected={selectionMode.selectedTaskIds.includes(task.id)}
-                onToggleSelect={() => {
-                  if (!selectionMode.isActive) {
-                    setSelectionMode({ isActive: true, sectionId: section.id, selectedTaskIds: [task.id] });
-                  } else {
-                    toggleTaskSelection(task.id);
-                  }
-                }}
-                onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
-                onPressMore={isListBoard ? undefined : ((t) => { setSelectedTask(t); setQuickMenuVisible(true); })}
-                onPress={() => {
-                  setSelectedTask(task);
-                  setDetailsVisible(true);
-                }}
+                isSelected={selectedTaskIdsSet.has(task.id)}
+                onToggleSelect={() => handleToggleSelectTask(task.id, section.id)}
+                onPressSnooze={handleSnoozePress}
+                onPressMore={isListBoard ? undefined : handleQuickMenuPress}
+                onPress={handleTaskPress}
               />
             );
           }
@@ -820,7 +847,7 @@ export default function BoardScreen({ route, navigation }) {
         contentContainerStyle={styles.listContent}
         stickyHeaderIndices={undefined}
         keyboardShouldPersistTaps="handled"
-        estimatedItemSize={70}
+        estimatedItemSize={85}
       />
 
       <TaskDetailsModal 

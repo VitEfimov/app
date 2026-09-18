@@ -14,7 +14,8 @@ const hexToRgba = (hex, alpha) => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const { sourceColor, themeMode } = useSelector((state) => state.themeReducer || {});
+  const sourceColor = useSelector((state) => state.themeReducer?.sourceColor);
+  const themeMode = useSelector((state) => state.themeReducer?.themeMode);
   const systemColorScheme = useColorScheme();
 
   const theme = useMemo(() => {
