@@ -1181,7 +1181,7 @@ useEffect(() => {
                   <View style={styles.column}>
                     <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('From')}</Text>
                     <TouchableOpacity 
-                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 44, borderRadius: 10 }]}
+                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 10 }]}
                       onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
                     >
                       <IconCalendar color={colors.textPrimary} />
@@ -1193,7 +1193,7 @@ useEffect(() => {
                   <View style={styles.column}>
                     <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('To')}</Text>
                     <TouchableOpacity 
-                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 44, borderRadius: 10 }]}
+                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 10 }]}
                       onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
                     >
                       <IconCalendar color={colors.textPrimary} />
@@ -1597,11 +1597,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 12,
-    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    gap: 8,
   },
   dateText: {
-    fontSize: 15,
+    fontSize: 14,
+    includeFontPadding: false,
   },
 
   twoColumnRow: {

@@ -532,18 +532,35 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
 export const deleteTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     const taskId = payload?.taskId || (typeof payload === 'string' ? payload : null);
-    if (taskId) {
-        const existingTask = state.taskReducer.tasks.find(t => t && String(t.id) === String(taskId));
-        if (existingTask) {
-            await cancelNotification(existingTask.notificationId, existingTask.id);
-        } else {
-            await cancelNotification(null, taskId);
-        }
-    }
+    const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id) === String(taskId)) : null;
+
+    // 1. Optimistic UI update: Remove from Redux immediately (0ms delay)
     dispatch(deleteTaskSync(payload));
-    const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks, getState);
+
+    // 2. Persist local storage immediately
+    const remainingTasks = getState().taskReducer.tasks;
+    persistTasksToStorage(remainingTasks, getState);
     syncRecurringAutomations(getState);
+
+    // 3. Background async cancellation of OS notifications (with Undo grace check)
+    if (taskId) {
+        setTimeout(async () => {
+            try {
+                // Verify if the user tapped Undo during the 5s toast window
+                const currentTasks = getState().taskReducer.tasks;
+                const isRestored = currentTasks.some(t => t && String(t.id) === String(taskId));
+                if (!isRestored) {
+                    if (existingTask) {
+                        await cancelNotification(existingTask.notificationId, existingTask.id);
+                    } else {
+                        await cancelNotification(null, taskId);
+                    }
+                }
+            } catch (e) {}
+        }, 5000);
+    }
+
+    // 4. Background DB sync for authenticated users
     if (state.userReducer?.isAuthenticated && taskId) {
         dispatch(deleteTaskAsync(taskId));
     }
@@ -553,16 +570,25 @@ export const deleteTasksByBoard = (payload) => async (dispatch, getState) => {
     const state = getState();
     const tasks = state.taskReducer.tasks || [];
     let targetId = payload?.boardId || (typeof payload === 'string' ? payload : null);
-    if (targetId) {
-        const affected = tasks.filter(t => t && String(t.boardId || t.board_id) === String(targetId));
-        for (const t of affected) {
-            await cancelNotification(t.notificationId, t.id);
-        }
-    }
+    const affected = targetId ? tasks.filter(t => t && String(t.boardId || t.board_id) === String(targetId)) : [];
+
+    // 1. Optimistic UI update
     dispatch(deleteTasksByBoardSync(payload));
+
     const newTasks = getState().taskReducer.tasks;
     persistTasksToStorage(newTasks, getState);
     syncRecurringAutomations(getState);
+
+    // 2. Background async cancellation of OS notifications
+    if (affected.length > 0) {
+        setTimeout(async () => {
+            for (const t of affected) {
+                try {
+                    await cancelNotification(t.notificationId, t.id);
+                } catch (e) {}
+            }
+        }, 0);
+    }
 };
 
 export const purgeOrphanedTasksThunk = (boards) => async (dispatch, getState) => {
@@ -619,24 +645,34 @@ export const updateRecurringSeries = (payload) => async (dispatch, getState) => 
 export const deleteRecurringSeries = (payload) => async (dispatch, getState) => {
     const state = getState();
     const { seriesId, fromDate } = payload || {};
-    if (seriesId) {
-        const fromDay = fromDate ? dayjs(fromDate).startOf('day') : null;
-        const affected = (state.taskReducer.tasks || []).filter(t => {
-            if (t && t.recurringSeriesId === seriesId) {
-                if (!fromDay) return true;
-                const taskDay = t.completionDate ? dayjs(t.completionDate).startOf('day') : null;
-                return taskDay && (taskDay.isSame(fromDay, 'day') || taskDay.isAfter(fromDay));
-            }
-            return false;
-        });
-        for (const t of affected) {
-            await cancelNotification(t.notificationId, t.id);
+    const fromDay = fromDate ? dayjs(fromDate).startOf('day') : null;
+    const affected = seriesId ? (state.taskReducer.tasks || []).filter(t => {
+        if (t && t.recurringSeriesId === seriesId) {
+            if (!fromDay) return true;
+            const taskDay = t.completionDate ? dayjs(t.completionDate).startOf('day') : null;
+            return taskDay && (taskDay.isSame(fromDay, 'day') || taskDay.isAfter(fromDay));
         }
-    }
+        return false;
+    }) : [];
+
+    // 1. Optimistic UI update: Remove series tasks from Redux state immediately
     dispatch(deleteRecurringSeriesSync(payload));
+
+    // 2. Persist local storage immediately
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
+
+    // 3. Background async cancellation of OS notifications
+    if (affected.length > 0) {
+        setTimeout(async () => {
+            for (const t of affected) {
+                try {
+                    await cancelNotification(t.notificationId, t.id);
+                } catch (e) {}
+            }
+        }, 0);
+    }
 };
 
 export const processAutoManageTasks = () => async (dispatch, getState) => {

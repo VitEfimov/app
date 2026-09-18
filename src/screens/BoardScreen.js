@@ -189,16 +189,28 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleDeleteSelected = () => {
+    const selectedTasksObjects = boardTasks.filter(t => selectionMode.selectedTaskIds.includes(t.id));
+    const count = selectedTasksObjects.length;
     setConfirmConfig({
       isVisible: true,
-      title: 'Delete Tasks',
-      message: `Are you sure you want to delete ${selectionMode.selectedTaskIds.length} tasks?`,
-      confirmText: 'Delete',
+      title: t('Delete Tasks') || 'Delete Tasks',
+      message: `${t('Are you sure you want to delete')} ${count} ${t('tasks')}?`,
+      confirmText: t('Delete') || 'Delete',
       isDestructive: true,
       onConfirm: () => {
         selectionMode.selectedTaskIds.forEach(id => dispatch(deleteTask({ taskId: id })));
         setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+
+        showToast(
+          `${count} ${t('tasks deleted')}`,
+          t('Undo'),
+          () => {
+            selectedTasksObjects.forEach(task => {
+              dispatch(addTask({ task }));
+            });
+          }
+        );
       }
     });
   };
