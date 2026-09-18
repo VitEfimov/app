@@ -101,7 +101,7 @@ function TabNavigator() {
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: t('Calendar'), tabBarTestID: 'tab_calendar' }} />
       <Tab.Screen name="Pomodoro" component={PomodoroScreen} options={{ tabBarLabel: t('Pomodoro'), tabBarTestID: 'tab_pomodoro' }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('Settings'), tabBarTestID: 'tab_settings' }} />
-      <Tab.Screen name="DevLogs" component={DevLogsScreen} options={{ tabBarLabel: 'Debug', tabBarTestID: 'tab_devlogs' }} />
+      <Tab.Screen name="DevLogs" component={DevLogsScreen} options={{ tabBarLabel: 'Debug', tabBarTestID: 'tab_devlogs', tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Statistics" component={StatisticsScreen} options={{ tabBarLabel: 'Statistics', tabBarItemStyle: { display: 'none' } }} />
     </Tab.Navigator>
   );

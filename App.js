@@ -7,7 +7,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import store from './src/store';
 if (typeof window !== 'undefined') window.__store = store;
 import AppNavigator from './src/navigation/AppNavigator';
-import { View, Text, ActivityIndicator, TouchableOpacity, AppState } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, AppState, LogBox } from 'react-native';
+
+LogBox.ignoreAllLogs(true);
 
 import { hydrateUserState } from './src/features/userSlice';
 import { hydrateThemeState } from './src/features/themeSlice';
