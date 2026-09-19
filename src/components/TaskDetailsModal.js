@@ -190,13 +190,21 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
 
+  const getValidDateString = (dateVal) => {
+    if (!dateVal) return dayjs().format('YYYY-MM-DD');
+    const d = dayjs(dateVal);
+    if (!d.isValid() || d.year() < 2000 || d.year() > 2100) return dayjs().format('YYYY-MM-DD');
+    return d.format('YYYY-MM-DD');
+  };
+
   const getCalendarMarkedDates = () => {
-    const activeDate = datePickerType === 'due' 
+    const rawActiveDate = datePickerType === 'due' 
       ? selectedDate 
       : datePickerType === 'repeatStart' 
       ? repeatStartDate 
       : repeatEndDate;
 
+    const activeDate = rawActiveDate ? getValidDateString(rawActiveDate) : null;
     const todayStr = dayjs().format('YYYY-MM-DD');
     const marks = {};
 
@@ -1369,44 +1377,58 @@ useEffect(() => {
         <RNModal visible={showDatePicker} transparent animationType="fade">
           <View style={styles.calendarOverlay}>
             <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
-              <Calendar
-                key={`${datePickerType === 'due' ? (selectedDate || dayjs().format('YYYY-MM-DD')) : datePickerType === 'repeatStart' ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD')) : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))}-${i18n.language}`}
-                markingType={'custom'}
-                firstDay={i18n.language === 'en' ? 0 : 1}
-                current={
+              {(() => {
+                const activeCalendarDate = getValidDateString(
                   datePickerType === 'due' 
-                    ? (selectedDate || dayjs().format('YYYY-MM-DD'))
+                    ? selectedDate 
                     : datePickerType === 'repeatStart'
-                    ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-                    : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-                }
-                onDayPress={(day) => handleDateSelect(day.dateString)}
-                markedDates={getCalendarMarkedDates()}
-                enableSwipeMonths={true}
-                renderHeader={(date) => {
-                  const currentDateVal = datePickerType === 'due' 
-                    ? (selectedDate || dayjs().format('YYYY-MM-DD'))
-                    : datePickerType === 'repeatStart'
-                    ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-                    : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'));
-                  const dateObj = dayjs(date ? (date.dateString || date.toString()) : currentDateVal);
-                  const monthStr = dateObj.format('MMMM YYYY');
-                  return (
-                    <TouchableOpacity
-                      accessible={true}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Select year`}
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
-                      onPress={() => setYearPickerVisible(true)}
-                    >
-                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
-                        {monthStr}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
-                    </TouchableOpacity>
-                  );
-                }}
-                theme={{
+                    ? (repeatStartDate || selectedDate)
+                    : (repeatEndDate || repeatStartDate || selectedDate)
+                );
+                return (
+                  <Calendar
+                    key={`${activeCalendarDate}-${i18n.language}`}
+                    markingType={'custom'}
+                    firstDay={i18n.language === 'en' ? 0 : 1}
+                    current={activeCalendarDate}
+                    onDayPress={(day) => handleDateSelect(day.dateString)}
+                    markedDates={getCalendarMarkedDates()}
+                    enableSwipeMonths={true}
+                    renderHeader={(date) => {
+                      let dateObj;
+                      if (date) {
+                        if (typeof date.toDate === 'function') {
+                          dateObj = dayjs(date.toDate());
+                        } else if (typeof date === 'string') {
+                          dateObj = dayjs(date);
+                        } else if (date instanceof Date) {
+                          dateObj = dayjs(date);
+                        } else {
+                          dateObj = dayjs(activeCalendarDate);
+                        }
+                      } else {
+                        dateObj = dayjs(activeCalendarDate);
+                      }
+                      if (!dateObj.isValid() || dateObj.year() < 2000 || dateObj.year() > 2100) {
+                        dateObj = dayjs(activeCalendarDate);
+                      }
+                      const monthStr = dateObj.format('MMMM YYYY');
+                      return (
+                        <TouchableOpacity
+                          accessible={true}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Select year`}
+                          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
+                          onPress={() => setYearPickerVisible(true)}
+                        >
+                          <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
+                            {monthStr}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
+                        </TouchableOpacity>
+                      );
+                    }}
+                    theme={{
                   backgroundColor: colors.bgCard,
                   calendarBackground: colors.bgCard,
                   textSectionTitleColor: colors.textSecondary,
@@ -1439,6 +1461,8 @@ useEffect(() => {
                   }
                 }}
               />
+              );
+            })()}
               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 15, paddingRight: 10 }}>
                 <TouchableOpacity 
                   style={{ padding: 10, paddingHorizontal: 20 }} 

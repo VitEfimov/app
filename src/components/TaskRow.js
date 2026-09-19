@@ -212,13 +212,13 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
       return;
     }
     if (disableInlineEdit) {
-      if (onPress) onPress();
+      if (onPress) onPress(task);
       return;
     }
     setEditName(taskTitleText);
     setCursorSelection({ start: taskTitleText.length, end: taskTitleText.length });
     setIsEditing(true);
-  }, [isSelectionMode, onToggleSelect, disableInlineEdit, onPress, taskTitleText]);
+  }, [isSelectionMode, onToggleSelect, disableInlineEdit, onPress, taskTitleText, task]);
 
   if (!task) return null;
 
@@ -291,7 +291,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         onLongPress={() => {
            if (onToggleSelect) onToggleSelect();
         }}
-        onPress={(e) => {
+        onPress={() => {
           if (isSelectionMode) {
             if (onToggleSelect) onToggleSelect();
             return;
@@ -299,7 +299,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
           if (isEditing) {
             submitEdit();
           }
-          if (onPress) onPress(e);
+          if (onPress) onPress(task);
         }}
         activeOpacity={0.7}
       >
@@ -419,11 +419,21 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
 
       {/* Region 4: Metadata */}
       {(!hideDate && task.completionDate) ? (
-        <View style={styles.metadata}>
+        <TouchableOpacity
+          style={styles.metadata}
+          onPress={() => {
+            if (isSelectionMode) {
+              if (onToggleSelect) onToggleSelect();
+              return;
+            }
+            if (onPress) onPress(task);
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Text style={[styles.date, { color: colors.textPrimary }]}>
             {dayjs(task.completionDate).format('MMM D')}
           </Text>
-        </View>
+        </TouchableOpacity>
       ) : null}
 
 
