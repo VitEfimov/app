@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard, Platform } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
-import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
+import { getBoardColor } from '../utils/boardColors';
 
 const SwipeIconComplete = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -92,7 +93,7 @@ const IconCheckCircle = ({ color }) => (
   </Svg>
 );
 
-const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
+const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardBadge = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   const { showToast } = useToast();
@@ -100,6 +101,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
 
   const taskNameWrap = useSelector(state => state.themeReducer?.taskNameWrap || 'nowrap');
   const fontSizeSetting = useSelector(state => state.themeReducer?.fontSize || 'normal');
+  const boards = useSelector(state => state.userReducer?.boards || []);
 
   const titleFontSize = fontSizeSetting === 'small' ? 13 : fontSizeSetting === 'big' ? 18 : 15;
 
@@ -272,38 +274,35 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
   const hasSubtasks = totalSubtasksCount > 0;
   const isRepeatingTask = !!(task.recurringSeriesId || task.isRecurring || (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') || (task.repeatFrequency && task.repeatFrequency !== 'None'));
 
-  return (
-    <Swipeable
-      ref={swipeableRef}
-      renderLeftActions={renderLeftActions}
-      renderRightActions={renderRightActions}
-      onSwipeableLeftOpen={handleSwipeComplete}
-      friction={2}
-      rightThreshold={40}
+  const taskBoardId = task.boardId || 'main';
+  const taskBoard = boards.find(b => b.id === taskBoardId);
+  const boardName = taskBoard ? (taskBoard.name === 'Main' ? t('Main') : taskBoard.name) : (taskBoardId === 'main' ? t('Main') : 'Board');
+  const boardColor = getBoardColor(taskBoardId, boards);
+
+  const taskRowContent = (
+    <TouchableOpacity
+      testID={`task_row_${testIDPrefix}${task.taskname || task.name}`}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
+      accessibilityState={{ checked: task.completed }}
+      style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: colors.bgMain }]}
+      onLongPress={() => {
+         if (onToggleSelect) onToggleSelect();
+      }}
+      onPress={() => {
+        if (isSelectionMode) {
+          if (onToggleSelect) onToggleSelect();
+          return;
+        }
+        if (isEditing) {
+          submitEdit();
+        }
+        if (onPress) onPress(task);
+      }}
+      activeOpacity={0.7}
     >
-      <TouchableOpacity
-        testID={`task_row_${testIDPrefix}${task.taskname || task.name}`}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
-        accessibilityState={{ checked: task.completed }}
-        style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: colors.bgMain }]}
-        onLongPress={() => {
-           if (onToggleSelect) onToggleSelect();
-        }}
-        onPress={() => {
-          if (isSelectionMode) {
-            if (onToggleSelect) onToggleSelect();
-            return;
-          }
-          if (isEditing) {
-            submitEdit();
-          }
-          if (onPress) onPress(task);
-        }}
-        activeOpacity={0.7}
-      >
-        {priorityColor ? (
+      {priorityColor ? (
         <View style={[styles.priorityIndicator, { backgroundColor: priorityColor }]} />
       ) : null}
 
@@ -381,8 +380,15 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         </View>
 
         {/* Indicators under task name */}
-        {(hasSubtasks || hasNotes || (task.time && task.time.trim() !== '') || isRepeatingTask || (task.completionDate && dayjs(task.completionDate).year() !== dayjs().year())) ? (
+        {((boards.length > 1 && !hideBoardBadge) || hasSubtasks || hasNotes || (task.time && task.time.trim() !== '') || isRepeatingTask || (task.completionDate && dayjs(task.completionDate).year() !== dayjs().year())) ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12, paddingHorizontal: 8 }}>
+            {(boards.length > 1 && !hideBoardBadge) ? (
+              <View style={[styles.subtaskBadge, { backgroundColor: `${boardColor}20`, borderColor: boardColor, marginBottom: 0 }]}>
+                <Text style={{ fontSize: 9, color: boardColor, fontWeight: 'bold' }}>
+                  {boardName}
+                </Text>
+              </View>
+            ) : null}
             {task.completionDate && dayjs(task.completionDate).year() !== dayjs().year() ? (
               <View style={[styles.subtaskBadge, { backgroundColor: `${colors.primary}15`, borderColor: colors.primary, marginBottom: 0 }]}>
                 <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
@@ -436,9 +442,23 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, onPress, d
         </TouchableOpacity>
       ) : null}
 
-
-
     </TouchableOpacity>
+  );
+
+  if (Platform.OS === 'web') {
+    return taskRowContent;
+  }
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      renderLeftActions={renderLeftActions}
+      renderRightActions={renderRightActions}
+      onSwipeableLeftOpen={handleSwipeComplete}
+      friction={2}
+      rightThreshold={40}
+    >
+      {taskRowContent}
     </Swipeable>
   );
 });

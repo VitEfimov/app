@@ -16,8 +16,9 @@ import MoveBoardModal from '../components/MoveBoardModal';
 import YearPickerModal from '../components/YearPickerModal';
 import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
-import { useTranslation } from 'react-i18next';
 import { updateTask, deleteTask, addTask } from '../features/taskSlice';
+import { getBoardColor } from '../utils/boardColors';
+import { useTranslation } from 'react-i18next';
 
 export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
@@ -340,21 +341,25 @@ export default function CalendarScreen() {
     const finalMarks = {};
     Object.keys(marks).forEach(dateStr => {
       const dayTasks = marks[dateStr].tasks;
-      const allCompleted = dayTasks.every(t => t.completed);
-      const anyMissed = dayTasks.some(t => !t.completed && (t.dateString || (typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : '')) < todayStr);
-      const anyNotes = dayTasks.some(t => !t.completed && t.description?.text && t.description.text.trim() !== '');
 
-      let dotColor = colors.primary;
-      if (allCompleted) dotColor = '#ffffff';
-      else if (anyMissed) dotColor = '#f44336';
-      else if (anyNotes) dotColor = '#ff9800';
+      // Extract unique board IDs for tasks on dateStr
+      const uniqueBoardIds = Array.from(new Set(dayTasks.map(t => t.boardId || 'main')));
+      const dots = uniqueBoardIds.map(bId => {
+        const boardObj = boards.find(b => b.id === bId) || { id: bId, name: bId === 'main' ? 'Main' : 'Board' };
+        const color = getBoardColor(boardObj, boards);
+        return {
+          key: `${bId}_${dateStr}`,
+          color: color,
+          selectedDotColor: colors.textInverse || '#ffffff',
+        };
+      });
 
       const isToday = dateStr === todayStr;
       const isSelected = dateStr === selectedDate;
 
       finalMarks[dateStr] = {
         marked: true,
-        dotColor: isSelected ? (colors.textInverse || '#ffffff') : dotColor,
+        dots: dots,
         customStyles: {
           container: isSelected ? {
             backgroundColor: colors.primary,
@@ -418,7 +423,7 @@ export default function CalendarScreen() {
     }
 
     return finalMarks;
-  }, [tasks, selectedDate, colors, isDark]);
+  }, [tasks, selectedDate, colors, isDark, boards]);
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
@@ -494,7 +499,7 @@ export default function CalendarScreen() {
         <Calendar
           testID="task_calendar"
           key={`${selectedDate}-${colors.bgMain}-${isDark}-${i18n.language}`}
-          markingType={'custom'}
+          markingType={'multi-dot'}
           current={selectedDate}
           firstDay={i18n.language === 'en' ? 0 : 1}
           onDayPress={(day) => {
@@ -596,6 +601,7 @@ export default function CalendarScreen() {
                     onPress={() => toggleBoardCollapse(section.id)}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(section.id, boards), marginRight: 8 }} />
                       <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
                         {section.title === 'Main' ? t('Main') : section.title}
                       </Text>
@@ -616,6 +622,7 @@ export default function CalendarScreen() {
                   <TaskRow 
                     task={item.task} 
                     hideDate={true} 
+                    hideBoardBadge={true}
                     disableInlineEdit={true} 
                     testIDPrefix="calendar_"
                     isSelectionMode={selectionMode.isActive}

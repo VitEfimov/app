@@ -158,6 +158,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const scrollViewRef = useRef(null);
   const notesRef = useRef(null);
+  const initialSnapshotRef = useRef(null);
   const { t, i18n } = useTranslation();
   const [scrollOffset, setScrollOffset] = useState(0);
 
@@ -251,58 +252,77 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const stripHtml = (html) => html ? html.replace(/<[^>]+>/g, '').trim() : '';
 
   useEffect(() => {
-  if (isVisible && task) {
-    setTaskName(task.taskname || '');
-    setNotes(stripHtml(task.description?.text) || '');
-    
-    // Backwards compatibility for old base64 img
-    const existingAttachments = task.description?.attachments ? [...task.description.attachments] : [];
-    if (task.description?.img && existingAttachments.length === 0) {
-      existingAttachments.push({
-        id: 'legacy_img',
-        type: 'image',
-        uri: task.description.img,
-        name: 'Attached Image',
-        size: 0
-      });
+    if (isVisible && task) {
+      const initialTaskName = task.taskname || task.name || '';
+      const initialNotesText = stripHtml(task.description?.text) || '';
+      
+      // Backwards compatibility for old base64 img
+      const existingAttachments = task.description?.attachments ? [...task.description.attachments] : [];
+      if (task.description?.img && existingAttachments.length === 0) {
+        existingAttachments.push({
+          id: 'legacy_img',
+          type: 'image',
+          uri: task.description.img,
+          name: 'Attached Image',
+          size: 0
+        });
+      }
+      const initialSubtasks = task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : [];
+      const initialPriority = (task.priority || 'none').toLowerCase();
+      const initialBoardId = task.boardId || 'main';
+      const initialDate = task.completionDate || '';
+      const initialTimeVal = task.time || null;
+
+      let config = task.repeatConfig || { preset: task.repeatFrequency || (task.repeat === 'yearly' ? 'every_year' : 'None') };
+      if (typeof config === 'string') {
+        try { config = JSON.parse(config); } catch (e) { config = { preset: 'None' }; }
+      }
+      if ((!config || !config.preset || config.preset === 'None') && (task.repeat === 'yearly' || task.repeatFrequency === 'Every year')) {
+        config = { preset: 'every_year' };
+      }
+
+      const initialRepStartDate = task.repeatStartDate || task.completionDate || '';
+      const initialRepEndDate = task.repeatEndDate || '';
+
+      let initialReminderVal = task.reminder || 'None';
+      if (task.isNagMode) {
+        initialReminderVal = 'Nag Mode (Every 10 min)';
+      } else if (task.escalationLevel === 'active') {
+        initialReminderVal = 'Escalating Reminder';
+      }
+      const initialAlarmVal = task.isAlarm || false;
+
+      setTaskName(initialTaskName);
+      setNotes(initialNotesText);
+      setAttachments(existingAttachments);
+      setSubtasks(initialSubtasks);
+      setPriority(initialPriority);
+      setSelectedBoardId(initialBoardId);
+      setSelectedDate(initialDate);
+      setSelectedTime(initialTimeVal);
+      setRepeatConfig(config);
+      setRepeatStartDate(initialRepStartDate);
+      setRepeatEndDate(initialRepEndDate);
+      setReminder(initialReminderVal);
+      setIsAlarm(initialAlarmVal);
+
+      initialSnapshotRef.current = {
+        taskName: initialTaskName,
+        notes: initialNotesText,
+        attachmentsJson: JSON.stringify(existingAttachments),
+        subtasksJson: JSON.stringify(initialSubtasks),
+        priority: initialPriority,
+        boardId: initialBoardId,
+        date: initialDate,
+        time: initialTimeVal,
+        repeatConfigJson: JSON.stringify(config),
+        repeatStartDate: initialRepStartDate,
+        repeatEndDate: initialRepEndDate,
+        reminder: initialReminderVal,
+        isAlarm: initialAlarmVal,
+      };
     }
-    setAttachments(existingAttachments);
-    
-    setSubtasks(task.subtasks || []);
-    setPriority((task.priority || 'none').toLowerCase());
-    setSelectedBoardId(task.boardId || 'main');
-    setSelectedDate(task.completionDate || '');
-
-    // Saved user time or null.
-    setSelectedTime(task.time || null);
-
-    let config = task.repeatConfig || { preset: task.repeatFrequency || (task.repeat === 'yearly' ? 'every_year' : 'None') };
-    if (typeof config === 'string') config = JSON.parse(config);
-    if ((!config || !config.preset || config.preset === 'None') && (task.repeat === 'yearly' || task.repeatFrequency === 'Every year')) {
-      config = { preset: 'every_year' };
-    }
-    setRepeatConfig(config);
-
-    setRepeatStartDate(
-      task.repeatStartDate ||
-      task.completionDate ||
-      ''
-    );
-
-    setRepeatEndDate(
-      task.repeatEndDate || ''
-    );
-
-    let initialReminder = task.reminder || 'None';
-    if (task.isNagMode) {
-      initialReminder = 'Nag Mode (Every 10 min)';
-    } else if (task.escalationLevel === 'active') {
-      initialReminder = 'Escalating Reminder';
-    }
-    setReminder(initialReminder);
-    setIsAlarm(task.isAlarm || false);
-  }
-}, [isVisible, task?.id]);
+  }, [isVisible, task?.id]);
 
 
 useEffect(() => {
@@ -440,25 +460,24 @@ useEffect(() => {
   };
 
   const hasUnsavedChanges = () => {
-    if (!task) return false;
+    if (!task || !initialSnapshotRef.current) return false;
     const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
-    if (taskName !== task.taskname) return true;
-    
-    const initialAttachments = task.description?.attachments || (task.description?.img ? [{ id: 'legacy_img', type: 'image', uri: task.description.img }] : []);
-    if (currentNotes !== (stripHtml(task.description?.text) || '') || JSON.stringify(attachments) !== JSON.stringify(initialAttachments)) return true;
-    
-    if ((selectedTime || '') !== (task.time || '')) return true;
-    if (reminder !== (task.reminder || 'None')) return true;
-    if (isAlarm !== (task.isAlarm || false)) return true;
-    if (priority !== (task.priority || 'none').toLowerCase()) return true;
-    if (selectedDate !== (task.completionDate || '')) return true;
-    
-    const initialConfig = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
-    if (JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig)) return true;
-    
-    if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) return true;
-    if (repeatEndDate !== (task.repeatEndDate || '')) return true;
-    if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) return true;
+    const snap = initialSnapshotRef.current;
+
+    if (taskName !== snap.taskName) return true;
+    if ((currentNotes || '').trim() !== (snap.notes || '').trim()) return true;
+    if (JSON.stringify(attachments) !== snap.attachmentsJson) return true;
+    if (JSON.stringify(subtasks) !== snap.subtasksJson) return true;
+    if (priority !== snap.priority) return true;
+    if (selectedBoardId !== snap.boardId) return true;
+    if (selectedDate !== snap.date) return true;
+    if ((selectedTime || null) !== (snap.time || null)) return true;
+    if (JSON.stringify(repeatConfig) !== snap.repeatConfigJson) return true;
+    if (repeatStartDate !== snap.repeatStartDate) return true;
+    if (repeatEndDate !== snap.repeatEndDate) return true;
+    if (reminder !== snap.reminder) return true;
+    if (isAlarm !== snap.isAlarm) return true;
+
     return false;
   };
 

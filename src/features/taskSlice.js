@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
+import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import axios from 'axios';
 
 dayjs.extend(isSameOrBefore);
@@ -120,7 +121,7 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
                     }
                 }
 
-                const mergedTasks = purgeOrphanedTasks(mergeTasks(unsyncedTasks, remoteTasks), boards);
+                const mergedTasks = sortTasksChronologically(purgeOrphanedTasks(mergeTasks(unsyncedTasks, remoteTasks), boards));
                 await AsyncStorage.setItem(taskKey, JSON.stringify(mergedTasks));
                 await AsyncStorage.setItem('tasks', JSON.stringify(mergedTasks));
                 return mergedTasks;
@@ -130,9 +131,10 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
         }
     }
 
-    await AsyncStorage.setItem(taskKey, JSON.stringify(localTasks));
-    await AsyncStorage.setItem('tasks', JSON.stringify(localTasks));
-    return localTasks;
+    const sortedLocal = sortTasksChronologically(localTasks);
+    await AsyncStorage.setItem(taskKey, JSON.stringify(sortedLocal));
+    await AsyncStorage.setItem('tasks', JSON.stringify(sortedLocal));
+    return sortedLocal;
 });
 
 export const addTaskAsync = createAsyncThunk('task/addTaskAsync', async (task, thunkAPI) => {
@@ -186,7 +188,7 @@ const taskSlice = createSlice({
     initialState,
     reducers: {
         hydrateTaskState: (state, action) => {
-            state.tasks = action.payload.map(t => {
+            const normalized = action.payload.map(t => {
                 const updated = { ...t };
                 if (!updated.id && updated._id) updated.id = updated._id;
                 if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
@@ -197,23 +199,28 @@ const taskSlice = createSlice({
                 }
                 return updated;
             });
+            state.tasks = sortTasksChronologically(normalized);
         },
         addTaskSync(state, action) {
             const { task } = action.payload;
             if (task.completionDate && !task.dateString) {
                 task.dateString = typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : dayjs(task.completionDate).format('YYYY-MM-DD');
             }
-            state.tasks.push(task); 
+            state.tasks = insertTaskSorted(state.tasks, task); 
         },
         addMultipleTasksSync(state, action) {
             const { tasks } = action.payload;
-            const updatedTasks = tasks.map(t => {
-                if (t.completionDate && !t.dateString) {
-                    return { ...t, dateString: typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD') };
+            let currentTasks = [...state.tasks];
+            for (const t of tasks) {
+                if (t) {
+                    const updated = { ...t };
+                    if (updated.completionDate && !updated.dateString) {
+                        updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
+                    }
+                    currentTasks = insertTaskSorted(currentTasks, updated);
                 }
-                return t;
-            });
-            state.tasks.push(...updatedTasks);
+            }
+            state.tasks = currentTasks;
         },
         deleteTaskSync(state, action) {
              const { taskId } = action.payload;
@@ -287,6 +294,10 @@ const taskSlice = createSlice({
                     task.subtasks = subtasks;
                 }
                 task.lastUpdatedDate = new Date().toISOString();
+
+                if (completionDate !== undefined || time !== undefined) {
+                    state.tasks = sortTasksChronologically(state.tasks);
+                }
             }
         },
         updateRecurringSeriesSync(state, action) {
@@ -369,7 +380,7 @@ const taskSlice = createSlice({
             .addCase(fetchTasks.pending, (state) => { state.loading = true; })
             .addCase(fetchTasks.fulfilled, (state, action) => {
                 state.loading = false;
-                state.tasks = action.payload.map(t => {
+                const normalized = action.payload.map(t => {
                     const updated = { ...t };
                     if (!updated.id && updated._id) updated.id = updated._id;
                     if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
@@ -380,6 +391,7 @@ const taskSlice = createSlice({
                     }
                     return updated;
                 });
+                state.tasks = sortTasksChronologically(normalized);
             })
             .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; })
             .addCase('user/deleteBoard/fulfilled', (state, action) => {

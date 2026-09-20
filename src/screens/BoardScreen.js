@@ -26,6 +26,7 @@ import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } f
 import { setBoardsCollapsed } from '../features/themeSlice';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
+import { getBoardColor } from '../utils/boardColors';
 import * as FileSystem from 'expo-file-system';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
 
@@ -750,8 +751,9 @@ export default function BoardScreen({ route, navigation }) {
                     style={[
                       styles.miniBoardLine, 
                       { 
-                        backgroundColor: activeBoardId === board.id ? colors.primary : colors.textSecondary,
+                        backgroundColor: getBoardColor(board, boards),
                         flex: activeBoardId === board.id ? 2 : 1, 
+                        opacity: activeBoardId === board.id ? 1 : 0.5,
                       }
                     ]} 
                   />
@@ -774,6 +776,7 @@ export default function BoardScreen({ route, navigation }) {
                     onPress={() => dispatch(setActiveBoardId(board.id))}
                     onLongPress={() => handleBoardOptions(board)}
                   >
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(board, boards), marginRight: 6 }} />
                     <Text style={[
                       styles.mainTabText, 
                       { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
@@ -833,6 +836,7 @@ export default function BoardScreen({ route, navigation }) {
               <TaskRow 
                 task={task} 
                 hideDate={isListBoard}
+                hideBoardBadge={true}
                 isSelectionMode={selectionMode.isActive}
                 isSelected={selectedTaskIdsSet.has(task.id)}
                 onToggleSelect={() => handleToggleSelectTask(task.id, section.id)}
