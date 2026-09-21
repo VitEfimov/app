@@ -191,9 +191,7 @@ export default function DashboardScreen({ navigation }) {
           handleNextMode();
         } else if (Math.abs(gestureState.dx) < 10 && Math.abs(gestureState.dy) < 10) {
           // Tap detected
-          if (isPremiumRef.current) {
-            navigation.navigate('Statistics');
-          }
+          navigation.navigate('Statistics');
         }
       },
     })
