@@ -85,6 +85,8 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+import AnimatedLoadingScreen from './src/components/AnimatedLoadingScreen';
+
 function InitApp() {
   const dispatch = useDispatch();
   const [ready, setReady] = useState(false);
@@ -576,11 +578,7 @@ function InitApp() {
   }, [dispatch, isUnlocked]);
 
   if (!ready) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <AnimatedLoadingScreen />;
   }
 
   if (themeReducer.appPin && !isUnlocked) {

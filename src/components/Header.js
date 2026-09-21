@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, SafeAreaView } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, SafeAreaView, Animated } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import dayjs from 'dayjs';
@@ -7,35 +7,6 @@ import { useTheme } from '../styles/ThemeContext';
 import { setThemeMode } from '../features/themeSlice';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
-
-// Custom icons
-
-const IconLightMode = ({ color }) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <Circle cx="12" cy="12" r="5" />
-    <Line x1="12" y1="1" x2="12" y2="3" />
-    <Line x1="12" y1="21" x2="12" y2="23" />
-    <Line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-    <Line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-    <Line x1="1" y1="12" x2="3" y2="12" />
-    <Line x1="21" y1="12" x2="23" y2="12" />
-    <Line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-    <Line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-  </Svg>
-);
-
-const IconDarkMode = ({ color }) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-  </Svg>
-);
-
-const IconContrast = ({ color }) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <Circle cx="12" cy="12" r="10" />
-    <Path d="M12 2a10 10 0 0 0 0 20V2z" fill={color} />
-  </Svg>
-);
 
 export default function Header() {
   const dispatch = useDispatch();
@@ -74,42 +45,36 @@ export default function Header() {
     dispatch(setThemeMode(modes[nextIndex]));
   };
 
-  const getThemeIcon = () => {
-    if (mode === 'contrast') return <IconContrast color={colors.textPrimary} />;
-    if (mode === 'dark') return <IconDarkMode color={colors.textPrimary} />;
-    if (mode === 'system') return isDark ? <IconDarkMode color={colors.textPrimary} /> : <IconLightMode color={colors.textPrimary} />;
-    return <IconLightMode color={colors.textPrimary} />;
+  const renderThemeIcon = () => {
+    if (mode === 'contrast') {
+      return (
+        <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2">
+          <Circle cx="12" cy="12" r="10" />
+          <Path d="M12 2a10 10 0 0 0 0 20V2z" fill={colors.textPrimary} />
+        </Svg>
+      );
+    }
+    if (isDark) {
+      return (
+        <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill={`${colors.primary}33`} />
+        </Svg>
+      );
+    }
+    return (
+      <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <Circle cx="12" cy="12" r="5" fill={`${colors.primary}33`} />
+        <Line x1="12" y1="1" x2="12" y2="3" />
+        <Line x1="12" y1="21" x2="12" y2="23" />
+        <Line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <Line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <Line x1="1" y1="12" x2="3" y2="12" />
+        <Line x1="21" y1="12" x2="23" y2="12" />
+        <Line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <Line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+      </Svg>
+    );
   };
-
-  const HeaderContent = () => (
-    <View style={[styles.headerContainer, { backgroundColor: userPicture ? 'rgba(0,0,0,0.5)' : colors.bgHeader }]}>
-      <View />
-      <View style={styles.rightSection}>
-        {(!!isPomodoroActive && !isTimeOver) ? (
-          <View style={styles.pomodoroBadge}>
-            <Text style={styles.pomodoroText}>{t('Pomodoro')}: {formatBadgeTime(timeRemaining)}</Text>
-          </View>
-        ) : null}
-        
-        {!!isTimeOver ? (
-          <View style={[styles.pomodoroBadge, { backgroundColor: colors.danger }]}>
-            <Text style={[styles.pomodoroText, { color: '#fff' }]}>{t("Time's Up!")}</Text>
-          </View>
-        ) : null}
-
-        <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-          {dayjs().format('ddd, MMM D')}
-        </Text>
-
-        <TouchableOpacity 
-          style={[styles.themeButton, { backgroundColor: colors.surfaceContainerHigh }]} 
-          onPress={handleToggleTheme}
-        >
-          {getThemeIcon()}
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
 
   return (
     <SafeAreaView style={{ backgroundColor: colors.bgHeader }}>
@@ -119,10 +84,70 @@ export default function Header() {
           style={styles.bgImage}
           imageStyle={{ resizeMode: themeReducer.headerBackgroundFit === 'contain' ? 'contain' : 'cover' }}
         >
-          <HeaderContent />
+          <View style={[styles.headerContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+            <View />
+            <View style={styles.rightSection}>
+              {(!!isPomodoroActive && !isTimeOver) ? (
+                <View style={styles.pomodoroBadge}>
+                  <Text style={styles.pomodoroText}>{t('Pomodoro')}: {formatBadgeTime(timeRemaining)}</Text>
+                </View>
+              ) : null}
+              
+              {!!isTimeOver ? (
+                <View style={[styles.pomodoroBadge, { backgroundColor: colors.danger }]}>
+                  <Text style={[styles.pomodoroText, { color: '#fff' }]}>{t("Time's Up!")}</Text>
+                </View>
+              ) : null}
+
+              <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+                {dayjs().format('ddd, MMM D')}
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Toggle Theme Mode"
+                style={[styles.themeButton, { backgroundColor: colors.surfaceContainerHigh }]}
+                onPress={handleToggleTheme}
+              >
+                {renderThemeIcon()}
+              </TouchableOpacity>
+            </View>
+          </View>
         </ImageBackground>
       ) : (
-        <HeaderContent />
+        <View style={[styles.headerContainer, { backgroundColor: colors.bgHeader }]}>
+          <View />
+          <View style={styles.rightSection}>
+            {(!!isPomodoroActive && !isTimeOver) ? (
+              <View style={styles.pomodoroBadge}>
+                <Text style={styles.pomodoroText}>{t('Pomodoro')}: {formatBadgeTime(timeRemaining)}</Text>
+              </View>
+            ) : null}
+            
+            {!!isTimeOver ? (
+              <View style={[styles.pomodoroBadge, { backgroundColor: colors.danger }]}>
+                <Text style={[styles.pomodoroText, { color: '#fff' }]}>{t("Time's Up!")}</Text>
+              </View>
+            ) : null}
+
+            <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+              {dayjs().format('ddd, MMM D')}
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Toggle Theme Mode"
+              style={[styles.themeButton, { backgroundColor: colors.surfaceContainerHigh }]}
+              onPress={handleToggleTheme}
+            >
+              {renderThemeIcon()}
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );

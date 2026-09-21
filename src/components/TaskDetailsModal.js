@@ -1178,6 +1178,19 @@ useEffect(() => {
               </View>
             </View>
 
+            {boards.length > 1 && (
+              <View style={{ marginBottom: 16 }}>
+                <CustomDropdown 
+                  label={t("Board")} 
+                  value={boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))} 
+                  options={boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id }))} 
+                  onSelect={(val) => setSelectedBoardId(val)} 
+                  colors={colors} 
+                  customBtnStyle={{ height: 48, borderRadius: 12 }} 
+                />
+              </View>
+            )}
+
             <View style={{ marginBottom: 16 }}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
               <TouchableOpacity 

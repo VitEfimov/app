@@ -3,32 +3,36 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Keyboard, K
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
+import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
+import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import Svg, { Path } from 'react-native-svg';
 import { Calendar } from 'react-native-calendars';
 import getFilters from '../utils/filters';
-import { useTranslation } from 'react-i18next';
+import { getBoardColor } from '../utils/boardColors';
 import YearPickerModal from './YearPickerModal';
 
-import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
-
 const IconPlus = ({ color }) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M12 5v14M5 12h14" />
   </Svg>
 );
 
 const IconCalendar = ({ color }) => (
-  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zM16 2v4M8 2v4M3 10h18" />
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M19 4H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z" />
+    <Path d="M16 2v4M8 2v4M3 10h18" />
   </Svg>
 );
 
-export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDetails }) {
+export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDetails, onAddTask, defaultBoardId }) {
   const { generateRepeatingTasks } = useTaskRepeat();
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const isEditing = isActive !== undefined ? isActive : internalIsEditing;
-  const setIsEditing = onToggle ? onToggle : setInternalIsEditing;
+  const setIsEditing = (val) => {
+    if (onToggle) onToggle(val);
+    setInternalIsEditing(val);
+  };
   const [taskName, setTaskName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isYearPickerVisible, setYearPickerVisible] = useState(false);
@@ -39,7 +43,14 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   const dispatch = useDispatch();
   const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
   const boards = useSelector(state => state.userReducer.boards || []);
+  const [selectedBoardId, setSelectedBoardId] = useState(defaultBoardId || activeBoardId || 'main');
+  const [showBoardPicker, setShowBoardPicker] = useState(false);
   const { t, i18n } = useTranslation();
+
+  useEffect(() => {
+    if (defaultBoardId) setSelectedBoardId(defaultBoardId);
+    else setSelectedBoardId(activeBoardId);
+  }, [defaultBoardId, activeBoardId]);
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
 
@@ -111,7 +122,8 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
   const handleAdd = () => {
     if (!taskName.trim()) return;
 
-    const activeBoard = boards.find(b => b.id === activeBoardId);
+    const targetBoardId = selectedBoardId || activeBoardId || 'main';
+    const activeBoard = boards.find(b => b.id === targetBoardId);
     const isEventsBoard = activeBoard?.type === 'birthdays' || activeBoard?.type === 'events' || (activeBoard?.name && activeBoard.name.toLowerCase() === 'events');
     const startDateStr = dayjs(selectedDate).format('YYYY-MM-DD');
     const endDateStr = dayjs(selectedDate).add(10, 'year').format('YYYY-MM-DD');
@@ -119,7 +131,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
 
     const newTask = {
       id: new Date().getTime().toString(),
-      boardId: activeBoardId || 'main',
+      boardId: targetBoardId,
       taskname: taskName,
       creationDate: new Date().toISOString(),
       lastUpdatedDate: null,
@@ -140,6 +152,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     };
 
     dispatch(addTask({ task: newTask }));
+    if (onAddTask) onAddTask(newTask);
 
     if (isEventsBoard) {
       generateRepeatingTasks(
@@ -230,7 +243,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         onSubmitEditing={handleAdd}
       />
       <View style={styles.actionsRow}>
-        <View style={{ flexDirection: 'row', gap: 6, flex: 1 }}>
+        <View style={{ flexDirection: 'row', gap: 6, flex: 1, alignItems: 'center' }}>
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel={`Select date, currently ${dayjs(selectedDate).format('MM/DD/YYYY')}`}
             style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
@@ -241,6 +254,21 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
               {dayjs(selectedDate).format('MMM D')}
             </Text>
           </TouchableOpacity>
+
+          {boards.length > 1 && (
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Select board"
+              style={[styles.dateBtn, { backgroundColor: `${getBoardColor(selectedBoardId, boards)}20`, borderColor: getBoardColor(selectedBoardId, boards), borderWidth: 1 }]} 
+              onPress={() => setShowBoardPicker(true)}
+            >
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(selectedBoardId, boards) }} />
+              <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>
+                {boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))}
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.textSecondary }}>▼</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity 
             accessible={true} accessibilityRole="button" accessibilityLabel="Add more details"
             style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer, flexShrink: 1 }]} 
@@ -334,6 +362,42 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      <Modal visible={showBoardPicker} transparent animationType="fade" onRequestClose={() => setShowBoardPicker(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowBoardPicker(false)}>
+          <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard, padding: 16, width: '85%', alignSelf: 'center' }]}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 16 }}>
+              {t('Select Board')}
+            </Text>
+            {boards.map(b => (
+              <TouchableOpacity
+                key={b.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 8,
+                  backgroundColor: selectedBoardId === b.id ? `${getBoardColor(b, boards)}20` : 'transparent',
+                  marginBottom: 6,
+                }}
+                onPress={() => {
+                  setSelectedBoardId(b.id);
+                  setShowBoardPicker(false);
+                }}
+              >
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: getBoardColor(b, boards), marginRight: 12 }} />
+                <Text style={{ fontSize: 15, fontWeight: selectedBoardId === b.id ? 'bold' : 'normal', color: colors.textPrimary, flex: 1 }}>
+                  {b.name === 'Main' ? t('Main') : b.name}
+                </Text>
+                {selectedBoardId === b.id && (
+                  <Text style={{ color: getBoardColor(b, boards), fontWeight: 'bold' }}>✓</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       <YearPickerModal

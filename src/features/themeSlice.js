@@ -24,7 +24,7 @@ const initialState = {
   userPicture: loaded?.userPicture || null,
   headerBackgroundFit: loaded?.headerBackgroundFit || 'cover',
   sourceColor: loaded?.sourceColor || '#6750A4',
-  themeMode: loaded?.themeMode || 'dark',
+  themeMode: loaded?.themeMode || 'system',
   calendarPanePosition: loaded?.calendarPanePosition || null,
   progressMode: loaded?.progressMode || 'daily',
   defaultSnoozeTime: loaded?.defaultSnoozeTime || 30,
@@ -138,7 +138,7 @@ const themeSlice = createSlice({
       state.taskNameWrap = 'wrap';
       state.timeFormat = '12h';
       state.sourceColor = '#6750A4';
-      state.themeMode = 'dark';
+      state.themeMode = 'system';
       state.userPicture = null;
       state.headerBackgroundFit = 'cover';
       state.calendarPanePosition = null;

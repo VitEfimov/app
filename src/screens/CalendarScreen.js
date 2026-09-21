@@ -662,7 +662,15 @@ export default function CalendarScreen() {
             onToggle={(active) => {
               if (active) setSelectionMode({ isActive: false, selectedTaskIds: [] });
             }}
+            onAddTask={(task) => {
+              if (task?.boardId && collapsedBoardIds.includes(task.boardId)) {
+                setCollapsedBoardIds(prev => prev.filter(id => id !== task.boardId));
+              }
+            }}
             onAddDetails={(task) => {
+              if (task?.boardId && collapsedBoardIds.includes(task.boardId)) {
+                setCollapsedBoardIds(prev => prev.filter(id => id !== task.boardId));
+              }
               setSelectedTask(task);
               setDetailsVisible(true);
             }}
