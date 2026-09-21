@@ -647,7 +647,8 @@ export default function CalendarScreen() {
             }}
             contentContainerStyle={styles.listContent}
             estimatedItemSize={65}
-            drawDistance={800}
+            drawDistance={1200}
+            removeClippedSubviews={Platform.OS === 'android'}
           />
         ) : (
           <View style={styles.emptyContainer}>
@@ -713,12 +714,6 @@ export default function CalendarScreen() {
             {t('Options for')} {dayjs(selectedDate).format('MMM D, YYYY')}
           </Text>
           
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig('time'); setSectionOptionsConfig(false); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Time')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig('priority'); setSectionOptionsConfig(false); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Priority')}</Text>
-          </TouchableOpacity>
 
           {isPremium && (
             <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 

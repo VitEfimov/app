@@ -825,6 +825,9 @@ export default function BoardScreen({ route, navigation }) {
         extraData={[activeBoardId, tasks, collapsedSections, sortConfig, isBoardsCollapsed, activeAddSectionId, selectionMode.isActive, selectedTaskIdsSet, flattenedData]}
         keyExtractor={(item) => item.type === 'task' ? `task_${item.task?.id || ''}_${item.section?.id || ''}` : `${item.type}_${item.section?.id || ''}`}
         getItemType={(item) => item.type}
+        overrideItemLayout={(layout, item) => {
+          layout.size = item.type === 'header' ? 48 : item.type === 'footer' ? 52 : 65;
+        }}
         renderItem={({ item }) => {
           if (item.type === 'header') return renderSectionHeader({ section: item.section });
           if (item.type === 'footer') return renderSectionFooter({ section: item.section });
@@ -851,7 +854,9 @@ export default function BoardScreen({ route, navigation }) {
         contentContainerStyle={styles.listContent}
         stickyHeaderIndices={undefined}
         keyboardShouldPersistTaps="handled"
-        estimatedItemSize={85}
+        estimatedItemSize={65}
+        drawDistance={1200}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
 
       <TaskDetailsModal 
@@ -903,12 +908,6 @@ export default function BoardScreen({ route, navigation }) {
             </>
           ) : (
             <>
-              <TouchableOpacity testID="section_option_sort_time" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Time" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'time'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
-                <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Time')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity testID="section_option_sort_priority" accessible={true} accessibilityRole="button" accessibilityLabel="Sort by Priority" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSortConfig(prev => ({...prev, [sectionOptionsConfig.section?.id]: 'priority'})); setSectionOptionsConfig({ isVisible: false, section: null }); }}>
-                <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Sort by Priority')}</Text>
-              </TouchableOpacity>
 
               {isPremium && (
                 <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 

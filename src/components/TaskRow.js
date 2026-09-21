@@ -286,7 +286,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       accessibilityRole="button"
       accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
       accessibilityState={{ checked: task.completed }}
-      style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: colors.bgMain }]}
+      style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: 'transparent' }]}
       onLongPress={() => {
          if (onToggleSelect) onToggleSelect();
       }}
