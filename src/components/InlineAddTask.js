@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, ScrollView } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -19,9 +19,16 @@ const IconPlus = ({ color }) => (
 );
 
 const IconCalendar = ({ color }) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M19 4H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z" />
     <Path d="M16 2v4M8 2v4M3 10h18" />
+  </Svg>
+);
+
+const IconDetails = ({ color }) => (
+  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <Path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
   </Svg>
 );
 
@@ -226,77 +233,96 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         <TouchableWithoutFeedback onPress={() => setIsEditing(false)}>
           <View style={{ flex: 1 }} />
         </TouchableWithoutFeedback>
-        <View style={[styles.editContainer, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor, borderTopLeftRadius: 12, borderTopRightRadius: 12 }]}>
+        <View style={[styles.editContainer, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
+          <View style={styles.handleBar} />
+          
           <TextInput
-        ref={inputRef}
-        testID="inline_task_input"
-        accessible={true} accessibilityLabel="New task name"
-        style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(46, inputHeight), maxHeight: 150 }]}
-        placeholder={t("Enter task name...")}
-        placeholderTextColor={colors.textSecondary}
-        value={taskName}
-        onChangeText={setTaskName}
-        onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
-        multiline={true}
-        scrollEnabled={true}
-        blurOnSubmit={true}
-        onSubmitEditing={handleAdd}
-      />
-      <View style={styles.actionsRow}>
-        <View style={{ flexDirection: 'row', gap: 6, flex: 1, alignItems: 'center' }}>
-          <TouchableOpacity 
-            accessible={true} accessibilityRole="button" accessibilityLabel={`Select date, currently ${dayjs(selectedDate).format('MM/DD/YYYY')}`}
-            style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer }]} 
-            onPress={() => setShowDatePicker(true)}
-          >
-            <IconCalendar color={colors.textPrimary} />
-            <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>
-              {dayjs(selectedDate).format('MMM D')}
-            </Text>
-          </TouchableOpacity>
+            ref={inputRef}
+            testID="inline_task_input"
+            accessible={true} accessibilityLabel="New task name"
+            style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(50, inputHeight), maxHeight: 150 }]}
+            placeholder={t("What would you like to do?")}
+            placeholderTextColor={colors.textSecondary}
+            value={taskName}
+            onChangeText={setTaskName}
+            onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
+            multiline={true}
+            scrollEnabled={true}
+            blurOnSubmit={true}
+            onSubmitEditing={handleAdd}
+          />
 
-          {boards.length > 1 && (
+          {/* Row 1: Attribute Selector Chips */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipsScrollView}
+            contentContainerStyle={styles.chipsContainer}
+          >
             <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Select board"
-              style={[styles.dateBtn, { backgroundColor: `${getBoardColor(selectedBoardId, boards)}20`, borderColor: getBoardColor(selectedBoardId, boards), borderWidth: 1 }]} 
-              onPress={() => setShowBoardPicker(true)}
+              accessible={true} accessibilityRole="button" accessibilityLabel={`Select date, currently ${dayjs(selectedDate).format('MM/DD/YYYY')}`}
+              style={[styles.chipBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]} 
+              onPress={() => setShowDatePicker(true)}
             >
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(selectedBoardId, boards) }} />
-              <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>
-                {boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))}
+              <IconCalendar color={colors.primary} />
+              <Text style={[styles.chipText, { color: colors.textPrimary }]}>
+                {dayjs(selectedDate).isSame(dayjs(), 'day') ? t('Today') : dayjs(selectedDate).format('MMM D')}
               </Text>
-              <Text style={{ fontSize: 10, color: colors.textSecondary }}>▼</Text>
             </TouchableOpacity>
-          )}
 
-          <TouchableOpacity 
-            accessible={true} accessibilityRole="button" accessibilityLabel="Add more details"
-            style={[styles.dateBtn, { backgroundColor: colors.surfaceContainer, flexShrink: 1 }]} 
-            onPress={handleAddWithDetails}
-          >
-            <Text style={[styles.dateText, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit>
-              {t('Add details')}
+            {boards.length > 1 && (
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Select board"
+                style={[styles.chipBtn, { backgroundColor: `${getBoardColor(selectedBoardId, boards)}1F`, borderColor: `${getBoardColor(selectedBoardId, boards)}60` }]} 
+                onPress={() => setShowBoardPicker(true)}
+              >
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(selectedBoardId, boards) }} />
+                <Text style={[styles.chipText, { color: colors.textPrimary }]}>
+                  {boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))}
+                </Text>
+                <Text style={{ fontSize: 10, color: colors.textSecondary }}>▼</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Add more details"
+              style={[styles.chipBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]} 
+              onPress={handleAddWithDetails}
+            >
+              <IconDetails color={colors.primary} />
+              <Text style={[styles.chipText, { color: colors.primary }]}>
+                {t('Add details')}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor }]} />
+
+          {/* Row 2: Bottom Primary Actions */}
+          <View style={styles.footerRow}>
+            <Text style={[styles.shortcutHint, { color: colors.textSecondary }]}>
+              {t('Press Enter to save')}
             </Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.rightActions}>
-          <TouchableOpacity 
-            accessible={true} accessibilityRole="button" accessibilityLabel="Cancel"
-            onPress={() => setIsEditing(false)} style={styles.cancelBtn}
-          >
-            <Text style={[styles.cancelText, { color: colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Cancel')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            testID="inline_submit_btn" 
-            accessible={true} accessibilityRole="button" accessibilityLabel="Submit task"
-            onPress={handleAdd} style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-          >
-            <Text style={[styles.submitText, { color: colors.textInverse }]} numberOfLines={1} adjustsFontSizeToFit>{t('Add')}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            <View style={styles.rightActions}>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Cancel"
+                onPress={() => setIsEditing(false)} style={styles.cancelBtn}
+              >
+                <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
+              </TouchableOpacity>
 
+              <TouchableOpacity 
+                testID="inline_submit_btn" 
+                accessible={true} accessibilityRole="button" accessibilityLabel="Submit task"
+                onPress={handleAdd}
+                disabled={!taskName.trim()}
+                style={[styles.submitBtn, { backgroundColor: colors.primary, opacity: taskName.trim() ? 1 : 0.4 }]}
+              >
+                <Text style={[styles.submitText, { color: colors.textInverse || '#ffffff' }]}>{t('Add Task')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -438,52 +464,100 @@ const styles = StyleSheet.create({
   addText: {
     fontSize: 15,
   },
+  handleBar: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128,128,128,0.3)',
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
   editContainer: {
-    padding: 15,
-    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderTopWidth: 1,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   input: {
-    fontSize: 15,
-    padding: 12,
-    marginBottom: 15,
+    fontSize: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     textAlignVertical: 'top',
   },
-  actionsRow: {
+  chipsScrollView: {
+    marginBottom: 8,
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 10,
+  },
+  chipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    marginVertical: 10,
+    opacity: 0.5,
+  },
+  footerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  dateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 4,
-  },
-  dateText: {
-    fontSize: 13,
-    fontWeight: '500',
+  shortcutHint: {
+    fontSize: 12,
+    fontWeight: '400',
   },
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 24,
-    flexShrink: 1,
+    gap: 12,
+  },
+  cancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   cancelText: {
     fontSize: 14,
     fontWeight: '600',
   },
   submitBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   submitText: {
-    fontWeight: 'bold',
+    fontWeight: '700',
     fontSize: 14,
   },
   modalOverlay: {
