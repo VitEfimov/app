@@ -458,8 +458,14 @@
   "Task moved backward": "Задача перенесена на более раннюю дату",
   "Are you sure you want to move all tasks in": "Вы уверены, что хотите переместить все задачи в",
   "forward": "на более позднюю дату",
-  "backward": "на более раннюю дату",
-  "Default Reminder Option": "Вариант напоминания по умолчанию",
   "Select Year": "Выбрать год",
-  "Date unchanged. You can change the date on the edit task page.": "Дата не изменилась. Вы можете изменить дату на странице редактирования."
+  "Select year": "Выбрать год",
+  "Date unchanged. You can change the date on the edit task page.": "Дата не изменилась. Вы можете изменить дату на странице редактирования.",
+  "Press Enter to save": "Нажмите Enter для сохранения",
+  "Add Task": "Добавить задачу",
+  "Best": "Рекорд",
+  "Current": "Текущая",
+  "+ Set a goal": "+ Поставить цель",
+  "Select Board": "Выбрать доску",
+  "Organizing your tasks...": "Организация ваших задач..."
 }

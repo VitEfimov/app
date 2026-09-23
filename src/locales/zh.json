@@ -447,7 +447,13 @@
   "Task moved backward": "任务已移至更早日期",
   "Are you sure you want to move all tasks in": "确定要将其中的所有任务移至",
   "forward": "更晚日期",
-  "backward": "更早日期",
-  "Default Reminder Option": "默认提醒选项",
-  "Select Year": "选择年份"
+  "Select Year": "选择年份",
+  "Select year": "选择年份",
+  "Press Enter to save": "按 Enter 保存",
+  "Add Task": "添加任务",
+  "Best": "最高纪录",
+  "Current": "当前",
+  "+ Set a goal": "+ 设置目标",
+  "Select Board": "选择看板",
+  "Organizing your tasks...": "正在整理您的任务..."
 }

@@ -447,7 +447,14 @@
   "Task moved backward": "Attività spostata indietro",
   "Are you sure you want to move all tasks in": "Sei sicuro di voler spostare tutte le attività in",
   "forward": "in avanti",
-  "backward": "indietro",
-  "Default Reminder Option": "Opzione predefinita per il promemoria",
-  "Select Year": "Seleziona anno"
+  "Select Year": "Seleziona anno",
+  "Select year": "Seleziona anno",
+  "Date unchanged. You can change the date on the edit task page.": "Data non modificata. Puoi modificare la data nella pagina di modifica dell'attività.",
+  "Press Enter to save": "Premi Invio per salvare",
+  "Add Task": "Aggiungi attività",
+  "Best": "Migliore",
+  "Current": "Attuale",
+  "+ Set a goal": "+ Imposta un obiettivo",
+  "Select Board": "Seleziona bacheca",
+  "Organizing your tasks...": "Organizzando le tue attività..."
 }

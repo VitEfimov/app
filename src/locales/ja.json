@@ -452,5 +452,13 @@
   "forward": "後の日付",
   "backward": "前の日付",
   "Default Reminder Option": "デフォルトのリマインダー設定",
-  "Select Year": "年を選択"
+  "Select Year": "年を選択",
+  "Select year": "年を選択",
+  "Press Enter to save": "Enterキーを押して保存",
+  "Add Task": "タスクを追加",
+  "Best": "最高",
+  "Current": "現在",
+  "+ Set a goal": "+ 目標を設定",
+  "Select Board": "ボードを選択",
+  "Organizing your tasks...": "タスクを整理中..."
 }

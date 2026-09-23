@@ -452,5 +452,13 @@
   "forward": "आगे",
   "backward": "पीछे",
   "Default Reminder Option": "डिफ़ॉल्ट अनुस्मारक विकल्प",
-  "Select Year": "वर्ष चुनें"
+  "Select Year": "वर्ष चुनें",
+  "Select year": "वर्ष चुनें",
+  "Press Enter to save": "सहेजने के लिए Enter दबाएं",
+  "Add Task": "कार्य जोड़ें",
+  "Best": "सर्वश्रेष्ठ",
+  "Current": "वर्तमान",
+  "+ Set a goal": "+ लक्ष्य निर्धारित करें",
+  "Select Board": "बोर्ड चुनें",
+  "Organizing your tasks...": "आपके कार्यों को व्यवस्थित किया जा रहा है..."
 }

@@ -447,9 +447,16 @@
   "Task moved backward": "Tâche déplacée vers l'arrière",
   "Are you sure you want to move all tasks in": "Etes-vous sûr de vouloir déplacer toutes les tâches vers",
   "forward": "avant",
-  "backward": "en arrière",
-  "Default Reminder Option": "Option de rappel par défaut",
   "Select Year": "Sélectionnez l'année",
+  "Select year": "Sélectionner l'année",
   "Reschedule Reminders & Alarms": "Replanifier les rappels et alarmes",
-  "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Replanifier automatiquement les notifications push et alarmes pour les tâches transférées vers une nouvelle date."
+  "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Replanifier automatiquement les notifications push et alarmes pour les tâches transférées vers une nouvelle date.",
+  "Date unchanged. You can change the date on the edit task page.": "Date inchangée. Vous pouvez modifier la date sur la page d'édition.",
+  "Press Enter to save": "Appuyez sur Entrée pour enregistrer",
+  "Add Task": "Ajouter une tâche",
+  "Best": "Meilleur",
+  "Current": "Actuel",
+  "+ Set a goal": "+ Définir un objectif",
+  "Select Board": "Sélectionner un tableau",
+  "Organizing your tasks...": "Organisation de vos tâches..."
 }

@@ -252,76 +252,75 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
             onSubmitEditing={handleAdd}
           />
 
-          {/* Row 1: Attribute Selector Chips */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.chipsScrollView}
-            contentContainerStyle={styles.chipsContainer}
-          >
-            <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel={`Select date, currently ${dayjs(selectedDate).format('MM/DD/YYYY')}`}
-              style={[styles.chipBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]} 
-              onPress={() => setShowDatePicker(true)}
+          {/* Row 1: Attribute Selector Chips & Cancel */}
+          <View style={styles.chipsRow}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.chipsScrollView}
+              contentContainerStyle={styles.chipsContainer}
             >
-              <IconCalendar color={colors.primary} />
-              <Text style={[styles.chipText, { color: colors.textPrimary }]}>
-                {dayjs(selectedDate).isSame(dayjs(), 'day') ? t('Today') : dayjs(selectedDate).format('MMM D')}
-              </Text>
-            </TouchableOpacity>
-
-            {boards.length > 1 && (
               <TouchableOpacity 
-                accessible={true} accessibilityRole="button" accessibilityLabel="Select board"
-                style={[styles.chipBtn, { backgroundColor: `${getBoardColor(selectedBoardId, boards)}1F`, borderColor: `${getBoardColor(selectedBoardId, boards)}60` }]} 
-                onPress={() => setShowBoardPicker(true)}
+                accessible={true} accessibilityRole="button" accessibilityLabel={`Select date, currently ${dayjs(selectedDate).format('MM/DD/YYYY')}`}
+                style={[styles.chipBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]} 
+                onPress={() => setShowDatePicker(true)}
               >
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(selectedBoardId, boards) }} />
+                <IconCalendar color={colors.primary} />
                 <Text style={[styles.chipText, { color: colors.textPrimary }]}>
-                  {boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))}
+                  {dayjs(selectedDate).isSame(dayjs(), 'day') ? t('Today') : dayjs(selectedDate).format('MMM D')}
                 </Text>
-                <Text style={{ fontSize: 10, color: colors.textSecondary }}>▼</Text>
               </TouchableOpacity>
-            )}
+
+              {boards.length > 1 && (
+                <TouchableOpacity 
+                  accessible={true} accessibilityRole="button" accessibilityLabel="Select board"
+                  style={[styles.chipBtn, { backgroundColor: `${getBoardColor(selectedBoardId, boards)}1F`, borderColor: `${getBoardColor(selectedBoardId, boards)}60` }]} 
+                  onPress={() => setShowBoardPicker(true)}
+                >
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(selectedBoardId, boards) }} />
+                  <Text style={[styles.chipText, { color: colors.textPrimary }]}>
+                    {boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: colors.textSecondary }}>▼</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
 
             <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Add more details"
-              style={[styles.chipBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]} 
-              onPress={handleAddWithDetails}
+              accessible={true} accessibilityRole="button" accessibilityLabel="Cancel"
+              style={[styles.cancelChipBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]} 
+              onPress={() => setIsEditing(false)}
             >
-              <IconDetails color={colors.primary} />
-              <Text style={[styles.chipText, { color: colors.primary }]}>
-                {t('Add details')}
+              <Text style={[styles.chipText, { color: colors.textSecondary }]}>
+                {t('Cancel')}
               </Text>
             </TouchableOpacity>
-          </ScrollView>
+          </View>
 
           <View style={[styles.divider, { backgroundColor: colors.borderColor }]} />
 
           {/* Row 2: Bottom Primary Actions */}
           <View style={styles.footerRow}>
-            <Text style={[styles.shortcutHint, { color: colors.textSecondary }]}>
-              {t('Press Enter to save')}
-            </Text>
+            <TouchableOpacity 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Add details"
+              style={styles.addDetailsFooterBtn} 
+              onPress={handleAddWithDetails}
+            >
+              <IconDetails color={colors.primary} />
+              <Text style={[styles.addDetailsFooterText, { color: colors.primary }]}>
+                {t('Add details')}
+              </Text>
+            </TouchableOpacity>
 
-            <View style={styles.rightActions}>
-              <TouchableOpacity 
-                accessible={true} accessibilityRole="button" accessibilityLabel="Cancel"
-                onPress={() => setIsEditing(false)} style={styles.cancelBtn}
-              >
-                <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                testID="inline_submit_btn" 
-                accessible={true} accessibilityRole="button" accessibilityLabel="Submit task"
-                onPress={handleAdd}
-                disabled={!taskName.trim()}
-                style={[styles.submitBtn, { backgroundColor: colors.primary, opacity: taskName.trim() ? 1 : 0.4 }]}
-              >
-                <Text style={[styles.submitText, { color: colors.textInverse || '#ffffff' }]}>{t('Add Task')}</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity 
+              testID="inline_submit_btn" 
+              accessible={true} accessibilityRole="button" accessibilityLabel="Submit task"
+              onPress={handleAdd}
+              disabled={!taskName.trim()}
+              style={[styles.submitBtn, { backgroundColor: colors.primary, opacity: taskName.trim() ? 1 : 0.4 }]}
+            >
+              <Text style={[styles.submitText, { color: colors.textInverse || '#ffffff' }]}>{t('Add Task')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -494,14 +493,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     textAlignVertical: 'top',
   },
-  chipsScrollView: {
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+    gap: 8,
+  },
+  chipsScrollView: {
+    flex: 1,
   },
   chipsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingRight: 10,
+    paddingRight: 6,
   },
   chipBtn: {
     flexDirection: 'row',
@@ -511,6 +517,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     gap: 6,
+  },
+  cancelChipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   chipText: {
     fontSize: 13,
@@ -526,21 +540,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  shortcutHint: {
-    fontSize: 12,
-    fontWeight: '400',
-  },
-  rightActions: {
+  addDetailsFooterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
-  cancelBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  cancelText: {
+  addDetailsFooterText: {
     fontSize: 14,
     fontWeight: '600',
   },

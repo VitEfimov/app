@@ -448,5 +448,13 @@
   "forward": "뒤로",
   "backward": "앞으로",
   "Default Reminder Option": "기본 알림 옵션",
-  "Select Year": "연도 선택"
+  "Select Year": "연도 선택",
+  "Select year": "연도 선택",
+  "Press Enter to save": "Enter를 눌러 저장",
+  "Add Task": "작업 추가",
+  "Best": "최고",
+  "Current": "현재",
+  "+ Set a goal": "+ 목표 설정",
+  "Select Board": "보드 선택",
+  "Organizing your tasks...": "작업을 정리하는 중..."
 }

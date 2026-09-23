@@ -451,8 +451,16 @@
   "Are you sure you want to move all tasks in": "Möchten Sie wirklich alle Aufgaben in",
   "forward": "nach vorne",
   "backward": "nach hinten",
-  "Default Reminder Option": "Standard-Erinnerungsoption",
   "Select Year": "Jahr auswählen",
+  "Select year": "Jahr auswählen",
   "Reschedule Reminders & Alarms": "Erinnerungen & Alarme neu planen",
-  "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Push-Benachrichtigungen und Alarme für Aufgaben, die auf ein neues Fälligkeitsdatum verschoben wurden, automatisch neu planen."
+  "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Push-Benachrichtigungen und Alarme für Aufgaben, die auf ein neues Fälligkeitsdatum verschoben wurden, automatisch neu planen.",
+  "Date unchanged. You can change the date on the edit task page.": "Datum unverändert. Sie können das Datum auf der Bearbeitungsseite ändern.",
+  "Press Enter to save": "Drücken Sie Eingabe zum Speichern",
+  "Add Task": "Aufgabe hinzufügen",
+  "Best": "Rekord",
+  "Current": "Aktuell",
+  "+ Set a goal": "+ Ziel festlegen",
+  "Select Board": "Board auswählen",
+  "Organizing your tasks...": "Ihre Aufgaben werden organisiert..."
 }

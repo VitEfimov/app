@@ -465,7 +465,15 @@
   "forward": "forward",
   "backward": "backward",
   "Select Year": "Select Year",
+  "Select year": "Select year",
   "Reschedule Reminders & Alarms": "Reschedule Reminders & Alarms",
   "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.",
-  "Date unchanged. You can change the date on the edit task page.": "Date unchanged. You can change the date on the edit task page."
+  "Date unchanged. You can change the date on the edit task page.": "Date unchanged. You can change the date on the edit task page.",
+  "Press Enter to save": "Press Enter to save",
+  "Add Task": "Add Task",
+  "Best": "Best",
+  "Current": "Current",
+  "+ Set a goal": "+ Set a goal",
+  "Select Board": "Select Board",
+  "Organizing your tasks...": "Organizing your tasks..."
 }
