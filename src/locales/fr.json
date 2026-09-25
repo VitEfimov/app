@@ -47,7 +47,6 @@
   "Complete all": "Tout terminer",
   "Move forward": "Déplacer vers l'avant",
   "Delete all": "Tout supprimer",
-  "Cancel": "Annuler",
   "Selected": "Sélectionné",
   "All": "Tout",
   "Share": "Partager",
@@ -458,5 +457,19 @@
   "Current": "Actuel",
   "+ Set a goal": "+ Définir un objectif",
   "Select Board": "Sélectionner un tableau",
-  "Organizing your tasks...": "Organisation de vos tâches..."
+  "Organizing your tasks...": "Organisation de vos tâches...",
+  "Board Color": "Board Color",
+  "Simple List": "Simple List",
+  "List (checklist)": "List (checklist)",
+  "Birthdays & Events": "Birthdays & Events",
+  "Shopping List": "Shopping List",
+  "Checklist": "Checklist",
+  "Quick shopping list with Need to Buy & Purchased sections.": "Quick shopping list with Need to Buy & Purchased sections.",
+  "To-Do": "To-Do",
+  "Need to Buy": "Need to Buy",
+  "Purchased": "Purchased",
+  "Upcoming Birthdays": "Upcoming Birthdays",
+  "Past / Completed": "Past / Completed",
+  "Default Reminder Option": "Default Reminder Option",
+  "backward": "backward"
 }

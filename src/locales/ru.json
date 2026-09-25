@@ -58,7 +58,6 @@
   "Complete all": "Завершить все",
   "Move forward": "Перенести на более позднюю дату",
   "Delete all": "Удалить все",
-  "Cancel": "Отмена",
   "Selected": "Выбрано",
   "All": "Все",
   "Share": "Поделиться",
@@ -467,5 +466,10 @@
   "Current": "Текущая",
   "+ Set a goal": "+ Поставить цель",
   "Select Board": "Выбрать доску",
-  "Organizing your tasks...": "Организация ваших задач..."
+  "Organizing your tasks...": "Организация ваших задач...",
+  "Board Color": "Board Color",
+  "Default Reminder Option": "Default Reminder Option",
+  "backward": "backward",
+  "Reschedule Reminders & Alarms": "Reschedule Reminders & Alarms",
+  "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives."
 }

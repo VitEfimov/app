@@ -456,5 +456,20 @@
   "Current": "현재",
   "+ Set a goal": "+ 목표 설정",
   "Select Board": "보드 선택",
-  "Organizing your tasks...": "작업을 정리하는 중..."
+  "Organizing your tasks...": "작업을 정리하는 중...",
+  "Board Color": "Board Color",
+  "Simple List": "Simple List",
+  "List (checklist)": "List (checklist)",
+  "Birthdays & Events": "Birthdays & Events",
+  "Shopping List": "Shopping List",
+  "Checklist": "Checklist",
+  "Quick shopping list with Need to Buy & Purchased sections.": "Quick shopping list with Need to Buy & Purchased sections.",
+  "To-Do": "To-Do",
+  "Need to Buy": "Need to Buy",
+  "Purchased": "Purchased",
+  "Upcoming Birthdays": "Upcoming Birthdays",
+  "Past / Completed": "Past / Completed",
+  "Reschedule Reminders & Alarms": "Reschedule Reminders & Alarms",
+  "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.",
+  "Date unchanged. You can change the date on the edit task page.": "Date unchanged. You can change the date on the edit task page."
 }

@@ -22,11 +22,11 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
-import { addBoardAsync, renameBoardAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
+import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed } from '../features/themeSlice';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
-import { getBoardColor } from '../utils/boardColors';
+import { getBoardColor, BOARD_COLORS } from '../utils/boardColors';
 import * as FileSystem from 'expo-file-system';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
 
@@ -659,7 +659,6 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleBoardOptions = (board) => {
-    if (board.id === 'main') return;
     setBoardOptionsConfig({ isVisible: true, board });
   };
 
@@ -970,12 +969,73 @@ export default function BoardScreen({ route, navigation }) {
       >
         <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
           <View style={styles.optionsModalDragHandle} />
-          <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
-            {t('Board')}: {boardOptionsConfig.board?.name}
-          </Text>
-          <Text style={{ color: colors.textSecondary, marginBottom: 15, paddingHorizontal: 20 }}>
+          
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+            <View style={{
+              width: 16,
+              height: 16,
+              borderRadius: 8,
+              backgroundColor: getBoardColor(boardOptionsConfig.board, boards),
+              marginRight: 10,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.2)'
+            }} />
+            <Text style={[styles.optionsModalTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
+              {t('Board')}: {boardOptionsConfig.board?.name === 'Main' ? t('Main') : boardOptionsConfig.board?.name}
+            </Text>
+          </View>
+          
+          <Text style={{ color: colors.textSecondary, marginBottom: 16, paddingHorizontal: 20, textAlign: 'center' }}>
             {t('What would you like to do?')}
           </Text>
+
+          {/* Color Palette (Palitra) */}
+          <View style={{ width: '100%', marginBottom: 18, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 10, fontWeight: '600' }}>
+              {t('Board Color')}
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15, gap: 10, alignItems: 'center' }}>
+              {BOARD_COLORS.map(c => {
+                const currentColor = getBoardColor(boardOptionsConfig.board, boards);
+                const isSelected = currentColor.toLowerCase() === c.toLowerCase();
+                return (
+                  <TouchableOpacity
+                    key={c}
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Color ${c}`}
+                    onPress={() => {
+                      if (boardOptionsConfig.board) {
+                        const boardId = boardOptionsConfig.board.id;
+                        dispatch(updateBoardColorAsync({ id: boardId, color: c }));
+                        setBoardOptionsConfig(prev => ({
+                          ...prev,
+                          board: prev.board ? { ...prev.board, color: c } : null
+                        }));
+                      }
+                    }}
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      backgroundColor: c,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: isSelected ? 3 : 0,
+                      borderColor: colors.textPrimary,
+                      shadowColor: c,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 3,
+                      elevation: 3,
+                    }}
+                  >
+                    {isSelected && <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>✓</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
           
           {isPremium && (
             <TouchableOpacity 
@@ -993,30 +1053,34 @@ export default function BoardScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Rename board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setPromptConfig({ isVisible: true, type: 'rename', targetBoard: boardOptionsConfig.board }); setBoardOptionsConfig({ isVisible: false, board: null }); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Rename')}</Text>
-          </TouchableOpacity>
+          {boardOptionsConfig.board?.id !== 'main' && (
+            <>
+              <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Rename board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setPromptConfig({ isVisible: true, type: 'rename', targetBoard: boardOptionsConfig.board }); setBoardOptionsConfig({ isVisible: false, board: null }); }}>
+                <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Rename')}</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Delete board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
-            const board = boardOptionsConfig.board;
-            setBoardOptionsConfig({ isVisible: false, board: null }); 
-            setTimeout(() => {
-              setConfirmConfig({
-                isVisible: true,
-                title: t('Delete Board'),
-                message: t('Are you sure? All tasks will be deleted.'),
-                confirmText: t('Delete'),
-                isDestructive: true,
-                onConfirm: () => {
-                  dispatch(deleteBoardAsync(board.id));
-                  dispatch(deleteTasksByBoard({ boardId: board.id, boardName: board.name }));
-                  setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-                }
-              });
-            }, 400);
-          }}>
-            <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete')}</Text>
-          </TouchableOpacity>
+              <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Delete board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+                const board = boardOptionsConfig.board;
+                setBoardOptionsConfig({ isVisible: false, board: null }); 
+                setTimeout(() => {
+                  setConfirmConfig({
+                    isVisible: true,
+                    title: t('Delete Board'),
+                    message: t('Are you sure? All tasks will be deleted.'),
+                    confirmText: t('Delete'),
+                    isDestructive: true,
+                    onConfirm: () => {
+                      dispatch(deleteBoardAsync(board.id));
+                      dispatch(deleteTasksByBoard({ boardId: board.id, boardName: board.name }));
+                      setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+                    }
+                  });
+                }, 400);
+              }}>
+                <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete')}</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}>
             <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>

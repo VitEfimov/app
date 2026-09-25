@@ -98,6 +98,19 @@ export const renameBoardAsync = createAsyncThunk('user/renameBoard', async ({ id
     return { id, name };
 });
 
+export const updateBoardColorAsync = createAsyncThunk('user/updateBoardColor', async ({ id, color }, thunkAPI) => {
+    const state = thunkAPI.getState().userReducer;
+    if (state.isAuthenticated) {
+        try {
+            const response = await axios.put(`/api/boards/${id}`, { color }, { withCredentials: true });
+            return response.data;
+        } catch (e) {
+            // Optimistic fallback
+        }
+    }
+    return { id, color };
+});
+
 export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, thunkAPI) => {
     const state = thunkAPI.getState().userReducer;
     if (state.isAuthenticated) {
@@ -308,6 +321,19 @@ const userSlice = createSlice({
             .addCase(renameBoardAsync.fulfilled, (state, action) => {
                 const board = state.boards.find(b => b.id === action.payload.id);
                 if (board) board.name = action.payload.name;
+                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+            })
+            .addCase(updateBoardColorAsync.pending, (state, action) => {
+                const { id, color } = action.meta.arg;
+                const board = state.boards.find(b => b.id === id);
+                if (board) board.color = color;
+                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+            })
+            .addCase(updateBoardColorAsync.fulfilled, (state, action) => {
+                const boardId = action.payload?.id || action.meta.arg.id;
+                const color = action.payload?.color || action.meta.arg.color;
+                const board = state.boards.find(b => b.id === boardId);
+                if (board) board.color = color;
                 AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
             .addCase(deleteBoardAsync.fulfilled, (state, action) => {
