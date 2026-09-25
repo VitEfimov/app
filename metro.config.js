@@ -3,6 +3,8 @@ const exclusionList = require('metro-config/src/defaults/exclusionList');
 
 const config = getDefaultConfig(__dirname);
 
+config.maxWorkers = 1;
+
 config.resolver.assetExts.push('ogg', 'wav');
 
 // Exclude Android build directories and Playwright test artifacts to prevent Metro file watcher errors

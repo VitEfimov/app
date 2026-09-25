@@ -102,6 +102,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const taskNameWrap = useSelector(state => state.themeReducer?.taskNameWrap || 'nowrap');
   const fontSizeSetting = useSelector(state => state.themeReducer?.fontSize || 'normal');
   const boards = useSelector(state => state.userReducer?.boards || []);
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
   const titleFontSize = fontSizeSetting === 'small' ? 13 : fontSizeSetting === 'big' ? 18 : 15;
 
@@ -288,7 +289,11 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       accessibilityState={{ checked: task.completed }}
       style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: 'transparent' }]}
       onLongPress={() => {
-         if (onToggleSelect) onToggleSelect();
+        if (isSelectionMode || isPremium) {
+          if (onToggleSelect) onToggleSelect();
+        } else {
+          showToast(t('Hold to select tasks is a Pro feature'));
+        }
       }}
       onPress={() => {
         if (isSelectionMode) {

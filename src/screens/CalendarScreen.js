@@ -723,14 +723,12 @@ export default function CalendarScreen() {
           </Text>
           
 
-          {isPremium && (
-            <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
-              setSelectionMode({ isActive: true, selectedTaskIds: [] }); 
-              setSectionOptionsConfig(false); 
-            }}>
-              <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
+            setSelectionMode({ isActive: true, selectedTaskIds: [] }); 
+            setSectionOptionsConfig(false); 
+          }}>
+            <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
+          </TouchableOpacity>
           
           <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleCompleteSection(), 400); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>

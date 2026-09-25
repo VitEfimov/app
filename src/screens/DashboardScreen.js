@@ -239,15 +239,15 @@ export default function DashboardScreen({ navigation }) {
     return { uncompletedTasks: uncomp, totalTasks: tot, completedTasks: comp, calcTotal: cTotal, calcCompleted: cCompleted };
   }, [filteredTasks, progressMode]);
 
-  const completionPercentage = calcTotal > 0 ? Math.round((calcCompleted / calcTotal) * 100) : (progressMode === 'daily' || progressMode === 'weekly' ? 100 : 0);
+  const completionPercentage = calcTotal > 0 ? Math.round((calcCompleted / calcTotal) * 100) : 0;
   const currentFill = Math.max(0, Math.min(100, 100 - completionPercentage)); 
   
   const circumference = 251.2;
   const strokeDashoffset = circumference - (circumference * completionPercentage) / 100;
 
   const getGreetingText = () => {
-    if (completionPercentage === 100 && totalTasks > 0) return t('Perfect!');
-    if (completionPercentage >= 50) return t('Great progress!');
+    if (calcTotal > 0 && completionPercentage === 100) return t('Perfect!');
+    if (calcTotal > 0 && completionPercentage >= 50) return t('Great progress!');
     return t('Keep going!');
   };
 

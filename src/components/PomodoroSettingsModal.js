@@ -74,6 +74,20 @@ export default function PomodoroSettingsModal() {
   const [workSound, setWorkSoundState] = useState('default');
   const [breakSound, setBreakSoundState] = useState('none');
 
+  const [prevValues, setPrevValues] = useState({});
+
+  const handleInputFocus = (key, currentValue, setter) => {
+    setPrevValues(prev => ({ ...prev, [key]: currentValue }));
+    setter('');
+  };
+
+  const handleInputBlur = (key, currentValue, setter, defaultValue) => {
+    if (currentValue === undefined || currentValue === null || currentValue.trim() === '') {
+      const restored = prevValues[key] !== undefined && prevValues[key] !== '' ? prevValues[key] : defaultValue;
+      setter(restored);
+    }
+  };
+
   const localizedSounds = predefinedSounds.map(s => ({ ...s, label: t(s.label) }));
 
   useEffect(() => {
@@ -87,17 +101,18 @@ export default function PomodoroSettingsModal() {
       setSessions(String(typeof currentPomodoro.intervalCount === 'object' ? currentPomodoro.intervalCount.count : 5));
       setWorkSoundState(currentPomodoro.workSound || 'default');
       setBreakSoundState(currentPomodoro.breakSound || 'default');
+      setPrevValues({});
     }
   }, [isSettingsOpen, currentPomodoro]);
 
   const handleSave = () => {
-    const wHrs = parseInt(workHrs) || 0;
-    const wMin = parseInt(workMin) || 0;
-    const wSec = parseInt(workSec) || 0;
-    const bHrs = parseInt(breakHrs) || 0;
-    const bMin = parseInt(breakMin) || 0;
-    const bSec = parseInt(breakSec) || 0;
-    const sCount = parseInt(sessions) || 5;
+    const wHrs = parseInt(workHrs) || (prevValues.workHrs ? parseInt(prevValues.workHrs) : 0);
+    const wMin = parseInt(workMin) || (prevValues.workMin ? parseInt(prevValues.workMin) : 0);
+    const wSec = parseInt(workSec) || (prevValues.workSec ? parseInt(prevValues.workSec) : 0);
+    const bHrs = parseInt(breakHrs) || (prevValues.breakHrs ? parseInt(prevValues.breakHrs) : 0);
+    const bMin = parseInt(breakMin) || (prevValues.breakMin ? parseInt(prevValues.breakMin) : 0);
+    const bSec = parseInt(breakSec) || (prevValues.breakSec ? parseInt(prevValues.breakSec) : 0);
+    const sCount = parseInt(sessions) || (prevValues.sessions ? parseInt(prevValues.sessions) : 5);
 
     let workTime = wHrs * 3600 + wMin * 60 + wSec;
     if (workTime === 0) workTime = 25 * 60;
@@ -155,6 +170,8 @@ export default function PomodoroSettingsModal() {
                 style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={workHrs}
                 onChangeText={setWorkHrs}
+                onFocus={() => handleInputFocus('workHrs', workHrs, setWorkHrs)}
+                onBlur={() => handleInputBlur('workHrs', workHrs, setWorkHrs, '0')}
                 keyboardType="numeric"
                 maxLength={2}
                 placeholder="0"
@@ -165,6 +182,8 @@ export default function PomodoroSettingsModal() {
                 style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={workMin}
                 onChangeText={setWorkMin}
+                onFocus={() => handleInputFocus('workMin', workMin, setWorkMin)}
+                onBlur={() => handleInputBlur('workMin', workMin, setWorkMin, '25')}
                 keyboardType="numeric"
                 maxLength={3}
                 placeholder="25"
@@ -175,6 +194,8 @@ export default function PomodoroSettingsModal() {
                 style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={workSec}
                 onChangeText={setWorkSec}
+                onFocus={() => handleInputFocus('workSec', workSec, setWorkSec)}
+                onBlur={() => handleInputBlur('workSec', workSec, setWorkSec, '0')}
                 keyboardType="numeric"
                 maxLength={2}
                 placeholder="00"
@@ -190,6 +211,8 @@ export default function PomodoroSettingsModal() {
                 style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={breakHrs}
                 onChangeText={setBreakHrs}
+                onFocus={() => handleInputFocus('breakHrs', breakHrs, setBreakHrs)}
+                onBlur={() => handleInputBlur('breakHrs', breakHrs, setBreakHrs, '0')}
                 keyboardType="numeric"
                 maxLength={2}
                 placeholder="0"
@@ -200,6 +223,8 @@ export default function PomodoroSettingsModal() {
                 style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={breakMin}
                 onChangeText={setBreakMin}
+                onFocus={() => handleInputFocus('breakMin', breakMin, setBreakMin)}
+                onBlur={() => handleInputBlur('breakMin', breakMin, setBreakMin, '05')}
                 keyboardType="numeric"
                 maxLength={3}
                 placeholder="05"
@@ -210,6 +235,8 @@ export default function PomodoroSettingsModal() {
                 style={[styles.timeInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
                 value={breakSec}
                 onChangeText={setBreakSec}
+                onFocus={() => handleInputFocus('breakSec', breakSec, setBreakSec)}
+                onBlur={() => handleInputBlur('breakSec', breakSec, setBreakSec, '0')}
                 keyboardType="numeric"
                 maxLength={2}
                 placeholder="00"
@@ -224,6 +251,8 @@ export default function PomodoroSettingsModal() {
               style={[styles.sessionInput, { color: colors.textPrimary, backgroundColor: colors.surfaceContainer, borderColor: colors.surfaceContainerHigh }]}
               value={sessions}
               onChangeText={setSessions}
+              onFocus={() => handleInputFocus('sessions', sessions, setSessions)}
+              onBlur={() => handleInputBlur('sessions', sessions, setSessions, '5')}
               keyboardType="numeric"
               maxLength={2}
             />
