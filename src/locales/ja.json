@@ -471,5 +471,18 @@
   "Past / Completed": "Past / Completed",
   "Reschedule Reminders & Alarms": "Reschedule Reminders & Alarms",
   "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.": "Automatically re-schedule push notifications and alarms for tasks transferred to a new due date when their time arrives.",
-  "Date unchanged. You can change the date on the edit task page.": "Date unchanged. You can change the date on the edit task page."
+  "Date unchanged. You can change the date on the edit task page.": "Date unchanged. You can change the date on the edit task page.",
+  "Show repeated tasks on board": "ボードに繰り返しタスクを表示",
+  "Task name": "タスク名",
+  "Due date": "期限",
+  "Time": "時間",
+  "Reminder": "リマインダー",
+  "Repeat": "繰り返し",
+  "Notes & attachments": "メモと添付ファイル",
+  "Subtasks": "サブタスク",
+  "Device Storage": "デバイスストレージ",
+  "Local Storage Mode": "ローカルストレージモード",
+  "Repeat configuration": "繰り返しの設定",
+  "From": "開始日",
+  "To": "終了日"
 }

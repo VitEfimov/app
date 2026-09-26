@@ -476,5 +476,18 @@
   "Current": "Current",
   "+ Set a goal": "+ Set a goal",
   "Select Board": "Select Board",
-  "Organizing your tasks...": "Organizing your tasks..."
+  "Organizing your tasks...": "Organizing your tasks...",
+  "Show repeated tasks on board": "Show repeated tasks on board",
+  "Task name": "Task name",
+  "Due date": "Due date",
+  "Time": "Time",
+  "Reminder": "Reminder",
+  "Repeat": "Repeat",
+  "Notes & attachments": "Notes & attachments",
+  "Subtasks": "Subtasks",
+  "Device Storage": "Device Storage",
+  "Local Storage Mode": "Local Storage Mode",
+  "Repeat configuration": "Repeat configuration",
+  "From": "From",
+  "To": "To"
 }

@@ -77,7 +77,9 @@ export default function PomodoroSettingsModal() {
   const [prevValues, setPrevValues] = useState({});
 
   const handleInputFocus = (key, currentValue, setter) => {
-    setPrevValues(prev => ({ ...prev, [key]: currentValue }));
+    if (currentValue !== '') {
+      setPrevValues(prev => ({ ...prev, [key]: currentValue }));
+    }
     setter('');
   };
 
@@ -174,7 +176,8 @@ export default function PomodoroSettingsModal() {
                 onBlur={() => handleInputBlur('workHrs', workHrs, setWorkHrs, '0')}
                 keyboardType="numeric"
                 maxLength={2}
-                placeholder="0"
+                selectTextOnFocus={true}
+                placeholder=""
                 placeholderTextColor={colors.textSecondary}
               />
               <Text style={[styles.timeColon, { color: colors.textSecondary }]}>:</Text>
@@ -186,7 +189,8 @@ export default function PomodoroSettingsModal() {
                 onBlur={() => handleInputBlur('workMin', workMin, setWorkMin, '25')}
                 keyboardType="numeric"
                 maxLength={3}
-                placeholder="25"
+                selectTextOnFocus={true}
+                placeholder=""
                 placeholderTextColor={colors.textSecondary}
               />
               <Text style={[styles.timeColon, { color: colors.textSecondary }]}>:</Text>
@@ -198,7 +202,8 @@ export default function PomodoroSettingsModal() {
                 onBlur={() => handleInputBlur('workSec', workSec, setWorkSec, '0')}
                 keyboardType="numeric"
                 maxLength={2}
-                placeholder="00"
+                selectTextOnFocus={true}
+                placeholder=""
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -215,7 +220,8 @@ export default function PomodoroSettingsModal() {
                 onBlur={() => handleInputBlur('breakHrs', breakHrs, setBreakHrs, '0')}
                 keyboardType="numeric"
                 maxLength={2}
-                placeholder="0"
+                selectTextOnFocus={true}
+                placeholder=""
                 placeholderTextColor={colors.textSecondary}
               />
               <Text style={[styles.timeColon, { color: colors.textSecondary }]}>:</Text>
@@ -224,10 +230,11 @@ export default function PomodoroSettingsModal() {
                 value={breakMin}
                 onChangeText={setBreakMin}
                 onFocus={() => handleInputFocus('breakMin', breakMin, setBreakMin)}
-                onBlur={() => handleInputBlur('breakMin', breakMin, setBreakMin, '05')}
+                onBlur={() => handleInputBlur('breakMin', breakMin, setBreakMin, '5')}
                 keyboardType="numeric"
                 maxLength={3}
-                placeholder="05"
+                selectTextOnFocus={true}
+                placeholder=""
                 placeholderTextColor={colors.textSecondary}
               />
               <Text style={[styles.timeColon, { color: colors.textSecondary }]}>:</Text>
@@ -239,7 +246,8 @@ export default function PomodoroSettingsModal() {
                 onBlur={() => handleInputBlur('breakSec', breakSec, setBreakSec, '0')}
                 keyboardType="numeric"
                 maxLength={2}
-                placeholder="00"
+                selectTextOnFocus={true}
+                placeholder=""
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -255,6 +263,9 @@ export default function PomodoroSettingsModal() {
               onBlur={() => handleInputBlur('sessions', sessions, setSessions, '5')}
               keyboardType="numeric"
               maxLength={2}
+              selectTextOnFocus={true}
+              placeholder=""
+              placeholderTextColor={colors.textSecondary}
             />
           </View>
 

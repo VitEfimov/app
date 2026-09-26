@@ -40,8 +40,12 @@ export default function StreaksCard({ colors }) {
         <View style={styles.streakInfo}>
           <Text style={[styles.streakTitle, { color: colors.textPrimary }]}>{title}</Text>
           <Text style={[styles.streakSub, { color: colors.textSecondary }]}>
-            {t('Best')}: {data.longest} {t('days')} · {t('Current')}: {data.current}
+            {t('Current')}: {data.current} {t('days')}
           </Text>
+        </View>
+        <View style={styles.recordStreak}>
+          <Text style={[styles.recordValue, { color: accentColor }]}>{data.longest}</Text>
+          <Text style={[styles.recordLabel, { color: colors.textSecondary }]}>{t('days')}</Text>
         </View>
       </View>
     );
@@ -129,5 +133,17 @@ const styles = StyleSheet.create({
   streakSub: {
     fontSize: 13,
     marginTop: 2
+  },
+  recordStreak: {
+    alignItems: 'center',
+    minWidth: 50
+  },
+  recordValue: {
+    fontSize: 22,
+    fontWeight: 'bold'
+  },
+  recordLabel: {
+    fontSize: 10,
+    textTransform: 'uppercase'
   }
 });
