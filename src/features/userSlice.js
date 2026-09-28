@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { Platform } from 'react-native';
 import axios from 'axios';
 
 const loadThemeFromLocalStorage = () => "light";
@@ -10,8 +11,13 @@ const loadBoardsFromLocalStorage = () => [{ id: 'main', name: 'Main', type: 'sta
 
 export const checkAuth = createAsyncThunk('user/checkAuth', async (_, thunkAPI) => {
     try {
+        const fullState = thunkAPI.getState();
+        const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
+        if (!dbSyncEnabled || Platform.OS === 'web') {
+            return { dbSyncDisabled: true };
+        }
         const response = await axios.get('/api/auth/me', { withCredentials: true });
-        return response.data;
+        return { ...response.data, dbSyncDisabled: false };
     } catch (err) {
         return thunkAPI.rejectWithValue(err.response?.data?.message || err.message);
     }
@@ -19,13 +25,15 @@ export const checkAuth = createAsyncThunk('user/checkAuth', async (_, thunkAPI) 
 
 export const loginUser = createAsyncThunk('user/login', async ({ email, password, rememberMe }, thunkAPI) => {
     try {
+        const fullState = thunkAPI.getState();
+        const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
         const response = await axios.post('/api/auth/login', { email, password, rememberMe }, { withCredentials: true });
         if (rememberMe) {
             await AsyncStorage.setItem('rememberedUser', JSON.stringify({ email, rememberMe: true }));
         } else {
             await AsyncStorage.removeItem('rememberedUser');
         }
-        return response.data;
+        return { ...response.data, dbSyncDisabled: !dbSyncEnabled };
     } catch (err) {
         const msg = err.response?.data?.message || (err.message === 'Network Error' ? 'Network / CORS Error: Cross-origin requests from localhost are blocked by backend CORS policy.' : err.message);
         return thunkAPI.rejectWithValue(msg);
@@ -34,8 +42,10 @@ export const loginUser = createAsyncThunk('user/login', async ({ email, password
 
 export const registerUser = createAsyncThunk('user/register', async ({ email, password }, thunkAPI) => {
     try {
+        const fullState = thunkAPI.getState();
+        const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
         const response = await axios.post('/api/auth/register', { email, password }, { withCredentials: true });
-        return response.data;
+        return { ...response.data, dbSyncDisabled: !dbSyncEnabled };
     } catch (err) {
         const msg = err.response?.data?.message || (err.message === 'Network Error' ? 'Network / CORS Error: Cross-origin requests from localhost are blocked by backend CORS policy.' : err.message);
         return thunkAPI.rejectWithValue(msg);
@@ -73,8 +83,10 @@ export const changePassword = createAsyncThunk('user/changePassword', async ({ c
 });
 
 export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name, type = 'standard', color }, thunkAPI) => {
-    const state = thunkAPI.getState().userReducer;
-    if (state.isAuthenticated) {
+    const fullState = thunkAPI.getState();
+    const state = fullState.userReducer;
+    const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
+    if (state.isAuthenticated && dbSyncEnabled) {
         try {
             const response = await axios.post('/api/boards', { id, name, type, color }, { withCredentials: true });
             return response.data;
@@ -86,8 +98,10 @@ export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name
 });
 
 export const renameBoardAsync = createAsyncThunk('user/renameBoard', async ({ id, name }, thunkAPI) => {
-    const state = thunkAPI.getState().userReducer;
-    if (state.isAuthenticated) {
+    const fullState = thunkAPI.getState();
+    const state = fullState.userReducer;
+    const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
+    if (state.isAuthenticated && dbSyncEnabled) {
         try {
             const response = await axios.put(`/api/boards/${id}`, { name }, { withCredentials: true });
             return response.data;
@@ -99,8 +113,10 @@ export const renameBoardAsync = createAsyncThunk('user/renameBoard', async ({ id
 });
 
 export const updateBoardColorAsync = createAsyncThunk('user/updateBoardColor', async ({ id, color }, thunkAPI) => {
-    const state = thunkAPI.getState().userReducer;
-    if (state.isAuthenticated) {
+    const fullState = thunkAPI.getState();
+    const state = fullState.userReducer;
+    const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
+    if (state.isAuthenticated && dbSyncEnabled) {
         try {
             const response = await axios.put(`/api/boards/${id}`, { color }, { withCredentials: true });
             return response.data;
@@ -112,8 +128,10 @@ export const updateBoardColorAsync = createAsyncThunk('user/updateBoardColor', a
 });
 
 export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, thunkAPI) => {
-    const state = thunkAPI.getState().userReducer;
-    if (state.isAuthenticated) {
+    const fullState = thunkAPI.getState();
+    const state = fullState.userReducer;
+    const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
+    if (state.isAuthenticated && dbSyncEnabled) {
         try {
             await axios.delete(`/api/boards/${id}`, { withCredentials: true });
         } catch (e) {
@@ -141,7 +159,8 @@ const mergeBoards = (currentBoards = [], incomingBoards = []) => {
     return Array.from(boardMap.values());
 };
 
-const syncUnsyncedBoards = async (mergedBoards = [], remoteBoards = []) => {
+const syncUnsyncedBoards = async (mergedBoards = [], remoteBoards = [], dbSyncEnabled = true) => {
+    if (!dbSyncEnabled) return;
     const remoteIds = new Set((remoteBoards || []).map(b => b.id || b._id));
     const remoteNames = new Set((remoteBoards || []).map(b => b.name));
     for (const b of mergedBoards) {
@@ -230,7 +249,7 @@ const userSlice = createSlice({
                 const merged = mergeBoards(state.boards, remoteBoards);
                 state.boards = merged;
                 AsyncStorage.setItem('boards', JSON.stringify(merged));
-                syncUnsyncedBoards(merged, remoteBoards);
+                syncUnsyncedBoards(merged, remoteBoards, !action.payload?.dbSyncDisabled);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);
@@ -252,7 +271,7 @@ const userSlice = createSlice({
                 const merged = mergeBoards(state.boards, remoteBoards);
                 state.boards = merged;
                 AsyncStorage.setItem('boards', JSON.stringify(merged));
-                syncUnsyncedBoards(merged, remoteBoards);
+                syncUnsyncedBoards(merged, remoteBoards, !action.payload?.dbSyncDisabled);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);
@@ -274,7 +293,7 @@ const userSlice = createSlice({
                 const merged = mergeBoards(state.boards, remoteBoards);
                 state.boards = merged;
                 AsyncStorage.setItem('boards', JSON.stringify(merged));
-                syncUnsyncedBoards(merged, remoteBoards);
+                syncUnsyncedBoards(merged, remoteBoards, !action.payload?.dbSyncDisabled);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);

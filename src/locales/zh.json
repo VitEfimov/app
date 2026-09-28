@@ -129,6 +129,11 @@
   "Subtask...": "子任务...",
   "Delete Task": "删除任务",
   "Are you sure you want to delete this task?": "确定要删除此任务吗？",
+  "Delete Recurring Task": "删除重复任务",
+  "Do you want to delete only this task or all recurring tasks?": "您是要仅删除此任务还是删除所有重复任务？",
+  "This task only": "仅此任务",
+  "All recurring tasks": "所有重复任务",
+  "Recurring tasks deleted": "重复任务已删除",
   "Pomodoro Settings": "番茄钟设置",
   "Work duration": "工作时长",
   "Break duration": "休息时长",
@@ -483,5 +488,9 @@
   "Local Storage Mode": "本地存储模式",
   "Repeat configuration": "重复配置",
   "From": "从",
-  "To": "到"
+  "To": "到",
+  "DB Synchronization": "数据库同步",
+  "Database Synchronization": "数据库同步",
+  "Synchronize data with cloud database": "与云端数据库同步数据",
+  "Keep data strictly on device": "严格将数据保存在设备上"
 }

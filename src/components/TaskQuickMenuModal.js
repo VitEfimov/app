@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'rea
 import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateTask, deleteTask, addTask } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
 import { useToast } from '../styles/ToastContext';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
@@ -103,7 +103,7 @@ export default function TaskQuickMenuModal({
   const { showToast } = useToast();
   const boards = useSelector(state => state.userReducer.boards || []);
   const [isMoveBoardVisible, setMoveBoardVisible] = React.useState(false);
-  const [confirmConfig, setConfirmConfig] = React.useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
+  const [confirmConfig, setConfirmConfig] = React.useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, secondaryIsDestructive: false, hideCancel: false, onConfirm: null, secondaryConfirmText: null, onSecondaryConfirm: null });
 
   if (!task) return null;
 
@@ -121,17 +121,54 @@ export default function TaskQuickMenuModal({
     );
   };
 
+  const isRepeatingTask = !!(task.recurringSeriesId || task.isRecurring || (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') || (task.repeatFrequency && task.repeatFrequency !== 'None'));
+
   const handleDelete = () => {
-    dispatch(deleteTask({ taskId: task.id }));
-    onClose();
-    
-    showToast(
-      t('Task Deleted'),
-      t('Undo'),
-      () => {
-        dispatch(addTask({ task, isUndo: true }));
-      }
-    );
+    const currentTask = task;
+    if (isRepeatingTask) {
+      onClose();
+      setTimeout(() => {
+        setConfirmConfig({
+          isVisible: true,
+          title: t('Delete Recurring Task'),
+          message: t('Do you want to delete only this task or all recurring tasks?'),
+          confirmText: t('This task only'),
+          isDestructive: true,
+          secondaryIsDestructive: true,
+          onConfirm: () => {
+            setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+            dispatch(deleteTask({ taskId: currentTask.id }));
+            showToast(
+              t('Task Deleted'),
+              t('Undo'),
+              () => {
+                dispatch(addTask({ task: currentTask, isUndo: true }));
+              }
+            );
+          },
+          secondaryConfirmText: t('All recurring tasks'),
+          onSecondaryConfirm: () => {
+            setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+            dispatch(deleteTask({ taskId: currentTask.id }));
+            if (currentTask.recurringSeriesId) {
+              dispatch(deleteRecurringSeries({ seriesId: currentTask.recurringSeriesId }));
+            }
+            showToast(t('Recurring tasks deleted'));
+          }
+        });
+      }, 300);
+    } else {
+      dispatch(deleteTask({ taskId: currentTask.id }));
+      onClose();
+      
+      showToast(
+        t('Task Deleted'),
+        t('Undo'),
+        () => {
+          dispatch(addTask({ task: currentTask, isUndo: true }));
+        }
+      );
+    }
   };
 
   const handleDuplicate = () => {
@@ -393,7 +430,10 @@ export default function TaskQuickMenuModal({
       confirmText={confirmConfig.confirmText}
       cancelText={confirmConfig.cancelText}
       isDestructive={confirmConfig.isDestructive}
+      secondaryIsDestructive={confirmConfig.secondaryIsDestructive}
       hideCancel={confirmConfig.hideCancel}
+      secondaryConfirmText={confirmConfig.secondaryConfirmText}
+      onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
       onConfirm={confirmConfig.onConfirm}
       onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
     />

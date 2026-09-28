@@ -140,6 +140,11 @@
   "Subtask...": "Подзадача...",
   "Delete Task": "Удалить задачу",
   "Are you sure you want to delete this task?": "Вы уверены, что хотите удалить эту задачу?",
+  "Delete Recurring Task": "Удалить повторяющуюся задачу",
+  "Do you want to delete only this task or all recurring tasks?": "Удалить только эту задачу или все повторяющиеся задачи?",
+  "This task only": "Только эту задачу",
+  "All recurring tasks": "Все повторяющиеся задачи",
+  "Recurring tasks deleted": "Повторяющиеся задачи удалены",
   "Pomodoro Settings": "Настройки Pomodoro",
   "Work duration": "Продолжительность работы",
   "Break duration": "Продолжительность перерыва",
@@ -483,5 +488,9 @@
   "Local Storage Mode": "Режим локального хранилища",
   "Repeat configuration": "Повторить настройку",
   "From": "От",
-  "To": "К"
+  "To": "К",
+  "DB Synchronization": "Синхронизация БД",
+  "Database Synchronization": "Синхронизация базы данных",
+  "Synchronize data with cloud database": "Синхронизировать данные с облачной базой данных",
+  "Keep data strictly on device": "Храните данные строго на устройстве"
 }

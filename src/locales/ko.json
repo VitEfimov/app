@@ -129,6 +129,11 @@
   "Subtask...": "하위 작업...",
   "Delete Task": "작업 삭제",
   "Are you sure you want to delete this task?": "이 작업을 삭제하시겠습니까?",
+  "Delete Recurring Task": "반복 작업 삭제",
+  "Do you want to delete only this task or all recurring tasks?": "이 작업만 삭제하시겠습니까, 아니면 모든 반복 작업을 삭제하시겠습니까?",
+  "This task only": "이 작업만",
+  "All recurring tasks": "모든 반복 작업",
+  "Recurring tasks deleted": "반복 작업이 삭제되었습니다",
   "Pomodoro Settings": "뽀모도로 설정",
   "Work duration": "작업 시간",
   "Break duration": "휴식 시간",
@@ -483,5 +488,9 @@
   "Local Storage Mode": "로컬 스토리지 모드",
   "Repeat configuration": "구성 반복",
   "From": "에서",
-  "To": "에게"
+  "To": "에게",
+  "DB Synchronization": "DB 동기화",
+  "Database Synchronization": "데이터베이스 동기화",
+  "Synchronize data with cloud database": "클라우드 데이터베이스와 데이터 동기화",
+  "Keep data strictly on device": "데이터를 기기에만 엄격하게 보관하세요"
 }

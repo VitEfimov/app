@@ -65,6 +65,9 @@ const initialState = {
   defaultReminderEnabled: loaded?.defaultReminderEnabled || false,
   defaultReminderTime: loaded?.defaultReminderTime || '15 min before',
 
+  // DB Sync
+  dbSyncEnabled: loaded?.dbSyncEnabled !== undefined ? loaded.dbSyncEnabled : true,
+
   // Per-Board Automations Map
   boardAutomations: loaded?.boardAutomations || {}
 };
@@ -255,6 +258,10 @@ const themeSlice = createSlice({
     setDefaultReminderTime: (state, action) => {
       state.defaultReminderTime = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setDbSyncEnabled: (state, action) => {
+      state.dbSyncEnabled = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
@@ -264,7 +271,7 @@ export const {
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
   setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
-  setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime
+  setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled
 } = themeSlice.actions;
 
 export default themeSlice.reducer;

@@ -439,14 +439,14 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
         identifier: 'complete_task',
         buttonTitle: 'Complete Task',
         options: {
-          opensAppToForeground: false,
+          opensAppToForeground: true,
         },
       },
       {
         identifier: 'snooze',
         buttonTitle: 'Snooze',
         options: {
-          opensAppToForeground: false,
+          opensAppToForeground: true,
         },
       },
       {
@@ -466,7 +466,14 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
         identifier: 'complete_task',
         buttonTitle: 'Complete Task',
         options: {
-          opensAppToForeground: false,
+          opensAppToForeground: true,
+        },
+      },
+      {
+        identifier: 'snooze',
+        buttonTitle: 'Snooze',
+        options: {
+          opensAppToForeground: true,
         },
       },
       {

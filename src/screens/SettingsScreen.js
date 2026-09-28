@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled } from '../features/themeSlice';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -104,6 +104,7 @@ export default function SettingsScreen({ navigation }) {
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
+  const [premiumFeatureName, setPremiumFeatureName] = useState('');
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [saveAlertVisible, setSaveAlertVisible] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
@@ -480,7 +481,39 @@ export default function SettingsScreen({ navigation }) {
               </Text>
             </View>
           </View>
-          <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 15 }]}>
+          <View style={[styles.rowItem, { display: 'none', borderBottomWidth: 1, borderBottomColor: colors.borderColor, paddingVertical: 14 }]}>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                  {t('DB Synchronization') || 'DB Synchronization'}
+                </Text>
+                {!isPremium && (
+                  <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#000' }}>PRO</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                {theme.dbSyncEnabled !== false
+                  ? (t('Synchronize data with cloud database') || 'Synchronize data with cloud database')
+                  : (t('Keep data strictly on device') || 'Keep data strictly on device')}
+              </Text>
+            </View>
+            <Switch
+              value={isPremium ? (theme.dbSyncEnabled !== false) : false}
+              onValueChange={(val) => {
+                if (!isPremium) {
+                  setPremiumFeatureName(t('DB Synchronization'));
+                  setPremiumModalVisible(true);
+                } else {
+                  dispatch(setDbSyncEnabled(val));
+                }
+              }}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
+            />
+          </View>
+
+          <View style={[styles.rowItem, { display: 'none', borderBottomWidth: 0, paddingVertical: 15 }]}>
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('App PIN Lock')}</Text>
             <Switch
               value={!!theme.appPin}
@@ -533,7 +566,7 @@ export default function SettingsScreen({ navigation }) {
       <PremiumModal
         isVisible={isPremiumModalVisible}
         onClose={() => setPremiumModalVisible(false)}
-        featureName="Android Auto Integration"
+        featureName={premiumFeatureName || "DB Synchronization"}
       />
       <ConfirmModal
         isVisible={confirmConfig.isVisible}

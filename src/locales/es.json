@@ -129,6 +129,11 @@
   "Subtask...": "Subtarea...",
   "Delete Task": "Eliminar tarea",
   "Are you sure you want to delete this task?": "¿Estás seguro de que quieres eliminar esta tarea?",
+  "Delete Recurring Task": "Eliminar tarea recurrente",
+  "Do you want to delete only this task or all recurring tasks?": "¿Deseas eliminar solo esta tarea o todas las tareas recurrentes?",
+  "This task only": "Solo esta tarea",
+  "All recurring tasks": "Todas las tareas recurrentes",
+  "Recurring tasks deleted": "Tareas recurrentes eliminadas",
   "Pomodoro Settings": "Configuración de Pomodoro",
   "Work duration": "Duración del trabajo",
   "Break duration": "Duración del descanso",
@@ -483,5 +488,9 @@
   "Local Storage Mode": "Modo de almacenamiento local",
   "Repeat configuration": "Repetir configuración",
   "From": "De",
-  "To": "A"
+  "To": "A",
+  "DB Synchronization": "Sincronización de bases de datos",
+  "Database Synchronization": "Sincronización de bases de datos",
+  "Synchronize data with cloud database": "Sincronizar datos con la base de datos en la nube",
+  "Keep data strictly on device": "Mantenga los datos estrictamente en el dispositivo"
 }

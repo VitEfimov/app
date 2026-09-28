@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard
 import { Swipeable } from 'react-native-gesture-handler';
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateTask, deleteTask, addTask } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
+import ConfirmModal from './ConfirmModal';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
 import dayjs from 'dayjs';
@@ -113,6 +114,21 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const [cursorSelection, setCursorSelection] = useState(null);
   const swipeableRef = useRef(null);
 
+  const isRepeatingTask = !!(task?.recurringSeriesId || task?.isRecurring || (task?.repeatConfig && task?.repeatConfig?.preset && task?.repeatConfig?.preset !== 'None') || (task?.repeatFrequency && task?.repeatFrequency !== 'None'));
+
+  const [confirmConfig, setConfirmConfig] = useState({
+    isVisible: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    isDestructive: false,
+    secondaryIsDestructive: false,
+    secondaryConfirmText: null,
+    onSecondaryConfirm: null,
+    onConfirm: null,
+  });
+
   const closeSwipeable = useCallback(() => {
     if (swipeableRef.current) {
       swipeableRef.current.close();
@@ -144,15 +160,46 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const handleSwipeDelete = useCallback(() => {
     if (!task) return;
     closeSwipeable();
-    dispatch(deleteTask({ taskId: task.id }));
-    showToast(
-      t('Task Deleted'),
-      t('Undo'),
-      () => {
-        dispatch(addTask({ task, isUndo: true }));
-      }
-    );
-  }, [closeSwipeable, dispatch, task, showToast, t]);
+    if (isRepeatingTask) {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Delete Recurring Task'),
+        message: t('Do you want to delete only this task or all recurring tasks?'),
+        confirmText: t('This task only'),
+        isDestructive: true,
+        secondaryIsDestructive: true,
+        onConfirm: () => {
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          dispatch(deleteTask({ taskId: task.id }));
+          showToast(
+            t('Task Deleted'),
+            t('Undo'),
+            () => {
+              dispatch(addTask({ task, isUndo: true }));
+            }
+          );
+        },
+        secondaryConfirmText: t('All recurring tasks'),
+        onSecondaryConfirm: () => {
+          setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+          dispatch(deleteTask({ taskId: task.id }));
+          if (task.recurringSeriesId) {
+            dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId }));
+          }
+          showToast(t('Recurring tasks deleted'));
+        }
+      });
+    } else {
+      dispatch(deleteTask({ taskId: task.id }));
+      showToast(
+        t('Task Deleted'),
+        t('Undo'),
+        () => {
+          dispatch(addTask({ task, isUndo: true }));
+        }
+      );
+    }
+  }, [closeSwipeable, dispatch, task, isRepeatingTask, showToast, t]);
 
   const handleSwipeSnooze = useCallback(() => {
     closeSwipeable();
@@ -273,7 +320,6 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const totalSubtasksCount = subtasks.length;
   const completedSubtasksCount = subtasks.filter(s => s.completed).length;
   const hasSubtasks = totalSubtasksCount > 0;
-  const isRepeatingTask = !!(task.recurringSeriesId || task.isRecurring || (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') || (task.repeatFrequency && task.repeatFrequency !== 'None'));
 
   const taskBoardId = task.boardId || 'main';
   const taskBoard = boards.find(b => b.id === taskBoardId);
@@ -455,16 +501,33 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   }
 
   return (
-    <Swipeable
-      ref={swipeableRef}
-      renderLeftActions={renderLeftActions}
-      renderRightActions={renderRightActions}
-      onSwipeableLeftOpen={handleSwipeComplete}
-      friction={2}
-      rightThreshold={40}
-    >
-      {taskRowContent}
-    </Swipeable>
+    <>
+      <Swipeable
+        ref={swipeableRef}
+        renderLeftActions={renderLeftActions}
+        renderRightActions={renderRightActions}
+        onSwipeableLeftOpen={handleSwipeComplete}
+        friction={2}
+        rightThreshold={40}
+      >
+        {taskRowContent}
+      </Swipeable>
+      {confirmConfig.isVisible && (
+        <ConfirmModal
+          isVisible={confirmConfig.isVisible}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmText={confirmConfig.confirmText}
+          cancelText={confirmConfig.cancelText}
+          isDestructive={confirmConfig.isDestructive}
+          secondaryIsDestructive={confirmConfig.secondaryIsDestructive}
+          secondaryConfirmText={confirmConfig.secondaryConfirmText}
+          onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
+        />
+      )}
+    </>
   );
 });
 

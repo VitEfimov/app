@@ -129,6 +129,11 @@
   "Subtask...": "サブタスク...",
   "Delete Task": "タスクを削除",
   "Are you sure you want to delete this task?": "このタスクを削除してもよろしいですか？",
+  "Delete Recurring Task": "繰り返しタスクを削除",
+  "Do you want to delete only this task or all recurring tasks?": "このタスクのみを削除しますか、それともすべての繰り返しタスクを削除しますか？",
+  "This task only": "このタスクのみ",
+  "All recurring tasks": "すべての繰り返しタスク",
+  "Recurring tasks deleted": "繰り返しタスクを削除しました",
   "Pomodoro Settings": "ポモドーロ設定",
   "Work duration": "作業時間",
   "Break duration": "休憩時間",
@@ -483,5 +488,9 @@
   "Local Storage Mode": "ローカルストレージモード",
   "Repeat configuration": "繰り返しの設定",
   "From": "開始日",
-  "To": "終了日"
+  "To": "終了日",
+  "DB Synchronization": "DB同期",
+  "Database Synchronization": "データベースの同期",
+  "Synchronize data with cloud database": "クラウドデータベースとデータを同期する",
+  "Keep data strictly on device": "データをデバイス上に厳重に保管する"
 }

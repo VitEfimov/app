@@ -129,6 +129,11 @@
   "Subtask...": "उप-कार्य...",
   "Delete Task": "कार्य हटाएँ",
   "Are you sure you want to delete this task?": "क्या आप वाकई इस कार्य को हटाना चाहते हैं?",
+  "Delete Recurring Task": "आवर्ती कार्य हटाएं",
+  "Do you want to delete only this task or all recurring tasks?": "क्या आप केवल यह कार्य या सभी आवर्ती कार्य हटाना चाहते हैं?",
+  "This task only": "केवल यह कार्य",
+  "All recurring tasks": "सभी आवर्ती कार्य",
+  "Recurring tasks deleted": "आवर्ती कार्य हटा दिए गए",
   "Pomodoro Settings": "पोमोडोरो सेटिंग्स",
   "Work duration": "कार्य की अवधि",
   "Break duration": "विराम की अवधि",
@@ -483,5 +488,9 @@
   "Local Storage Mode": "स्थानीय संग्रहण मोड",
   "Repeat configuration": "कॉन्फ़िगरेशन दोहराएँ",
   "From": "से",
-  "To": "को"
+  "To": "को",
+  "DB Synchronization": "डीबी सिंक्रनाइज़ेशन",
+  "Database Synchronization": "डेटाबेस तुल्यकालन",
+  "Synchronize data with cloud database": "क्लाउड डेटाबेस के साथ डेटा सिंक्रनाइज़ करें",
+  "Keep data strictly on device": "डेटा को डिवाइस पर सख्ती से रखें"
 }

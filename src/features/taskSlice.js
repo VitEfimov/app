@@ -86,7 +86,9 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
 
     localTasks = purgeOrphanedTasks(localTasks, boards);
 
-    if (isAuthenticated) {
+    const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
+
+    if (isAuthenticated && dbSyncEnabled) {
         try {
             const response = await axios.get('/api/tasks', { withCredentials: true });
             if (Array.isArray(response.data)) {
@@ -348,11 +350,12 @@ const taskSlice = createSlice({
             });
         },
         deleteRecurringSeriesSync(state, action) {
-            const { seriesId, fromDate } = action.payload;
+            const { seriesId, fromDate, excludeTaskId } = action.payload || {};
             if (!seriesId) return;
             const fromDay = fromDate ? dayjs(fromDate).startOf('day') : null;
             state.tasks = state.tasks.filter(task => {
                 if (task.recurringSeriesId === seriesId) {
+                    if (excludeTaskId && task.id === excludeTaskId) return true;
                     if (!fromDay) return false;
                     const taskDay = task.completionDate ? dayjs(task.completionDate).startOf('day') : null;
                     if (taskDay && (taskDay.isSame(fromDay, 'day') || taskDay.isAfter(fromDay))) {
@@ -498,7 +501,8 @@ export const addTask = (payload) => async (dispatch, getState) => {
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
-    if (state.userReducer?.isAuthenticated && payload?.task) {
+    const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
+    if (state.userReducer?.isAuthenticated && dbSyncEnabled && payload?.task) {
         dispatch(addTaskAsync(payload.task));
     }
 };
@@ -536,7 +540,8 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
-    if (state.userReducer?.isAuthenticated && Array.isArray(payload?.tasks)) {
+    const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
+    if (state.userReducer?.isAuthenticated && dbSyncEnabled && Array.isArray(payload?.tasks)) {
         dispatch(addMultipleTasksAsync(payload.tasks));
     }
 };
@@ -573,7 +578,8 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
     }
 
     // 4. Background DB sync for authenticated users
-    if (state.userReducer?.isAuthenticated && taskId) {
+    const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
+    if (state.userReducer?.isAuthenticated && dbSyncEnabled && taskId) {
         dispatch(deleteTaskAsync(taskId));
     }
 };
@@ -642,7 +648,8 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
-    if (state.userReducer?.isAuthenticated && payload?.taskId) {
+    const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
+    if (state.userReducer?.isAuthenticated && dbSyncEnabled && payload?.taskId) {
         dispatch(updateTaskAsync({ taskId: payload.taskId, payload }));
     }
 };
@@ -656,10 +663,11 @@ export const updateRecurringSeries = (payload) => async (dispatch, getState) => 
 
 export const deleteRecurringSeries = (payload) => async (dispatch, getState) => {
     const state = getState();
-    const { seriesId, fromDate } = payload || {};
+    const { seriesId, fromDate, excludeTaskId } = payload || {};
     const fromDay = fromDate ? dayjs(fromDate).startOf('day') : null;
     const affected = seriesId ? (state.taskReducer.tasks || []).filter(t => {
         if (t && t.recurringSeriesId === seriesId) {
+            if (excludeTaskId && t.id === excludeTaskId) return false;
             if (!fromDay) return true;
             const taskDay = t.completionDate ? dayjs(t.completionDate).startOf('day') : null;
             return taskDay && (taskDay.isSame(fromDay, 'day') || taskDay.isAfter(fromDay));
@@ -684,6 +692,16 @@ export const deleteRecurringSeries = (payload) => async (dispatch, getState) => 
                 } catch (e) {}
             }
         }, 0);
+    }
+
+    // 4. Background DB sync for authenticated users
+    const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
+    if (state.userReducer?.isAuthenticated && dbSyncEnabled && affected.length > 0) {
+        for (const t of affected) {
+            if (t && t.id) {
+                dispatch(deleteTaskAsync(t.id));
+            }
+        }
     }
 };
 

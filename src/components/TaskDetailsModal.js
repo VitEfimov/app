@@ -182,7 +182,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [isRepeatModalVisible, setIsRepeatModalVisible] = useState(false);
   const [repeatStartDate, setRepeatStartDate] = useState('');
   const [repeatEndDate, setRepeatEndDate] = useState('');
-  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null, hideCancel: false, cancelText: '' });
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryIsDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null, hideCancel: false, cancelText: '' });
   const { generateRepeatingTasks } = useTaskRepeat();
 
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
@@ -281,8 +281,12 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
         config = { preset: 'every_year' };
       }
 
-      const initialRepStartDate = task.repeatStartDate || task.completionDate || '';
-      const initialRepEndDate = task.repeatEndDate || '';
+      // Repeat start date should ALWAYS be in sync with the task's completion date (due date)
+      const initialRepStartDate = initialDate || task.repeatStartDate || '';
+      let initialRepEndDate = task.repeatEndDate || '';
+      if (config && config.preset && config.preset !== 'None' && !initialRepEndDate && initialRepStartDate) {
+        initialRepEndDate = dayjs(initialRepStartDate).add(1, 'year').format('YYYY-MM-DD');
+      }
 
       let initialReminderVal = task.reminder || 'None';
       if (task.isNagMode) {
@@ -501,18 +505,24 @@ useEffect(() => {
     if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
     if (selectedBoardId !== (task.boardId || 'main')) updates.boardId = selectedBoardId;
     
+    const effectiveStartDate = selectedDate || repeatStartDate || dayjs().format('YYYY-MM-DD');
+    const effectiveEndDate = repeatEndDate || dayjs(effectiveStartDate).add(1, 'year').format('YYYY-MM-DD');
+
     const initialConfig = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
     const repeatConfigChanged = JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig);
+    const dateChanged = selectedDate !== (task.completionDate || '');
+    const repeatStartDateChanged = repeatStartDate !== (task.repeatStartDate || task.completionDate || '');
+    const repeatEndDateChanged = repeatEndDate !== (task.repeatEndDate || '');
+
     if (repeatConfigChanged) {
       updates.repeatConfig = repeatConfig;
       updates.repeatFrequency = repeatConfig.preset; // backwards compatibility
     }
     
-    if (repeatStartDate !== (task.repeatStartDate || task.completionDate || '')) updates.repeatStartDate = repeatStartDate;
-    if (repeatEndDate !== (task.repeatEndDate || '')) updates.repeatEndDate = repeatEndDate;
+    if (repeatStartDateChanged || effectiveStartDate !== (task.repeatStartDate || '')) updates.repeatStartDate = effectiveStartDate;
+    if (repeatEndDateChanged || effectiveEndDate !== (task.repeatEndDate || '')) updates.repeatEndDate = effectiveEndDate;
     
     const timeChanged = selectedTime !== (task.time || '');
-    const dateChanged = selectedDate !== (task.completionDate || '');
     const reminderChanged = reminder !== (task.reminder || 'None');
     const isAlarmChanged = isAlarm !== (task.isAlarm || false);
     const nameChanged = taskName !== task.taskname;
@@ -537,12 +547,14 @@ useEffect(() => {
     }
     
     // If repeat is newly configured or task does not have a recurring series yet
-    if (repeatConfig.preset !== 'None' && repeatEndDate && !task.recurringSeriesId) {
+    if (repeatConfig.preset !== 'None' && effectiveEndDate && !task.recurringSeriesId) {
       const result = generateRepeatingTasks(
         task, 
         { 
           name: taskName, 
           priority, 
+          date: selectedDate,
+          completionDate: selectedDate,
           time: selectedTime, 
           reminder, 
           isAlarm, 
@@ -550,27 +562,44 @@ useEffect(() => {
           subtasks, 
           description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments }
         }, 
-        { ...repeatConfig, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate }
+        { ...repeatConfig, startDate: effectiveStartDate, endDate: effectiveEndDate }
       );
       if (result && result.seriesId) {
         updates.recurringSeriesId = result.seriesId;
         updates.isRecurring = true;
+        updates.repeatStartDate = effectiveStartDate;
+        updates.repeatEndDate = effectiveEndDate;
       }
     } else if (task.recurringSeriesId && updateSeries) {
       // If user chose to update all upcoming tasks in this series:
-      if (repeatConfigChanged && repeatConfig.preset === 'None') {
+      if (repeatConfig.preset === 'None') {
         // Stop repeat: delete future instances
-        dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: task.completionDate }));
+        dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: task.completionDate, excludeTaskId: task.id }));
         updates.recurringSeriesId = null;
         updates.isRecurring = false;
-      } else if (repeatConfigChanged && repeatEndDate) {
-        // Regenerate future instances
-        dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: dayjs(task.completionDate).add(1, 'day').toISOString() }));
+        updates.repeatConfig = { preset: 'None' };
+        updates.repeatFrequency = 'None';
+        updates.repeatStartDate = '';
+        updates.repeatEndDate = '';
+      } else if (repeatConfigChanged || dateChanged || repeatStartDateChanged || repeatEndDateChanged) {
+        // Schedule changed: delete upcoming instances and regenerate
+        const oldDate = task.completionDate ? dayjs(task.completionDate) : dayjs(effectiveStartDate);
+        const newDate = dayjs(effectiveStartDate);
+        const earliestDate = oldDate.isBefore(newDate) ? oldDate : newDate;
+
+        dispatch(deleteRecurringSeries({
+          seriesId: task.recurringSeriesId,
+          fromDate: earliestDate.toISOString(),
+          excludeTaskId: task.id
+        }));
+
         generateRepeatingTasks(
           task, 
           { 
             name: taskName, 
             priority, 
+            date: selectedDate,
+            completionDate: selectedDate,
             time: selectedTime, 
             reminder, 
             isAlarm, 
@@ -578,8 +607,13 @@ useEffect(() => {
             subtasks, 
             description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments }
           }, 
-          { ...repeatConfig, startDate: repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'), endDate: repeatEndDate }
+          { ...repeatConfig, startDate: effectiveStartDate, endDate: effectiveEndDate }
         );
+
+        updates.repeatConfig = repeatConfig;
+        updates.repeatFrequency = repeatConfig.preset;
+        updates.repeatStartDate = effectiveStartDate;
+        updates.repeatEndDate = effectiveEndDate;
       } else {
         // Update all upcoming instances with the modified fields!
         dispatch(updateRecurringSeries({
@@ -600,8 +634,8 @@ useEffect(() => {
             subtasks: subtasks,
             repeatConfig: repeatConfig,
             repeatFrequency: repeatConfig.preset,
-            repeatStartDate: repeatStartDate,
-            repeatEndDate: repeatEndDate
+            repeatStartDate: effectiveStartDate,
+            repeatEndDate: effectiveEndDate
           }
         }));
       }
@@ -995,8 +1029,17 @@ useEffect(() => {
   const handleDateSelect = (dateStr) => {
     if (datePickerType === 'due') {
       setSelectedDate(dateStr);
+      if (!repeatStartDate) {
+        setRepeatStartDate(dateStr);
+      }
+      if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(dateStr))) {
+        setRepeatEndDate(dayjs(dateStr).add(1, 'year').format('YYYY-MM-DD'));
+      }
     } else if (datePickerType === 'repeatStart') {
       setRepeatStartDate(dateStr);
+      if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(dateStr))) {
+        setRepeatEndDate(dayjs(dateStr).add(1, 'year').format('YYYY-MM-DD'));
+      }
     } else if (datePickerType === 'repeatEnd') {
       setRepeatEndDate(dateStr);
     }
@@ -1004,23 +1047,26 @@ useEffect(() => {
   };
 
   const handleDelete = () => {
-    const isRecurring = !!(task.recurringSeriesId || (task.isRecurring && task.recurringSeriesId));
+    const isRecurring = !!(task.recurringSeriesId || task.isRecurring || (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') || (task.repeatFrequency && task.repeatFrequency !== 'None'));
     if (isRecurring) {
       setConfirmConfig({
         isVisible: true,
         title: t('Delete Recurring Task'),
-        message: t('Do you want to delete only this task or all upcoming tasks in this series?'),
+        message: t('Do you want to delete only this task or all recurring tasks?'),
         confirmText: t('This task only'),
         isDestructive: true,
+        secondaryIsDestructive: true,
         onConfirm: () => {
           dispatch(deleteTask({ taskId: task.id }));
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
           onClose();
         },
-        secondaryConfirmText: t('All upcoming tasks'),
+        secondaryConfirmText: t('All recurring tasks'),
         onSecondaryConfirm: () => {
           dispatch(deleteTask({ taskId: task.id }));
-          dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: task.completionDate }));
+          if (task.recurringSeriesId) {
+            dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId }));
+          }
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
           onClose();
         }
@@ -1393,6 +1439,7 @@ useEffect(() => {
           cancelText={confirmConfig.cancelText || t('Cancel')}
           hideCancel={confirmConfig.hideCancel}
           isDestructive={confirmConfig.isDestructive}
+          secondaryIsDestructive={confirmConfig.secondaryIsDestructive}
           secondaryConfirmText={confirmConfig.secondaryConfirmText}
           onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
           onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
@@ -1521,9 +1568,18 @@ useEffect(() => {
             if (datePickerType === 'due') {
               const newDate = dayjs(selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
               setSelectedDate(newDate);
+              if (!repeatStartDate) {
+                setRepeatStartDate(newDate);
+              }
+              if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
+                setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
+              }
             } else if (datePickerType === 'repeatStart') {
               const newDate = dayjs(repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
               setRepeatStartDate(newDate);
+              if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
+                setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
+              }
             } else if (datePickerType === 'repeatEnd') {
               const newDate = dayjs(repeatEndDate || repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
               setRepeatEndDate(newDate);
@@ -1552,7 +1608,16 @@ useEffect(() => {
         isVisible={isRepeatModalVisible}
         onClose={() => setIsRepeatModalVisible(false)}
         initialConfig={repeatConfig}
-        onSave={setRepeatConfig}
+        onSave={(newConfig) => {
+          setRepeatConfig(newConfig);
+          if (newConfig && newConfig.preset && newConfig.preset !== 'None') {
+            const currentStart = selectedDate || repeatStartDate || dayjs().format('YYYY-MM-DD');
+            setRepeatStartDate(currentStart);
+            if (!repeatEndDate || !dayjs(repeatEndDate).isAfter(dayjs(currentStart))) {
+              setRepeatEndDate(dayjs(currentStart).add(1, 'year').format('YYYY-MM-DD'));
+            }
+          }
+        }}
       />
     </Modal>
   );

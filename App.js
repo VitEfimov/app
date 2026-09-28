@@ -519,57 +519,67 @@ function InitApp() {
       }
 
       if (taskId) {
-        let tasks = store.getState().taskReducer.tasks;
-        let task = tasks.find(t => t.id === taskId);
+        const state = store.getState();
+        let tasks = state.taskReducer?.tasks || [];
+        let task = tasks.find(t => t && String(t.id) === String(taskId));
         
         if (!task) {
-          const tasksJson = await AsyncStorage.getItem('tasks');
+          const { getTaskStorageKey } = require('./src/features/taskSlice');
+          const taskKey = getTaskStorageKey(state);
+          const tasksJson = await AsyncStorage.getItem(taskKey) || await AsyncStorage.getItem('tasks') || await AsyncStorage.getItem('tasks_guest');
           if (tasksJson) {
-            const parsedTasks = JSON.parse(tasksJson);
-            task = parsedTasks.find(t => t.id === taskId);
+            try {
+              const parsedTasks = JSON.parse(tasksJson);
+              task = parsedTasks.find(t => t && String(t.id) === String(taskId));
+            } catch (e) {}
           }
         }
         
-        if (task) {
-          if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER || actionIdentifier === 'reschedule') {
-            if (isLocked) {
-              setPendingNotificationPayload({ type: 'task', taskId, actionIdentifier });
+        const taskName = task?.taskname || task?.name || response.notification.request.content.body || response.notification.request.content.title || 'Task';
+        const isAlarm = task?.isAlarm || false;
+
+        if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER || actionIdentifier === 'reschedule') {
+          if (isLocked) {
+            setPendingNotificationPayload({ type: 'task', taskId, actionIdentifier });
+          } else {
+            if (navigationRef.isReady()) {
+              navigationRef.navigate('Board', { editTaskId: taskId });
             } else {
-              if (navigationRef.isReady()) {
-                navigationRef.navigate('Board', { editTaskId: taskId });
-              } else {
-                setPendingNotificationPayload({ type: 'task', taskId, actionIdentifier });
-              }
+              setPendingNotificationPayload({ type: 'task', taskId, actionIdentifier });
             }
-          } else if (actionIdentifier === 'complete_task') {
-             dispatch(updateTask({ taskId, completed: true }));
-          } else if (actionIdentifier === 'snooze') {
-             const themeState = store.getState().themeReducer;
-             const snoozeMins = themeState.defaultSnoozeTime || 30;
+          }
+        } else if (actionIdentifier === 'complete_task') {
+          dispatch(updateTask({ taskId, completed: true }));
+        } else if (actionIdentifier === 'snooze') {
+          const themeState = store.getState().themeReducer || {};
+          const snoozeMins = themeState.defaultSnoozeTime || 30;
 
-             const newTime = dayjs().add(snoozeMins, 'minute');
-             
-             // Schedule new reminder without changing the actual task's time
-             const notifId = await scheduleExactTaskReminder(task.taskname, newTime.toDate(), task.id, task.isAlarm || false, 'task_reminder', themeState);
-             if (notifId) {
-               // Append the new snoozed notification ID so it can be cleaned up if task is deleted
-               const updatedNotifIds = [...(task.notificationId || []), notifId];
-               dispatch(updateTask({
-                 taskId,
-                 notificationId: updatedNotifIds
-               }));
+          const newTime = dayjs().add(snoozeMins, 'minute');
+          
+          // Schedule new reminder without changing the actual task's time
+          const notifId = await scheduleExactTaskReminder(taskName, newTime.toDate(), taskId, isAlarm, 'task_reminder', themeState);
+          if (notifId && task) {
+            const prevNotifIds = Array.isArray(task.notificationId)
+              ? task.notificationId
+              : (task.notificationId ? [task.notificationId] : []);
+            const updatedNotifIds = [...prevNotifIds, notifId];
+            dispatch(updateTask({
+              taskId,
+              notificationId: updatedNotifIds
+            }));
+          }
 
-               const channelId = getChannelId(false, themeState.notificationSound, themeState.vibrationEnabled);
-
-               await Notifications.scheduleNotificationAsync({
-                 content: {
-                   title: 'Task Snoozed',
-                   body: `Snoozed '${task.taskname}' for ${snoozeMins} minute(s)`,
-                   priority: Notifications.AndroidNotificationPriority.MAX,
-                 },
-                 trigger: Platform.OS === 'android' ? { channelId } : null,
-               });
-             }
+          try {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: 'Task Snoozed',
+                body: `Snoozed '${taskName}' for ${snoozeMins} minute(s)`,
+                priority: Notifications.AndroidNotificationPriority.MAX,
+              },
+              trigger: null,
+            });
+          } catch (notifErr) {
+            console.warn("Failed to schedule snooze confirmation toast:", notifErr);
           }
         }
       }
