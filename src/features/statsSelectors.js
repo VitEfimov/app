@@ -23,11 +23,11 @@ export const selectNormalizedDailyStats = createSelector(
       dailyDataset[key] = { ...dailyDataset[key] };
     });
 
-    // Re-verify tasksCreated and tasksCompleted from actual task list (in case of deletions/edits)
+    const activeCreated = {};
+    const activeCompleted = {};
+
     // Clear out counts that will be recalculated
     Object.keys(dailyDataset).forEach(date => {
-      dailyDataset[date].tasksCreated = 0;
-      dailyDataset[date].tasksCompleted = 0;
       dailyDataset[date].tasksDue = 0;
       dailyDataset[date].tasksCompletedOnTime = 0;
       dailyDataset[date].tasksCompletedLate = 0;
@@ -40,10 +40,10 @@ export const selectNormalizedDailyStats = createSelector(
       // 1. Created
       let createdDate = task.createdAt ? dayjs(task.createdAt).format('YYYY-MM-DD') : null;
       if (createdDate) {
+        activeCreated[createdDate] = (activeCreated[createdDate] || 0) + 1;
         if (!dailyDataset[createdDate]) {
           dailyDataset[createdDate] = { tasksCreated: 0, tasksCompleted: 0, pomodoroSessions: 0, pomodoroMinutes: 0, tasksDue: 0, tasksCompletedOnTime: 0, tasksCompletedLate: 0, overdueTasks: 0 };
         }
-        dailyDataset[createdDate].tasksCreated += 1;
       }
 
       // 2. Due Date handling
@@ -67,10 +67,10 @@ export const selectNormalizedDailyStats = createSelector(
 
         if (completedDateObj) {
           const completedDateStr = completedDateObj.format('YYYY-MM-DD');
+          activeCompleted[completedDateStr] = (activeCompleted[completedDateStr] || 0) + 1;
           if (!dailyDataset[completedDateStr]) {
             dailyDataset[completedDateStr] = { tasksCreated: 0, tasksCompleted: 0, pomodoroSessions: 0, pomodoroMinutes: 0, tasksDue: 0, tasksCompletedOnTime: 0, tasksCompletedLate: 0, overdueTasks: 0 };
           }
-          dailyDataset[completedDateStr].tasksCompleted += 1;
 
           if (dueDateStr) {
              if (completedDateObj.isSameOrBefore(dayjs(dueDateStr).endOf('day'))) {
@@ -86,6 +86,17 @@ export const selectNormalizedDailyStats = createSelector(
            dailyDataset[dueDateStr].overdueTasks += 1;
         }
       }
+    });
+
+    // Merge historical persistedStats with active tasks counts
+    Object.keys(dailyDataset).forEach(date => {
+      const histCreated = persistedStats[date]?.tasksCreated || 0;
+      const actCreated = activeCreated[date] || 0;
+      dailyDataset[date].tasksCreated = Math.max(histCreated, actCreated);
+
+      const histCompleted = persistedStats[date]?.tasksCompleted || 0;
+      const actCompleted = activeCompleted[date] || 0;
+      dailyDataset[date].tasksCompleted = Math.max(histCompleted, actCompleted);
     });
 
     return dailyDataset;

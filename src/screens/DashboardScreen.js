@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
 import { setActiveBoardId, setDashboardFilterType } from '../features/userSlice';
+import { selectNormalizedDailyStats } from '../features/statsSelectors';
 
 const IconLeft = ({ color }) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -197,6 +198,12 @@ export default function DashboardScreen({ navigation }) {
     })
   ).current;
 
+  const normalizedDailyStats = useSelector(selectNormalizedDailyStats);
+
+  const totalLifetimeCompleted = useMemo(() => {
+    return Object.values(normalizedDailyStats).reduce((sum, day) => sum + (day.tasksCompleted || 0), 0);
+  }, [normalizedDailyStats]);
+
   const { uncompletedTasks, totalTasks, completedTasks, calcTotal, calcCompleted } = useMemo(() => {
     const uncomp = filteredTasks.filter(task => !task.completed);
     const tot = uncomp.length;
@@ -232,12 +239,12 @@ export default function DashboardScreen({ navigation }) {
       cCompleted = dueThisWeekAll.filter(t => t.completed).length;
       cTotal = dueThisWeekAll.length;
     } else {
-      cCompleted = comp;
-      cTotal = filteredTasks.length;
+      cCompleted = filterType === 'all' ? Math.max(comp, totalLifetimeCompleted) : comp;
+      cTotal = tot + cCompleted;
     }
 
     return { uncompletedTasks: uncomp, totalTasks: tot, completedTasks: comp, calcTotal: cTotal, calcCompleted: cCompleted };
-  }, [filteredTasks, progressMode]);
+  }, [filteredTasks, progressMode, totalLifetimeCompleted]);
 
   const completionPercentage = calcTotal > 0 ? Math.round((calcCompleted / calcTotal) * 100) : 0;
   const currentFill = Math.max(0, Math.min(100, 100 - completionPercentage)); 
