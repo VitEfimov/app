@@ -54,7 +54,7 @@ const SOUND_ASSETS = {
 
 const IconUser = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill={color}>
-    <Path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+    <Path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
   </Svg>
 );
 
@@ -77,7 +77,7 @@ export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   const { t, i18n } = useTranslation();
-  
+
   const theme = useSelector(state => state.themeReducer);
   const tasks = useSelector(state => state.taskReducer.tasks);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
@@ -88,7 +88,7 @@ export default function SettingsScreen({ navigation }) {
     dispatch(logoutUser());
     dispatch(logout());
   };
-  
+
   const taskNameWrap = theme.taskNameWrap || 'wrap';
   const fontSize = theme.fontSize || 'normal';
   const progressMode = theme.progressMode || 'daily';
@@ -279,14 +279,14 @@ export default function SettingsScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
+
         {/* Header Section */}
         <View style={styles.topHeader}>
           <View style={{ flex: 1, marginRight: 10 }}>
             <Text style={[styles.pageTitle, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
             <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('App preferences & account')}</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             accessible={true} accessibilityRole="button" accessibilityLabel="Save settings"
             style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
           >
@@ -298,43 +298,43 @@ export default function SettingsScreen({ navigation }) {
         {/* Appearance Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Appearance')}</Text>
         <View style={styles.sectionGroup}>
-          <TouchableOpacity 
+          <TouchableOpacity
             accessible={true} accessibilityRole="button" accessibilityLabel="Customize theme"
-            style={[styles.rowItem, { borderBottomColor: colors.borderColor }]} 
+            style={[styles.rowItem, { borderBottomColor: colors.borderColor }]}
             onPress={() => setThemeModalVisible(true)}
           >
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Customize theme')}</Text>
             <Text style={[styles.rowArrow, { color: colors.textSecondary }]}>{'>'}</Text>
           </TouchableOpacity>
           <View style={styles.dropdownRow}>
-            <CustomDropdown 
-              label={t("Text wrapping") || "Text wrapping"} 
-              value={taskNameWrap} 
-              options={wrapOptions} 
-              onSelect={val => dispatch(setTaskNameWrap(val))} 
+            <CustomDropdown
+              label={t("Text wrapping") || "Text wrapping"}
+              value={taskNameWrap}
+              options={wrapOptions}
+              onSelect={val => dispatch(setTaskNameWrap(val))}
               colors={colors}
               layout="horizontal"
             />
           </View>
           <View style={styles.dropdownRow}>
-            <CustomDropdown 
-              label={t("Font size") || "Font size"} 
-              value={fontSize} 
-              options={fontOptions} 
-              onSelect={val => dispatch(setFontSize(val))} 
+            <CustomDropdown
+              label={t("Font size") || "Font size"}
+              value={fontSize}
+              options={fontOptions}
+              onSelect={val => dispatch(setFontSize(val))}
               colors={colors}
               layout="horizontal"
             />
           </View>
           <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
-            <CustomDropdown 
-              label={t('Language') || 'Language'} 
-              value={i18n.language} 
-              options={languageOptions} 
+            <CustomDropdown
+              label={t('Language') || 'Language'}
+              value={i18n.language}
+              options={languageOptions}
               onSelect={val => {
                 i18n.changeLanguage(val);
                 AsyncStorage.setItem('appLanguage', val);
-              }} 
+              }}
               colors={colors}
               layout="horizontal"
               searchable={true}
@@ -366,9 +366,9 @@ export default function SettingsScreen({ navigation }) {
               </View>
               {theme.defaultReminderEnabled && (
                 <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
-                  <CustomDropdown 
-                    label={t("Default Reminder Option")} 
-                    value={theme.defaultReminderTime ? t(theme.defaultReminderTime) : t('15 min before')} 
+                  <CustomDropdown
+                    label={t("Default Reminder Option")}
+                    value={theme.defaultReminderTime ? t(theme.defaultReminderTime) : t('15 min before')}
                     options={[
                       { label: t('None'), value: 'None' },
                       { label: t('15 min before'), value: '15 min before' },
@@ -376,8 +376,8 @@ export default function SettingsScreen({ navigation }) {
                       { label: t('1 hr before'), value: '1 hr before' },
                       { label: t('1 day before'), value: '1 day before' },
                       { label: t('Day of'), value: 'Day of' }
-                    ]} 
-                    onSelect={val => dispatch(setDefaultReminderTime(val))} 
+                    ]}
+                    onSelect={val => dispatch(setDefaultReminderTime(val))}
                     colors={colors}
                     layout="horizontal"
                   />
@@ -386,10 +386,10 @@ export default function SettingsScreen({ navigation }) {
             </>
           )}
           <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
-            <CustomDropdown 
-              label={t("Notification Sound")} 
-              value={notificationSound} 
-              options={soundOptions} 
+            <CustomDropdown
+              label={t("Notification Sound")}
+              value={notificationSound}
+              options={soundOptions}
               onSelect={val => {
                 dispatch(setNotificationSound(val));
                 playSoundPreview(val);
@@ -401,10 +401,10 @@ export default function SettingsScreen({ navigation }) {
             />
           </View>
           <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
-            <CustomDropdown 
-              label={t("Alarm Sound")} 
-              value={alarmSound} 
-              options={soundOptions} 
+            <CustomDropdown
+              label={t("Alarm Sound")}
+              value={alarmSound}
+              options={soundOptions}
               onSelect={val => {
                 dispatch(setAlarmSound(val));
                 playSoundPreview(val);
@@ -429,11 +429,11 @@ export default function SettingsScreen({ navigation }) {
             />
           </View>
           <View style={[styles.dropdownRow, { borderBottomWidth: 0 }]}>
-            <CustomDropdown 
-              label={t("Default Snooze")} 
-              value={defaultSnoozeTime} 
-              options={snoozeOptions} 
-              onSelect={val => dispatch(setDefaultSnoozeTime(val))} 
+            <CustomDropdown
+              label={t("Default Snooze")}
+              value={defaultSnoozeTime}
+              options={snoozeOptions}
+              onSelect={val => dispatch(setDefaultSnoozeTime(val))}
               colors={colors}
               layout="horizontal"
             />
@@ -445,9 +445,9 @@ export default function SettingsScreen({ navigation }) {
           <>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Automation')}</Text>
             <View style={styles.sectionGroup}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 accessible={true} accessibilityRole="button" accessibilityLabel="Task Automations"
-                style={[styles.rowItem, { borderBottomWidth: 1 }]} 
+                style={[styles.rowItem, { borderBottomWidth: 1 }]}
                 onPress={() => setAutoManageModalVisible(true)}
               >
                 <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Task Automations')}</Text>
@@ -481,7 +481,7 @@ export default function SettingsScreen({ navigation }) {
               </Text>
             </View>
           </View>
-          <View style={[styles.rowItem, { display: 'none', borderBottomWidth: 1, borderBottomColor: colors.borderColor, paddingVertical: 14 }]}>
+          <View style={[styles.rowItem, { display: 'none', height: 0, maxHeight: 0, opacity: 0, overflow: 'hidden', paddingVertical: 0, marginVertical: 0, borderBottomWidth: 0, pointerEvents: 'none' }]}>
             <View style={{ flex: 1, marginRight: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
@@ -500,6 +500,7 @@ export default function SettingsScreen({ navigation }) {
               </Text>
             </View>
             <Switch
+              style={{ display: 'none', opacity: 0 }}
               value={isPremium ? (theme.dbSyncEnabled !== false) : false}
               onValueChange={(val) => {
                 if (!isPremium) {
@@ -513,16 +514,17 @@ export default function SettingsScreen({ navigation }) {
             />
           </View>
 
-          <View style={[styles.rowItem, { display: 'none', borderBottomWidth: 0, paddingVertical: 15 }]}>
+          <View style={[styles.rowItem, { display: 'none', height: 0, maxHeight: 0, opacity: 0, overflow: 'hidden', paddingVertical: 0, marginVertical: 0, borderBottomWidth: 0, pointerEvents: 'none' }]}>
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('App PIN Lock')}</Text>
             <Switch
+              style={{ display: 'none', opacity: 0 }}
               value={!!theme.appPin}
               onValueChange={handleTogglePin}
               trackColor={{ false: colors.borderColor, true: colors.primary }}
             />
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"
             style={[styles.deleteBtn, { backgroundColor: colors.danger || '#c62828' }]} onPress={handleDeleteData}
           >
@@ -534,11 +536,11 @@ export default function SettingsScreen({ navigation }) {
       </ScrollView>
 
       {/* Modals */}
-      <ThemeSettingsModal 
-        isVisible={isThemeModalVisible} 
-        onClose={() => setThemeModalVisible(false)} 
+      <ThemeSettingsModal
+        isVisible={isThemeModalVisible}
+        onClose={() => setThemeModalVisible(false)}
       />
-      <AutoManageSettings 
+      <AutoManageSettings
         isVisible={isAutoManageModalVisible}
         onClose={() => setAutoManageModalVisible(false)}
       />

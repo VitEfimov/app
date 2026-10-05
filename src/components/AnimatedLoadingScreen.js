@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { View, Text, StyleSheet, Animated, Easing, Image } from 'react-native';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useTheme } from '../styles/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
@@ -72,11 +72,11 @@ export default function AnimatedLoadingScreen() {
         {/* Animated App Logo Icon */}
         <Animated.View style={{ transform: [{ scale: pulseAnim }], marginBottom: 28, alignItems: 'center' }}>
           <View style={[styles.logoBadge, { backgroundColor: `${primaryColor}18`, borderColor: `${primaryColor}30`, borderWidth: 1.5 }]}>
-            <Svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={primaryColor} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <Rect x="3" y="4" width="18" height="16" rx="3" fill={`${primaryColor}12`} />
-              <Path d="M9 12l2 2 4-4" strokeWidth="2.8" />
-              <Path d="M8 8h8" strokeWidth="2" strokeLinecap="round" />
-            </Svg>
+            <Image 
+              source={require('../../assets/icon.png')} 
+              style={styles.logoImage} 
+              resizeMode="contain"
+            />
           </View>
         </Animated.View>
 
@@ -90,7 +90,7 @@ export default function AnimatedLoadingScreen() {
 
         {/* Pulsing Loading Text */}
         <Animated.Text style={[styles.title, { color: colors.textPrimary || '#1E293B', opacity: fadeAnim }]}>
-          {t('TaskManager Redux')}
+          {t('Task Flow')}
         </Animated.Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary || '#64748B' }]}>
           {t('Organizing your tasks...')}
@@ -121,6 +121,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
   },
   title: {
     fontSize: 20,
@@ -133,3 +139,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+
