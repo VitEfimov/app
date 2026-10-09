@@ -341,25 +341,12 @@ export default function CalendarScreen() {
     const finalMarks = {};
     Object.keys(marks).forEach(dateStr => {
       const dayTasks = marks[dateStr].tasks;
-
-      // Extract unique board IDs for tasks on dateStr
-      const uniqueBoardIds = Array.from(new Set(dayTasks.map(t => t.boardId || 'main')));
-      const dots = uniqueBoardIds.map(bId => {
-        const boardObj = boards.find(b => b.id === bId) || { id: bId, name: bId === 'main' ? 'Main' : 'Board' };
-        const color = getBoardColor(boardObj, boards);
-        return {
-          key: `${bId}_${dateStr}`,
-          color: color,
-          selectedDotColor: colors.textInverse || '#ffffff',
-        };
-      });
-
       const isToday = dateStr === todayStr;
       const isSelected = dateStr === selectedDate;
 
       finalMarks[dateStr] = {
-        marked: true,
-        dots: dots,
+        marked: dayTasks.length > 0,
+        dotColor: isSelected ? (colors.textInverse || '#ffffff') : colors.primary,
         customStyles: {
           container: isSelected ? {
             backgroundColor: colors.primary,
@@ -374,7 +361,7 @@ export default function CalendarScreen() {
           } : {},
           text: isSelected ? {
             color: colors.textInverse || '#ffffff',
-            fontWeight: isToday ? '900' : 'bold',
+            fontWeight: '900',
             fontSize: 15,
           } : isToday ? {
             color: colors.primary,
@@ -405,16 +392,22 @@ export default function CalendarScreen() {
     }
 
     if (!finalMarks[todayStr]) {
+      const isTodaySelected = selectedDate === todayStr;
       finalMarks[todayStr] = {
         customStyles: {
-          container: {
+          container: isTodaySelected ? {
+            backgroundColor: colors.primary,
+            borderRadius: 18,
+            borderWidth: 2,
+            borderColor: colors.textInverse || '#ffffff',
+          } : {
             borderWidth: 2,
             borderColor: colors.primary,
             borderRadius: 18,
             backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
           },
           text: {
-            color: colors.primary,
+            color: isTodaySelected ? (colors.textInverse || '#ffffff') : colors.primary,
             fontWeight: '900',
             fontSize: 15,
           }
@@ -423,7 +416,7 @@ export default function CalendarScreen() {
     }
 
     return finalMarks;
-  }, [tasks, selectedDate, colors, isDark, boards]);
+  }, [tasks, selectedDate, colors, isDark]);
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
@@ -499,7 +492,7 @@ export default function CalendarScreen() {
         <Calendar
           testID="task_calendar"
           key={`${selectedDate}-${colors.bgMain}-${isDark}-${i18n.language}`}
-          markingType={'multi-dot'}
+          markingType={'custom'}
           current={selectedDate}
           firstDay={i18n.language === 'en' ? 0 : 1}
           onDayPress={(day) => {
@@ -540,19 +533,13 @@ export default function CalendarScreen() {
             arrowColor: colors.primary,
             monthTextColor: colors.textPrimary,
             indicatorColor: colors.primary,
-            textDayFontWeight: '700',
+            textDayFontWeight: '600',
             todayButtonFontWeight: 'bold',
             textMonthFontWeight: 'bold',
             textDayHeaderFontWeight: '600',
-            textDayFontSize: 16,
+            textDayFontSize: 15,
             textMonthFontSize: 18,
-            textDayHeaderFontSize: 14,
-            'stylesheet.day.basic': {
-              todayText: {
-                color: colors.primary,
-                fontWeight: 'bold',
-              },
-            }
+            textDayHeaderFontSize: 14
           }}
           style={styles.calendar}
         />
