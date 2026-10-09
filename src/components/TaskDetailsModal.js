@@ -26,9 +26,11 @@ import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
 import { takePhotoAsync, shareTaskAsync, openDocumentAsync as nativeOpenDocumentAsync } from '../../modules/expo-task-alarm';
 import CustomDropdown from './CustomDropdown';
 import CustomRepeatModal from './CustomRepeatModal';
+import CustomReminderModal from './CustomReminderModal';
 import YearPickerModal from './YearPickerModal';
 import ConfirmModal from './ConfirmModal';
 import PremiumModal from './PremiumModal';
+import { toggleTaskOptionsCollapsed } from '../features/userSlice';
 import { useTranslation } from 'react-i18next';
 
 const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style }, ref) => {
@@ -150,12 +152,19 @@ const IconCheckSquare = ({ color }) => (
   </Svg>
 );
 
+const IconChevronDown = ({ color, isCollapsed }) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: [{ rotate: isCollapsed ? '-90deg' : '0deg' }] }}>
+    <Path d="M6 9l6 6 6-6" />
+  </Svg>
+);
+
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const themeState = useSelector(state => state.themeReducer);
   const boards = useSelector(state => state.userReducer.boards || []);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
+  const isTaskOptionsCollapsed = useSelector(state => state.userReducer?.isTaskOptionsCollapsed !== undefined ? state.userReducer.isTaskOptionsCollapsed : true);
   const scrollViewRef = useRef(null);
   const notesRef = useRef(null);
   const initialSnapshotRef = useRef(null);
@@ -176,6 +185,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [selectedTime, setSelectedTime] = useState(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [reminder, setReminder] = useState('None');
+  const [isCustomReminderModalVisible, setIsCustomReminderModalVisible] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState('main');
   const [isAlarm, setIsAlarm] = useState(false);
   const [repeatConfig, setRepeatConfig] = useState({ preset: 'None' });
@@ -696,11 +706,25 @@ useEffect(() => {
   };
 
   const handleReminderSelect = (selectedVal) => {
+    if (selectedVal === 'custom') {
+      setIsCustomReminderModalVisible(true);
+      return;
+    }
     setReminder(selectedVal);
     let updates = { 
       reminder: selectedVal, 
       isNagMode: selectedVal === 'Nag Mode (Every 10 min)', 
       escalationLevel: selectedVal === 'Escalating Reminder' ? 'active' : 'none' 
+    };
+    handleUpdate(updates);
+  };
+
+  const handleCustomReminderSave = (customReminderStr) => {
+    setReminder(customReminderStr);
+    let updates = {
+      reminder: customReminderStr,
+      isNagMode: false,
+      escalationLevel: 'none'
     };
     handleUpdate(updates);
   };
@@ -1199,96 +1223,135 @@ useEffect(() => {
               </View>
             </View>
 
-            <View style={[styles.twoColumnRow, { marginBottom: 16 }]}>
-              <View style={styles.column}>
-                <CustomDropdown label={t("Priority")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 48, borderRadius: 12 }} />
-              </View>
-              <View style={styles.column}>
-                <CustomDropdown 
-                  label={t("Reminder")} 
-                  value={reminder === 'Nag Mode (Every 10 min)' ? t('Nag Mode (Every 10 min)') : reminder === 'Escalating Reminder' ? t('Escalating Reminder') : (t(reminder) || reminder)} 
-                  options={[
-                    {label: t('None'), value: 'None'}, 
-                    {label: t('15 min before'), value: '15 min before'}, 
-                    {label: t('30 min before'), value: '30 min before'}, 
-                    {label: t('1 hr before'), value: '1 hr before'}, 
-                    {label: t('1 day before'), value: '1 day before'}, 
-                    {label: t('Day of'), value: 'Day of'},
-                    {label: t('Nag Mode (Every 10 min)'), value: 'Nag Mode (Every 10 min)'},
-                    {label: t('Escalating Reminder'), value: 'Escalating Reminder'}
-                  ]} 
-                  onSelect={handleReminderSelect} 
-                  colors={colors} 
-                  customBtnStyle={{ height: 48, borderRadius: 12 }} 
-                />
-              </View>
-            </View>
-
-            {boards.length > 1 && (
-              <View style={{ marginBottom: 16 }}>
-                <CustomDropdown 
-                  label={t("Board")} 
-                  value={boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))} 
-                  options={boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id }))} 
-                  onSelect={(val) => setSelectedBoardId(val)} 
-                  colors={colors} 
-                  customBtnStyle={{ height: 48, borderRadius: 12 }} 
-                />
-              </View>
-            )}
-
-            <View style={{ marginBottom: 16 }}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
-              <TouchableOpacity 
-                style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 48, borderRadius: 12 }]}
-                onPress={() => {
-                  setIsRepeatModalVisible(true);
-                }}
-              >
-                <Text style={{ color: colors.textPrimary }}>
-                  {repeatConfig.preset === 'custom' ? t('Custom...') : 
-                   repeatConfig.preset === 'None' ? t('None') : 
-                   (t(repeatConfig.preset) || repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}
+            {/* Collapsible Options Header */}
+            <TouchableOpacity
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('Priority, Reminder, Board, Repeat') || 'Priority, Reminder, Board, Repeat'}, ${isTaskOptionsCollapsed ? 'collapsed' : 'expanded'}`}
+              style={[
+                styles.optionsCollapsibleHeader,
+                { 
+                  borderColor: colors.borderColor,
+                  backgroundColor: surfaceLighter,
+                  marginBottom: isTaskOptionsCollapsed ? 16 : 12,
+                }
+              ]}
+              onPress={() => dispatch(toggleTaskOptionsCollapsed())}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+                <Text style={[styles.optionsCollapsibleTitle, { color: colors.textPrimary }]}>
+                  {t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}
                 </Text>
-              </TouchableOpacity>
-            </View>
-
-            {reminder !== 'None' && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <Switch value={isAlarm} onValueChange={setIsAlarm} trackColor={{ true: colors.primary }} />
-                <Text style={{ color: colors.textPrimary, marginLeft: 10, fontWeight: '600', fontSize: 14 }}>{t('Play Reminder as Alarm')}</Text>
+                {isTaskOptionsCollapsed && (priority !== 'none' || reminder !== 'None' || (repeatConfig && repeatConfig.preset !== 'None')) && (
+                  <View style={[styles.optionsSummaryBadge, { backgroundColor: `${colors.primary}18` }]}>
+                    <Text style={{ fontSize: 11, color: colors.primary, fontWeight: 'bold' }}>
+                      {[
+                        priority !== 'none' ? priority.toUpperCase() : null,
+                        reminder !== 'None' ? reminder : null,
+                        repeatConfig?.preset && repeatConfig.preset !== 'None' ? (t('Repeating') || 'Repeating') : null
+                      ].filter(Boolean).join(' • ')}
+                    </Text>
+                  </View>
+                )}
               </View>
-            )}
+              <IconChevronDown color={colors.textSecondary} isCollapsed={isTaskOptionsCollapsed} />
+            </TouchableOpacity>
 
-            {repeatConfig.preset !== 'None' && (
-              <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, borderRadius: 12, marginBottom: 16, padding: 14 }]}>
-                <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('Repeat configuration')}</Text>
-                <View style={styles.twoColumnRow}>
+            {!isTaskOptionsCollapsed && (
+              <View style={styles.collapsibleContent}>
+                <View style={[styles.twoColumnRow, { marginBottom: 16 }]}>
                   <View style={styles.column}>
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('From')}</Text>
-                    <TouchableOpacity 
-                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 10 }]}
-                      onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
-                    >
-                      <IconCalendar color={colors.textPrimary} />
-                      <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {repeatStartDate || selectedDate ? dayjs(repeatStartDate || selectedDate).format('MM/DD/YYYY') : t('Select')}
-                      </Text>
-                    </TouchableOpacity>
+                    <CustomDropdown label={t("Priority")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 48, borderRadius: 12 }} />
                   </View>
                   <View style={styles.column}>
-                    <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('To')}</Text>
-                    <TouchableOpacity 
-                      style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 10 }]}
-                      onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
-                    >
-                      <IconCalendar color={colors.textPrimary} />
-                      <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {repeatEndDate ? dayjs(repeatEndDate).format('MM/DD/YYYY') : t('Select')}
-                      </Text>
-                    </TouchableOpacity>
+                    <CustomDropdown 
+                      label={t("Reminder")} 
+                      value={reminder === 'Nag Mode (Every 10 min)' ? t('Nag Mode (Every 10 min)') : reminder === 'Escalating Reminder' ? t('Escalating Reminder') : (t(reminder) || reminder)} 
+                      options={[
+                        {label: t('None'), value: 'None'}, 
+                        {label: t('15 min before'), value: '15 min before'}, 
+                        {label: t('30 min before'), value: '30 min before'}, 
+                        {label: t('1 hr before'), value: '1 hr before'}, 
+                        {label: t('1 day before'), value: '1 day before'}, 
+                        {label: t('Day of'), value: 'Day of'},
+                        {label: t('Custom...'), value: 'custom'},
+                        {label: t('Nag Mode (Every 10 min)'), value: 'Nag Mode (Every 10 min)', hidden: true, style: { display: 'none' }},
+                        {label: t('Escalating Reminder'), value: 'Escalating Reminder', hidden: true, style: { display: 'none' }}
+                      ]} 
+                      onSelect={handleReminderSelect} 
+                      colors={colors} 
+                      customBtnStyle={{ height: 48, borderRadius: 12 }} 
+                    />
                   </View>
                 </View>
+
+                {boards.length > 1 && (
+                  <View style={{ marginBottom: 16 }}>
+                    <CustomDropdown 
+                      label={t("Board")} 
+                      value={boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))} 
+                      options={boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id }))} 
+                      onSelect={(val) => setSelectedBoardId(val)} 
+                      colors={colors} 
+                      customBtnStyle={{ height: 48, borderRadius: 12 }} 
+                    />
+                  </View>
+                )}
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
+                  <TouchableOpacity 
+                    style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 48, borderRadius: 12 }]}
+                    onPress={() => {
+                      setIsRepeatModalVisible(true);
+                    }}
+                  >
+                    <Text style={{ color: colors.textPrimary }}>
+                      {repeatConfig.preset === 'custom' ? t('Custom...') : 
+                       repeatConfig.preset === 'None' ? t('None') : 
+                       (t(repeatConfig.preset) || repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {reminder !== 'None' && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                    <Switch value={isAlarm} onValueChange={setIsAlarm} trackColor={{ true: colors.primary }} />
+                    <Text style={{ color: colors.textPrimary, marginLeft: 10, fontWeight: '600', fontSize: 14 }}>{t('Play Reminder as Alarm')}</Text>
+                  </View>
+                )}
+
+                {repeatConfig.preset !== 'None' && (
+                  <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, borderRadius: 12, marginBottom: 16, padding: 14 }]}>
+                    <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('Repeat configuration')}</Text>
+                    <View style={styles.twoColumnRow}>
+                      <View style={styles.column}>
+                        <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('From')}</Text>
+                        <TouchableOpacity 
+                          style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 10 }]}
+                          onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
+                        >
+                          <IconCalendar color={colors.textPrimary} />
+                          <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
+                            {repeatStartDate || selectedDate ? dayjs(repeatStartDate || selectedDate).format('MM/DD/YYYY') : t('Select')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.column}>
+                        <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('To')}</Text>
+                        <TouchableOpacity 
+                          style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 10 }]}
+                          onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
+                        >
+                          <IconCalendar color={colors.textPrimary} />
+                          <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
+                            {repeatEndDate ? dayjs(repeatEndDate).format('MM/DD/YYYY') : t('Select')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
@@ -1619,6 +1682,12 @@ useEffect(() => {
           }
         }}
       />
+      <CustomReminderModal
+        isVisible={isCustomReminderModalVisible}
+        initialValue={reminder}
+        onClose={() => setIsCustomReminderModalVisible(false)}
+        onSave={handleCustomReminderSave}
+      />
     </Modal>
   );
 }
@@ -1851,5 +1920,27 @@ const styles = StyleSheet.create({
   fullscreenImage: {
     width: '100%',
     height: '100%',
+  },
+  optionsCollapsibleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  optionsCollapsibleTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  optionsSummaryBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  collapsibleContent: {
+    paddingTop: 4,
   }
 });

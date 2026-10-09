@@ -540,13 +540,19 @@ export default function CalendarScreen() {
             arrowColor: colors.primary,
             monthTextColor: colors.textPrimary,
             indicatorColor: colors.primary,
-            textDayFontWeight: '600',
+            textDayFontWeight: '700',
             todayButtonFontWeight: 'bold',
             textMonthFontWeight: 'bold',
             textDayHeaderFontWeight: '600',
             textDayFontSize: 16,
             textMonthFontSize: 18,
-            textDayHeaderFontSize: 14
+            textDayHeaderFontSize: 14,
+            'stylesheet.day.basic': {
+              todayText: {
+                color: colors.primary,
+                fontWeight: 'bold',
+              },
+            }
           }}
           style={styles.calendar}
         />

@@ -5,7 +5,19 @@ import axios from 'axios';
 
 const loadThemeFromLocalStorage = () => "light";
 const loadShowWeatherFromLocalStorage = () => false;
-const loadIsGuestFromLocalStorage = () => true;
+const loadIsGuestFromLocalStorage = () => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem('isGuest') === 'true';
+    }
+    return false;
+};
+const loadTaskOptionsCollapsedFromLocalStorage = () => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+        const val = window.localStorage.getItem('isTaskOptionsCollapsed');
+        if (val !== null) return val === 'true';
+    }
+    return true; // hidden by default
+};
 const loadLayoutVersionFromLocalStorage = () => "v1";
 const loadBoardsFromLocalStorage = () => [{ id: 'main', name: 'Main', type: 'standard' }];
 
@@ -187,6 +199,7 @@ const initialState = {
     activeBoardId: 'main',
     dashboardFilterType: 'all',
     layoutVersion: loadLayoutVersionFromLocalStorage(),
+    isTaskOptionsCollapsed: loadTaskOptionsCollapsedFromLocalStorage(),
 };
 
 const userSlice = createSlice({
@@ -233,6 +246,14 @@ const userSlice = createSlice({
         toggleLayoutVersion: (state) => {
             state.layoutVersion = state.layoutVersion === 'v1' ? 'v2' : 'v1';
             AsyncStorage.setItem('layoutVersion', state.layoutVersion);
+        },
+        toggleTaskOptionsCollapsed: (state) => {
+            state.isTaskOptionsCollapsed = !state.isTaskOptionsCollapsed;
+            AsyncStorage.setItem('isTaskOptionsCollapsed', String(state.isTaskOptionsCollapsed));
+        },
+        setTaskOptionsCollapsed: (state, action) => {
+            state.isTaskOptionsCollapsed = action.payload;
+            AsyncStorage.setItem('isTaskOptionsCollapsed', String(action.payload));
         },
     },
     extraReducers: (builder) => {
@@ -365,6 +386,6 @@ const userSlice = createSlice({
     }
 });
 
-export const { hydrateUserState, logout, continueAsGuest, updateUserTheme, updateShowWeather, setActiveBoardId, setDashboardFilterType, toggleLayoutVersion } = userSlice.actions;
+export const { hydrateUserState, logout, continueAsGuest, updateUserTheme, updateShowWeather, setActiveBoardId, setDashboardFilterType, toggleLayoutVersion, toggleTaskOptionsCollapsed, setTaskOptionsCollapsed } = userSlice.actions;
 export default userSlice.reducer;
 

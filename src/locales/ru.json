@@ -492,5 +492,15 @@
   "DB Synchronization": "Синхронизация БД",
   "Database Synchronization": "Синхронизация базы данных",
   "Synchronize data with cloud database": "Синхронизировать данные с облачной базой данных",
-  "Keep data strictly on device": "Храните данные строго на устройстве"
+  "Keep data strictly on device": "Храните данные строго на устройстве",
+  "Custom Reminder": "Своё напоминание",
+  "Set Reminder": "Установить напоминание",
+  "Priority, Reminder, Repeat": "Приоритет, напоминание, повтор",
+  "Priority, Reminder, Board, Repeat": "Приоритет, напоминание, доска, повтор",
+  "Remind before task": "Напомнить до задачи",
+  "Quick Presets": "Быстрый выбор",
+  "min": "мин",
+  "hr": "ч",
+  "day": "дн",
+  "before": "до"
 }

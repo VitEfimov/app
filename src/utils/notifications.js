@@ -567,7 +567,17 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       "1 day before": { amount: 1, unit: "day" }
     };
 
-    const offset = offsets[reminderValue];
+    let offset = offsets[reminderValue];
+    if (!offset) {
+      const match = String(reminderValue).match(/^(\d+)\s*(min|minute|hr|hour|day)s?\s*before$/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        const u = match[2].toLowerCase();
+        const unit = u.startsWith('min') ? 'minute' : (u.startsWith('hr') || u.startsWith('hour')) ? 'hour' : 'day';
+        offset = { amount: num, unit };
+      }
+    }
+
     if (offset) {
       let reminderDate = targetDate.subtract(offset.amount, offset.unit);
       const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm, 'task_reminder', themeState);

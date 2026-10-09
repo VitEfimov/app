@@ -526,7 +526,7 @@ export default function SettingsScreen({ navigation }) {
 
           <TouchableOpacity
             accessible={true} accessibilityRole="button" accessibilityLabel="Delete all data"
-            style={[styles.deleteBtn, { backgroundColor: colors.danger || '#c62828' }]} onPress={handleDeleteData}
+            style={[styles.deleteBtn, { backgroundColor: '#c62828' }]} onPress={handleDeleteData}
           >
             <Text style={styles.deleteBtnText}>{t('Delete All Data')}</Text>
           </TouchableOpacity>

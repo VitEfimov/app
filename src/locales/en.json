@@ -498,5 +498,15 @@
   "DB Synchronization": "DB Synchronization",
   "Database Synchronization": "Database Synchronization",
   "Synchronize data with cloud database": "Synchronize data with cloud database",
-  "Keep data strictly on device": "Keep data strictly on device"
+  "Keep data strictly on device": "Keep data strictly on device",
+  "Custom Reminder": "Custom Reminder",
+  "Set Reminder": "Set Reminder",
+  "Priority, Reminder, Repeat": "Priority, Reminder, Repeat",
+  "Priority, Reminder, Board, Repeat": "Priority, Reminder, Board, Repeat",
+  "Remind before task": "Remind before task",
+  "Quick Presets": "Quick Presets",
+  "min": "min",
+  "hr": "hr",
+  "day": "day",
+  "before": "before"
 }

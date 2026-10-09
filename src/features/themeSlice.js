@@ -1,7 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createSlice } from '@reduxjs/toolkit';
 
-const loadThemeState = () => undefined;
+const loadThemeState = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const saved = window.localStorage.getItem('customTheme');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+  }
+  return undefined;
+};
 
 const loaded = loadThemeState();
 const initialState = {
@@ -24,7 +32,7 @@ const initialState = {
   userPicture: loaded?.userPicture || null,
   headerBackgroundFit: loaded?.headerBackgroundFit || 'cover',
   sourceColor: loaded?.sourceColor || '#6750A4',
-  themeMode: loaded?.themeMode || 'system',
+  themeMode: loaded?.themeMode || 'light',
   calendarPanePosition: loaded?.calendarPanePosition || null,
   progressMode: loaded?.progressMode || 'daily',
   defaultSnoozeTime: loaded?.defaultSnoozeTime || 30,

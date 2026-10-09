@@ -27,9 +27,11 @@ const CustomDropdown = ({
     typeof opt === 'string' ? { label: opt, value: opt } : opt
   );
   
+  const visibleOptions = normalizedOptions.filter(o => !o.hidden && o.style?.display !== 'none' && o.display !== 'none');
+
   const filteredOptions = searchable && searchQuery 
-    ? normalizedOptions.filter(o => o.label.toLowerCase().includes(searchQuery.toLowerCase()))
-    : normalizedOptions;
+    ? visibleOptions.filter(o => o.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    : visibleOptions;
   
   const selectedLabel = normalizedOptions.find(o => o.value === value)?.label || value;
 
