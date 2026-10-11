@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Modal as RNModal } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
-import { togglePomodoroSettings, setTime, setBreakInterval, setIntervalCount, setWorkSound, setBreakSound } from '../features/pomodoroSlice';
+import { togglePomodoroSettings, updatePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path } from 'react-native-svg';
 import CustomDropdown from './CustomDropdown';
@@ -75,16 +75,16 @@ export default function PomodoroSettingsModal() {
   const [breakSound, setBreakSoundState] = useState('none');
 
   const [prevValues, setPrevValues] = useState({});
+  const wasOpenRef = useRef(false);
 
-  const handleInputFocus = (key, currentValue, setter) => {
+  const handleInputFocus = (key, currentValue) => {
     if (currentValue !== '') {
       setPrevValues(prev => ({ ...prev, [key]: currentValue }));
     }
-    setter('');
   };
 
   const handleInputBlur = (key, currentValue, setter, defaultValue) => {
-    if (currentValue === undefined || currentValue === null || currentValue.trim() === '') {
+    if (currentValue === undefined || currentValue === null || String(currentValue).trim() === '') {
       const restored = prevValues[key] !== undefined && prevValues[key] !== '' ? prevValues[key] : defaultValue;
       setter(restored);
     }
@@ -93,50 +93,65 @@ export default function PomodoroSettingsModal() {
   const localizedSounds = predefinedSounds.map(s => ({ ...s, label: t(s.label) }));
 
   useEffect(() => {
-    if (isSettingsOpen) {
-      setWorkHrs(String(Math.floor((currentPomodoro.initialTime || 1500) / 3600)));
-      setWorkMin(String(Math.floor(((currentPomodoro.initialTime || 1500) % 3600) / 60)));
-      setWorkSec(String((currentPomodoro.initialTime || 1500) % 60));
-      setBreakHrs(String(Math.floor((currentPomodoro.breakInterval || 300) / 3600)));
-      setBreakMin(String(Math.floor(((currentPomodoro.breakInterval || 300) % 3600) / 60)));
-      setBreakSec(String((currentPomodoro.breakInterval || 300) % 60));
-      setSessions(String(typeof currentPomodoro.intervalCount === 'object' ? currentPomodoro.intervalCount.count : 5));
+    if (isSettingsOpen && !wasOpenRef.current) {
+      const initTime = currentPomodoro.initialTime || 1500;
+      const brkTime = currentPomodoro.breakInterval || 300;
+      setWorkHrs(String(Math.floor(initTime / 3600)));
+      setWorkMin(String(Math.floor((initTime % 3600) / 60)));
+      setWorkSec(String(initTime % 60));
+      setBreakHrs(String(Math.floor(brkTime / 3600)));
+      setBreakMin(String(Math.floor((brkTime % 3600) / 60)));
+      setBreakSec(String(brkTime % 60));
+      setSessions(String(typeof currentPomodoro.intervalCount === 'object' ? (currentPomodoro.intervalCount.count || 5) : 5));
       setWorkSoundState(currentPomodoro.workSound || 'default');
       setBreakSoundState(currentPomodoro.breakSound || 'default');
       setPrevValues({});
     }
-  }, [isSettingsOpen, currentPomodoro]);
+    wasOpenRef.current = isSettingsOpen;
+  }, [isSettingsOpen]);
+
+  const parseVal = (str, fallback) => {
+    if (str === '' || str === null || str === undefined) return fallback;
+    const parsed = parseInt(str, 10);
+    return isNaN(parsed) || parsed < 0 ? fallback : parsed;
+  };
 
   const handleSave = () => {
-    const wHrs = parseInt(workHrs) || (prevValues.workHrs ? parseInt(prevValues.workHrs) : 0);
-    const wMin = parseInt(workMin) || (prevValues.workMin ? parseInt(prevValues.workMin) : 0);
-    const wSec = parseInt(workSec) || (prevValues.workSec ? parseInt(prevValues.workSec) : 0);
-    const bHrs = parseInt(breakHrs) || (prevValues.breakHrs ? parseInt(prevValues.breakHrs) : 0);
-    const bMin = parseInt(breakMin) || (prevValues.breakMin ? parseInt(prevValues.breakMin) : 0);
-    const bSec = parseInt(breakSec) || (prevValues.breakSec ? parseInt(prevValues.breakSec) : 0);
-    const sCount = parseInt(sessions) || (prevValues.sessions ? parseInt(prevValues.sessions) : 5);
+    const wHrs = parseVal(workHrs, prevValues.workHrs !== undefined ? parseVal(prevValues.workHrs, 0) : 0);
+    const wMin = parseVal(workMin, prevValues.workMin !== undefined ? parseVal(prevValues.workMin, 25) : 25);
+    const wSec = parseVal(workSec, prevValues.workSec !== undefined ? parseVal(prevValues.workSec, 0) : 0);
+    const bHrs = parseVal(breakHrs, prevValues.breakHrs !== undefined ? parseVal(prevValues.breakHrs, 0) : 0);
+    const bMin = parseVal(breakMin, prevValues.breakMin !== undefined ? parseVal(prevValues.breakMin, 5) : 5);
+    const bSec = parseVal(breakSec, prevValues.breakSec !== undefined ? parseVal(prevValues.breakSec, 0) : 0);
+    const sCount = parseVal(sessions, prevValues.sessions !== undefined ? parseVal(prevValues.sessions, 5) : 5);
 
     let workTime = wHrs * 3600 + wMin * 60 + wSec;
-    if (workTime === 0) workTime = 25 * 60;
+    if (workTime <= 0) workTime = 25 * 60;
 
     let breakTime = bHrs * 3600 + bMin * 60 + bSec;
-    if (breakTime === 0) breakTime = 5 * 60;
+    if (breakTime <= 0) breakTime = 5 * 60;
 
-    dispatch(setTime(workTime));
-    dispatch(setBreakInterval(breakTime));
-    dispatch(setIntervalCount(Math.min(sCount, 10))); // Max 10 sessions
-    dispatch(setWorkSound(workSound));
-    dispatch(setBreakSound(breakSound));
-    
+    const sessionCount = Math.max(1, Math.min(sCount, 10));
+
+    dispatch(updatePomodoroSettings({
+      workTime,
+      breakTime,
+      intervalCount: sessionCount,
+      workSound,
+      breakSound,
+    }));
+
     dispatch(togglePomodoroSettings(false));
   };
 
   const handleResetToDefault = () => {
-    dispatch(setTime(25 * 60));
-    dispatch(setBreakInterval(5 * 60));
-    dispatch(setIntervalCount(5));
-    dispatch(setWorkSound('default'));
-    dispatch(setBreakSound('default'));
+    dispatch(updatePomodoroSettings({
+      workTime: 25 * 60,
+      breakTime: 5 * 60,
+      intervalCount: 5,
+      workSound: 'default',
+      breakSound: 'default',
+    }));
     dispatch(togglePomodoroSettings(false));
   };
 

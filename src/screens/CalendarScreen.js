@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSelector, useDispatch } from 'react-redux';
@@ -325,98 +325,114 @@ export default function CalendarScreen() {
     showToast(`${t('Moved')} ${selectedIds.length} ${t('Tasks to')} ${boardName}`);
   };
 
+  const todayStr = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
+
+  // Prepare marked dates with distinct board dots
   const markedDates = useMemo(() => {
-    const todayStr = dayjs().format('YYYY-MM-DD');
     const marks = {};
     tasks.forEach(task => {
       if (task.completionDate) {
         const dateStr = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
-        if (!marks[dateStr]) {
-          marks[dateStr] = { tasks: [] };
+        if (dateStr) {
+          if (!marks[dateStr]) {
+            marks[dateStr] = { tasks: [] };
+          }
+          marks[dateStr].tasks.push(task);
         }
-        marks[dateStr].tasks.push(task);
       }
     });
 
     const finalMarks = {};
     Object.keys(marks).forEach(dateStr => {
       const dayTasks = marks[dateStr].tasks;
-      const isToday = dateStr === todayStr;
-      const isSelected = dateStr === selectedDate;
+      // Extract unique board IDs for tasks on this date
+      const uniqueBoardIds = Array.from(new Set(dayTasks.map(t => t.boardId || 'main')));
+      const dots = uniqueBoardIds.map(bId => {
+        const boardObj = boards.find(b => b && (b.id === bId || b._id === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Board' };
+        return {
+          key: `${bId}_${dateStr}`,
+          color: getBoardColor(boardObj, boards),
+        };
+      });
 
       finalMarks[dateStr] = {
-        marked: dayTasks.length > 0,
-        dotColor: isSelected ? (colors.textInverse || '#ffffff') : colors.primary,
-        customStyles: {
-          container: isSelected ? {
-            backgroundColor: colors.primary,
-            borderRadius: 18,
-            borderWidth: isToday ? 2 : 0,
-            borderColor: isToday ? (colors.textInverse || '#ffffff') : 'transparent',
-          } : isToday ? {
-            borderWidth: 2,
-            borderColor: colors.primary,
-            borderRadius: 18,
-            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
-          } : {},
-          text: isSelected ? {
-            color: colors.textInverse || '#ffffff',
-            fontWeight: '900',
-            fontSize: 15,
-          } : isToday ? {
-            color: colors.primary,
-            fontWeight: '900',
-            fontSize: 15,
-          } : {}
-        }
+        dots,
+        marked: dots.length > 0,
       };
     });
 
     if (!finalMarks[selectedDate]) {
-      const isToday = selectedDate === todayStr;
-      finalMarks[selectedDate] = {
-        customStyles: {
-          container: {
-            backgroundColor: colors.primary,
-            borderRadius: 18,
-            borderWidth: isToday ? 2 : 0,
-            borderColor: isToday ? (colors.textInverse || '#ffffff') : 'transparent',
-          },
-          text: {
-            color: colors.textInverse || '#ffffff',
-            fontWeight: '900',
-            fontSize: 15,
-          }
-        }
-      };
+      finalMarks[selectedDate] = { dots: [] };
     }
-
     if (!finalMarks[todayStr]) {
-      const isTodaySelected = selectedDate === todayStr;
-      finalMarks[todayStr] = {
-        customStyles: {
-          container: isTodaySelected ? {
-            backgroundColor: colors.primary,
-            borderRadius: 18,
-            borderWidth: 2,
-            borderColor: colors.textInverse || '#ffffff',
-          } : {
-            borderWidth: 2,
-            borderColor: colors.primary,
-            borderRadius: 18,
-            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
-          },
-          text: {
-            color: isTodaySelected ? (colors.textInverse || '#ffffff') : colors.primary,
-            fontWeight: '900',
-            fontSize: 15,
-          }
-        }
-      };
+      finalMarks[todayStr] = { dots: [] };
     }
 
     return finalMarks;
-  }, [tasks, selectedDate, colors, isDark]);
+  }, [tasks, boards, selectedDate, todayStr]);
+
+  const renderCustomDay = useCallback(({ date, state, marking }) => {
+    if (!date) return null;
+    const dateStr = date.dateString;
+    const isSelected = dateStr === selectedDate;
+    const isToday = dateStr === todayStr;
+    const isDisabled = state === 'disabled';
+    const dayDots = marking?.dots || markedDates[dateStr]?.dots || [];
+    const visibleDots = dayDots.slice(0, 4);
+
+    return (
+      <TouchableOpacity
+        testID={`calendar_day_${dateStr}`}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`${dateStr}${isSelected ? ', selected' : ''}${isToday ? ', today' : ''}`}
+        activeOpacity={0.7}
+        onPress={() => {
+          setSelectedDate(dateStr);
+          setSelectionMode({ isActive: false, selectedTaskIds: [] });
+        }}
+        style={styles.dayCellContainer}
+      >
+        <View
+          style={[
+            styles.dayCircle,
+            isSelected ? {
+              backgroundColor: colors.primary,
+            } : isToday ? {
+              backgroundColor: isDark ? 'rgba(33, 150, 243, 0.28)' : 'rgba(0, 102, 204, 0.16)',
+            } : null,
+          ]}
+        >
+          <Text
+            style={[
+              styles.dayText,
+              {
+                color: isSelected
+                  ? (colors.textInverse || '#ffffff')
+                  : isToday
+                  ? colors.primary
+                  : isDisabled
+                  ? (colors.surfaceContainerHigh || '#888888')
+                  : colors.textPrimary,
+                fontWeight: isSelected || isToday ? 'bold' : '600',
+              },
+            ]}
+          >
+            {date.day}
+          </Text>
+        </View>
+
+        <View style={styles.dotsRow}>
+          {visibleDots.map(dot => (
+            <View
+              key={dot.key}
+              style={[styles.boardDot, { backgroundColor: dot.color }]}
+            />
+          ))}
+        </View>
+      </TouchableOpacity>
+    );
+  }, [selectedDate, todayStr, markedDates, colors, isDark]);
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
@@ -492,7 +508,7 @@ export default function CalendarScreen() {
         <Calendar
           testID="task_calendar"
           key={`${selectedDate}-${colors.bgMain}-${isDark}-${i18n.language}`}
-          markingType={'custom'}
+          markingType={'multi-dot'}
           current={selectedDate}
           firstDay={i18n.language === 'en' ? 0 : 1}
           onDayPress={(day) => {
@@ -501,6 +517,7 @@ export default function CalendarScreen() {
           }}
           markedDates={markedDates}
           enableSwipeMonths={true}
+          dayComponent={renderCustomDay}
           renderHeader={(date) => {
             const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
             const monthStr = dateObj.format('MMMM YYYY');
@@ -810,6 +827,38 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
     elevation: 3,
+  },
+  dayCellContainer: {
+    width: 38,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 1,
+  },
+  dayCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayText: {
+    fontSize: 15,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 7,
+    marginTop: 2,
+  },
+  boardDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginHorizontal: 1,
   },
   taskListHeader: {
     flexDirection: 'row',

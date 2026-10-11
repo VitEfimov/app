@@ -508,5 +508,10 @@
   "min": "min",
   "hr": "hr",
   "day": "day",
-  "before": "before"
+  "before": "before",
+  "Keep notification all day": "Keep notification all day",
+  "Cannot be closed until task is modified or completed": "Cannot be closed until task is modified or completed",
+  "All Day Notification": "All Day Notification",
+  "Complete Task": "Complete Task",
+  "Edit Task": "Edit Task"
 }

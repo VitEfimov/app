@@ -101,12 +101,11 @@ export default function PomodoroScreen() {
   const [localIsActive, setLocalIsActive] = useState(false);
   const [localIsBreak, setLocalIsBreak] = useState(pomodoro.isBreak);
   
-  const initialIntervalCount = typeof pomodoro.intervalCount === 'object' ? pomodoro.intervalCount.count : 5;
-  const initialPassed = typeof pomodoro.intervalCount === 'object' ? pomodoro.intervalCount.passed : 0;
+  const intervalCount = typeof pomodoro.intervalCount === 'object' ? (pomodoro.intervalCount.count || 5) : 5;
+  const initialPassed = typeof pomodoro.intervalCount === 'object' ? (pomodoro.intervalCount.passed || 0) : 0;
   
   const [localCompletedIntervals, setLocalCompletedIntervals] = useState(initialPassed);
 
-  const staticIntervalCountRef = useRef(initialIntervalCount);
   const intervalRef = useRef(null);
   const targetEndTimeRef = useRef(null);
 
@@ -117,12 +116,21 @@ export default function PomodoroScreen() {
   const notificationIdRef = useRef(null);
 
   useEffect(() => {
+    if (!pomodoro.isActive && localIsActive) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setLocalIsActive(false);
+      targetEndTimeRef.current = null;
+      if (notificationIdRef.current) {
+        cancelPomodoroAlarm('current');
+        notificationIdRef.current = null;
+      }
+    }
     setLocalTime(pomodoro.time);
     setLocalIsBreak(pomodoro.isBreak);
     setLocalCompletedIntervals(
-      typeof pomodoro.intervalCount === 'object' ? pomodoro.intervalCount.passed : 0
+      typeof pomodoro.intervalCount === 'object' ? (pomodoro.intervalCount.passed || 0) : 0
     );
-  }, [pomodoro]);
+  }, [pomodoro.time, pomodoro.initialTime, pomodoro.breakInterval, pomodoro.isBreak, pomodoro.isActive, pomodoro.intervalCount]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -180,11 +188,11 @@ export default function PomodoroScreen() {
         playAudio(breakSoundKey);
       }
 
-      if (localCompletedIntervals + 1 >= staticIntervalCountRef.current) {
+      if (localCompletedIntervals + 1 >= intervalCount) {
         dispatch(resetTimer());
       }
     } else {
-      dispatch(completeWorkInterval(pomodoro.initialTime));
+      dispatch(completeWorkInterval());
       if (Platform.OS !== 'android') {
         playAudio(workSoundKey);
       }
@@ -253,7 +261,7 @@ export default function PomodoroScreen() {
   };
 
   const handleResetTimer = () => {
-    clearInterval(intervalRef.current);
+    if (intervalRef.current) clearInterval(intervalRef.current);
     setLocalIsActive(false);
     setLocalIsBreak(false);
     setLocalCompletedIntervals(0);
@@ -279,11 +287,11 @@ export default function PomodoroScreen() {
     };
   };
 
-  const currentFill = Math.max(0, Math.min(100, 100 - (localTime / (localIsBreak ? pomodoro.breakInterval : pomodoro.initialTime)) * 100));
+  const totalDuration = localIsBreak ? (pomodoro.breakInterval || 300) : (pomodoro.initialTime || 1500);
+  const currentFill = Math.max(0, Math.min(100, 100 - (localTime / Math.max(1, totalDuration)) * 100));
   const circumference = 283; // 2 * pi * r (where r = 45)
   const strokeDashoffset = circumference - (circumference * currentFill) / 100;
   
-  const intervalCount = staticIntervalCountRef.current;
   const timerColor = colors.primary;
 
   return (

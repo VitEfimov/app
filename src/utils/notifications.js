@@ -486,6 +486,26 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
     ]
   );
 
+  await Notifications.setNotificationCategoryAsync(
+    'task_persistent',
+    [
+      {
+        identifier: 'complete_task',
+        buttonTitle: 'Complete Task',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: 'reschedule',
+        buttonTitle: 'Edit Task',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+    ]
+  );
+
   /*
    * You do not need a push token for local notifications.
    * Obtain one only when you intend to receive remote push messages.
@@ -502,7 +522,7 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 dayjs.extend(customParseFormat);
 export async function scheduleTaskReminder(taskName, reminderValue, completionDateStr, timeStr, taskId = null, isAlarm = false, themeState = {}, advancedOptions = {}) {
   if (Platform.OS === 'web') return [];
-  DevLogger.info(`scheduleTaskReminder called for task: ${taskName}`, { reminderValue, completionDateStr, timeStr, isAlarm });
+  DevLogger.info(`scheduleTaskReminder called for task: ${taskName}`, { reminderValue, completionDateStr, timeStr, isAlarm, advancedOptions });
   if (!completionDateStr) {
     DevLogger.warn(`scheduleTaskReminder: No completionDateStr provided, aborting`);
     return [];
@@ -518,10 +538,40 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
   if (!targetDate.isValid()) return [];
 
   const hasReminder = reminderValue && reminderValue !== 'None';
+  const isKeepAllDay = !!advancedOptions.keepNotificationAllDay;
   
   // If reminder is 'None' and isAlarm is false, do not schedule any reminder unless explicitly asked
-  if (!hasReminder && !isAlarm && !advancedOptions.isNagMode && advancedOptions.escalationLevel !== 'active') {
+  if (!hasReminder && !isAlarm && !advancedOptions.isNagMode && advancedOptions.escalationLevel !== 'active' && !isKeepAllDay) {
     return [];
+  }
+
+  // Schedule persistent all-day notification if requested
+  if (isKeepAllDay) {
+    const now = dayjs();
+    const isTodayOrPast = targetDate.isSameOrBefore(now, 'day');
+    
+    let triggerDate;
+    if (isTodayOrPast) {
+      triggerDate = now.add(2, 'second');
+    } else {
+      let futureMorning = targetDate.startOf('day').hour(8).minute(0).second(0);
+      if (timeStr) {
+        const [h, m] = timeStr.split(':').map(Number);
+        if (!isNaN(h) && !isNaN(m) && (h < 8 || (h === 8 && m === 0))) {
+          futureMorning = targetDate.startOf('day').hour(h).minute(m).second(0);
+        }
+      }
+      triggerDate = futureMorning;
+    }
+
+    const persistentId = await schedulePersistentTaskNotification(
+      taskName,
+      triggerDate.toDate(),
+      taskId,
+      timeStr,
+      themeState
+    );
+    if (persistentId) ids.push(persistentId);
   }
 
   if (timeStr) {
@@ -545,16 +595,18 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       return [];
     }
 
-    // Schedule exact time notification
-    const timeId = await scheduleExactTaskReminder(
-      taskName,
-      targetDate.toDate(),
-      taskId,
-      isAlarm,
-      isAlarm ? 'task_reminder' : 'task_regular',
-      themeState
-    );
-    if (timeId) ids.push(timeId);
+    // Schedule exact time notification if reminder or alarm is set
+    if (hasReminder || isAlarm) {
+      const timeId = await scheduleExactTaskReminder(
+        taskName,
+        targetDate.toDate(),
+        taskId,
+        isAlarm,
+        isAlarm ? 'task_reminder' : 'task_regular',
+        themeState
+      );
+      if (timeId) ids.push(timeId);
+    }
   } else {
     targetDate = targetDate.hour(9).minute(0).second(0); // Default to 9 AM
   }
@@ -613,6 +665,59 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
   }
 
   return ids;
+}
+
+export async function schedulePersistentTaskNotification(
+  taskName,
+  triggerDateObj,
+  taskId = null,
+  timeStr = null,
+  themeState = {}
+) {
+  if (Platform.OS === 'web') return null;
+  const targetDate = dayjs(triggerDateObj);
+  DevLogger.info(`schedulePersistentTaskNotification for: ${taskName}`, { targetDate: targetDate.format(), taskId });
+
+  const notificationSound = themeState.notificationSound || 'default';
+  const vibrationEnabled = themeState.vibrationEnabled !== false;
+  const channelId = getChannelId(false, notificationSound, vibrationEnabled);
+  const sound = notificationSound;
+
+  try {
+    await configureAndroidNotificationChannels(notificationSound, 'default', vibrationEnabled);
+
+    const scheduledId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Task Reminder',
+        body: timeStr ? `${taskName} (${timeStr})` : taskName,
+        ...(Platform.OS !== 'android' && { sound }),
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        categoryIdentifier: 'task_persistent',
+        data: {
+          taskId,
+          isAlarm: false,
+          keepNotificationAllDay: true,
+        },
+        sticky: true,
+        autoDismiss: false,
+      },
+      trigger:
+        Platform.OS === 'android'
+          ? {
+              date: targetDate.toDate(),
+              channelId,
+            }
+          : {
+              date: targetDate.toDate(),
+            },
+    });
+
+    DevLogger.success(`Successfully scheduled persistent notification`, { scheduledId, channelId, taskName });
+    return scheduledId;
+  } catch (error) {
+    DevLogger.error(`Error scheduling persistent notification`, error.message);
+    return null;
+  }
 }
 
 export async function scheduleExactTaskReminder(
@@ -809,6 +914,7 @@ export async function cancelNotification(notificationIds, taskId = null) {
         } else {
           try {
             await Notifications.cancelScheduledNotificationAsync(id);
+            await Notifications.dismissNotificationAsync(id);
           } catch (e) {}
         }
       }
@@ -826,6 +932,15 @@ export async function cancelNotification(notificationIds, taskId = null) {
         const itemTaskId = item.content?.data?.taskId;
         if (itemTaskId !== undefined && itemTaskId !== null && String(itemTaskId) === String(targetId)) {
           await Notifications.cancelScheduledNotificationAsync(item.identifier);
+          await Notifications.dismissNotificationAsync(item.identifier);
+        }
+      }
+
+      const presented = await Notifications.getPresentedNotificationsAsync();
+      for (const item of presented) {
+        const itemTaskId = item.request?.content?.data?.taskId;
+        if (itemTaskId !== undefined && itemTaskId !== null && String(itemTaskId) === String(targetId)) {
+          await Notifications.dismissNotificationAsync(item.request.identifier);
         }
       }
     } catch (err) {
@@ -841,7 +956,9 @@ export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, upda
     if (task.completed) continue;
     await cancelNotification(task.notificationId, task.id);
     
-    if (task.reminder && task.reminder !== 'None') {
+    const hasReminder = task.reminder && task.reminder !== 'None';
+    const isKeepAllDay = !!task.keepNotificationAllDay;
+    if (hasReminder || isKeepAllDay) {
       const notifIds = await scheduleTaskReminder(
         task.taskname,
         task.reminder,
@@ -850,7 +967,11 @@ export async function rescheduleAllActiveTasks(tasks, themeState, dispatch, upda
         task.id,
         task.isAlarm || false,
         themeState,
-        { isNagMode: task.isNagMode, escalationLevel: task.escalationLevel }
+        {
+          isNagMode: task.isNagMode,
+          escalationLevel: task.escalationLevel,
+          keepNotificationAllDay: task.keepNotificationAllDay
+        }
       );
       
       if (notifIds && notifIds.length > 0) {

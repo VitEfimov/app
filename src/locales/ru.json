@@ -502,5 +502,10 @@
   "min": "мин",
   "hr": "ч",
   "day": "дн",
-  "before": "до"
+  "before": "до",
+  "Keep notification all day": "Держать уведомление весь день",
+  "Cannot be closed until task is modified or completed": "Нельзя закрыть до изменения или выполнения задачи",
+  "All Day Notification": "Уведомление на весь день",
+  "Complete Task": "Завершить задачу",
+  "Edit Task": "Редактировать задачу"
 }

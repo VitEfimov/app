@@ -492,5 +492,20 @@
   "DB Synchronization": "Sincronizzazione DB",
   "Database Synchronization": "Sincronizzazione dei database",
   "Synchronize data with cloud database": "Sincronizza i dati con il database cloud",
-  "Keep data strictly on device": "Conserva i dati rigorosamente sul dispositivo"
+  "Keep data strictly on device": "Conserva i dati rigorosamente sul dispositivo",
+  "Custom Reminder": "Promemoria personalizzato",
+  "Set Reminder": "Imposta promemoria",
+  "Priority, Reminder, Repeat": "Priorità, promemoria, ripetizione",
+  "Priority, Reminder, Board, Repeat": "Priorità, Promemoria, Consiglio, Ripeti",
+  "Remind before task": "Ricorda prima dell'attività",
+  "Quick Presets": "Preimpostazioni rapide",
+  "min": "min",
+  "hr": "ora",
+  "day": "giorno",
+  "before": "Prima",
+  "Keep notification all day": "Mantieni la notifica tutto il giorno",
+  "Cannot be closed until task is modified or completed": "Non può essere chiuso finché l'attività non viene modificata o completata",
+  "All Day Notification": "Notifica per tutto il giorno",
+  "Complete Task": "Completa l'attività",
+  "Edit Task": "Modifica attività"
 }

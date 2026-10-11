@@ -492,5 +492,20 @@
   "DB Synchronization": "DB-Synchronisierung",
   "Database Synchronization": "Datenbanksynchronisierung",
   "Synchronize data with cloud database": "Daten mit der Cloud-Datenbank synchronisieren",
-  "Keep data strictly on device": "Bewahren Sie die Daten ausschließlich auf dem Gerät auf"
+  "Keep data strictly on device": "Bewahren Sie die Daten ausschließlich auf dem Gerät auf",
+  "Custom Reminder": "Benutzerdefinierte Erinnerung",
+  "Set Reminder": "Erinnerung festlegen",
+  "Priority, Reminder, Repeat": "Priorität, Erinnerung, Wiederholung",
+  "Priority, Reminder, Board, Repeat": "Priorität, Erinnerung, Tafel, Wiederholung",
+  "Remind before task": "Vor der Aufgabe erinnern",
+  "Quick Presets": "Schnellvoreinstellungen",
+  "min": "min",
+  "hr": "Std",
+  "day": "Tag",
+  "before": "vor",
+  "Keep notification all day": "Bleiben Sie den ganzen Tag über benachrichtigt",
+  "Cannot be closed until task is modified or completed": "Kann nicht geschlossen werden, bis die Aufgabe geändert oder abgeschlossen wurde",
+  "All Day Notification": "Ganztägige Benachrichtigung",
+  "Complete Task": "Aufgabe abschließen",
+  "Edit Task": "Aufgabe bearbeiten"
 }

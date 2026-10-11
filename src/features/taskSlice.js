@@ -284,6 +284,7 @@ const taskSlice = createSlice({
                 if (action.payload.repeatEndDate !== undefined) task.repeatEndDate = action.payload.repeatEndDate;
                 if (action.payload.isNagMode !== undefined) task.isNagMode = action.payload.isNagMode;
                 if (action.payload.escalationLevel !== undefined) task.escalationLevel = action.payload.escalationLevel;
+                if (action.payload.keepNotificationAllDay !== undefined) task.keepNotificationAllDay = action.payload.keepNotificationAllDay;
                 if (description) {
                     task.description = {
                         text: description.text !== undefined ? description.text : (task.description?.text || ''),
@@ -318,6 +319,7 @@ const taskSlice = createSlice({
                         if (updates.reminder !== undefined) updated.reminder = updates.reminder;
                         if (updates.boardId !== undefined) updated.boardId = updates.boardId;
                         if (updates.isAlarm !== undefined) updated.isAlarm = updates.isAlarm;
+                        if (updates.keepNotificationAllDay !== undefined) updated.keepNotificationAllDay = updates.keepNotificationAllDay;
                         if (updates.description !== undefined) {
                             updated.description = {
                                 text: updates.description.text !== undefined ? updates.description.text : (task.description?.text || ''),
@@ -478,7 +480,9 @@ export const addTask = (payload) => async (dispatch, getState) => {
         if (isPremium && themeState?.defaultReminderEnabled && (!payload.task.reminder || payload.task.reminder === 'None')) {
             payload.task.reminder = themeState.defaultReminderTime || '15 min before';
         }
-        if (payload.task.reminder && payload.task.reminder !== 'None' && payload.task.completionDate && !payload.task.completed) {
+        const hasReminder = payload.task.reminder && payload.task.reminder !== 'None';
+        const isKeepAllDay = !!payload.task.keepNotificationAllDay;
+        if ((hasReminder || isKeepAllDay) && payload.task.completionDate && !payload.task.completed) {
             try {
                 const notifIds = await scheduleTaskReminder(
                     payload.task.taskname,
@@ -487,7 +491,12 @@ export const addTask = (payload) => async (dispatch, getState) => {
                     payload.task.time,
                     payload.task.id,
                     !!payload.task.isAlarm,
-                    themeState
+                    themeState,
+                    {
+                        isNagMode: payload.task.isNagMode,
+                        escalationLevel: payload.task.escalationLevel,
+                        keepNotificationAllDay: payload.task.keepNotificationAllDay
+                    }
                 );
                 if (notifIds && notifIds.length > 0) {
                     payload.task.notificationId = notifIds;
@@ -517,7 +526,9 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
                 if (isPremium && themeState?.defaultReminderEnabled && (!task.reminder || task.reminder === 'None')) {
                     task.reminder = themeState.defaultReminderTime || '15 min before';
                 }
-                if (task.reminder && task.reminder !== 'None' && task.completionDate && !task.completed) {
+                const hasReminder = task.reminder && task.reminder !== 'None';
+                const isKeepAllDay = !!task.keepNotificationAllDay;
+                if ((hasReminder || isKeepAllDay) && task.completionDate && !task.completed) {
                     try {
                         const notifIds = await scheduleTaskReminder(
                             task.taskname,
@@ -526,7 +537,12 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
                             task.time,
                             task.id,
                             !!task.isAlarm,
-                            themeState
+                            themeState,
+                            {
+                                isNagMode: task.isNagMode,
+                                escalationLevel: task.escalationLevel,
+                                keepNotificationAllDay: task.keepNotificationAllDay
+                            }
                         );
                         if (notifIds && notifIds.length > 0) {
                             task.notificationId = notifIds;
@@ -627,21 +643,30 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     if (updatedTask) {
         if (updatedTask.completed) {
             await cancelNotification(updatedTask.notificationId, updatedTask.id);
-        } else if (existingTask && existingTask.completed && !updatedTask.completed && updatedTask.reminder && updatedTask.reminder !== 'None') {
-            try {
-                const notifIds = await scheduleTaskReminder(
-                    updatedTask.taskname,
-                    updatedTask.reminder,
-                    updatedTask.completionDate,
-                    updatedTask.time,
-                    updatedTask.id,
-                    !!updatedTask.isAlarm,
-                    state.themeReducer
-                );
-                if (notifIds && notifIds.length > 0) {
-                    dispatch(updateTaskSync({ taskId: updatedTask.id, notificationId: notifIds }));
-                }
-            } catch (e) {}
+        } else if (existingTask && existingTask.completed && !updatedTask.completed) {
+            const hasReminder = updatedTask.reminder && updatedTask.reminder !== 'None';
+            const isKeepAllDay = !!updatedTask.keepNotificationAllDay;
+            if (hasReminder || isKeepAllDay) {
+                try {
+                    const notifIds = await scheduleTaskReminder(
+                        updatedTask.taskname,
+                        updatedTask.reminder,
+                        updatedTask.completionDate,
+                        updatedTask.time,
+                        updatedTask.id,
+                        !!updatedTask.isAlarm,
+                        state.themeReducer,
+                        {
+                            isNagMode: updatedTask.isNagMode,
+                            escalationLevel: updatedTask.escalationLevel,
+                            keepNotificationAllDay: updatedTask.keepNotificationAllDay
+                        }
+                    );
+                    if (notifIds && notifIds.length > 0) {
+                        dispatch(updateTaskSync({ taskId: updatedTask.id, notificationId: notifIds }));
+                    }
+                } catch (e) {}
+            }
         }
     }
 
@@ -886,7 +911,7 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
                                     updatedTask.id,
                                     !!updatedTask.isAlarm,
                                     themeState,
-                                    { isNagMode: updatedTask.isNagMode, escalationLevel: updatedTask.escalationLevel }
+                                    { isNagMode: updatedTask.isNagMode, escalationLevel: updatedTask.escalationLevel, keepNotificationAllDay: updatedTask.keepNotificationAllDay }
                                 );
                                 if (newNotifIds && newNotifIds.length > 0) {
                                     updatedTask.notificationId = newNotifIds;

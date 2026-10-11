@@ -492,5 +492,20 @@
   "DB Synchronization": "数据库同步",
   "Database Synchronization": "数据库同步",
   "Synchronize data with cloud database": "与云端数据库同步数据",
-  "Keep data strictly on device": "严格将数据保存在设备上"
+  "Keep data strictly on device": "严格将数据保存在设备上",
+  "Custom Reminder": "自定义提醒",
+  "Set Reminder": "设置提醒",
+  "Priority, Reminder, Repeat": "优先、提醒、重复",
+  "Priority, Reminder, Board, Repeat": "优先、提醒、公告板、重复",
+  "Remind before task": "任务前提醒",
+  "Quick Presets": "快速预设",
+  "min": "分钟",
+  "hr": "小时",
+  "day": "天",
+  "before": "前",
+  "Keep notification all day": "全天保持通知",
+  "Cannot be closed until task is modified or completed": "在任务修改或完成之前无法关闭",
+  "All Day Notification": "全天通知",
+  "Complete Task": "完成任务",
+  "Edit Task": "编辑任务"
 }

@@ -492,5 +492,20 @@
   "DB Synchronization": "DB同期",
   "Database Synchronization": "データベースの同期",
   "Synchronize data with cloud database": "クラウドデータベースとデータを同期する",
-  "Keep data strictly on device": "データをデバイス上に厳重に保管する"
+  "Keep data strictly on device": "データをデバイス上に厳重に保管する",
+  "Custom Reminder": "カスタムリマインダー",
+  "Set Reminder": "リマインダーを設定する",
+  "Priority, Reminder, Repeat": "優先順位、リマインダー、繰り返し",
+  "Priority, Reminder, Board, Repeat": "優先順位、リマインダー、ボード、リピート",
+  "Remind before task": "タスクの前にリマインドする",
+  "Quick Presets": "クイックプリセット",
+  "min": "分",
+  "hr": "時",
+  "day": "日",
+  "before": "前に",
+  "Keep notification all day": "一日中通知を維持する",
+  "Cannot be closed until task is modified or completed": "タスクが変更されるか完了するまで閉じることはできません",
+  "All Day Notification": "終日通知",
+  "Complete Task": "タスクを完了する",
+  "Edit Task": "タスクの編集"
 }

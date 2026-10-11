@@ -492,5 +492,20 @@
   "DB Synchronization": "DB 동기화",
   "Database Synchronization": "데이터베이스 동기화",
   "Synchronize data with cloud database": "클라우드 데이터베이스와 데이터 동기화",
-  "Keep data strictly on device": "데이터를 기기에만 엄격하게 보관하세요"
+  "Keep data strictly on device": "데이터를 기기에만 엄격하게 보관하세요",
+  "Custom Reminder": "맞춤 알림",
+  "Set Reminder": "알림 설정",
+  "Priority, Reminder, Repeat": "우선순위, 알림, 반복",
+  "Priority, Reminder, Board, Repeat": "우선순위, 알림, 게시판, 반복",
+  "Remind before task": "작업 전에 알림",
+  "Quick Presets": "빠른 사전 설정",
+  "min": "분",
+  "hr": "시간",
+  "day": "낮",
+  "before": "~ 전에",
+  "Keep notification all day": "하루 종일 알림을 유지",
+  "Cannot be closed until task is modified or completed": "작업이 수정되거나 완료될 때까지 닫을 수 없습니다.",
+  "All Day Notification": "하루 종일 알림",
+  "Complete Task": "작업 완료",
+  "Edit Task": "작업 편집"
 }

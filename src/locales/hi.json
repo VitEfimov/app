@@ -492,5 +492,20 @@
   "DB Synchronization": "डीबी सिंक्रनाइज़ेशन",
   "Database Synchronization": "डेटाबेस तुल्यकालन",
   "Synchronize data with cloud database": "क्लाउड डेटाबेस के साथ डेटा सिंक्रनाइज़ करें",
-  "Keep data strictly on device": "डेटा को डिवाइस पर सख्ती से रखें"
+  "Keep data strictly on device": "डेटा को डिवाइस पर सख्ती से रखें",
+  "Custom Reminder": "कस्टम अनुस्मारक",
+  "Set Reminder": "अनुस्मारक सेट करें",
+  "Priority, Reminder, Repeat": "प्राथमिकता, अनुस्मारक, दोहराव",
+  "Priority, Reminder, Board, Repeat": "प्राथमिकता, अनुस्मारक, बोर्ड, दोहराव",
+  "Remind before task": "कार्य से पहले याद दिलाएँ",
+  "Quick Presets": "त्वरित प्रीसेट",
+  "min": "मिन",
+  "hr": "मानव संसाधन",
+  "day": "दिन",
+  "before": "पहले",
+  "Keep notification all day": "पूरे दिन अधिसूचना रखें",
+  "Cannot be closed until task is modified or completed": "कार्य संशोधित या पूर्ण होने तक बंद नहीं किया जा सकता",
+  "All Day Notification": "पूरे दिन की अधिसूचना",
+  "Complete Task": "पूरा कार्य",
+  "Edit Task": "कार्य संपादित करें"
 }

@@ -188,6 +188,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [isCustomReminderModalVisible, setIsCustomReminderModalVisible] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState('main');
   const [isAlarm, setIsAlarm] = useState(false);
+  const [keepNotificationAllDay, setKeepNotificationAllDay] = useState(false);
   const [repeatConfig, setRepeatConfig] = useState({ preset: 'None' });
   const [isRepeatModalVisible, setIsRepeatModalVisible] = useState(false);
   const [repeatStartDate, setRepeatStartDate] = useState('');
@@ -305,6 +306,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
         initialReminderVal = 'Escalating Reminder';
       }
       const initialAlarmVal = task.isAlarm || false;
+      const initialKeepNotificationVal = task.keepNotificationAllDay || false;
 
       setTaskName(initialTaskName);
       setNotes(initialNotesText);
@@ -319,6 +321,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       setRepeatEndDate(initialRepEndDate);
       setReminder(initialReminderVal);
       setIsAlarm(initialAlarmVal);
+      setKeepNotificationAllDay(initialKeepNotificationVal);
 
       initialSnapshotRef.current = {
         taskName: initialTaskName,
@@ -334,6 +337,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
         repeatEndDate: initialRepEndDate,
         reminder: initialReminderVal,
         isAlarm: initialAlarmVal,
+        keepNotificationAllDay: initialKeepNotificationVal,
       };
     }
   }, [isVisible, task?.id]);
@@ -491,6 +495,7 @@ useEffect(() => {
     if (repeatEndDate !== snap.repeatEndDate) return true;
     if (reminder !== snap.reminder) return true;
     if (isAlarm !== snap.isAlarm) return true;
+    if (keepNotificationAllDay !== snap.keepNotificationAllDay) return true;
 
     return false;
   };
@@ -535,20 +540,36 @@ useEffect(() => {
     const timeChanged = selectedTime !== (task.time || '');
     const reminderChanged = reminder !== (task.reminder || 'None');
     const isAlarmChanged = isAlarm !== (task.isAlarm || false);
+    const keepNotificationAllDayChanged = keepNotificationAllDay !== (task.keepNotificationAllDay || false);
     const nameChanged = taskName !== task.taskname;
 
     if (isAlarmChanged) updates.isAlarm = isAlarm;
+    if (keepNotificationAllDayChanged) updates.keepNotificationAllDay = keepNotificationAllDay;
 
-    if (timeChanged || dateChanged || reminderChanged || isAlarmChanged || nameChanged) {
+    if (timeChanged || dateChanged || reminderChanged || isAlarmChanged || keepNotificationAllDayChanged || nameChanged) {
       updates.reminder = reminder;
       updates.isNagMode = reminder === 'Nag Mode (Every 10 min)';
       updates.escalationLevel = reminder === 'Escalating Reminder' ? 'active' : 'none';
+      updates.keepNotificationAllDay = keepNotificationAllDay;
       // Schedule new notifications
       if (task.notificationId) {
-        await cancelNotification(task.notificationId);
+        await cancelNotification(task.notificationId, task.id);
         updates.notificationId = null;
       }
-      const notifIds = await scheduleTaskReminder(taskName, reminder, selectedDate || dayjs().format('YYYY-MM-DD'), selectedTime, task.id, isAlarm, themeState);
+      const notifIds = await scheduleTaskReminder(
+        taskName,
+        reminder,
+        selectedDate || dayjs().format('YYYY-MM-DD'),
+        selectedTime,
+        task.id,
+        isAlarm,
+        themeState,
+        {
+          isNagMode: updates.isNagMode,
+          escalationLevel: updates.escalationLevel,
+          keepNotificationAllDay: keepNotificationAllDay
+        }
+      );
       if (notifIds && notifIds.length > 0) updates.notificationId = notifIds;
     }
     
@@ -568,6 +589,7 @@ useEffect(() => {
           time: selectedTime, 
           reminder, 
           isAlarm, 
+          keepNotificationAllDay,
           attachments, 
           subtasks, 
           description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments }
@@ -613,6 +635,7 @@ useEffect(() => {
             time: selectedTime, 
             reminder, 
             isAlarm, 
+            keepNotificationAllDay,
             attachments, 
             subtasks, 
             description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments }
@@ -635,6 +658,7 @@ useEffect(() => {
             time: selectedTime,
             reminder: reminder,
             isAlarm: isAlarm,
+            keepNotificationAllDay: keepNotificationAllDay,
             description: {
               text: currentNotes,
               img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '',
@@ -1242,12 +1266,13 @@ useEffect(() => {
                 <Text style={[styles.optionsCollapsibleTitle, { color: colors.textPrimary }]}>
                   {t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}
                 </Text>
-                {isTaskOptionsCollapsed && (priority !== 'none' || reminder !== 'None' || (repeatConfig && repeatConfig.preset !== 'None')) && (
+                {isTaskOptionsCollapsed && (priority !== 'none' || reminder !== 'None' || keepNotificationAllDay || (repeatConfig && repeatConfig.preset !== 'None')) && (
                   <View style={[styles.optionsSummaryBadge, { backgroundColor: `${colors.primary}18` }]}>
                     <Text style={{ fontSize: 11, color: colors.primary, fontWeight: 'bold' }}>
                       {[
                         priority !== 'none' ? priority.toUpperCase() : null,
                         reminder !== 'None' ? reminder : null,
+                        keepNotificationAllDay ? (t('All Day Notification') || 'All Day Notification') : null,
                         repeatConfig?.preset && repeatConfig.preset !== 'None' ? (t('Repeating') || 'Repeating') : null
                       ].filter(Boolean).join(' • ')}
                     </Text>
@@ -1320,6 +1345,23 @@ useEffect(() => {
                     <Text style={{ color: colors.textPrimary, marginLeft: 10, fontWeight: '600', fontSize: 14 }}>{t('Play Reminder as Alarm')}</Text>
                   </View>
                 )}
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>
+                      {t('Keep notification all day')}
+                    </Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                      {t('Cannot be closed until task is modified or completed')}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="keep_notification_all_day_switch"
+                    value={keepNotificationAllDay}
+                    onValueChange={setKeepNotificationAllDay}
+                    trackColor={{ true: colors.primary }}
+                  />
+                </View>
 
                 {repeatConfig.preset !== 'None' && (
                   <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, borderRadius: 12, marginBottom: 16, padding: 14 }]}>

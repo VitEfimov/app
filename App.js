@@ -500,10 +500,13 @@ function InitApp() {
       
       // Dismiss the notification from the system tray since Android doesn't always do this automatically for background actions
       if (response.notification?.request?.identifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
-        try {
-          await Notifications.dismissNotificationAsync(response.notification.request.identifier);
-        } catch (err) {
-          console.warn("Failed to dismiss notification", err);
+        const isPersistent = !!(data.keepNotificationAllDay);
+        if (!isPersistent || actionIdentifier === 'complete_task') {
+          try {
+            await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+          } catch (err) {
+            console.warn("Failed to dismiss notification", err);
+          }
         }
       }
 

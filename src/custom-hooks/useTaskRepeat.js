@@ -200,6 +200,7 @@ export const useTaskRepeat = () => {
                 time: formData.time !== undefined ? formData.time : (originalTask.time || null),
                 reminder: formData.reminder !== undefined ? formData.reminder : (originalTask.reminder || 'None'),
                 isAlarm: formData.isAlarm !== undefined ? formData.isAlarm : (originalTask.isAlarm || false),
+                keepNotificationAllDay: formData.keepNotificationAllDay !== undefined ? formData.keepNotificationAllDay : (originalTask.keepNotificationAllDay || false),
                 description: {
                     text: descText,
                     img: descImg,
