@@ -76,6 +76,11 @@ const initialState = {
   // DB Sync
   dbSyncEnabled: loaded?.dbSyncEnabled !== undefined ? loaded.dbSyncEnabled : true,
 
+  // Calendar Sync (expo-calendar)
+  calendarSyncEnabled: loaded?.calendarSyncEnabled || false,
+  calendarAlarmsEnabled: loaded?.calendarAlarmsEnabled || false,
+  selectedCalendarId: loaded?.selectedCalendarId || null,
+
   // Per-Board Automations Map
   boardAutomations: loaded?.boardAutomations || {}
 };
@@ -270,6 +275,18 @@ const themeSlice = createSlice({
     setDbSyncEnabled: (state, action) => {
       state.dbSyncEnabled = action.payload;
       AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setCalendarSyncEnabled: (state, action) => {
+      state.calendarSyncEnabled = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setCalendarAlarmsEnabled: (state, action) => {
+      state.calendarAlarmsEnabled = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
+    },
+    setSelectedCalendarId: (state, action) => {
+      state.selectedCalendarId = action.payload;
+      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
@@ -279,7 +296,8 @@ export const {
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
   setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
-  setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled
+  setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
+  setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId
 } = themeSlice.actions;
 
 export default themeSlice.reducer;

@@ -513,5 +513,18 @@
   "Cannot be closed until task is modified or completed": "Cannot be closed until task is modified or completed",
   "All Day Notification": "All Day Notification",
   "Complete Task": "Complete Task",
-  "Edit Task": "Edit Task"
+  "Edit Task": "Edit Task",
+  "Google & Device Calendar": "Google & Device Calendar",
+  "Sync Tasks to Calendar": "Sync Tasks to Calendar",
+  "Syncs tasks with due dates to Google Calendar & device calendar": "Syncs tasks with due dates to Google Calendar & device calendar",
+  "Target Calendar": "Target Calendar",
+  "Auto (Default / Google Calendar)": "Auto (Default / Google Calendar)",
+  "Calendar Alarms (Reminders)": "Calendar Alarms (Reminders)",
+  "Off avoids duplicate alerts; app will send notifications.": "Off avoids duplicate alerts; app will send notifications.",
+  "Sync All Tasks to Calendar Now": "Sync All Tasks to Calendar Now",
+  "Calendar Synced": "Calendar Synced",
+  "tasks synced to your calendar.": "tasks synced to your calendar.",
+  "Calendar Permission Required": "Calendar Permission Required",
+  "Please allow calendar permissions to synchronize your tasks with Google & device calendars.": "Please allow calendar permissions to synchronize your tasks with Google & device calendars.",
+  "Sync Day with Device Calendar": "Sync Day with Device Calendar"
 }

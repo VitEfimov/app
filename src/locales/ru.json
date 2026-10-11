@@ -507,5 +507,18 @@
   "Cannot be closed until task is modified or completed": "Нельзя закрыть до изменения или выполнения задачи",
   "All Day Notification": "Уведомление на весь день",
   "Complete Task": "Завершить задачу",
-  "Edit Task": "Редактировать задачу"
+  "Edit Task": "Редактировать задачу",
+  "Google & Device Calendar": "Google Календарь и календарь устройства",
+  "Sync Tasks to Calendar": "Синхронизация задач с календарем",
+  "Syncs tasks with due dates to Google Calendar & device calendar": "Синхронизирует задачи с датами в Google Календарь и календарь устройства",
+  "Target Calendar": "Календарь для синхронизации",
+  "Auto (Default / Google Calendar)": "Авто (По умолчанию / Google)",
+  "Calendar Alarms (Reminders)": "Будильники и сигналы в календаре",
+  "Off avoids duplicate alerts; app will send notifications.": "Выкл. предотвращает дублирование (напоминать будет приложение).",
+  "Sync All Tasks to Calendar Now": "Синхронизировать все задачи сейчас",
+  "Calendar Synced": "Календарь синхронизирован",
+  "tasks synced to your calendar.": "задач синхронизировано с календарем.",
+  "Calendar Permission Required": "Требуется доступ к календарю",
+  "Please allow calendar permissions to synchronize your tasks with Google & device calendars.": "Пожалуйста, разрешите доступ к календарю для синхронизации задач.",
+  "Sync Day with Device Calendar": "Синхронизировать день с календарем"
 }

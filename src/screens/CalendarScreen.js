@@ -16,7 +16,8 @@ import MoveBoardModal from '../components/MoveBoardModal';
 import YearPickerModal from '../components/YearPickerModal';
 import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
-import { updateTask, deleteTask, addTask } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask, updateTaskSync } from '../features/taskSlice';
+import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, syncAllTasksToCalendarAsync } from '../utils/calendarSync';
 import { getBoardColor } from '../utils/boardColors';
 import { useTranslation } from 'react-i18next';
 
@@ -307,6 +308,29 @@ export default function CalendarScreen() {
         );
       }
     });
+  };
+
+  const handleSyncDayToCalendar = async () => {
+    try {
+      const hasPerm = await checkCalendarPermissionsAsync();
+      if (!hasPerm) {
+        const granted = await requestCalendarPermissionsAsync();
+        if (!granted) {
+          showToast(t('Calendar Permission Required') || 'Calendar Permission Required');
+          return;
+        }
+      }
+      const themeState = { calendarSyncEnabled: true };
+      const { syncedCount, eventMap } = await syncAllTasksToCalendarAsync(selectedTasks, themeState);
+      if (eventMap && Object.keys(eventMap).length > 0) {
+        Object.entries(eventMap).forEach(([tId, calId]) => {
+          dispatch(updateTaskSync({ taskId: tId, calendarEventId: calId }));
+        });
+      }
+      showToast(`${syncedCount} ${t('tasks synced to your calendar.') || 'tasks synced to your calendar.'}`);
+    } catch (e) {
+      console.warn('Error syncing day to calendar:', e);
+    }
   };
 
   // Prepare marked dates
@@ -746,6 +770,10 @@ export default function CalendarScreen() {
 
           <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleMoveForward(), 400); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move forward')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleSyncDayToCalendar(), 400); }}>
+            <Text style={[styles.optionText, { color: colors.primary }]}>{t('Sync Day with Device Calendar') || 'Sync Day with Device Calendar'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleDeleteSection(), 400); }}>

@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { clearTasks, updateTask } from '../features/taskSlice';
+import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
+import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync } from '../utils/calendarSync';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
 import { useTheme } from '../styles/ThemeContext';
@@ -108,7 +109,62 @@ export default function SettingsScreen({ navigation }) {
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [saveAlertVisible, setSaveAlertVisible] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
+  const [deviceCalendars, setDeviceCalendars] = useState([]);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const currentSoundRef = useRef(null);
+
+  React.useEffect(() => {
+    if (theme.calendarSyncEnabled) {
+      getWritableCalendarsAsync().then(cals => {
+        setDeviceCalendars(cals || []);
+      });
+    }
+  }, [theme.calendarSyncEnabled]);
+
+  const handleToggleCalendarSync = async (enabled) => {
+    if (enabled) {
+      const hasPerm = await checkCalendarPermissionsAsync();
+      if (!hasPerm) {
+        const granted = await requestCalendarPermissionsAsync();
+        if (!granted) {
+          setConfirmConfig({
+            isVisible: true,
+            title: t('Calendar Permission Required') || 'Calendar Permission Required',
+            message: t('Please allow calendar permissions to synchronize your tasks with Google & device calendars.') || 'Please allow calendar permissions to synchronize your tasks with Google & device calendars.',
+            confirmText: t('OK') || 'OK',
+            hideCancel: true,
+            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+          });
+          return;
+        }
+      }
+      dispatch(setCalendarSyncEnabled(true));
+      const cals = await getWritableCalendarsAsync();
+      setDeviceCalendars(cals || []);
+      dispatch(batchSyncCalendarTasks());
+    } else {
+      dispatch(setCalendarSyncEnabled(false));
+    }
+  };
+
+  const handleManualCalendarSync = async () => {
+    setIsSyncingCalendar(true);
+    try {
+      const count = await dispatch(batchSyncCalendarTasks());
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Calendar Synced') || 'Calendar Synced',
+        message: `${count || 0} ${t('tasks synced to your calendar.') || 'tasks synced to your calendar.'}`,
+        confirmText: t('OK') || 'OK',
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
+    } catch (e) {
+      console.warn('Manual calendar sync error:', e);
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
 
   const languageOptions = [
     { label: 'English', value: 'en' },
@@ -147,6 +203,14 @@ export default function SettingsScreen({ navigation }) {
     { label: t('15 mins'), value: 15 },
     { label: t('30 mins'), value: 30 },
     { label: t('1 hour'), value: 60 },
+  ];
+
+  const calendarOptions = [
+    { label: t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)', value: null },
+    ...deviceCalendars.map(cal => ({
+      label: cal.title || cal.source?.name || cal.ownerAccount || 'Calendar',
+      value: cal.id
+    }))
   ];
 
   const soundOptions = [
@@ -465,6 +529,72 @@ export default function SettingsScreen({ navigation }) {
           </>
         )}
 
+        {/* Google & Device Calendar Section */}
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Google & Device Calendar') || 'Google & Device Calendar'}</Text>
+        <View style={styles.sectionGroup}>
+          <View style={[styles.rowItem, { borderBottomWidth: theme.calendarSyncEnabled ? 1 : 0, paddingVertical: 12 }]}>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Sync Tasks to Calendar') || 'Sync Tasks to Calendar'}</Text>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                {t('Syncs tasks with due dates to Google Calendar & device calendar') || 'Syncs tasks with due dates to Google Calendar & device calendar'}
+              </Text>
+            </View>
+            <Switch
+              value={theme.calendarSyncEnabled || false}
+              onValueChange={handleToggleCalendarSync}
+              trackColor={{ false: colors.borderColor, true: colors.primary }}
+            />
+          </View>
+
+          {theme.calendarSyncEnabled && (
+            <>
+              {deviceCalendars.length > 0 && (
+                <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+                  <CustomDropdown
+                    label={t('Target Calendar') || 'Target Calendar'}
+                    value={
+                      theme.selectedCalendarId
+                        ? (deviceCalendars.find(c => String(c.id) === String(theme.selectedCalendarId))?.title || t('Custom Calendar'))
+                        : (t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)')
+                    }
+                    options={calendarOptions}
+                    onSelect={val => dispatch(setSelectedCalendarId(val))}
+                    colors={colors}
+                    layout="horizontal"
+                  />
+                </View>
+              )}
+
+              <View style={[styles.rowItem, { borderBottomWidth: 1, paddingVertical: 12 }]}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Calendar Alarms (Reminders)') || 'Calendar Alarms (Reminders)'}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    {t('Off avoids duplicate alerts; app will send notifications.') || 'Off avoids duplicate alerts; app will send notifications.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={theme.calendarAlarmsEnabled || false}
+                  onValueChange={val => dispatch(setCalendarAlarmsEnabled(val))}
+                  trackColor={{ false: colors.borderColor, true: colors.primary }}
+                />
+              </View>
+
+              <TouchableOpacity
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Sync tasks to calendar now"
+                style={[styles.syncNowBtn, { borderColor: colors.primary }]}
+                onPress={handleManualCalendarSync}
+                disabled={isSyncingCalendar}
+              >
+                <Text style={[styles.syncNowBtnText, { color: colors.primary }]}>
+                  {isSyncingCalendar ? (t('Syncing...') || 'Syncing...') : (t('Sync All Tasks to Calendar Now') || 'Sync All Tasks to Calendar Now')}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
         {/* Account Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Account')}</Text>
         <View style={styles.sectionGroup}>
@@ -694,5 +824,18 @@ const styles = StyleSheet.create({
   logoutBtnText: {
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  syncNowBtn: {
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  syncNowBtnText: {
+    fontWeight: '700',
+    fontSize: 15,
   }
 });

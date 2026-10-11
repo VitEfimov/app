@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
+import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync } from '../utils/calendarSync';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import axios from 'axios';
 
@@ -276,6 +277,7 @@ const taskSlice = createSlice({
                 if (action.payload.boardId !== undefined) task.boardId = action.payload.boardId;
                 if (action.payload.isAlarm !== undefined) task.isAlarm = action.payload.isAlarm;
                 task.notificationId = action.payload.notificationId !== undefined ? action.payload.notificationId : task.notificationId;
+                if (action.payload.calendarEventId !== undefined) task.calendarEventId = action.payload.calendarEventId;
                 if (action.payload.recurringSeriesId !== undefined) task.recurringSeriesId = action.payload.recurringSeriesId;
                 if (action.payload.isRecurring !== undefined) task.isRecurring = action.payload.isRecurring;
                 if (action.payload.repeatFrequency !== undefined) task.repeatFrequency = action.payload.repeatFrequency;
@@ -505,6 +507,16 @@ export const addTask = (payload) => async (dispatch, getState) => {
                 console.warn('Failed to schedule reminder on addTask:', e);
             }
         }
+        if (themeState?.calendarSyncEnabled && payload.task.completionDate) {
+            try {
+                const calEventId = await syncTaskToCalendarAsync(payload.task, themeState);
+                if (calEventId) {
+                    payload.task.calendarEventId = calEventId;
+                }
+            } catch (calErr) {
+                console.warn('Calendar sync error on addTask:', calErr);
+            }
+        }
     }
     dispatch(addTaskSync(payload)); 
     const tasks = getState().taskReducer.tasks;
@@ -549,6 +561,14 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
                         }
                     } catch (e) {}
                 }
+                if (themeState?.calendarSyncEnabled && task.completionDate) {
+                    try {
+                        const calEventId = await syncTaskToCalendarAsync(task, themeState);
+                        if (calEventId) {
+                            task.calendarEventId = calEventId;
+                        }
+                    } catch (calErr) {}
+                }
             }
         }
     }
@@ -585,6 +605,9 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
                 if (!isRestored) {
                     if (existingTask) {
                         await cancelNotification(existingTask.notificationId, existingTask.id);
+                        if (existingTask.calendarEventId) {
+                            await removeTaskFromCalendarAsync(existingTask.calendarEventId);
+                        }
                     } else {
                         await cancelNotification(null, taskId);
                     }
@@ -670,6 +693,24 @@ export const updateTask = (payload) => async (dispatch, getState) => {
         }
     }
 
+    if (state.themeReducer?.calendarSyncEnabled && updatedTask) {
+        try {
+            if (updatedTask.completed) {
+                await syncTaskToCalendarAsync(updatedTask, state.themeReducer);
+            } else if (updatedTask.completionDate) {
+                const newCalId = await syncTaskToCalendarAsync(updatedTask, state.themeReducer);
+                if (newCalId && newCalId !== updatedTask.calendarEventId) {
+                    dispatch(updateTaskSync({ taskId: updatedTask.id, calendarEventId: newCalId }));
+                }
+            } else if (!updatedTask.completionDate && updatedTask.calendarEventId) {
+                await removeTaskFromCalendarAsync(updatedTask.calendarEventId);
+                dispatch(updateTaskSync({ taskId: updatedTask.id, calendarEventId: null }));
+            }
+        } catch (e) {
+            console.warn('Calendar sync error on updateTask:', e);
+        }
+    }
+
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
@@ -677,6 +718,20 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     if (state.userReducer?.isAuthenticated && dbSyncEnabled && payload?.taskId) {
         dispatch(updateTaskAsync({ taskId: payload.taskId, payload }));
     }
+};
+
+export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
+    const state = getState();
+    const tasks = state.taskReducer.tasks;
+    const themeState = state.themeReducer;
+    const { syncedCount, eventMap } = await syncAllTasksToCalendarAsync(tasks, themeState);
+    if (eventMap && Object.keys(eventMap).length > 0) {
+        Object.entries(eventMap).forEach(([taskId, calId]) => {
+            dispatch(updateTaskSync({ taskId, calendarEventId: calId }));
+        });
+        persistTasksToStorage(getState().taskReducer.tasks, getState);
+    }
+    return syncedCount;
 };
 
 export const updateRecurringSeries = (payload) => async (dispatch, getState) => {

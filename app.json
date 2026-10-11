@@ -16,7 +16,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vitvalef.app"
+      "bundleIdentifier": "com.vitvalef.app",
+      "infoPlist": {
+        "NSRemindersUsageDescription": "TaskFlow needs access to your reminders to sync tasks.",
+        "NSCalendarsUsageDescription": "TaskFlow needs access to your calendar to sync tasks."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +40,9 @@
         "POST_NOTIFICATIONS",
         "ACCESS_NOTIFICATION_POLICY",
         "USE_FULL_SCREEN_INTENT",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
       ]
     },
     "web": {
@@ -106,6 +112,12 @@
         "expo-share-intent",
         {
           "customScheme": "taskmanager"
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "TaskFlow needs access to your calendar to sync tasks."
         }
       ]
     ]
