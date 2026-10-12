@@ -63,6 +63,61 @@ export default function CalendarScreen() {
   const panY = useRef(new Animated.Value(360)).current;
   const lastY = useRef(360);
 
+  // Smooth Calendar Month Swap Animation
+  const calendarSlideAnim = useRef(new Animated.Value(0)).current;
+  const calendarOpacityAnim = useRef(new Animated.Value(1)).current;
+  const isAnimatingRef = useRef(false);
+  const currentMonthStr = useRef(dayjs(selectedDate).format('YYYY-MM'));
+
+  const animateCalendarSlide = useCallback((direction = 'left', callback) => {
+    isAnimatingRef.current = true;
+    const startX = direction === 'left' ? 36 : direction === 'right' ? -36 : 0;
+    calendarSlideAnim.setValue(startX);
+    calendarOpacityAnim.setValue(0.7);
+    if (typeof callback === 'function') {
+      callback();
+    }
+    Animated.parallel([
+      Animated.timing(calendarSlideAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(calendarOpacityAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      isAnimatingRef.current = false;
+    });
+  }, [calendarSlideAnim, calendarOpacityAnim]);
+
+  const handleMonthChange = useCallback((monthObj) => {
+    const newMonth = monthObj?.dateString 
+      ? dayjs(monthObj.dateString).format('YYYY-MM') 
+      : (monthObj?.year && monthObj?.month ? `${monthObj.year}-${String(monthObj.month).padStart(2, '0')}` : null);
+
+    const prevMonth = currentMonthStr.current;
+    if (newMonth) {
+      currentMonthStr.current = newMonth;
+    }
+
+    if (!isAnimatingRef.current) {
+      if (newMonth && prevMonth) {
+        if (newMonth > prevMonth) {
+          animateCalendarSlide('left');
+        } else if (newMonth < prevMonth) {
+          animateCalendarSlide('right');
+        } else {
+          animateCalendarSlide('fade');
+        }
+      } else {
+        animateCalendarSlide('fade');
+      }
+    }
+  }, [animateCalendarSlide]);
+
   const handleCalendarLayout = (event) => {
     const { height } = event.nativeEvent.layout;
     if (Math.abs(maxYRef.current - height) > 5) {
@@ -527,61 +582,70 @@ export default function CalendarScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <View onLayout={handleCalendarLayout}>
-        <Calendar
-          testID="task_calendar"
-          key={`${selectedDate}-${colors.bgMain}-${isDark}-${i18n.language}`}
-          markingType={'multi-dot'}
-          current={selectedDate}
-          firstDay={i18n.language === 'en' ? 0 : 1}
-          onDayPress={(day) => {
-            setSelectedDate(day.dateString);
-            setSelectionMode({ isActive: false, selectedTaskIds: [] });
-          }}
-          markedDates={markedDates}
-          enableSwipeMonths={true}
-          dayComponent={renderCustomDay}
-          renderHeader={(date) => {
-            const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
-            const monthStr = dateObj.format('MMMM YYYY');
-            return (
-              <TouchableOpacity
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel={`Select year`}
-                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
-                onPress={() => setYearPickerVisible(true)}
-              >
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
-                  {monthStr}
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
-              </TouchableOpacity>
-            );
-          }}
-          theme={{
-            backgroundColor: colors.bgMain,
-            calendarBackground: colors.bgMain,
-            textSectionTitleColor: colors.textSecondary,
-            selectedDayBackgroundColor: colors.primary,
-            selectedDayTextColor: colors.textInverse,
-            todayTextColor: colors.primary,
-            dayTextColor: colors.textPrimary,
-            textDisabledColor: colors.surfaceContainerHigh,
-            dotColor: colors.primary,
-            selectedDotColor: colors.textInverse,
-            arrowColor: colors.primary,
-            monthTextColor: colors.textPrimary,
-            indicatorColor: colors.primary,
-            textDayFontWeight: '600',
-            todayButtonFontWeight: 'bold',
-            textMonthFontWeight: 'bold',
-            textDayHeaderFontWeight: '600',
-            textDayFontSize: 15,
-            textMonthFontSize: 18,
-            textDayHeaderFontSize: 14
-          }}
-          style={styles.calendar}
-        />
+        <Animated.View style={{ transform: [{ translateX: calendarSlideAnim }], opacity: calendarOpacityAnim }}>
+          <Calendar
+            testID="task_calendar"
+            key={`${colors.bgMain}-${isDark}-${i18n.language}`}
+            markingType={'multi-dot'}
+            current={selectedDate}
+            firstDay={i18n.language === 'en' ? 0 : 1}
+            onDayPress={(day) => {
+              setSelectedDate(day.dateString);
+              setSelectionMode({ isActive: false, selectedTaskIds: [] });
+            }}
+            markedDates={markedDates}
+            enableSwipeMonths={true}
+            onPressArrowLeft={(subtractMonth) => {
+              animateCalendarSlide('right', subtractMonth);
+            }}
+            onPressArrowRight={(addMonth) => {
+              animateCalendarSlide('left', addMonth);
+            }}
+            onMonthChange={handleMonthChange}
+            dayComponent={renderCustomDay}
+            renderHeader={(date) => {
+              const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
+              const monthStr = dateObj.format('MMMM YYYY');
+              return (
+                <TouchableOpacity
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select year`}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
+                  onPress={() => setYearPickerVisible(true)}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
+                    {monthStr}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
+                </TouchableOpacity>
+              );
+            }}
+            theme={{
+              backgroundColor: colors.bgMain,
+              calendarBackground: colors.bgMain,
+              textSectionTitleColor: colors.textSecondary,
+              selectedDayBackgroundColor: colors.primary,
+              selectedDayTextColor: colors.textInverse,
+              todayTextColor: colors.primary,
+              dayTextColor: colors.textPrimary,
+              textDisabledColor: colors.surfaceContainerHigh,
+              dotColor: colors.primary,
+              selectedDotColor: colors.textInverse,
+              arrowColor: colors.primary,
+              monthTextColor: colors.textPrimary,
+              indicatorColor: colors.primary,
+              textDayFontWeight: '600',
+              todayButtonFontWeight: 'bold',
+              textMonthFontWeight: 'bold',
+              textDayHeaderFontWeight: '600',
+              textDayFontSize: 15,
+              textMonthFontSize: 18,
+              textDayHeaderFontSize: 14
+            }}
+            style={styles.calendar}
+          />
+        </Animated.View>
       </View>
       
       {/* Custom Bottom Sheet */}
@@ -835,6 +899,7 @@ export default function CalendarScreen() {
         currentYear={dayjs(selectedDate).year()}
         onSelectYear={(year) => {
           const newDate = dayjs(selectedDate).year(year).format('YYYY-MM-DD');
+          animateCalendarSlide('fade');
           setSelectedDate(newDate);
         }}
         colors={colors}
