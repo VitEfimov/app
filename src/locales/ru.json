@@ -520,5 +520,7 @@
   "tasks synced to your calendar.": "задач синхронизировано с календарем.",
   "Calendar Permission Required": "Требуется доступ к календарю",
   "Please allow calendar permissions to synchronize your tasks with Google & device calendars.": "Пожалуйста, разрешите доступ к календарю для синхронизации задач.",
-  "Sync Day with Device Calendar": "Синхронизировать день с календарем"
+  "Sync Day with Device Calendar": "Синхронизировать день с календарем",
+  "Synchronize Calendar Now": "Синхронизировать календарь сейчас",
+  "events imported from calendar.": "событий импортировано из календаря."
 }

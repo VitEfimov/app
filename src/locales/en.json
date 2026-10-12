@@ -526,5 +526,7 @@
   "tasks synced to your calendar.": "tasks synced to your calendar.",
   "Calendar Permission Required": "Calendar Permission Required",
   "Please allow calendar permissions to synchronize your tasks with Google & device calendars.": "Please allow calendar permissions to synchronize your tasks with Google & device calendars.",
-  "Sync Day with Device Calendar": "Sync Day with Device Calendar"
+  "Sync Day with Device Calendar": "Sync Day with Device Calendar",
+  "Synchronize Calendar Now": "Synchronize Calendar Now",
+  "events imported from calendar.": "events imported from calendar."
 }

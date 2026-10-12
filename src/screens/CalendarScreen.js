@@ -16,7 +16,7 @@ import MoveBoardModal from '../components/MoveBoardModal';
 import YearPickerModal from '../components/YearPickerModal';
 import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
-import { updateTask, deleteTask, addTask, updateTaskSync } from '../features/taskSlice';
+import { updateTask, deleteTask, addTask, updateTaskSync, batchCalendarSyncComplete } from '../features/taskSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, syncAllTasksToCalendarAsync } from '../utils/calendarSync';
 import { getBoardColor } from '../utils/boardColors';
 import { useTranslation } from 'react-i18next';
@@ -323,9 +323,7 @@ export default function CalendarScreen() {
       const themeState = { calendarSyncEnabled: true };
       const { syncedCount, eventMap } = await syncAllTasksToCalendarAsync(selectedTasks, themeState);
       if (eventMap && Object.keys(eventMap).length > 0) {
-        Object.entries(eventMap).forEach(([tId, calId]) => {
-          dispatch(updateTaskSync({ taskId: tId, calendarEventId: calId }));
-        });
+        dispatch(batchCalendarSyncComplete({ eventMap }));
       }
       showToast(`${syncedCount} ${t('tasks synced to your calendar.') || 'tasks synced to your calendar.'}`);
     } catch (e) {

@@ -150,11 +150,12 @@ export default function SettingsScreen({ navigation }) {
   const handleManualCalendarSync = async () => {
     setIsSyncingCalendar(true);
     try {
-      const count = await dispatch(batchSyncCalendarTasks());
+      const result = await dispatch(batchSyncCalendarTasks());
+      const { exportedCount = 0, importedCount = 0 } = result || {};
       setConfirmConfig({
         isVisible: true,
         title: t('Calendar Synced') || 'Calendar Synced',
-        message: `${count || 0} ${t('tasks synced to your calendar.') || 'tasks synced to your calendar.'}`,
+        message: `${exportedCount} ${t('tasks synced to your calendar.') || 'tasks synced to your calendar.'}\n${importedCount} ${t('events imported from calendar.') || 'events imported from calendar.'}`,
         confirmText: t('OK') || 'OK',
         hideCancel: true,
         onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
@@ -582,13 +583,13 @@ export default function SettingsScreen({ navigation }) {
               <TouchableOpacity
                 accessible={true}
                 accessibilityRole="button"
-                accessibilityLabel="Sync tasks to calendar now"
+                accessibilityLabel="Synchronize calendar now"
                 style={[styles.syncNowBtn, { borderColor: colors.primary }]}
                 onPress={handleManualCalendarSync}
                 disabled={isSyncingCalendar}
               >
                 <Text style={[styles.syncNowBtnText, { color: colors.primary }]}>
-                  {isSyncingCalendar ? (t('Syncing...') || 'Syncing...') : (t('Sync All Tasks to Calendar Now') || 'Sync All Tasks to Calendar Now')}
+                  {isSyncingCalendar ? (t('Syncing...') || 'Syncing...') : (t('Synchronize Calendar Now') || 'Synchronize Calendar Now')}
                 </Text>
               </TouchableOpacity>
             </>

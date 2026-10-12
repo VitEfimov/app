@@ -15,6 +15,7 @@ const loadFromLocalStoragePomodoro = () => {
     workSound: 'default',
     breakSound: 'default',
     isSettingsOpen: false,
+    targetEndTime: null,
   }];
 };
 
@@ -31,33 +32,57 @@ export const pomodoroSlice = createSlice({
     hydratePomodoroState: (state, action) => {
       const payload = action.payload;
       if (payload && payload[0]) {
-        if (payload[0].breakInterval === undefined) {
-          payload[0].breakInterval = 5 * 60; // default to 5 minutes
+        const p = payload[0];
+        if (p.breakInterval === undefined) {
+          p.breakInterval = 5 * 60; // default to 5 minutes
         }
-        if (payload[0].initialTime === undefined) {
-          payload[0].initialTime = 25 * 60;
+        if (p.initialTime === undefined) {
+          p.initialTime = 25 * 60;
         }
-        if (typeof payload[0].intervalCount !== 'object' || payload[0].intervalCount === null) {
-          const count = parseInt(payload[0].intervalCount, 10) || 5;
-          payload[0].intervalCount = { count, progress: 0, passed: 0 };
+        if (typeof p.intervalCount !== 'object' || p.intervalCount === null) {
+          const count = parseInt(p.intervalCount, 10) || 5;
+          p.intervalCount = { count, progress: 0, passed: 0 };
         }
-        if (payload[0].isBreak && !payload[0].time) {
-          payload[0].time = payload[0].breakInterval;
+        // Check if timer was running when app was closed/suspended
+        if (p.isActive && p.targetEndTime) {
+          const remaining = Math.round((p.targetEndTime - Date.now()) / 1000);
+          if (remaining > 0) {
+            p.time = remaining;
+          } else {
+            p.time = 0;
+            p.isActive = false;
+            p.targetEndTime = null;
+          }
+        } else if (p.isActive && !p.targetEndTime) {
+          p.isActive = false;
+        }
+        if (p.isBreak && !p.time) {
+          p.time = p.breakInterval;
         }
       }
       state.pomodoro = payload;
     },
-    startTimer: (state) => {
-      state.pomodoro[0].isActive = true;
+    startTimer: (state, action) => {
+      const p = state.pomodoro[0];
+      p.isActive = true;
+      p.targetEndTime = (action && action.payload && action.payload.targetEndTime)
+        ? action.payload.targetEndTime
+        : (Date.now() + (p.time * 1000));
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },
     pauseTimer: (state) => {
-      state.pomodoro[0].isActive = false;
+      const p = state.pomodoro[0];
+      if (p.isActive && p.targetEndTime) {
+        p.time = Math.max(0, Math.round((p.targetEndTime - Date.now()) / 1000));
+      }
+      p.isActive = false;
+      p.targetEndTime = null;
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },
     resetTimer: (state) => {
       const p = state.pomodoro[0];
       p.isActive = false;
+      p.targetEndTime = null;
       p.isBreak = false;
       p.time = p.initialTime || 25 * 60;
       const currentCount = typeof p.intervalCount === 'object' ? (p.intervalCount.count || 5) : 5;
@@ -69,24 +94,42 @@ export const pomodoroSlice = createSlice({
 
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },
-    updateTime: (state, action) => {
-      state.pomodoro[0].time = action.payload;
-
-      const initial = state.pomodoro[0].initialTime || 1500;
-      if (typeof state.pomodoro[0].intervalCount !== 'object' || state.pomodoro[0].intervalCount === null) {
-        state.pomodoro[0].intervalCount = { count: 5, progress: 0, passed: 0 };
+    tickTimer: (state, action) => {
+      const p = state.pomodoro[0];
+      if (!p) return;
+      const newTime = typeof action.payload === 'number' ? action.payload : action.payload?.time;
+      if (typeof newTime === 'number') {
+        p.time = Math.max(0, newTime);
+        const initial = p.isBreak ? (p.breakInterval || 300) : (p.initialTime || 1500);
+        if (typeof p.intervalCount !== 'object' || p.intervalCount === null) {
+          p.intervalCount = { count: 5, progress: 0, passed: 0 };
+        }
+        p.intervalCount.progress =
+          100 - Math.round((p.time / Math.max(1, initial)) * 100);
       }
-      state.pomodoro[0].intervalCount.progress =
+    },
+    updateTime: (state, action) => {
+      const p = state.pomodoro[0];
+      p.time = action.payload;
+
+      const initial = p.initialTime || 1500;
+      if (typeof p.intervalCount !== 'object' || p.intervalCount === null) {
+        p.intervalCount = { count: 5, progress: 0, passed: 0 };
+      }
+      p.intervalCount.progress =
         100 - Math.round((action.payload / Math.max(1, initial)) * 100);
 
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },
     toggleBreak: (state) => {
-      state.pomodoro[0].isBreak = !state.pomodoro[0].isBreak;
-      if (state.pomodoro[0].isBreak) {
-        state.pomodoro[0].time = state.pomodoro[0].breakInterval || 300;
+      const p = state.pomodoro[0];
+      p.isActive = false;
+      p.targetEndTime = null;
+      p.isBreak = !p.isBreak;
+      if (p.isBreak) {
+        p.time = p.breakInterval || 300;
       } else {
-        state.pomodoro[0].time = state.pomodoro[0].initialTime || 1500;
+        p.time = p.initialTime || 1500;
       }
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },
@@ -156,24 +199,34 @@ export const pomodoroSlice = createSlice({
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },
     completeWorkInterval: (state) => {
-      if (typeof state.pomodoro[0].intervalCount !== 'object' || state.pomodoro[0].intervalCount === null) {
-        state.pomodoro[0].intervalCount = {
+      const p = state.pomodoro[0];
+      if (typeof p.intervalCount !== 'object' || p.intervalCount === null) {
+        p.intervalCount = {
           count: 5,
           progress: 0,
           passed: 0,
         };
       }
 
-      if (state.pomodoro[0].intervalCount.passed < state.pomodoro[0].intervalCount.count) {
-        state.pomodoro[0].intervalCount.passed += 1;
-        state.pomodoro[0].isBreak = true;
-        state.pomodoro[0].time = state.pomodoro[0].breakInterval || 300;
+      if (p.intervalCount.passed < p.intervalCount.count) {
+        p.intervalCount.passed += 1;
       }
+      p.isBreak = true;
+      p.isActive = false;
+      p.targetEndTime = null;
+      p.time = p.breakInterval || 300;
+      p.intervalCount.progress = 0;
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },
     completeBreakInterval: (state) => {
-      state.pomodoro[0].isBreak = false;
-      state.pomodoro[0].time = state.pomodoro[0].initialTime || 1500;
+      const p = state.pomodoro[0];
+      p.isBreak = false;
+      p.isActive = false;
+      p.targetEndTime = null;
+      p.time = p.initialTime || 1500;
+      if (typeof p.intervalCount === 'object' && p.intervalCount !== null) {
+        p.intervalCount.progress = 0;
+      }
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },
     setWorkSound: (state, action) => {
@@ -191,6 +244,7 @@ export const { hydratePomodoroState,
   startTimer,
   pauseTimer,
   resetTimer,
+  tickTimer,
   updateTime,
   toggleBreak,
   updatePomodoroSettings,

@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
-import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync } from '../utils/calendarSync';
+import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync } from '../utils/calendarSync';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import axios from 'axios';
 
@@ -380,6 +380,50 @@ const taskSlice = createSlice({
         },
         clearPendingCleanupTaskIds(state) {
             state.pendingCleanupTaskIds = [];
+        },
+        batchCalendarSyncComplete(state, action) {
+            const { eventMap, newTasks, updatedTasks } = action.payload || {};
+            
+            // 1. Update calendarEventIds from eventMap
+            if (eventMap && typeof eventMap === 'object') {
+                Object.entries(eventMap).forEach(([tId, calId]) => {
+                    const task = state.tasks.find(t => t.id === tId);
+                    if (task) {
+                        task.calendarEventId = calId;
+                    }
+                });
+            }
+
+            // 2. Update existing tasks with updates from calendar
+            if (Array.isArray(updatedTasks) && updatedTasks.length > 0) {
+                updatedTasks.forEach(u => {
+                    const task = state.tasks.find(t => t.id === u.taskId);
+                    if (task) {
+                        if (u.calendarEventId !== undefined) task.calendarEventId = u.calendarEventId;
+                        if (u.name !== undefined) task.taskname = u.name;
+                        if (u.completionDate !== undefined) {
+                            task.completionDate = u.completionDate;
+                            task.dateString = u.completionDate;
+                        }
+                        if (u.time !== undefined) task.time = u.time;
+                        if (u.completed !== undefined) task.completed = u.completed;
+                        if (u.description !== undefined) task.description = u.description;
+                        task.lastUpdatedDate = new Date().toISOString();
+                    }
+                });
+            }
+
+            // 3. Add new tasks imported from calendar
+            if (Array.isArray(newTasks) && newTasks.length > 0) {
+                for (const nt of newTasks) {
+                    if (nt) {
+                        state.tasks = insertTaskSorted(state.tasks, nt);
+                    }
+                }
+            }
+
+            // 4. Sort tasks chronologically
+            state.tasks = sortTasksChronologically(state.tasks);
         }
     },
     extraReducers: (builder) => {
@@ -413,7 +457,7 @@ const taskSlice = createSlice({
     }
 });
 
-export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, purgeOrphanedTasksSync, updateTaskSync, updateRecurringSeriesSync, deleteRecurringSeriesSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds } = taskSlice.actions;
+export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, purgeOrphanedTasksSync, updateTaskSync, updateRecurringSeriesSync, deleteRecurringSeriesSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds, batchCalendarSyncComplete } = taskSlice.actions;
 
 let saveStorageTimeout = null;
 let lastTasksToSave = null;
@@ -724,14 +768,28 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
     const state = getState();
     const tasks = state.taskReducer.tasks;
     const themeState = state.themeReducer;
+
+    // 1. Export local tasks to Google Calendar
     const { syncedCount, eventMap } = await syncAllTasksToCalendarAsync(tasks, themeState);
-    if (eventMap && Object.keys(eventMap).length > 0) {
-        Object.entries(eventMap).forEach(([taskId, calId]) => {
-            dispatch(updateTaskSync({ taskId, calendarEventId: calId }));
-        });
-        persistTasksToStorage(getState().taskReducer.tasks, getState);
-    }
-    return syncedCount;
+
+    // 2. Import events from Google Calendar to local tasks
+    const { newTasks, updatedTasks, importedCount } = await importCalendarEventsAsync(themeState, tasks);
+
+    // 3. Atomically update Redux in ONE single dispatch
+    dispatch(batchCalendarSyncComplete({
+        eventMap,
+        newTasks,
+        updatedTasks
+    }));
+
+    // 4. Persist to storage once
+    persistTasksToStorage(getState().taskReducer.tasks, getState);
+
+    return {
+        exportedCount: syncedCount || 0,
+        importedCount: importedCount || 0,
+        totalSynced: (syncedCount || 0) + (importedCount || 0)
+    };
 };
 
 export const updateRecurringSeries = (payload) => async (dispatch, getState) => {

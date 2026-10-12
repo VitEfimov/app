@@ -210,7 +210,7 @@ export const removeTaskFromCalendarAsync = async (calendarEventId) => {
 };
 
 /**
- * Batch sync multiple tasks to device calendar
+ * Batch sync multiple tasks to device calendar (exports tasks to calendar)
  */
 export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}) => {
   if (Platform.OS === 'web') return { syncedCount: 0, eventMap: {} };
@@ -223,9 +223,16 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}) => 
 
     const eventMap = {};
     let syncedCount = 0;
+    let index = 0;
 
     for (const task of tasks) {
       if (task && task.completionDate && !task.completed) {
+        index++;
+        if (index % 3 === 0) {
+          // Yield to JS event loop so UI thread stays responsive and does not freeze
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
         const eventDetails = buildEventDetails(task, calendarAlarmsEnabled);
         if (eventDetails) {
           try {
@@ -254,5 +261,145 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}) => 
   } catch (error) {
     console.warn('Failed to batch sync tasks to calendar:', error);
     return { syncedCount: 0, eventMap: {} };
+  }
+};
+
+/**
+ * Imports/synchronizes events from device/Google calendar to local tasks (two-way sync)
+ */
+export const importCalendarEventsAsync = async (settings = {}, existingTasks = []) => {
+  if (Platform.OS === 'web') return { newTasks: [], updatedTasks: [], importedCount: 0 };
+  const { calendarSyncEnabled, selectedCalendarId } = settings;
+  if (!calendarSyncEnabled) return { newTasks: [], updatedTasks: [], importedCount: 0 };
+
+  try {
+    const hasPermission = await checkCalendarPermissionsAsync();
+    if (!hasPermission) return { newTasks: [], updatedTasks: [], importedCount: 0 };
+
+    const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
+    if (!calendarId) return { newTasks: [], updatedTasks: [], importedCount: 0 };
+
+    // Fetch events from 30 days ago to 180 days in future
+    const startDate = dayjs().subtract(30, 'day').startOf('day').toDate();
+    const endDate = dayjs().add(180, 'day').endOf('day').toDate();
+
+    const calendarEvents = await Calendar.getEventsAsync([calendarId], startDate, endDate);
+    if (!calendarEvents || calendarEvents.length === 0) {
+      return { newTasks: [], updatedTasks: [], importedCount: 0 };
+    }
+
+    const taskByCalEventId = new Map();
+    const taskByNameAndDate = new Map();
+
+    (existingTasks || []).forEach(t => {
+      if (!t) return;
+      if (t.calendarEventId) {
+        taskByCalEventId.set(String(t.calendarEventId), t);
+      }
+      const dateKey = t.dateString || (t.completionDate ? (typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD')) : '');
+      if (t.taskname && dateKey) {
+        const key = `${t.taskname.trim().toLowerCase()}_${dateKey}`;
+        taskByNameAndDate.set(key, t);
+      }
+    });
+
+    const newTasks = [];
+    const updatedTasks = [];
+    let counter = 0;
+
+    for (const event of calendarEvents) {
+      counter++;
+      if (counter % 5 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      if (!event || event.status === 'CANCELED' || !event.title) continue;
+
+      const eventCalId = String(event.id);
+      const isCompleted = event.title.startsWith('✓ ');
+      const cleanTitle = event.title.replace(/^✓\s*/, '').trim() || 'Calendar Event';
+      
+      const startDay = dayjs(event.startDate);
+      const dateStr = startDay.format('YYYY-MM-DD');
+      const timeStr = event.allDay ? '' : startDay.format('HH:mm');
+      
+      const cleanNotes = (event.notes || '')
+        .replace(/\[Synced from TaskFlow\]/g, '')
+        .trim();
+
+      // Check if already mapped to a task
+      const existingLinkedTask = taskByCalEventId.get(eventCalId);
+      if (existingLinkedTask) {
+        // Event is already linked to this task. Check if calendar updated
+        const titleChanged = existingLinkedTask.taskname !== cleanTitle;
+        const dateChanged = existingLinkedTask.completionDate !== dateStr;
+        const timeChanged = (existingLinkedTask.time || '') !== timeStr;
+        const completionChanged = isCompleted && !existingLinkedTask.completed;
+
+        if (titleChanged || dateChanged || timeChanged || completionChanged) {
+          updatedTasks.push({
+            taskId: existingLinkedTask.id,
+            name: cleanTitle,
+            completionDate: dateStr,
+            time: timeStr,
+            completed: completionChanged ? true : existingLinkedTask.completed,
+            ...(cleanNotes ? { description: { ...(existingLinkedTask.description || {}), text: cleanNotes } } : {})
+          });
+        }
+        continue;
+      }
+
+      // Check if matches an unlinked task by title and date
+      const matchKey = `${cleanTitle.toLowerCase()}_${dateStr}`;
+      const unlinkedMatch = taskByNameAndDate.get(matchKey);
+      if (unlinkedMatch && !unlinkedMatch.calendarEventId) {
+        // Just link them up
+        updatedTasks.push({
+          taskId: unlinkedMatch.id,
+          calendarEventId: eventCalId
+        });
+        taskByCalEventId.set(eventCalId, unlinkedMatch);
+        continue;
+      }
+
+      // This is a new event from Google Calendar / device calendar! Import it into TaskFlow
+      const nowIso = new Date().toISOString();
+      const uniqueId = `cal_${eventCalId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      newTasks.push({
+        id: uniqueId,
+        taskname: cleanTitle,
+        completionDate: dateStr,
+        dateString: dateStr,
+        time: timeStr,
+        completed: isCompleted,
+        priority: 'normal',
+        boardId: 'main',
+        calendarEventId: eventCalId,
+        syncedFromCalendar: true,
+        reminder: 'None',
+        isAlarm: false,
+        subtasks: [],
+        description: {
+          text: cleanNotes,
+          img: '',
+          url: '',
+          attachments: []
+        },
+        createdAt: nowIso,
+        lastUpdatedDate: nowIso
+      });
+      // Register in map to prevent duplicate creates if calendar has multiple instances
+      taskByCalEventId.set(eventCalId, { id: uniqueId });
+    }
+
+    return {
+      newTasks,
+      updatedTasks,
+      importedCount: newTasks.length
+    };
+  } catch (error) {
+    console.warn('Failed to import events from calendar:', error);
+    return { newTasks: [], updatedTasks: [], importedCount: 0 };
   }
 };
