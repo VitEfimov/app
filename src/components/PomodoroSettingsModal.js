@@ -160,15 +160,6 @@ export default function PomodoroSettingsModal() {
   return (
     <Modal
       isVisible={isSettingsOpen}
-      animationIn="slideInUp"
-      animationOut="slideOutDown"
-      animationInTiming={220}
-      animationOutTiming={180}
-      backdropTransitionInTiming={220}
-      backdropTransitionOutTiming={180}
-      useNativeDriver={true}
-      useNativeDriverForBackdrop={true}
-      hideModalContentWhileAnimating={true}
       onSwipeComplete={() => dispatch(togglePomodoroSettings(false))}
       swipeDirection={['down']}
       onBackdropPress={() => dispatch(togglePomodoroSettings(false))}

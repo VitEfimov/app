@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal } from 'react-native';
 import { useTheme } from '../styles/ThemeContext';
 
 export default function PromptModal({ isVisible, title, message, defaultValue = '', onCancel, onSubmit, submitText = 'Submit', maxLength, keyboardType }) {
@@ -14,56 +13,50 @@ export default function PromptModal({ isVisible, title, message, defaultValue = 
   }, [isVisible, defaultValue]);
 
   return (
-    <Modal 
-      isVisible={isVisible} 
-      animationIn="zoomIn" 
-      animationOut="zoomOut"
-      animationInTiming={180}
-      animationOutTiming={150}
-      backdropTransitionInTiming={180}
-      backdropTransitionOutTiming={150}
-      useNativeDriver={true}
-      useNativeDriverForBackdrop={true}
-      hideModalContentWhileAnimating={true}
-      backdropOpacity={0.5}
-      onBackdropPress={onCancel}
-      style={{ margin: 20, justifyContent: 'center', alignItems: 'center' }}
-    >
-      <View style={[styles.container, { backgroundColor: colors.bgCard, borderColor: colors.borderColor || 'transparent' }]}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
-        {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
-        
-        <TextInput
-          testID="prompt_input"
-          style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: colors.bgMain }]}
-          value={value}
-          onChangeText={setValue}
-          autoFocus
-          onSubmitEditing={() => onSubmit(value)}
-          returnKeyType="done"
-          maxLength={maxLength}
-          keyboardType={keyboardType}
-        />
+    <RNModal visible={isVisible} transparent animationType="fade">
+      <View style={styles.overlay}>
+        <View style={[styles.container, { backgroundColor: colors.bgCard }]}>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+          {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
+          
+          <TextInput
+            testID="prompt_input"
+            style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: colors.bgMain }]}
+            value={value}
+            onChangeText={setValue}
+            autoFocus
+            onSubmitEditing={() => onSubmit(value)}
+            returnKeyType="done"
+            maxLength={maxLength}
+            keyboardType={keyboardType}
+          />
 
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.btn} onPress={onCancel}>
-            <Text style={[styles.btnText, { color: colors.textSecondary }]}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity testID="prompt_submit_btn" style={styles.btn} onPress={() => onSubmit(value)}>
-            <Text style={[styles.btnText, { color: colors.primary, fontWeight: 'bold' }]}>{submitText}</Text>
-          </TouchableOpacity>
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.btn} onPress={onCancel}>
+              <Text style={[styles.btnText, { color: colors.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="prompt_submit_btn" style={styles.btn} onPress={() => onSubmit(value)}>
+              <Text style={[styles.btnText, { color: colors.primary, fontWeight: 'bold' }]}>{submitText}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </Modal>
+    </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   container: {
     width: '100%',
     borderRadius: 12,
     padding: 20,
-    borderWidth: 1,
   },
   title: {
     fontSize: 18,

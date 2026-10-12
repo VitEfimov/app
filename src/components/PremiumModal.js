@@ -21,15 +21,8 @@ export default function PremiumModal({ isVisible, onClose, featureName }) {
   return (
     <Modal
       isVisible={isVisible}
-      animationIn="zoomIn"
-      animationOut="zoomOut"
-      animationInTiming={180}
-      animationOutTiming={150}
-      backdropTransitionInTiming={180}
-      backdropTransitionOutTiming={150}
-      useNativeDriver={true}
-      useNativeDriverForBackdrop={true}
-      hideModalContentWhileAnimating={true}
+      animationIn="fadeInUp"
+      animationOut="fadeOutDown"
       backdropOpacity={0.6}
       onBackdropPress={onClose}
       style={styles.modal}

@@ -201,15 +201,6 @@ export default function SnoozeModal({
   return (
     <Modal
       isVisible={isVisible}
-      animationIn="slideInUp"
-      animationOut="slideOutDown"
-      animationInTiming={220}
-      animationOutTiming={180}
-      backdropTransitionInTiming={220}
-      backdropTransitionOutTiming={180}
-      useNativeDriver={true}
-      useNativeDriverForBackdrop={true}
-      hideModalContentWhileAnimating={true}
       onSwipeComplete={onClose}
       swipeDirection={['down']}
       propagateSwipe={true}
