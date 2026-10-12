@@ -19,8 +19,15 @@ export default function AutomaticCleanupModal() {
   return (
     <Modal
       isVisible={isVisible}
-      animationIn="fadeIn"
-      animationOut="fadeOut"
+      animationIn="zoomIn"
+      animationOut="zoomOut"
+      animationInTiming={180}
+      animationOutTiming={150}
+      backdropTransitionInTiming={180}
+      backdropTransitionOutTiming={150}
+      useNativeDriver={true}
+      useNativeDriverForBackdrop={true}
+      hideModalContentWhileAnimating={true}
       backdropOpacity={0.5}
       style={{ margin: 0, justifyContent: 'center', alignItems: 'center' }}
     >

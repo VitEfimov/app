@@ -1147,6 +1147,15 @@ useEffect(() => {
     <Modal 
       testID="task_details_modal"
       isVisible={isVisible} 
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      animationInTiming={220}
+      animationOutTiming={180}
+      backdropTransitionInTiming={220}
+      backdropTransitionOutTiming={180}
+      useNativeDriver={true}
+      useNativeDriverForBackdrop={true}
+      hideModalContentWhileAnimating={true}
       onSwipeComplete={handleClose}
       swipeDirection={scrollOffset > 0 ? undefined : ['down']}
       onBackdropPress={handleClose}

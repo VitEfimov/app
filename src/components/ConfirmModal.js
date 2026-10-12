@@ -9,8 +9,15 @@ export default function ConfirmModal({ isVisible, title, message, onCancel, onCo
   return (
     <Modal 
       isVisible={isVisible} 
-      animationIn="fadeIn" 
-      animationOut="fadeOut"
+      animationIn="zoomIn" 
+      animationOut="zoomOut"
+      animationInTiming={180}
+      animationOutTiming={150}
+      backdropTransitionInTiming={180}
+      backdropTransitionOutTiming={150}
+      useNativeDriver={true}
+      useNativeDriverForBackdrop={true}
+      hideModalContentWhileAnimating={true}
       backdropOpacity={0.5}
       onBackdropPress={onCancel}
       style={{ margin: 20, justifyContent: 'center', alignItems: 'center' }}

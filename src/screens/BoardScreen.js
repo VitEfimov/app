@@ -881,6 +881,15 @@ export default function BoardScreen({ route, navigation }) {
         swipeDirection={['down']}
         propagateSwipe={true}
         onBackdropPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        animationInTiming={220}
+        animationOutTiming={180}
+        backdropTransitionInTiming={220}
+        backdropTransitionOutTiming={180}
+        useNativeDriver={true}
+        useNativeDriverForBackdrop={true}
+        hideModalContentWhileAnimating={true}
         style={{ margin: 0, justifyContent: 'flex-end' }}
       >
         <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
@@ -965,6 +974,15 @@ export default function BoardScreen({ route, navigation }) {
         swipeDirection={['down']}
         propagateSwipe={true}
         onBackdropPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        animationInTiming={220}
+        animationOutTiming={180}
+        backdropTransitionInTiming={220}
+        backdropTransitionOutTiming={180}
+        useNativeDriver={true}
+        useNativeDriverForBackdrop={true}
+        hideModalContentWhileAnimating={true}
         style={{ margin: 0, justifyContent: 'flex-end' }}
       >
         <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>

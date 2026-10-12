@@ -63,6 +63,53 @@ export default function CalendarScreen() {
   const panY = useRef(new Animated.Value(360)).current;
   const lastY = useRef(360);
 
+  // Calendar Slide Animation State
+  const calendarSlideAnim = useRef(new Animated.Value(0)).current;
+  const calendarOpacityAnim = useRef(new Animated.Value(1)).current;
+
+  const animateCalendarSlide = useCallback((direction = 'left', callback) => {
+    const startX = direction === 'left' ? 35 : direction === 'right' ? -35 : 0;
+    calendarSlideAnim.setValue(startX);
+    calendarOpacityAnim.setValue(0.75);
+    if (typeof callback === 'function') {
+      callback();
+    }
+    Animated.parallel([
+      Animated.timing(calendarSlideAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(calendarOpacityAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [calendarSlideAnim, calendarOpacityAnim]);
+
+  const handleMonthChange = useCallback(() => {
+    calendarOpacityAnim.setValue(0.75);
+    Animated.timing(calendarOpacityAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [calendarOpacityAnim]);
+
+  const toggleBottomSheet = useCallback(() => {
+    panY.stopAnimation((currentVal) => {
+      const isExpanded = currentVal < (maxYRef.current / 2);
+      const targetY = isExpanded ? maxYRef.current : MIN_Y;
+      lastY.current = targetY;
+      Animated.timing(panY, {
+        toValue: targetY,
+        duration: 180,
+        useNativeDriver: false,
+      }).start();
+    });
+  }, [panY]);
+
   const handleCalendarLayout = (event) => {
     const { height } = event.nativeEvent.layout;
     if (Math.abs(maxYRef.current - height) > 5) {
@@ -79,7 +126,7 @@ export default function CalendarScreen() {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
       Animated.timing(panY, {
         toValue: MIN_Y,
-        duration: 300,
+        duration: 180,
         useNativeDriver: false,
       }).start();
       lastY.current = MIN_Y;
@@ -111,11 +158,15 @@ export default function CalendarScreen() {
         const currentY = lastY.current + gestureState.dy;
         let targetY = maxYRef.current;
         
-        // Snap to nearest position
+        // Snap to nearest position with velocity awareness
         const distToMin = Math.abs(currentY - MIN_Y);
         const distToMax = Math.abs(currentY - maxYRef.current);
 
-        if (distToMin < distToMax) {
+        if (gestureState.vy < -0.5) {
+          targetY = MIN_Y;
+        } else if (gestureState.vy > 0.5) {
+          targetY = maxYRef.current;
+        } else if (distToMin < distToMax) {
           targetY = MIN_Y;
         } else {
           targetY = maxYRef.current;
@@ -125,7 +176,7 @@ export default function CalendarScreen() {
 
         Animated.timing(panY, {
           toValue: targetY,
-          duration: 300,
+          duration: 180,
           useNativeDriver: false,
         }).start();
       }
@@ -527,61 +578,70 @@ export default function CalendarScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <View onLayout={handleCalendarLayout}>
-        <Calendar
-          testID="task_calendar"
-          key={`${selectedDate}-${colors.bgMain}-${isDark}-${i18n.language}`}
-          markingType={'multi-dot'}
-          current={selectedDate}
-          firstDay={i18n.language === 'en' ? 0 : 1}
-          onDayPress={(day) => {
-            setSelectedDate(day.dateString);
-            setSelectionMode({ isActive: false, selectedTaskIds: [] });
-          }}
-          markedDates={markedDates}
-          enableSwipeMonths={true}
-          dayComponent={renderCustomDay}
-          renderHeader={(date) => {
-            const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
-            const monthStr = dateObj.format('MMMM YYYY');
-            return (
-              <TouchableOpacity
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel={`Select year`}
-                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
-                onPress={() => setYearPickerVisible(true)}
-              >
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
-                  {monthStr}
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
-              </TouchableOpacity>
-            );
-          }}
-          theme={{
-            backgroundColor: colors.bgMain,
-            calendarBackground: colors.bgMain,
-            textSectionTitleColor: colors.textSecondary,
-            selectedDayBackgroundColor: colors.primary,
-            selectedDayTextColor: colors.textInverse,
-            todayTextColor: colors.primary,
-            dayTextColor: colors.textPrimary,
-            textDisabledColor: colors.surfaceContainerHigh,
-            dotColor: colors.primary,
-            selectedDotColor: colors.textInverse,
-            arrowColor: colors.primary,
-            monthTextColor: colors.textPrimary,
-            indicatorColor: colors.primary,
-            textDayFontWeight: '600',
-            todayButtonFontWeight: 'bold',
-            textMonthFontWeight: 'bold',
-            textDayHeaderFontWeight: '600',
-            textDayFontSize: 15,
-            textMonthFontSize: 18,
-            textDayHeaderFontSize: 14
-          }}
-          style={styles.calendar}
-        />
+        <Animated.View style={{ transform: [{ translateX: calendarSlideAnim }], opacity: calendarOpacityAnim }}>
+          <Calendar
+            testID="task_calendar"
+            key={`${colors.bgMain}-${isDark}-${i18n.language}`}
+            markingType={'multi-dot'}
+            current={selectedDate}
+            firstDay={i18n.language === 'en' ? 0 : 1}
+            onDayPress={(day) => {
+              setSelectedDate(day.dateString);
+              setSelectionMode({ isActive: false, selectedTaskIds: [] });
+            }}
+            markedDates={markedDates}
+            enableSwipeMonths={true}
+            onPressArrowLeft={(subtractMonth) => {
+              animateCalendarSlide('right', subtractMonth);
+            }}
+            onPressArrowRight={(addMonth) => {
+              animateCalendarSlide('left', addMonth);
+            }}
+            onMonthChange={handleMonthChange}
+            dayComponent={renderCustomDay}
+            renderHeader={(date) => {
+              const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
+              const monthStr = dateObj.format('MMMM YYYY');
+              return (
+                <TouchableOpacity
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select year`}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
+                  onPress={() => setYearPickerVisible(true)}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
+                    {monthStr}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
+                </TouchableOpacity>
+              );
+            }}
+            theme={{
+              backgroundColor: colors.bgMain,
+              calendarBackground: colors.bgMain,
+              textSectionTitleColor: colors.textSecondary,
+              selectedDayBackgroundColor: colors.primary,
+              selectedDayTextColor: colors.textInverse,
+              todayTextColor: colors.primary,
+              dayTextColor: colors.textPrimary,
+              textDisabledColor: colors.surfaceContainerHigh,
+              dotColor: colors.primary,
+              selectedDotColor: colors.textInverse,
+              arrowColor: colors.primary,
+              monthTextColor: colors.textPrimary,
+              indicatorColor: colors.primary,
+              textDayFontWeight: '600',
+              todayButtonFontWeight: 'bold',
+              textMonthFontWeight: 'bold',
+              textDayHeaderFontWeight: '600',
+              textDayFontSize: 15,
+              textMonthFontSize: 18,
+              textDayHeaderFontSize: 14
+            }}
+            style={styles.calendar}
+          />
+        </Animated.View>
       </View>
       
       {/* Custom Bottom Sheet */}
@@ -592,14 +652,27 @@ export default function CalendarScreen() {
         ]}
       >
         <View {...panResponder.panHandlers}>
-          <View style={styles.dragHandleContainer}>
+          <TouchableOpacity 
+            activeOpacity={0.7} 
+            onPress={toggleBottomSheet} 
+            style={styles.dragHandleContainer}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={t('Toggle bottom sheet') || 'Toggle sheet'}
+          >
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
-          </View>
+          </TouchableOpacity>
 
           <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
-            <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
-              {t('Tasks for')} {dayjs(selectedDate).format('MMM D, YYYY')}
-            </Text>
+            <TouchableOpacity 
+              activeOpacity={0.8} 
+              onPress={toggleBottomSheet} 
+              style={{ flex: 1, paddingVertical: 2 }}
+            >
+              <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
+                {t('Tasks for')} {dayjs(selectedDate).format('MMM D, YYYY')}
+              </Text>
+            </TouchableOpacity>
             {selectedTasks.length > 0 && (
               <TouchableOpacity 
                 style={styles.ellipsisBtn} 
@@ -746,6 +819,15 @@ export default function CalendarScreen() {
         swipeDirection={['down']}
         propagateSwipe={true}
         onBackdropPress={() => setSectionOptionsConfig(false)}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        animationInTiming={220}
+        animationOutTiming={180}
+        backdropTransitionInTiming={220}
+        backdropTransitionOutTiming={180}
+        useNativeDriver={true}
+        useNativeDriverForBackdrop={true}
+        hideModalContentWhileAnimating={true}
         style={{ margin: 0, justifyContent: 'flex-end' }}
       >
         <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
@@ -762,19 +844,19 @@ export default function CalendarScreen() {
             <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleCompleteSection(), 400); }}>
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleCompleteSection(), 200); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleMoveForward(), 400); }}>
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleMoveForward(), 200); }}>
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move forward')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleSyncDayToCalendar(), 400); }}>
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleSyncDayToCalendar(), 200); }}>
             <Text style={[styles.optionText, { color: colors.primary }]}>{t('Sync Day with Device Calendar') || 'Sync Day with Device Calendar'}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleDeleteSection(), 400); }}>
+          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleDeleteSection(), 200); }}>
             <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete all')}</Text>
           </TouchableOpacity>
 
@@ -835,6 +917,7 @@ export default function CalendarScreen() {
         currentYear={dayjs(selectedDate).year()}
         onSelectYear={(year) => {
           const newDate = dayjs(selectedDate).year(year).format('YYYY-MM-DD');
+          animateCalendarSlide('fade');
           setSelectedDate(newDate);
         }}
         colors={colors}
