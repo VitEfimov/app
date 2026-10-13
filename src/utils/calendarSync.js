@@ -1,6 +1,88 @@
 import { Platform } from 'react-native';
 import * as Calendar from 'expo-calendar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
+
+export const SYNC_PAST_DAYS = 30;
+export const SYNC_FUTURE_DAYS = 90;
+const TOMBSTONES_STORAGE_KEY = 'calendar_deleted_tombstones';
+const TOMBSTONE_TTL_MS = 15 * 60 * 1000; // 15-minute TTL to prevent resurrection
+
+// In-memory cache for zero-latency lookups
+let inMemoryTombstones = new Map();
+let tombstonesLoaded = false;
+
+/**
+ * Retrieves the set of recently deleted calendar event IDs
+ */
+export const getTombstonesAsync = async () => {
+  const now = Date.now();
+  if (!tombstonesLoaded) {
+    try {
+      const stored = await AsyncStorage.getItem(TOMBSTONES_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        Object.entries(parsed).forEach(([id, time]) => {
+          if (now - time < TOMBSTONE_TTL_MS) {
+            inMemoryTombstones.set(String(id), time);
+          }
+        });
+      }
+    } catch (e) {}
+    tombstonesLoaded = true;
+  } else {
+    // Purge expired tombstones
+    for (const [id, time] of inMemoryTombstones.entries()) {
+      if (now - time >= TOMBSTONE_TTL_MS) {
+        inMemoryTombstones.delete(id);
+      }
+    }
+  }
+  return inMemoryTombstones;
+};
+
+/**
+ * Records a deleted calendar event ID to prevent resurrection
+ */
+export const addTombstoneAsync = async (calEventId) => {
+  if (!calEventId) return;
+  const idStr = String(calEventId);
+  const now = Date.now();
+  inMemoryTombstones.set(idStr, now);
+  try {
+    const obj = Object.fromEntries(inMemoryTombstones.entries());
+    await AsyncStorage.setItem(TOMBSTONES_STORAGE_KEY, JSON.stringify(obj));
+  } catch (e) {}
+};
+
+/**
+ * Normalizes calendar event start date and time.
+ * Fixes the Android UTC all-day date shift bug where 00:00:00Z shifts back to previous day in Western timezones.
+ */
+export const parseCalendarEventDate = (event) => {
+  if (!event || !event.startDate) return { dateStr: '', timeStr: '' };
+
+  if (event.allDay) {
+    let dateStr = '';
+    if (typeof event.startDate === 'string') {
+      dateStr = event.startDate.slice(0, 10);
+    } else if (event.startDate instanceof Date) {
+      const y = event.startDate.getUTCFullYear();
+      const m = String(event.startDate.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(event.startDate.getUTCDate()).padStart(2, '0');
+      dateStr = `${y}-${m}-${d}`;
+    } else {
+      dateStr = dayjs(event.startDate).format('YYYY-MM-DD');
+    }
+    return { dateStr, timeStr: '' };
+  }
+
+  const startDay = dayjs(event.startDate);
+  return {
+    dateStr: startDay.format('YYYY-MM-DD'),
+    timeStr: startDay.format('HH:mm')
+  };
+};
 
 /**
  * Checks whether calendar permissions are granted
@@ -265,29 +347,79 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}) => 
 };
 
 /**
- * Imports/synchronizes events from device/Google calendar to local tasks (two-way sync)
+ * Performs Foreground Differential Synchronization with device/Google calendar.
+ * Implements:
+ * 1. Strict Rolling Time Horizon [Today - 30 days, Today + 90 days]
+ * 2. Window-Scoped Ghost Deletion Detection (prevents false-wiping out-of-boundary tasks)
+ * 3. Tombstone Ledger check (prevents zombie resurrection)
+ * 4. UTC All-Day Date Normalization (eliminates Android -1 day time shift)
  */
-export const importCalendarEventsAsync = async (settings = {}, existingTasks = []) => {
-  if (Platform.OS === 'web') return { newTasks: [], updatedTasks: [], importedCount: 0 };
+export const performDifferentialCalendarSyncAsync = async (settings = {}, existingTasks = []) => {
+  if (Platform.OS === 'web') {
+    return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
+  }
   const { calendarSyncEnabled, selectedCalendarId } = settings;
-  if (!calendarSyncEnabled) return { newTasks: [], updatedTasks: [], importedCount: 0 };
+  if (!calendarSyncEnabled) {
+    return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
+  }
 
   try {
     const hasPermission = await checkCalendarPermissionsAsync();
-    if (!hasPermission) return { newTasks: [], updatedTasks: [], importedCount: 0 };
-
-    const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
-    if (!calendarId) return { newTasks: [], updatedTasks: [], importedCount: 0 };
-
-    // Fetch events from 30 days ago to 180 days in future
-    const startDate = dayjs().subtract(30, 'day').startOf('day').toDate();
-    const endDate = dayjs().add(180, 'day').endOf('day').toDate();
-
-    const calendarEvents = await Calendar.getEventsAsync([calendarId], startDate, endDate);
-    if (!calendarEvents || calendarEvents.length === 0) {
-      return { newTasks: [], updatedTasks: [], importedCount: 0 };
+    if (!hasPermission) {
+      return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
     }
 
+    const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
+    if (!calendarId) {
+      return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
+    }
+
+    // 1. Strict Rolling Time Window: [Today - 30 days, Today + 90 days]
+    const windowStart = dayjs().subtract(SYNC_PAST_DAYS, 'day').startOf('day');
+    const windowEnd = dayjs().add(SYNC_FUTURE_DAYS, 'day').endOf('day');
+
+    const calendarEvents = await Calendar.getEventsAsync([calendarId], windowStart.toDate(), windowEnd.toDate());
+    
+    // Collect active native IDs and map
+    const activeNativeEventMap = new Map();
+    const activeNativeIds = new Set();
+    (calendarEvents || []).forEach(event => {
+      if (event && event.id && event.status !== 'CANCELED') {
+        const idStr = String(event.id);
+        activeNativeIds.add(idStr);
+        activeNativeEventMap.set(idStr, event);
+      }
+    });
+
+    // Load active tombstone IDs (recently deleted in TaskFlow)
+    const tombstones = await getTombstonesAsync();
+
+    // 2. Window-Scoped Ghost Deletion Detection:
+    // Only evaluate tasks whose completionDate falls strictly within [windowStart, windowEnd].
+    // Tasks scheduled outside the window are protected from false deletion.
+    const deletedTaskIds = [];
+    (existingTasks || []).forEach(task => {
+      if (!task || !task.calendarEventId) return;
+
+      const taskDateStr = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : (task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : null));
+      if (!taskDateStr) return;
+
+      const taskDay = dayjs(taskDateStr);
+      if (!taskDay.isValid()) return;
+
+      const isInWindow = (taskDay.isSame(windowStart, 'day') || taskDay.isAfter(windowStart, 'day')) &&
+                         (taskDay.isSame(windowEnd, 'day') || taskDay.isBefore(windowEnd, 'day'));
+
+      if (isInWindow) {
+        const taskCalId = String(task.calendarEventId);
+        if (!activeNativeIds.has(taskCalId)) {
+          // Native event no longer exists in calendar -> Ghost deletion detected!
+          deletedTaskIds.push(task.id);
+        }
+      }
+    });
+
+    // 3. Process Active Native Events (Updates & Imports)
     const taskByCalEventId = new Map();
     const taskByNameAndDate = new Map();
 
@@ -307,21 +439,26 @@ export const importCalendarEventsAsync = async (settings = {}, existingTasks = [
     const updatedTasks = [];
     let counter = 0;
 
-    for (const event of calendarEvents) {
+    for (const [eventCalId, event] of activeNativeEventMap.entries()) {
       counter++;
       if (counter % 5 === 0) {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
 
-      if (!event || event.status === 'CANCELED' || !event.title) continue;
+      if (!event.title) continue;
 
-      const eventCalId = String(event.id);
+      // Anti-Resurrection Guard: If user recently deleted this task in TaskFlow,
+      // do not re-import it as a new task. Asynchronously purge the orphaned native event.
+      if (tombstones.has(eventCalId)) {
+        try {
+          Calendar.deleteEventAsync(eventCalId).catch(() => {});
+        } catch (e) {}
+        continue;
+      }
+
       const isCompleted = event.title.startsWith('✓ ');
       const cleanTitle = event.title.replace(/^✓\s*/, '').trim() || 'Calendar Event';
-      
-      const startDay = dayjs(event.startDate);
-      const dateStr = startDay.format('YYYY-MM-DD');
-      const timeStr = event.allDay ? '' : startDay.format('HH:mm');
+      const { dateStr, timeStr } = parseCalendarEventDate(event);
       
       const cleanNotes = (event.notes || '')
         .replace(/\[Synced from TaskFlow\]/g, '')
@@ -330,9 +467,11 @@ export const importCalendarEventsAsync = async (settings = {}, existingTasks = [
       // Check if already mapped to a task
       const existingLinkedTask = taskByCalEventId.get(eventCalId);
       if (existingLinkedTask) {
-        // Event is already linked to this task. Check if calendar updated
+        // Skip if task was marked for deletion
+        if (deletedTaskIds.includes(existingLinkedTask.id)) continue;
+
         const titleChanged = existingLinkedTask.taskname !== cleanTitle;
-        const dateChanged = existingLinkedTask.completionDate !== dateStr;
+        const dateChanged = (existingLinkedTask.dateString || existingLinkedTask.completionDate) !== dateStr;
         const timeChanged = (existingLinkedTask.time || '') !== timeStr;
         const completionChanged = isCompleted && !existingLinkedTask.completed;
 
@@ -353,16 +492,17 @@ export const importCalendarEventsAsync = async (settings = {}, existingTasks = [
       const matchKey = `${cleanTitle.toLowerCase()}_${dateStr}`;
       const unlinkedMatch = taskByNameAndDate.get(matchKey);
       if (unlinkedMatch && !unlinkedMatch.calendarEventId) {
-        // Just link them up
-        updatedTasks.push({
-          taskId: unlinkedMatch.id,
-          calendarEventId: eventCalId
-        });
-        taskByCalEventId.set(eventCalId, unlinkedMatch);
-        continue;
+        if (!deletedTaskIds.includes(unlinkedMatch.id)) {
+          updatedTasks.push({
+            taskId: unlinkedMatch.id,
+            calendarEventId: eventCalId
+          });
+          taskByCalEventId.set(eventCalId, unlinkedMatch);
+          continue;
+        }
       }
 
-      // This is a new event from Google Calendar / device calendar! Import it into TaskFlow
+      // New event from Google Calendar / Native Calendar -> Import into TaskFlow
       const nowIso = new Date().toISOString();
       const uniqueId = `cal_${eventCalId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -389,17 +529,28 @@ export const importCalendarEventsAsync = async (settings = {}, existingTasks = [
         createdAt: nowIso,
         lastUpdatedDate: nowIso
       });
-      // Register in map to prevent duplicate creates if calendar has multiple instances
       taskByCalEventId.set(eventCalId, { id: uniqueId });
     }
 
+    const hasChanges = deletedTaskIds.length > 0 || newTasks.length > 0 || updatedTasks.length > 0;
+
     return {
+      hasChanges,
       newTasks,
       updatedTasks,
-      importedCount: newTasks.length
+      deletedTaskIds,
+      importedCount: newTasks.length,
+      deletedCount: deletedTaskIds.length
     };
   } catch (error) {
-    console.warn('Failed to import events from calendar:', error);
-    return { newTasks: [], updatedTasks: [], importedCount: 0 };
+    console.warn('Failed to differential sync events from calendar:', error);
+    return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
   }
+};
+
+/**
+ * Backward compatibility alias for performDifferentialCalendarSyncAsync
+ */
+export const importCalendarEventsAsync = async (settings = {}, existingTasks = []) => {
+  return await performDifferentialCalendarSyncAsync(settings, existingTasks);
 };

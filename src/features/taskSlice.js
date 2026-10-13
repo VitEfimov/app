@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
-import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync } from '../utils/calendarSync';
+import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, addTombstoneAsync } from '../utils/calendarSync';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import axios from 'axios';
 
@@ -382,8 +382,14 @@ const taskSlice = createSlice({
             state.pendingCleanupTaskIds = [];
         },
         batchCalendarSyncComplete(state, action) {
-            const { eventMap, newTasks, updatedTasks } = action.payload || {};
+            const { eventMap, newTasks, updatedTasks, deletedTaskIds } = action.payload || {};
             
+            // 0. Remove ghost-deleted tasks identified by differential sync
+            if (Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
+                const delSet = new Set(deletedTaskIds.map(String));
+                state.tasks = state.tasks.filter(t => t && !delSet.has(String(t.id)));
+            }
+
             // 1. Update calendarEventIds from eventMap
             if (eventMap && typeof eventMap === 'object') {
                 Object.entries(eventMap).forEach(([tId, calId]) => {
@@ -551,21 +557,28 @@ export const addTask = (payload) => async (dispatch, getState) => {
                 console.warn('Failed to schedule reminder on addTask:', e);
             }
         }
-        if (themeState?.calendarSyncEnabled && payload.task.completionDate) {
-            try {
-                const calEventId = await syncTaskToCalendarAsync(payload.task, themeState);
-                if (calEventId) {
-                    payload.task.calendarEventId = calEventId;
-                }
-            } catch (calErr) {
-                console.warn('Calendar sync error on addTask:', calErr);
-            }
-        }
     }
+
+    // 1. Optimistic UI update: instantaneous 0ms response
     dispatch(addTaskSync(payload)); 
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
+
+    // 2. Non-blocking bi-directional write to native calendar
+    if (themeState?.calendarSyncEnabled && payload?.task?.completionDate) {
+        syncTaskToCalendarAsync(payload.task, themeState)
+            .then(calEventId => {
+                if (calEventId) {
+                    dispatch(updateTaskSync({ taskId: payload.task.id, calendarEventId: calEventId }));
+                    persistTasksToStorage(getState().taskReducer.tasks, getState);
+                }
+            })
+            .catch(calErr => {
+                console.warn('Background calendar sync error on addTask:', calErr);
+            });
+    }
+
     const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
     if (state.userReducer?.isAuthenticated && dbSyncEnabled && payload?.task) {
         dispatch(addTaskAsync(payload.task));
@@ -605,21 +618,37 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
                         }
                     } catch (e) {}
                 }
-                if (themeState?.calendarSyncEnabled && task.completionDate) {
-                    try {
-                        const calEventId = await syncTaskToCalendarAsync(task, themeState);
-                        if (calEventId) {
-                            task.calendarEventId = calEventId;
-                        }
-                    } catch (calErr) {}
-                }
             }
         }
     }
+
+    // 1. Optimistic UI update
     dispatch(addMultipleTasksSync(payload));
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
+
+    // 2. Non-blocking background push to native calendar
+    if (themeState?.calendarSyncEnabled && Array.isArray(payload?.tasks)) {
+        setTimeout(async () => {
+            let anySynced = false;
+            for (const task of payload.tasks) {
+                if (task && task.completionDate) {
+                    try {
+                        const calEventId = await syncTaskToCalendarAsync(task, themeState);
+                        if (calEventId) {
+                            dispatch(updateTaskSync({ taskId: task.id, calendarEventId: calEventId }));
+                            anySynced = true;
+                        }
+                    } catch (calErr) {}
+                }
+            }
+            if (anySynced) {
+                persistTasksToStorage(getState().taskReducer.tasks, getState);
+            }
+        }, 0);
+    }
+
     const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
     if (state.userReducer?.isAuthenticated && dbSyncEnabled && Array.isArray(payload?.tasks)) {
         dispatch(addMultipleTasksAsync(payload.tasks));
@@ -630,6 +659,11 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     const taskId = payload?.taskId || (typeof payload === 'string' ? payload : null);
     const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id) === String(taskId)) : null;
+
+    // Immediately record tombstone if linked to calendar to prevent AppState resurrection
+    if (existingTask?.calendarEventId) {
+        addTombstoneAsync(existingTask.calendarEventId);
+    }
 
     // 1. Optimistic UI update: Remove from Redux immediately (0ms delay)
     dispatch(deleteTaskSync(payload));
@@ -764,6 +798,69 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     }
 };
 
+let isCalendarSyncInProgress = false;
+let lastSyncCompletedTimestamp = 0;
+
+/**
+ * Foreground differential calendar sync triggered on AppState active or interval.
+ * Includes concurrency mutex, 10s cooldown throttle, and cloud DB deletion harmonization.
+ */
+export const performForegroundCalendarSync = (force = false) => async (dispatch, getState) => {
+    const state = getState();
+    const themeState = state.themeReducer;
+    if (!themeState?.calendarSyncEnabled || Platform.OS === 'web') {
+        return { hasChanges: false, totalSynced: 0 };
+    }
+
+    const now = Date.now();
+    if (isCalendarSyncInProgress) {
+        return { hasChanges: false, inProgress: true };
+    }
+    if (!force && (now - lastSyncCompletedTimestamp < 10000)) {
+        return { hasChanges: false, throttled: true };
+    }
+
+    isCalendarSyncInProgress = true;
+    try {
+        const currentTasks = state.taskReducer.tasks || [];
+        const diffResult = await performDifferentialCalendarSyncAsync(themeState, currentTasks);
+        const { hasChanges, newTasks, updatedTasks, deletedTaskIds, importedCount = 0, deletedCount = 0 } = diffResult;
+
+        if (hasChanges) {
+            dispatch(batchCalendarSyncComplete({
+                newTasks,
+                updatedTasks,
+                deletedTaskIds
+            }));
+
+            const remainingTasks = getState().taskReducer.tasks;
+            persistTasksToStorage(remainingTasks, getState);
+            syncRecurringAutomations(getState);
+
+            // Cloud DB sync for authenticated users: remove ghost-deleted tasks remotely
+            const dbSyncEnabled = themeState?.dbSyncEnabled !== false && Platform.OS !== 'web';
+            if (state.userReducer?.isAuthenticated && dbSyncEnabled && Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
+                for (const delId of deletedTaskIds) {
+                    dispatch(deleteTaskAsync(delId));
+                }
+            }
+        }
+
+        lastSyncCompletedTimestamp = Date.now();
+        return {
+            hasChanges,
+            importedCount,
+            deletedCount,
+            totalSynced: importedCount + deletedCount + (updatedTasks?.length || 0)
+        };
+    } catch (error) {
+        console.warn('Foreground calendar sync error:', error);
+        return { hasChanges: false, error: error.message };
+    } finally {
+        isCalendarSyncInProgress = false;
+    }
+};
+
 export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
     const state = getState();
     const tasks = state.taskReducer.tasks;
@@ -772,23 +869,33 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
     // 1. Export local tasks to Google Calendar
     const { syncedCount, eventMap } = await syncAllTasksToCalendarAsync(tasks, themeState);
 
-    // 2. Import events from Google Calendar to local tasks
-    const { newTasks, updatedTasks, importedCount } = await importCalendarEventsAsync(themeState, tasks);
+    // 2. Differential sync from Google Calendar to local tasks
+    const { newTasks, updatedTasks, deletedTaskIds, importedCount = 0, deletedCount = 0 } = await performDifferentialCalendarSyncAsync(themeState, tasks);
 
     // 3. Atomically update Redux in ONE single dispatch
     dispatch(batchCalendarSyncComplete({
         eventMap,
         newTasks,
-        updatedTasks
+        updatedTasks,
+        deletedTaskIds
     }));
 
     // 4. Persist to storage once
     persistTasksToStorage(getState().taskReducer.tasks, getState);
 
+    // 5. Harmonize with remote DB
+    const dbSyncEnabled = themeState?.dbSyncEnabled !== false && Platform.OS !== 'web';
+    if (state.userReducer?.isAuthenticated && dbSyncEnabled && Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
+        for (const delId of deletedTaskIds) {
+            dispatch(deleteTaskAsync(delId));
+        }
+    }
+
     return {
         exportedCount: syncedCount || 0,
         importedCount: importedCount || 0,
-        totalSynced: (syncedCount || 0) + (importedCount || 0)
+        deletedCount: deletedCount || 0,
+        totalSynced: (syncedCount || 0) + (importedCount || 0) + (deletedCount || 0)
     };
 };
 

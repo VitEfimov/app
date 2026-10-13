@@ -14,8 +14,46 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
     
     if (themeJson) {
       const themeState = JSON.parse(themeJson);
-      const tasks = tasksJson ? JSON.parse(tasksJson) : [];
+      let tasks = tasksJson ? JSON.parse(tasksJson) : [];
       
+      // Headless differential calendar sync if enabled
+      if (themeState.calendarSyncEnabled) {
+        try {
+          const { performDifferentialCalendarSyncAsync } = require('./calendarSync');
+          const diffResult = await performDifferentialCalendarSyncAsync(themeState, tasks);
+          if (diffResult && diffResult.hasChanges) {
+            const { deletedTaskIds, updatedTasks, newTasks } = diffResult;
+            let currentList = [...tasks];
+            if (Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
+              const delSet = new Set(deletedTaskIds.map(String));
+              currentList = currentList.filter(t => t && !delSet.has(String(t.id)));
+            }
+            if (Array.isArray(updatedTasks) && updatedTasks.length > 0) {
+              updatedTasks.forEach(u => {
+                const item = currentList.find(t => t && t.id === u.taskId);
+                if (item) {
+                  if (u.name !== undefined) item.taskname = u.name;
+                  if (u.completionDate !== undefined) {
+                    item.completionDate = u.completionDate;
+                    item.dateString = u.completionDate;
+                  }
+                  if (u.time !== undefined) item.time = u.time;
+                  if (u.completed !== undefined) item.completed = u.completed;
+                }
+              });
+            }
+            if (Array.isArray(newTasks) && newTasks.length > 0) {
+              const { sortTasksChronologically } = require('./binaryInsert');
+              currentList = sortTasksChronologically([...currentList, ...newTasks]);
+            }
+            await AsyncStorage.setItem('tasks', JSON.stringify(currentList));
+            tasks = currentList;
+          }
+        } catch (calErr) {
+          console.warn('Background headless calendar sync error:', calErr);
+        }
+      }
+
       // Rebuild the exact scheduled notifications for the next 24-48 hours based on current state
       await updateRecurringAutomations(themeState, tasks);
       return BackgroundFetch.BackgroundFetchResult.NewData;

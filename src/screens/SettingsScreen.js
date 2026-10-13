@@ -151,11 +151,12 @@ export default function SettingsScreen({ navigation }) {
     setIsSyncingCalendar(true);
     try {
       const result = await dispatch(batchSyncCalendarTasks());
-      const { exportedCount = 0, importedCount = 0 } = result || {};
+      const { exportedCount = 0, importedCount = 0, deletedCount = 0 } = result || {};
+      const delLine = deletedCount > 0 ? `\n${deletedCount} ${t('tasks removed (deleted in calendar).') || 'tasks removed (deleted in calendar).'}` : '';
       setConfirmConfig({
         isVisible: true,
         title: t('Calendar Synced') || 'Calendar Synced',
-        message: `${exportedCount} ${t('tasks synced to your calendar.') || 'tasks synced to your calendar.'}\n${importedCount} ${t('events imported from calendar.') || 'events imported from calendar.'}`,
+        message: `${exportedCount} ${t('tasks synced to your calendar.') || 'tasks synced to your calendar.'}\n${importedCount} ${t('events imported from calendar.') || 'events imported from calendar.'}${delLine}`,
         confirmText: t('OK') || 'OK',
         hideCancel: true,
         onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
@@ -580,16 +581,28 @@ export default function SettingsScreen({ navigation }) {
                 />
               </View>
 
+              <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12, flexDirection: 'column', alignItems: 'flex-start' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: 8 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                    {t('Automatic Foreground Sync Active') || 'Automatic Foreground Sync Active'}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 16 }}>
+                  {t('Changes in Google or Apple Calendar synchronize automatically in real-time whenever you switch back to TaskFlow.') || 'Changes in Google or Apple Calendar synchronize automatically in real-time whenever you switch back to TaskFlow.'}
+                </Text>
+              </View>
+
               <TouchableOpacity
                 accessible={true}
                 accessibilityRole="button"
-                accessibilityLabel="Synchronize calendar now"
-                style={[styles.syncNowBtn, { borderColor: colors.primary }]}
+                accessibilityLabel="Force calendar re-sync"
+                style={[styles.syncNowBtn, { borderColor: colors.borderColor, marginTop: 2, paddingVertical: 10 }]}
                 onPress={handleManualCalendarSync}
                 disabled={isSyncingCalendar}
               >
-                <Text style={[styles.syncNowBtnText, { color: colors.primary }]}>
-                  {isSyncingCalendar ? (t('Syncing...') || 'Syncing...') : (t('Synchronize Calendar Now') || 'Synchronize Calendar Now')}
+                <Text style={[styles.syncNowBtnText, { color: colors.textSecondary, fontSize: 13, fontWeight: '600' }]}>
+                  {isSyncingCalendar ? (t('Syncing...') || 'Syncing...') : (t('Force Full Re-Sync') || 'Force Full Re-Sync')}
                 </Text>
               </TouchableOpacity>
             </>

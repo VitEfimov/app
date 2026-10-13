@@ -478,7 +478,10 @@ function InitApp() {
   useEffect(() => {
     const handleAppStateChange = async (nextAppState) => {
       if (nextAppState === 'active') {
-        const { processAutoManageTasks } = require('./src/features/taskSlice');
+        const { processAutoManageTasks, performForegroundCalendarSync } = require('./src/features/taskSlice');
+        // 1. Silent Foreground Differential Calendar Sync (0-button real-time sync)
+        dispatch(performForegroundCalendarSync()).catch(() => {});
+        // 2. Auto-manage overdue/completed tasks
         await dispatch(processAutoManageTasks());
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
         const { flushPendingTaskSaves } = require('./src/features/taskSlice');
