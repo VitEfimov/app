@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share, useWindowDimensions, Dimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSelector, useDispatch } from 'react-redux';
 import { CalendarList } from 'react-native-calendars';
@@ -25,13 +25,14 @@ export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const { t, i18n } = useTranslation();
-  const { width: windowWidth } = useWindowDimensions();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || []);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const [visibleMonth, setVisibleMonth] = useState(dayjs().format('YYYY-MM'));
+  const initialDate = useMemo(() => selectedDate, []);
+  const visibleMonthRef = useRef(dayjs(selectedDate).format('YYYY-MM'));
   const calendarListRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(() => Math.round(Dimensions.get('window').width));
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
   const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
@@ -66,20 +67,23 @@ export default function CalendarScreen() {
   const panY = useRef(new Animated.Value(360)).current;
   const lastY = useRef(360);
 
-  // Calendar Month Change Handler
+  // Calendar Month Change Handler (pure ref update - zero re-renders during swipe)
   const handleMonthChange = useCallback((monthObj) => {
     const newMonth = monthObj?.dateString 
       ? dayjs(monthObj.dateString).format('YYYY-MM') 
       : (monthObj?.year && monthObj?.month ? `${monthObj.year}-${String(monthObj.month).padStart(2, '0')}` : null);
 
     if (newMonth) {
-      setVisibleMonth(newMonth);
+      visibleMonthRef.current = newMonth;
     }
   }, []);
 
-  const handleCalendarLayout = (event) => {
-    const { height } = event.nativeEvent.layout;
-    if (Math.abs(maxYRef.current - height) > 5) {
+  const handleCalendarLayout = useCallback((event) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width && Math.abs(containerWidth - width) > 1) {
+      setContainerWidth(Math.round(width));
+    }
+    if (height && Math.abs(maxYRef.current - height) > 5) {
       maxYRef.current = height;
       if (!isInitialized.current) {
         panY.setValue(height);
@@ -87,7 +91,33 @@ export default function CalendarScreen() {
         isInitialized.current = true;
       }
     }
-  };
+  }, [containerWidth, panY]);
+
+  const renderHeader = useCallback((date) => {
+    const dateObj = dayjs(date ? (typeof date.toString === 'function' ? date.toString('yyyy-MM-dd') : date) : selectedDate);
+    const monthStr = dateObj.format('MMMM YYYY');
+    return (
+      <TouchableOpacity
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Select year"
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 4,
+          paddingHorizontal: 10,
+          borderRadius: 8,
+          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+        }}
+        onPress={() => setYearPickerVisible(true)}
+      >
+        <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
+          {monthStr}
+        </Text>
+        <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
+      </TouchableOpacity>
+    );
+  }, [colors, isDark, selectedDate]);
 
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
@@ -551,7 +581,7 @@ export default function CalendarScreen() {
           testID="task_calendar"
           key={`${colors.bgMain}-${isDark}-${i18n.language}`}
           markingType={'multi-dot'}
-          current={visibleMonth ? `${visibleMonth}-01` : selectedDate}
+          current={initialDate}
           firstDay={i18n.language === 'en' ? 0 : 1}
           onDayPress={(day) => {
             setSelectedDate(day.dateString);
@@ -561,7 +591,9 @@ export default function CalendarScreen() {
           horizontal={true}
           pagingEnabled={true}
           scrollEnabled={true}
-          calendarWidth={windowWidth}
+          nestedScrollEnabled={true}
+          removeClippedSubviews={false}
+          calendarWidth={containerWidth}
           calendarHeight={355}
           pastScrollRange={50}
           futureScrollRange={50}
@@ -570,24 +602,7 @@ export default function CalendarScreen() {
           hideArrows={false}
           onMonthChange={handleMonthChange}
           dayComponent={renderCustomDay}
-          renderHeader={(date) => {
-            const dateObj = dayjs(date ? (typeof date.toString === 'function' ? date.toString('yyyy-MM-dd') : date) : (visibleMonth ? `${visibleMonth}-01` : selectedDate));
-            const monthStr = dateObj.format('MMMM YYYY');
-            return (
-              <TouchableOpacity
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel={`Select year`}
-                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
-                onPress={() => setYearPickerVisible(true)}
-              >
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
-                  {monthStr}
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
-              </TouchableOpacity>
-            );
-          }}
+          renderHeader={renderHeader}
           theme={{
             backgroundColor: colors.bgMain,
             calendarBackground: colors.bgMain,
@@ -878,12 +893,12 @@ export default function CalendarScreen() {
       <YearPickerModal
         isVisible={isYearPickerVisible}
         onClose={() => setYearPickerVisible(false)}
-        currentYear={dayjs(visibleMonth ? `${visibleMonth}-01` : selectedDate).year()}
+        currentYear={dayjs(visibleMonthRef.current ? `${visibleMonthRef.current}-01` : selectedDate).year()}
         onSelectYear={(year) => {
-          const currentM = visibleMonth ? dayjs(`${visibleMonth}-01`).month() : dayjs(selectedDate).month();
+          const currentM = visibleMonthRef.current ? dayjs(`${visibleMonthRef.current}-01`).month() : dayjs(selectedDate).month();
           const targetDate = dayjs().year(year).month(currentM).date(1).format('YYYY-MM-DD');
           setSelectedDate(targetDate);
-          setVisibleMonth(dayjs(targetDate).format('YYYY-MM'));
+          visibleMonthRef.current = dayjs(targetDate).format('YYYY-MM');
           calendarListRef.current?.scrollToMonth(targetDate);
         }}
         colors={colors}
