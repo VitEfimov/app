@@ -202,25 +202,51 @@ const getAlarmOffsetMinutes = (reminder) => {
 export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
   if (!task || !task.completionDate) return null;
 
-  const dateStr = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : dayjs(task.completionDate).format('YYYY-MM-DD'));
-  const hasTime = !!(task.time && task.time.trim() !== '');
+  let rawDate = task.dateString;
+  if (!rawDate && typeof task.completionDate === 'string') {
+    rawDate = task.completionDate.split('T')[0];
+  } else if (!rawDate && task.completionDate) {
+    rawDate = dayjs(task.completionDate).format('YYYY-MM-DD');
+  }
+
+  if (!rawDate || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    const parsed = dayjs(task.completionDate);
+    if (!parsed.isValid()) return null;
+    rawDate = parsed.format('YYYY-MM-DD');
+  }
+
+  const rawTime = typeof task.time === 'string' ? task.time.trim() : '';
+  const timeRegex = /^([01]?\d|2[0-3]):([0-5]\d)/;
+  const matchTime = rawTime.match(timeRegex);
 
   let startDate;
   let endDate;
   let allDay = false;
 
-  if (hasTime) {
-    startDate = dayjs(`${dateStr}T${task.time}`).toDate();
-    endDate = dayjs(startDate).add(30, 'minute').toDate();
-    allDay = false;
-  } else {
-    startDate = dayjs(dateStr).startOf('day').toDate();
-    endDate = dayjs(dateStr).endOf('day').toDate();
+  if (matchTime) {
+    const formattedTime = `${matchTime[1].padStart(2, '0')}:${matchTime[2]}`;
+    const startDayjs = dayjs(`${rawDate}T${formattedTime}:00`);
+    if (startDayjs.isValid()) {
+      startDate = startDayjs.toDate();
+      endDate = startDayjs.add(30, 'minute').toDate();
+      allDay = false;
+    }
+  }
+
+  if (!startDate || isNaN(startDate.getTime())) {
+    const dayStart = dayjs(rawDate).startOf('day');
+    const dayEnd = dayjs(rawDate).endOf('day');
+    if (!dayStart.isValid()) return null;
+    startDate = dayStart.toDate();
+    endDate = dayEnd.toDate();
     allDay = true;
   }
 
-  // Alarms: By default, alarms: [] to avoid duplicate notifications (app push handles reminders).
-  // If user enabled calendar alarms in settings, attach relative offset.
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return null;
+  }
+
+  // Alarms: Only attach alarms if user enabled calendar alarms in settings and reminder is set
   const alarms = [];
   if (calendarAlarmsEnabled && task.reminder && task.reminder !== 'None') {
     const offset = getAlarmOffsetMinutes(task.reminder);
@@ -230,18 +256,30 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
   }
 
   const cleanDescription = task.description?.text
-    ? task.description.text.replace(/<[^>]+>/g, '').trim()
+    ? String(task.description.text).replace(/<[^>]+>/g, '').trim()
     : '';
 
-  return {
-    title: task.completed ? `✓ ${task.taskname}` : task.taskname,
+  const cleanTitle = (task.taskname ? String(task.taskname).trim() : 'Task') || 'Task';
+
+  const details = {
+    title: task.completed ? `✓ ${cleanTitle}` : cleanTitle,
     startDate,
     endDate,
     allDay,
     notes: cleanDescription ? `${cleanDescription}\n\n[Synced from TaskFlow]` : '[Synced from TaskFlow]',
-    alarms,
     availability: Calendar.Availability.BUSY,
   };
+
+  if (allDay) {
+    details.timeZone = 'UTC';
+    details.endTimeZone = 'UTC';
+  }
+
+  if (alarms.length > 0) {
+    details.alarms = alarms;
+  }
+
+  return details;
 };
 
 /**
@@ -262,17 +300,22 @@ export const syncTaskToCalendarAsync = async (task, settings = {}) => {
 
     // If task already has a calendar event ID, try to update it
     if (task.calendarEventId) {
-      try {
-        await Calendar.updateEventAsync(String(task.calendarEventId), eventDetails);
-        return task.calendarEventId;
-      } catch (updateErr) {
-        // Event might have been deleted from calendar externally; recreate
+      const eventIdStr = String(task.calendarEventId);
+      const isNumericId = /^\d+$/.test(eventIdStr);
+      const canUpdate = Platform.OS === 'android' ? isNumericId : !!eventIdStr;
+      if (canUpdate) {
+        try {
+          await Calendar.updateEventAsync(eventIdStr, eventDetails);
+          return eventIdStr;
+        } catch (updateErr) {
+          // Event might have been deleted from calendar externally; recreate below
+        }
       }
     }
 
     // Create new event
-    const newEventId = await Calendar.createEventAsync(calendarId, eventDetails);
-    return newEventId;
+    const newEventId = await Calendar.createEventAsync(String(calendarId), eventDetails);
+    return newEventId ? String(newEventId) : null;
   } catch (error) {
     console.warn(`Failed to sync task "${task.taskname}" to calendar:`, error);
     return null;
@@ -284,8 +327,10 @@ export const syncTaskToCalendarAsync = async (task, settings = {}) => {
  */
 export const removeTaskFromCalendarAsync = async (calendarEventId) => {
   if (Platform.OS === 'web' || !calendarEventId) return;
+  const idStr = String(calendarEventId);
+  if (Platform.OS === 'android' && !/^\d+$/.test(idStr)) return;
   try {
-    await Calendar.deleteEventAsync(String(calendarEventId));
+    await Calendar.deleteEventAsync(idStr);
   } catch (error) {
     // Silently ignore if already removed
   }
@@ -303,6 +348,7 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}) => 
     const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
     if (!calendarId) return { syncedCount: 0, eventMap: {} };
 
+    const stringCalendarId = String(calendarId);
     const eventMap = {};
     let syncedCount = 0;
     let index = 0;
@@ -318,18 +364,22 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}) => 
         const eventDetails = buildEventDetails(task, calendarAlarmsEnabled);
         if (eventDetails) {
           try {
-            let eventId = task.calendarEventId;
-            if (eventId) {
+            let eventId = task.calendarEventId ? String(task.calendarEventId) : null;
+            const isNumericId = eventId && /^\d+$/.test(eventId);
+            const canUpdate = Platform.OS === 'android' ? isNumericId : !!eventId;
+
+            if (canUpdate) {
               try {
-                await Calendar.updateEventAsync(String(eventId), eventDetails);
+                await Calendar.updateEventAsync(eventId, eventDetails);
               } catch (e) {
-                eventId = await Calendar.createEventAsync(calendarId, eventDetails);
+                eventId = await Calendar.createEventAsync(stringCalendarId, eventDetails);
               }
             } else {
-              eventId = await Calendar.createEventAsync(calendarId, eventDetails);
+              eventId = await Calendar.createEventAsync(stringCalendarId, eventDetails);
             }
             if (eventId) {
-              eventMap[task.id] = eventId;
+              const idString = String(eventId);
+              eventMap[task.id] = idString;
               syncedCount++;
             }
           } catch (e) {
@@ -378,7 +428,13 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
     const windowStart = dayjs().subtract(SYNC_PAST_DAYS, 'day').startOf('day');
     const windowEnd = dayjs().add(SYNC_FUTURE_DAYS, 'day').endOf('day');
 
-    const calendarEvents = await Calendar.getEventsAsync([calendarId], windowStart.toDate(), windowEnd.toDate());
+    let calendarEvents = [];
+    try {
+      calendarEvents = await Calendar.getEventsAsync([String(calendarId)], windowStart.toDate(), windowEnd.toDate());
+    } catch (e) {
+      console.warn('Calendar.getEventsAsync error:', e);
+      return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
+    }
     
     // Collect active native IDs and map
     const activeNativeEventMap = new Map();
@@ -429,8 +485,9 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
         taskByCalEventId.set(String(t.calendarEventId), t);
       }
       const dateKey = t.dateString || (t.completionDate ? (typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD')) : '');
-      if (t.taskname && dateKey) {
-        const key = `${t.taskname.trim().toLowerCase()}_${dateKey}`;
+      const taskTitle = typeof t.taskname === 'string' ? t.taskname.trim().toLowerCase() : (t.taskname ? String(t.taskname).trim().toLowerCase() : '');
+      if (taskTitle && dateKey) {
+        const key = `${taskTitle}_${dateKey}`;
         taskByNameAndDate.set(key, t);
       }
     });

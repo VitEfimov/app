@@ -77,7 +77,7 @@ export const startPomodoroSession = async (dispatch, pomodoro) => {
     : (pomodoro.isBreak ? (pomodoro.breakInterval || 300) : (pomodoro.initialTime || 1500));
 
   const endTime = Date.now() + (timeInSec * 1000);
-  dispatch(startTimer({ targetEndTime: endTime }));
+  dispatch(startTimer({ targetEndTime: endTime, time: timeInSec }));
 
   const soundKey = pomodoro.isBreak
     ? (pomodoro.breakSound || 'default')
@@ -111,11 +111,32 @@ export const resetPomodoroSession = async (dispatch) => {
 
 export const handlePomodoroPeriodEnd = async (dispatch, pomodoro) => {
   if (!pomodoro) return;
-  try {
-    await cancelPomodoroAlarm('current');
-  } catch (e) {}
 
   const isBreak = !!pomodoro.isBreak;
+  const intervalCount = typeof pomodoro.intervalCount === 'object'
+    ? (pomodoro.intervalCount.count || 5)
+    : 5;
+  const passed = typeof pomodoro.intervalCount === 'object'
+    ? (pomodoro.intervalCount.passed || 0)
+    : 0;
+
+  // 1. Immediately transition Redux state FIRST so top toggle and timer display switch without delay
+  if (isBreak) {
+    if (passed >= intervalCount) {
+      dispatch(resetTimer());
+    } else {
+      dispatch(completeBreakInterval());
+    }
+  } else {
+    dispatch(completeWorkInterval());
+  }
+
+  // 2. Cancel native alarm non-blockingly
+  try {
+    cancelPomodoroAlarm('current').catch(() => {});
+  } catch (e) {}
+
+  // 3. Send notification & audio non-blockingly
   const title = isBreak ? 'Break time is over!' : 'Work session complete!';
   const body = isBreak ? 'Time to get back to work.' : 'Take a short break.';
 
@@ -130,23 +151,9 @@ export const handlePomodoroPeriodEnd = async (dispatch, pomodoro) => {
   } catch (e) {}
 
   if (Platform.OS !== 'android') {
-    playAudio(soundKey);
-  }
-
-  const intervalCount = typeof pomodoro.intervalCount === 'object'
-    ? (pomodoro.intervalCount.count || 5)
-    : 5;
-  const passed = typeof pomodoro.intervalCount === 'object'
-    ? (pomodoro.intervalCount.passed || 0)
-    : 0;
-
-  if (isBreak) {
-    dispatch(completeBreakInterval());
-    if (passed + 1 >= intervalCount) {
-      dispatch(resetTimer());
-    }
-  } else {
-    dispatch(completeWorkInterval(pomodoro.initialTime || 25 * 60));
+    try {
+      playAudio(soundKey);
+    } catch (e) {}
   }
 };
 

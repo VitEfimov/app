@@ -36,7 +36,9 @@ export default function PremiumModal({ isVisible, onClose, featureName }) {
           {name}
         </Text>
         <Text style={[styles.description, { color: colors.textSecondary || '#666' }]}>
-          {t('Understand your work patterns with monthly and yearly trends, productivity scores, activity heat maps, streaks, records, goals, and personalized insights.')}
+          {featureName && (featureName.includes('Calendar') || featureName.includes('Sync'))
+            ? (t('Seamlessly synchronize all your tasks with due dates and times across Google Calendar, Apple Calendar, and device calendars in real time.') || 'Seamlessly synchronize all your tasks with due dates and times across Google Calendar, Apple Calendar, and device calendars in real time.')
+            : t('Understand your work patterns with monthly and yearly trends, productivity scores, activity heat maps, streaks, records, goals, and personalized insights.')}
         </Text>
 
         <TouchableOpacity 

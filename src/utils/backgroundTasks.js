@@ -16,8 +16,17 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
       const themeState = JSON.parse(themeJson);
       let tasks = tasksJson ? JSON.parse(tasksJson) : [];
       
-      // Headless differential calendar sync if enabled
-      if (themeState.calendarSyncEnabled) {
+      // Headless differential calendar sync if enabled (PRO)
+      const entitlementJson = await AsyncStorage.getItem('entitlement');
+      let isPremium = false;
+      if (entitlementJson) {
+        try {
+          const ent = JSON.parse(entitlementJson);
+          isPremium = !!ent.isPremium;
+        } catch (e) {}
+      }
+
+      if (isPremium && themeState.calendarSyncEnabled) {
         try {
           const { performDifferentialCalendarSyncAsync } = require('./calendarSync');
           const diffResult = await performDifferentialCalendarSyncAsync(themeState, tasks);

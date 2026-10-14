@@ -366,6 +366,11 @@ export default function CalendarScreen() {
   };
 
   const handleSyncDayToCalendar = async () => {
+    if (!isPremium) {
+      setPremiumFeatureName(t('Calendar Synchronization') || 'Calendar Synchronization');
+      setPremiumModalVisible(true);
+      return;
+    }
     try {
       const hasPerm = await checkCalendarPermissionsAsync();
       if (!hasPerm) {
@@ -835,7 +840,14 @@ export default function CalendarScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleSyncDayToCalendar(), 400); }}>
-            <Text style={[styles.optionText, { color: colors.primary }]}>{t('Sync Day with Device Calendar') || 'Sync Day with Device Calendar'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.optionText, { color: colors.primary }]}>{t('Sync Day with Device Calendar') || 'Sync Day with Device Calendar'}</Text>
+              {!isPremium && (
+                <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#000' }}>PRO</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleDeleteSection(), 400); }}>

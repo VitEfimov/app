@@ -21,23 +21,29 @@ export const compareTaskOrder = (a, b) => {
   if (!hasDateA && hasDateB) return 1;
 
   if (hasDateA && hasDateB) {
-    const dateStrA = a.dateString || (typeof a.completionDate === 'string' ? a.completionDate.split('T')[0] : '');
-    const dateStrB = b.dateString || (typeof b.completionDate === 'string' ? b.completionDate.split('T')[0] : '');
+    const dateStrA = typeof a.dateString === 'string'
+      ? a.dateString
+      : (typeof a.completionDate === 'string' ? a.completionDate.split('T')[0] : (a.completionDate ? String(a.completionDate) : ''));
+    const dateStrB = typeof b.dateString === 'string'
+      ? b.dateString
+      : (typeof b.completionDate === 'string' ? b.completionDate.split('T')[0] : (b.completionDate ? String(b.completionDate) : ''));
     
     if (dateStrA !== dateStrB) {
-      return dateStrA.localeCompare(dateStrB);
+      return String(dateStrA).localeCompare(String(dateStrB));
     }
   }
 
   // Same date (or both undated): compare time
-  const hasTimeA = !!(a.time && a.time.trim() !== '' && a.time !== '--:--');
-  const hasTimeB = !!(b.time && b.time.trim() !== '' && b.time !== '--:--');
+  const timeA = typeof a.time === 'string' ? a.time.trim() : (a.time ? String(a.time).trim() : '');
+  const timeB = typeof b.time === 'string' ? b.time.trim() : (b.time ? String(b.time).trim() : '');
+  const hasTimeA = !!(timeA && timeA !== '' && timeA !== '--:--');
+  const hasTimeB = !!(timeB && timeB !== '' && timeB !== '--:--');
 
   if (hasTimeA && !hasTimeB) return -1;
   if (!hasTimeA && hasTimeB) return 1;
 
   if (hasTimeA && hasTimeB) {
-    const timeCompare = a.time.localeCompare(b.time);
+    const timeCompare = timeA.localeCompare(timeB);
     if (timeCompare !== 0) return timeCompare;
   }
 

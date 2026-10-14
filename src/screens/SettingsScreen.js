@@ -123,6 +123,11 @@ export default function SettingsScreen({ navigation }) {
 
   const handleToggleCalendarSync = async (enabled) => {
     if (enabled) {
+      if (!isPremium) {
+        setPremiumFeatureName(t('Calendar Synchronization') || 'Calendar Synchronization');
+        setPremiumModalVisible(true);
+        return;
+      }
       const hasPerm = await checkCalendarPermissionsAsync();
       if (!hasPerm) {
         const granted = await requestCalendarPermissionsAsync();
@@ -148,10 +153,43 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleManualCalendarSync = async () => {
+    if (!isPremium) {
+      setPremiumFeatureName(t('Calendar Synchronization') || 'Calendar Synchronization');
+      setPremiumModalVisible(true);
+      return;
+    }
     setIsSyncingCalendar(true);
     try {
+      const hasPermission = await checkCalendarPermissionsAsync();
+      if (!hasPermission) {
+        const granted = await requestCalendarPermissionsAsync();
+        if (!granted) {
+          setConfirmConfig({
+            isVisible: true,
+            title: t('Calendar Permission Required') || 'Calendar Permission Required',
+            message: t('Please allow calendar permissions to synchronize your tasks with Google & device calendars.') || 'Please allow calendar permissions to synchronize your tasks with Google & device calendars.',
+            confirmText: t('OK') || 'OK',
+            hideCancel: true,
+            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+          });
+          return;
+        }
+      }
+
       const result = await dispatch(batchSyncCalendarTasks());
-      const { exportedCount = 0, importedCount = 0, deletedCount = 0 } = result || {};
+      const { exportedCount = 0, importedCount = 0, deletedCount = 0, error } = result || {};
+      if (error) {
+        setConfirmConfig({
+          isVisible: true,
+          title: t('Sync Warning') || 'Sync Warning',
+          message: error,
+          confirmText: t('OK') || 'OK',
+          hideCancel: true,
+          onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+        });
+        return;
+      }
+
       const delLine = deletedCount > 0 ? `\n${deletedCount} ${t('tasks removed (deleted in calendar).') || 'tasks removed (deleted in calendar).'}` : '';
       setConfirmConfig({
         isVisible: true,
@@ -534,21 +572,37 @@ export default function SettingsScreen({ navigation }) {
         {/* Google & Device Calendar Section */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Google & Device Calendar') || 'Google & Device Calendar'}</Text>
         <View style={styles.sectionGroup}>
-          <View style={[styles.rowItem, { borderBottomWidth: theme.calendarSyncEnabled ? 1 : 0, paddingVertical: 12 }]}>
+          <TouchableOpacity
+            activeOpacity={isPremium ? 1 : 0.7}
+            onPress={() => {
+              if (!isPremium) {
+                setPremiumFeatureName(t('Calendar Synchronization') || 'Calendar Synchronization');
+                setPremiumModalVisible(true);
+              }
+            }}
+            style={[styles.rowItem, { borderBottomWidth: (isPremium && theme.calendarSyncEnabled) ? 1 : 0, paddingVertical: 12 }]}
+          >
             <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Sync Tasks to Calendar') || 'Sync Tasks to Calendar'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Sync Tasks to Calendar') || 'Sync Tasks to Calendar'}</Text>
+                {!isPremium && (
+                  <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#000' }}>PRO</Text>
+                  </View>
+                )}
+              </View>
               <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
                 {t('Syncs tasks with due dates to Google Calendar & device calendar') || 'Syncs tasks with due dates to Google Calendar & device calendar'}
               </Text>
             </View>
             <Switch
-              value={theme.calendarSyncEnabled || false}
+              value={isPremium ? (theme.calendarSyncEnabled || false) : false}
               onValueChange={handleToggleCalendarSync}
               trackColor={{ false: colors.borderColor, true: colors.primary }}
             />
-          </View>
+          </TouchableOpacity>
 
-          {theme.calendarSyncEnabled && (
+          {isPremium && theme.calendarSyncEnabled && (
             <>
               {deviceCalendars.length > 0 && (
                 <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>

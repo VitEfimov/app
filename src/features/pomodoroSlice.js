@@ -49,21 +49,54 @@ export const pomodoroSlice = createSlice({
           if (remaining > 0) {
             p.time = remaining;
           } else {
-            p.time = 0;
+            // Timer expired while inactive/closed: transition interval
             p.isActive = false;
             p.targetEndTime = null;
+            if (!p.isBreak) {
+              // Transition from work to break
+              if (p.intervalCount.passed < p.intervalCount.count) {
+                p.intervalCount.passed += 1;
+              }
+              p.isBreak = true;
+              p.time = p.breakInterval || 300;
+              p.intervalCount.progress = 0;
+            } else {
+              // Transition from break to work
+              p.isBreak = false;
+              p.time = p.initialTime || 1500;
+              p.intervalCount.progress = 0;
+              if (p.intervalCount.passed >= p.intervalCount.count) {
+                p.intervalCount.passed = 0;
+              }
+            }
           }
         } else if (p.isActive && !p.targetEndTime) {
           p.isActive = false;
         }
-        if (p.isBreak && !p.time) {
-          p.time = p.breakInterval;
+
+        // Ensure time is initialized correctly when idle
+        if (!p.isActive) {
+          if (p.isBreak) {
+            if (!p.time || p.time <= 0) {
+              p.time = p.breakInterval || 300;
+            }
+          } else {
+            if (!p.time || p.time <= 0) {
+              p.time = p.initialTime || 1500;
+            }
+          }
         }
       }
       state.pomodoro = payload;
+      AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro)).catch(() => {});
     },
     startTimer: (state, action) => {
       const p = state.pomodoro[0];
+      if (action && action.payload && typeof action.payload.time === 'number') {
+        p.time = action.payload.time;
+      } else if (!p.time || p.time <= 0) {
+        p.time = p.isBreak ? (p.breakInterval || 300) : (p.initialTime || 1500);
+      }
       p.isActive = true;
       p.targetEndTime = (action && action.payload && action.payload.targetEndTime)
         ? action.payload.targetEndTime
@@ -200,6 +233,7 @@ export const pomodoroSlice = createSlice({
     },
     completeWorkInterval: (state) => {
       const p = state.pomodoro[0];
+      if (!p) return;
       if (typeof p.intervalCount !== 'object' || p.intervalCount === null) {
         p.intervalCount = {
           count: 5,
@@ -220,12 +254,16 @@ export const pomodoroSlice = createSlice({
     },
     completeBreakInterval: (state) => {
       const p = state.pomodoro[0];
+      if (!p) return;
       p.isBreak = false;
       p.isActive = false;
       p.targetEndTime = null;
       p.time = p.initialTime || 1500;
       if (typeof p.intervalCount === 'object' && p.intervalCount !== null) {
         p.intervalCount.progress = 0;
+        if (p.intervalCount.passed >= p.intervalCount.count) {
+          p.intervalCount.passed = 0;
+        }
       }
       AsyncStorage.setItem('pomodoro', JSON.stringify(state.pomodoro));
     },

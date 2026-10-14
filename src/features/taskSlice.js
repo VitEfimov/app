@@ -393,7 +393,7 @@ const taskSlice = createSlice({
             // 1. Update calendarEventIds from eventMap
             if (eventMap && typeof eventMap === 'object') {
                 Object.entries(eventMap).forEach(([tId, calId]) => {
-                    const task = state.tasks.find(t => t.id === tId);
+                    const task = state.tasks.find(t => String(t.id) === String(tId));
                     if (task) {
                         task.calendarEventId = calId;
                     }
@@ -403,7 +403,7 @@ const taskSlice = createSlice({
             // 2. Update existing tasks with updates from calendar
             if (Array.isArray(updatedTasks) && updatedTasks.length > 0) {
                 updatedTasks.forEach(u => {
-                    const task = state.tasks.find(t => t.id === u.taskId);
+                    const task = state.tasks.find(t => String(t.id) === String(u.taskId));
                     if (task) {
                         if (u.calendarEventId !== undefined) task.calendarEventId = u.calendarEventId;
                         if (u.name !== undefined) task.taskname = u.name;
@@ -423,7 +423,7 @@ const taskSlice = createSlice({
             if (Array.isArray(newTasks) && newTasks.length > 0) {
                 for (const nt of newTasks) {
                     if (nt) {
-                        state.tasks = insertTaskSorted(state.tasks, nt);
+                        state.tasks.push(nt);
                     }
                 }
             }
@@ -565,8 +565,8 @@ export const addTask = (payload) => async (dispatch, getState) => {
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
 
-    // 2. Non-blocking bi-directional write to native calendar
-    if (themeState?.calendarSyncEnabled && payload?.task?.completionDate) {
+    // 2. Non-blocking bi-directional write to native calendar (PRO)
+    if (isPremium && themeState?.calendarSyncEnabled && payload?.task?.completionDate) {
         syncTaskToCalendarAsync(payload.task, themeState)
             .then(calEventId => {
                 if (calEventId) {
@@ -628,8 +628,8 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
 
-    // 2. Non-blocking background push to native calendar
-    if (themeState?.calendarSyncEnabled && Array.isArray(payload?.tasks)) {
+    // 2. Non-blocking background push to native calendar (PRO)
+    if (isPremium && themeState?.calendarSyncEnabled && Array.isArray(payload?.tasks)) {
         setTimeout(async () => {
             let anySynced = false;
             for (const task of payload.tasks) {
@@ -771,7 +771,8 @@ export const updateTask = (payload) => async (dispatch, getState) => {
         }
     }
 
-    if (state.themeReducer?.calendarSyncEnabled && updatedTask) {
+    const isPremium = state.entitlementReducer?.isPremium;
+    if (isPremium && state.themeReducer?.calendarSyncEnabled && updatedTask) {
         try {
             if (updatedTask.completed) {
                 await syncTaskToCalendarAsync(updatedTask, state.themeReducer);
@@ -807,6 +808,10 @@ let lastSyncCompletedTimestamp = 0;
  */
 export const performForegroundCalendarSync = (force = false) => async (dispatch, getState) => {
     const state = getState();
+    const isPremium = state.entitlementReducer?.isPremium;
+    if (!isPremium) {
+        return { hasChanges: false, totalSynced: 0 };
+    }
     const themeState = state.themeReducer;
     if (!themeState?.calendarSyncEnabled || Platform.OS === 'web') {
         return { hasChanges: false, totalSynced: 0 };
@@ -862,41 +867,70 @@ export const performForegroundCalendarSync = (force = false) => async (dispatch,
 };
 
 export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
-    const state = getState();
-    const tasks = state.taskReducer.tasks;
-    const themeState = state.themeReducer;
-
-    // 1. Export local tasks to Google Calendar
-    const { syncedCount, eventMap } = await syncAllTasksToCalendarAsync(tasks, themeState);
-
-    // 2. Differential sync from Google Calendar to local tasks
-    const { newTasks, updatedTasks, deletedTaskIds, importedCount = 0, deletedCount = 0 } = await performDifferentialCalendarSyncAsync(themeState, tasks);
-
-    // 3. Atomically update Redux in ONE single dispatch
-    dispatch(batchCalendarSyncComplete({
-        eventMap,
-        newTasks,
-        updatedTasks,
-        deletedTaskIds
-    }));
-
-    // 4. Persist to storage once
-    persistTasksToStorage(getState().taskReducer.tasks, getState);
-
-    // 5. Harmonize with remote DB
-    const dbSyncEnabled = themeState?.dbSyncEnabled !== false && Platform.OS !== 'web';
-    if (state.userReducer?.isAuthenticated && dbSyncEnabled && Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
-        for (const delId of deletedTaskIds) {
-            dispatch(deleteTaskAsync(delId));
+    try {
+        const state = getState();
+        const isPremium = state.entitlementReducer?.isPremium;
+        if (!isPremium) {
+            return {
+                exportedCount: 0,
+                importedCount: 0,
+                deletedCount: 0,
+                totalSynced: 0
+            };
         }
-    }
+        const tasks = state.taskReducer.tasks || [];
+        const themeState = state.themeReducer || {};
 
-    return {
-        exportedCount: syncedCount || 0,
-        importedCount: importedCount || 0,
-        deletedCount: deletedCount || 0,
-        totalSynced: (syncedCount || 0) + (importedCount || 0) + (deletedCount || 0)
-    };
+        // 1. Export local tasks to Google Calendar
+        const { syncedCount = 0, eventMap = {} } = await syncAllTasksToCalendarAsync(tasks, themeState);
+
+        // Merge newly created/updated eventMap IDs into tasks before differential sync so they are recognized
+        const tasksWithUpdatedEventIds = tasks.map(t => {
+            if (t && eventMap && eventMap[t.id]) {
+                return { ...t, calendarEventId: eventMap[t.id] };
+            }
+            return t;
+        });
+
+        // 2. Differential sync from Google Calendar to local tasks
+        const { newTasks = [], updatedTasks = [], deletedTaskIds = [], importedCount = 0, deletedCount = 0 } = 
+            await performDifferentialCalendarSyncAsync(themeState, tasksWithUpdatedEventIds);
+
+        // 3. Atomically update Redux in ONE single dispatch
+        dispatch(batchCalendarSyncComplete({
+            eventMap,
+            newTasks,
+            updatedTasks,
+            deletedTaskIds
+        }));
+
+        // 4. Persist to storage once
+        persistTasksToStorage(getState().taskReducer.tasks, getState);
+
+        // 5. Harmonize with remote DB
+        const dbSyncEnabled = themeState?.dbSyncEnabled !== false && Platform.OS !== 'web';
+        if (state.userReducer?.isAuthenticated && dbSyncEnabled && Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
+            for (const delId of deletedTaskIds) {
+                dispatch(deleteTaskAsync(delId));
+            }
+        }
+
+        return {
+            exportedCount: syncedCount || 0,
+            importedCount: importedCount || 0,
+            deletedCount: deletedCount || 0,
+            totalSynced: (syncedCount || 0) + (importedCount || 0) + (deletedCount || 0)
+        };
+    } catch (error) {
+        console.warn('batchSyncCalendarTasks error:', error);
+        return {
+            exportedCount: 0,
+            importedCount: 0,
+            deletedCount: 0,
+            totalSynced: 0,
+            error: error.message
+        };
+    }
 };
 
 export const updateRecurringSeries = (payload) => async (dispatch, getState) => {
