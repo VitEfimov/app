@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share } from 'react-native';
+import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSelector, useDispatch } from 'react-redux';
-import { Calendar } from 'react-native-calendars';
+import { CalendarList } from 'react-native-calendars';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
 import TaskRow from '../components/TaskRow';
@@ -25,10 +25,13 @@ export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const { t, i18n } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || []);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
+  const [visibleMonth, setVisibleMonth] = useState(dayjs().format('YYYY-MM'));
+  const calendarListRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
   const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
@@ -63,60 +66,16 @@ export default function CalendarScreen() {
   const panY = useRef(new Animated.Value(360)).current;
   const lastY = useRef(360);
 
-  // Smooth Calendar Month Swap Animation
-  const calendarSlideAnim = useRef(new Animated.Value(0)).current;
-  const calendarOpacityAnim = useRef(new Animated.Value(1)).current;
-  const isAnimatingRef = useRef(false);
-  const currentMonthStr = useRef(dayjs(selectedDate).format('YYYY-MM'));
-
-  const animateCalendarSlide = useCallback((direction = 'left', callback) => {
-    isAnimatingRef.current = true;
-    const startX = direction === 'left' ? 36 : direction === 'right' ? -36 : 0;
-    calendarSlideAnim.setValue(startX);
-    calendarOpacityAnim.setValue(0.7);
-    if (typeof callback === 'function') {
-      callback();
-    }
-    Animated.parallel([
-      Animated.timing(calendarSlideAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(calendarOpacityAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      isAnimatingRef.current = false;
-    });
-  }, [calendarSlideAnim, calendarOpacityAnim]);
-
+  // Calendar Month Change Handler
   const handleMonthChange = useCallback((monthObj) => {
     const newMonth = monthObj?.dateString 
       ? dayjs(monthObj.dateString).format('YYYY-MM') 
       : (monthObj?.year && monthObj?.month ? `${monthObj.year}-${String(monthObj.month).padStart(2, '0')}` : null);
 
-    const prevMonth = currentMonthStr.current;
     if (newMonth) {
-      currentMonthStr.current = newMonth;
+      setVisibleMonth(newMonth);
     }
-
-    if (!isAnimatingRef.current) {
-      if (newMonth && prevMonth) {
-        if (newMonth > prevMonth) {
-          animateCalendarSlide('left');
-        } else if (newMonth < prevMonth) {
-          animateCalendarSlide('right');
-        } else {
-          animateCalendarSlide('fade');
-        }
-      } else {
-        animateCalendarSlide('fade');
-      }
-    }
-  }, [animateCalendarSlide]);
+  }, []);
 
   const handleCalendarLayout = (event) => {
     const { height } = event.nativeEvent.layout;
@@ -587,70 +546,78 @@ export default function CalendarScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <View onLayout={handleCalendarLayout}>
-        <Animated.View style={{ transform: [{ translateX: calendarSlideAnim }], opacity: calendarOpacityAnim }}>
-          <Calendar
-            testID="task_calendar"
-            key={`${colors.bgMain}-${isDark}-${i18n.language}`}
-            markingType={'multi-dot'}
-            current={selectedDate}
-            firstDay={i18n.language === 'en' ? 0 : 1}
-            onDayPress={(day) => {
-              setSelectedDate(day.dateString);
-              setSelectionMode({ isActive: false, selectedTaskIds: [] });
-            }}
-            markedDates={markedDates}
-            enableSwipeMonths={true}
-            onPressArrowLeft={(subtractMonth) => {
-              animateCalendarSlide('right', subtractMonth);
-            }}
-            onPressArrowRight={(addMonth) => {
-              animateCalendarSlide('left', addMonth);
-            }}
-            onMonthChange={handleMonthChange}
-            dayComponent={renderCustomDay}
-            renderHeader={(date) => {
-              const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
-              const monthStr = dateObj.format('MMMM YYYY');
-              return (
-                <TouchableOpacity
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select year`}
-                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
-                  onPress={() => setYearPickerVisible(true)}
-                >
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
-                    {monthStr}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
-                </TouchableOpacity>
-              );
-            }}
-            theme={{
-              backgroundColor: colors.bgMain,
-              calendarBackground: colors.bgMain,
-              textSectionTitleColor: colors.textSecondary,
-              selectedDayBackgroundColor: colors.primary,
-              selectedDayTextColor: colors.textInverse,
-              todayTextColor: colors.primary,
-              dayTextColor: colors.textPrimary,
-              textDisabledColor: colors.surfaceContainerHigh,
-              dotColor: colors.primary,
-              selectedDotColor: colors.textInverse,
-              arrowColor: colors.primary,
-              monthTextColor: colors.textPrimary,
-              indicatorColor: colors.primary,
-              textDayFontWeight: '600',
-              todayButtonFontWeight: 'bold',
-              textMonthFontWeight: 'bold',
-              textDayHeaderFontWeight: '600',
-              textDayFontSize: 15,
-              textMonthFontSize: 18,
-              textDayHeaderFontSize: 14
-            }}
-            style={styles.calendar}
-          />
-        </Animated.View>
+        <CalendarList
+          ref={calendarListRef}
+          testID="task_calendar"
+          key={`${colors.bgMain}-${isDark}-${i18n.language}`}
+          markingType={'multi-dot'}
+          current={visibleMonth ? `${visibleMonth}-01` : selectedDate}
+          firstDay={i18n.language === 'en' ? 0 : 1}
+          onDayPress={(day) => {
+            setSelectedDate(day.dateString);
+            setSelectionMode({ isActive: false, selectedTaskIds: [] });
+          }}
+          markedDates={markedDates}
+          horizontal={true}
+          pagingEnabled={true}
+          scrollEnabled={true}
+          calendarWidth={windowWidth}
+          calendarHeight={355}
+          pastScrollRange={50}
+          futureScrollRange={50}
+          showScrollIndicator={false}
+          animateScroll={true}
+          hideArrows={false}
+          onMonthChange={handleMonthChange}
+          dayComponent={renderCustomDay}
+          renderHeader={(date) => {
+            const dateObj = dayjs(date ? (typeof date.toString === 'function' ? date.toString('yyyy-MM-dd') : date) : (visibleMonth ? `${visibleMonth}-01` : selectedDate));
+            const monthStr = dateObj.format('MMMM YYYY');
+            return (
+              <TouchableOpacity
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`Select year`}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
+                onPress={() => setYearPickerVisible(true)}
+              >
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
+                  {monthStr}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
+              </TouchableOpacity>
+            );
+          }}
+          theme={{
+            backgroundColor: colors.bgMain,
+            calendarBackground: colors.bgMain,
+            textSectionTitleColor: colors.textSecondary,
+            selectedDayBackgroundColor: colors.primary,
+            selectedDayTextColor: colors.textInverse,
+            todayTextColor: colors.primary,
+            dayTextColor: colors.textPrimary,
+            textDisabledColor: colors.surfaceContainerHigh,
+            dotColor: colors.primary,
+            selectedDotColor: colors.textInverse,
+            arrowColor: colors.primary,
+            monthTextColor: colors.textPrimary,
+            indicatorColor: colors.primary,
+            textDayFontWeight: '600',
+            todayButtonFontWeight: 'bold',
+            textMonthFontWeight: 'bold',
+            textDayHeaderFontWeight: '600',
+            textDayFontSize: 15,
+            textMonthFontSize: 18,
+            textDayHeaderFontSize: 14,
+            'stylesheet.calendar-list.main': {
+              calendar: {
+                paddingLeft: 0,
+                paddingRight: 0,
+              },
+            },
+          }}
+          style={styles.calendar}
+        />
       </View>
       
       {/* Custom Bottom Sheet */}
@@ -839,7 +806,10 @@ export default function CalendarScreen() {
             <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move forward')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleSyncDayToCalendar(), 400); }}>
+          <TouchableOpacity 
+            style={[styles.optionBtn, { borderBottomColor: colors.borderColor, display: 'none' }]} 
+            onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleSyncDayToCalendar(), 400); }}
+          >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={[styles.optionText, { color: colors.primary }]}>{t('Sync Day with Device Calendar') || 'Sync Day with Device Calendar'}</Text>
               {!isPremium && (
@@ -908,11 +878,13 @@ export default function CalendarScreen() {
       <YearPickerModal
         isVisible={isYearPickerVisible}
         onClose={() => setYearPickerVisible(false)}
-        currentYear={dayjs(selectedDate).year()}
+        currentYear={dayjs(visibleMonth ? `${visibleMonth}-01` : selectedDate).year()}
         onSelectYear={(year) => {
-          const newDate = dayjs(selectedDate).year(year).format('YYYY-MM-DD');
-          animateCalendarSlide('fade');
-          setSelectedDate(newDate);
+          const currentM = visibleMonth ? dayjs(`${visibleMonth}-01`).month() : dayjs(selectedDate).month();
+          const targetDate = dayjs().year(year).month(currentM).date(1).format('YYYY-MM-DD');
+          setSelectedDate(targetDate);
+          setVisibleMonth(dayjs(targetDate).format('YYYY-MM'));
+          calendarListRef.current?.scrollToMonth(targetDate);
         }}
         colors={colors}
       />
