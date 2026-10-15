@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share, useWindowDimensions, Dimensions } from 'react-native';
+import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share, useWindowDimensions, Dimensions, I18nManager } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSelector, useDispatch } from 'react-redux';
 import { CalendarList } from 'react-native-calendars';
@@ -31,8 +31,7 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const initialDate = useMemo(() => selectedDate, []);
   const visibleMonthRef = useRef(dayjs(selectedDate).format('YYYY-MM'));
-  const calendarListRef = useRef(null);
-  const [containerWidth, setContainerWidth] = useState(() => Math.round(Dimensions.get('window').width));
+  const { width: windowWidth } = useWindowDimensions();
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
   const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
@@ -79,10 +78,7 @@ export default function CalendarScreen() {
   }, []);
 
   const handleCalendarLayout = useCallback((event) => {
-    const { width, height } = event.nativeEvent.layout;
-    if (width && Math.abs(containerWidth - width) > 1) {
-      setContainerWidth(Math.round(width));
-    }
+    const { height } = event.nativeEvent.layout;
     if (height && Math.abs(maxYRef.current - height) > 5) {
       maxYRef.current = height;
       if (!isInitialized.current) {
@@ -91,7 +87,30 @@ export default function CalendarScreen() {
         isInitialized.current = true;
       }
     }
-  }, [containerWidth, panY]);
+  }, [panY]);
+
+  // Ensure calendar list snaps cleanly to exact month boundary on device swipe
+  const handleMomentumScrollEnd = useCallback((event) => {
+    const offsetX = event?.nativeEvent?.contentOffset?.x;
+    if (typeof offsetX === 'number' && visibleMonthRef.current && windowWidth > 0) {
+      const [initY, initM] = initialDate.split('-').map(Number);
+      const [visY, visM] = visibleMonthRef.current.split('-').map(Number);
+      const diffMonths = (visY - initY) * 12 + (visM - initM);
+      const isRTLAndroid = Platform.OS === 'android' && I18nManager.isRTL;
+      const targetOffset = (isRTLAndroid ? 50 - diffMonths : 50 + diffMonths) * windowWidth;
+
+      if (Math.abs(offsetX - targetOffset) >= 1) {
+        calendarListRef.current?.scrollToMonth(`${visibleMonthRef.current}-01`);
+      }
+    }
+  }, [windowWidth, initialDate]);
+
+  const handleScrollEndDrag = useCallback((event) => {
+    const velocityX = event?.nativeEvent?.velocity?.x;
+    if (!velocityX || Math.abs(velocityX) < 0.05) {
+      handleMomentumScrollEnd(event);
+    }
+  }, [handleMomentumScrollEnd]);
 
   const renderHeader = useCallback((date) => {
     const dateObj = dayjs(date ? (typeof date.toString === 'function' ? date.toString('yyyy-MM-dd') : date) : selectedDate);
@@ -575,7 +594,7 @@ export default function CalendarScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
-      <View onLayout={handleCalendarLayout}>
+      <View onLayout={handleCalendarLayout} style={{ width: windowWidth, overflow: 'hidden' }}>
         <CalendarList
           ref={calendarListRef}
           testID="task_calendar"
@@ -593,7 +612,7 @@ export default function CalendarScreen() {
           scrollEnabled={true}
           nestedScrollEnabled={true}
           removeClippedSubviews={false}
-          calendarWidth={containerWidth}
+          calendarWidth={windowWidth}
           calendarHeight={355}
           pastScrollRange={50}
           futureScrollRange={50}
@@ -601,6 +620,8 @@ export default function CalendarScreen() {
           animateScroll={true}
           hideArrows={false}
           onMonthChange={handleMonthChange}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          onScrollEndDrag={handleScrollEndDrag}
           dayComponent={renderCustomDay}
           renderHeader={renderHeader}
           theme={{
@@ -628,10 +649,18 @@ export default function CalendarScreen() {
               calendar: {
                 paddingLeft: 0,
                 paddingRight: 0,
+                width: windowWidth,
+              },
+            },
+            'stylesheet.calendar.main': {
+              container: {
+                paddingLeft: 0,
+                paddingRight: 0,
+                width: windowWidth,
               },
             },
           }}
-          style={styles.calendar}
+          style={[styles.calendar, { width: windowWidth }]}
         />
       </View>
       

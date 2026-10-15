@@ -570,97 +570,99 @@ export default function SettingsScreen({ navigation }) {
         )}
 
         {/* Google & Device Calendar Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Google & Device Calendar') || 'Google & Device Calendar'}</Text>
-        <View style={styles.sectionGroup}>
-          <TouchableOpacity
-            activeOpacity={isPremium ? 1 : 0.7}
-            onPress={() => {
-              if (!isPremium) {
-                setPremiumFeatureName(t('Calendar Synchronization') || 'Calendar Synchronization');
-                setPremiumModalVisible(true);
-              }
-            }}
-            style={[styles.rowItem, { borderBottomWidth: (isPremium && theme.calendarSyncEnabled) ? 1 : 0, paddingVertical: 12 }]}
-          >
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Sync Tasks to Calendar') || 'Sync Tasks to Calendar'}</Text>
-                {!isPremium && (
-                  <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 }}>
-                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#000' }}>PRO</Text>
+        <View style={{ display: 'none' }}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Google & Device Calendar') || 'Google & Device Calendar'}</Text>
+          <View style={styles.sectionGroup}>
+            <TouchableOpacity
+              activeOpacity={isPremium ? 1 : 0.7}
+              onPress={() => {
+                if (!isPremium) {
+                  setPremiumFeatureName(t('Calendar Synchronization') || 'Calendar Synchronization');
+                  setPremiumModalVisible(true);
+                }
+              }}
+              style={[styles.rowItem, { borderBottomWidth: (isPremium && theme.calendarSyncEnabled) ? 1 : 0, paddingVertical: 12 }]}
+            >
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Sync Tasks to Calendar') || 'Sync Tasks to Calendar'}</Text>
+                  {!isPremium && (
+                    <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 }}>
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#000' }}>PRO</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                  {t('Syncs tasks with due dates to Google Calendar & device calendar') || 'Syncs tasks with due dates to Google Calendar & device calendar'}
+                </Text>
+              </View>
+              <Switch
+                value={isPremium ? (theme.calendarSyncEnabled || false) : false}
+                onValueChange={handleToggleCalendarSync}
+                trackColor={{ false: colors.borderColor, true: colors.primary }}
+              />
+            </TouchableOpacity>
+
+            {isPremium && theme.calendarSyncEnabled && (
+              <>
+                {deviceCalendars.length > 0 && (
+                  <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
+                    <CustomDropdown
+                      label={t('Target Calendar') || 'Target Calendar'}
+                      value={
+                        theme.selectedCalendarId
+                          ? (deviceCalendars.find(c => String(c.id) === String(theme.selectedCalendarId))?.title || t('Custom Calendar'))
+                          : (t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)')
+                      }
+                      options={calendarOptions}
+                      onSelect={val => dispatch(setSelectedCalendarId(val))}
+                      colors={colors}
+                      layout="horizontal"
+                    />
                   </View>
                 )}
-              </View>
-              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                {t('Syncs tasks with due dates to Google Calendar & device calendar') || 'Syncs tasks with due dates to Google Calendar & device calendar'}
-              </Text>
-            </View>
-            <Switch
-              value={isPremium ? (theme.calendarSyncEnabled || false) : false}
-              onValueChange={handleToggleCalendarSync}
-              trackColor={{ false: colors.borderColor, true: colors.primary }}
-            />
-          </TouchableOpacity>
 
-          {isPremium && theme.calendarSyncEnabled && (
-            <>
-              {deviceCalendars.length > 0 && (
-                <View style={[styles.dropdownRow, { borderBottomWidth: 1, borderBottomColor: colors.borderColor }]}>
-                  <CustomDropdown
-                    label={t('Target Calendar') || 'Target Calendar'}
-                    value={
-                      theme.selectedCalendarId
-                        ? (deviceCalendars.find(c => String(c.id) === String(theme.selectedCalendarId))?.title || t('Custom Calendar'))
-                        : (t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)')
-                    }
-                    options={calendarOptions}
-                    onSelect={val => dispatch(setSelectedCalendarId(val))}
-                    colors={colors}
-                    layout="horizontal"
+                <View style={[styles.rowItem, { borderBottomWidth: 1, paddingVertical: 12 }]}>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Calendar Alarms (Reminders)') || 'Calendar Alarms (Reminders)'}</Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                      {t('Off avoids duplicate alerts; app will send notifications.') || 'Off avoids duplicate alerts; app will send notifications.'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={theme.calendarAlarmsEnabled || false}
+                    onValueChange={val => dispatch(setCalendarAlarmsEnabled(val))}
+                    trackColor={{ false: colors.borderColor, true: colors.primary }}
                   />
                 </View>
-              )}
 
-              <View style={[styles.rowItem, { borderBottomWidth: 1, paddingVertical: 12 }]}>
-                <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{t('Calendar Alarms (Reminders)') || 'Calendar Alarms (Reminders)'}</Text>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                    {t('Off avoids duplicate alerts; app will send notifications.') || 'Off avoids duplicate alerts; app will send notifications.'}
+                <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12, flexDirection: 'column', alignItems: 'flex-start' }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: 8 }} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                      {t('Automatic Foreground Sync Active') || 'Automatic Foreground Sync Active'}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 16 }}>
+                    {t('Changes in Google or Apple Calendar synchronize automatically in real-time whenever you switch back to TaskFlow.') || 'Changes in Google or Apple Calendar synchronize automatically in real-time whenever you switch back to TaskFlow.'}
                   </Text>
                 </View>
-                <Switch
-                  value={theme.calendarAlarmsEnabled || false}
-                  onValueChange={val => dispatch(setCalendarAlarmsEnabled(val))}
-                  trackColor={{ false: colors.borderColor, true: colors.primary }}
-                />
-              </View>
 
-              <View style={[styles.rowItem, { borderBottomWidth: 0, paddingVertical: 12, flexDirection: 'column', alignItems: 'flex-start' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: 8 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
-                    {t('Automatic Foreground Sync Active') || 'Automatic Foreground Sync Active'}
+                <TouchableOpacity
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel="Force calendar re-sync"
+                  style={[styles.syncNowBtn, { borderColor: colors.borderColor, marginTop: 2, paddingVertical: 10 }]}
+                  onPress={handleManualCalendarSync}
+                  disabled={isSyncingCalendar}
+                >
+                  <Text style={[styles.syncNowBtnText, { color: colors.textSecondary, fontSize: 13, fontWeight: '600' }]}>
+                    {isSyncingCalendar ? (t('Syncing...') || 'Syncing...') : (t('Force Full Re-Sync') || 'Force Full Re-Sync')}
                   </Text>
-                </View>
-                <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 16 }}>
-                  {t('Changes in Google or Apple Calendar synchronize automatically in real-time whenever you switch back to TaskFlow.') || 'Changes in Google or Apple Calendar synchronize automatically in real-time whenever you switch back to TaskFlow.'}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel="Force calendar re-sync"
-                style={[styles.syncNowBtn, { borderColor: colors.borderColor, marginTop: 2, paddingVertical: 10 }]}
-                onPress={handleManualCalendarSync}
-                disabled={isSyncingCalendar}
-              >
-                <Text style={[styles.syncNowBtnText, { color: colors.textSecondary, fontSize: 13, fontWeight: '600' }]}>
-                  {isSyncingCalendar ? (t('Syncing...') || 'Syncing...') : (t('Force Full Re-Sync') || 'Force Full Re-Sync')}
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
 
         {/* Account Section */}
