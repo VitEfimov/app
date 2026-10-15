@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
@@ -47,7 +47,7 @@ const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placehol
   return (
     <TextInput
       accessible={true} accessibilityLabel="Task Notes"
-      style={style}
+      style={[{ outlineStyle: 'none', outlineWidth: 0, borderWidth: 0, backgroundColor: 'transparent' }, style]}
       value={text}
       onChangeText={setText}
       placeholder={placeholder}
@@ -59,8 +59,8 @@ const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placehol
   );
 }));
 
-const IconClose = ({ color }) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const IconClose = ({ color, size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M18 6L6 18M6 6l12 12" />
   </Svg>
 );
@@ -79,14 +79,14 @@ const IconCalendar = ({ color }) => (
   </Svg>
 );
 
-const IconCircle = ({ color }) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const IconCircle = ({ color, size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Circle cx="12" cy="12" r="10" />
   </Svg>
 );
 
-const IconCheckCircle = ({ color }) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const IconCheckCircle = ({ color, size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Circle cx="12" cy="12" r="10" />
     <Path d="M8 12l3 3 5-6" />
   </Svg>
@@ -152,8 +152,38 @@ const IconCheckSquare = ({ color }) => (
   </Svg>
 );
 
+const IconTune = ({ color }) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+  </Svg>
+);
+
+const IconFlag = ({ color }) => (
+  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" />
+  </Svg>
+);
+
+const IconCheck = ({ color }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Polyline points="20 6 9 17 4 12" />
+  </Svg>
+);
+
+const IconTrash = ({ color }) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
+  </Svg>
+);
+
+const IconPlus = ({ color }) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+
 const IconChevronDown = ({ color, isCollapsed }) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: [{ rotate: isCollapsed ? '-90deg' : '0deg' }] }}>
+  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: [{ rotate: isCollapsed ? '0deg' : '180deg' }] }}>
     <Path d="M6 9l6 6 6-6" />
   </Svg>
 );
@@ -172,6 +202,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [scrollOffset, setScrollOffset] = useState(0);
 
   const [taskName, setTaskName] = useState('');
+  const [nameInputHeight, setNameInputHeight] = useState(48);
   const [scrollViewHeight, setScrollViewHeight] = useState(0);
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const [notes, setNotes] = useState('');
@@ -201,6 +232,39 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [selectedFullscreenImage, setSelectedFullscreenImage] = useState(null);
 
   const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
+  const cardBg = isDark ? '#161f26' : 'rgba(0,0,0,0.03)';
+  const cardBorder = isDark ? '#24303a' : colors.borderColor;
+
+  const priorityBadgeStyle = useMemo(() => {
+    switch (priority) {
+      case 'high':
+        return {
+          bg: isDark ? 'rgba(56, 189, 248, 0.16)' : 'rgba(2, 132, 199, 0.14)',
+          text: isDark ? '#38bdf8' : '#0284c7',
+        };
+      case 'medium':
+        return {
+          bg: isDark ? 'rgba(251, 146, 60, 0.16)' : 'rgba(234, 88, 12, 0.14)',
+          text: isDark ? '#fb923c' : '#ea580c',
+        };
+      case 'low':
+        return {
+          bg: isDark ? 'rgba(74, 222, 128, 0.16)' : 'rgba(22, 163, 74, 0.14)',
+          text: isDark ? '#4ade80' : '#16a34a',
+        };
+      default:
+        return {
+          bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+          text: colors.textSecondary,
+        };
+    }
+  }, [priority, isDark, colors]);
+
+  const selectedBoardName = useMemo(() => {
+    const found = boards.find(b => b.id === selectedBoardId);
+    if (!found) return 'Main';
+    return found.name === 'Main' ? t('Main') : found.name;
+  }, [boards, selectedBoardId, t]);
 
   const getValidDateString = (dateVal) => {
     if (!dateVal) return dayjs().format('YYYY-MM-DD');
@@ -309,6 +373,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       const initialKeepNotificationVal = task.keepNotificationAllDay || false;
 
       setTaskName(initialTaskName);
+      setNameInputHeight(48);
       setNotes(initialNotesText);
       setAttachments(existingAttachments);
       setSubtasks(initialSubtasks);
@@ -806,6 +871,30 @@ useEffect(() => {
     requestAnimationFrame(() => pickDocument());
   };
 
+  const handleOpenAttachmentOptions = () => {
+    if (!isPremium) {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Pro Feature'),
+        message: t('Photo & document attachments are available in the Pro version.'),
+        confirmText: t('OK'),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
+      return;
+    }
+    Alert.alert(
+      t('Add Attachment'),
+      t('Choose an attachment type:'),
+      [
+        { text: t('Take Photo'), onPress: launchCamera },
+        { text: t('Choose from Gallery'), onPress: launchImageLibrary },
+        { text: t('Attach Document'), onPress: pickDocument },
+        { text: t('Cancel'), style: 'cancel' }
+      ]
+    );
+  };
+
   const processPickedImages = async (result) => {
     if (result?.canceled || !result?.assets?.length) {
       return;
@@ -1192,11 +1281,10 @@ useEffect(() => {
             keyboardShouldPersistTaps="handled"
           >
             
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0 }]}>{t('Task name')}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel="Toggle task completion"
-                onPress={toggleComplete} style={{ justifyContent: 'center' }}
+                onPress={toggleComplete} style={{ justifyContent: 'center', marginTop: 12 }}
               >
                 {task.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />}
               </TouchableOpacity>
@@ -1204,198 +1292,239 @@ useEffect(() => {
               <TextInput
                 testID="task_details_name_input"
                 accessible={true} accessibilityLabel="Task Name"
-                style={[styles.input, { flex: 1, color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, minHeight: 48, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 }]}
+                style={[
+                  styles.input,
+                  {
+                    flex: 1,
+                    color: colors.textPrimary,
+                    borderColor: colors.borderColor,
+                    backgroundColor: surfaceLighter,
+                    minHeight: 48,
+                    height: Math.max(48, nameInputHeight),
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    textAlignVertical: 'top',
+                    overflow: 'hidden',
+                    outlineStyle: 'none',
+                    outlineWidth: 0,
+                  },
+                  Platform.OS === 'web' && { fieldSizing: 'content' },
+                ]}
                 value={taskName}
                 onChangeText={setTaskName}
+                onContentSizeChange={(e) => {
+                  const h = e.nativeEvent?.contentSize?.height;
+                  if (h && h > 0) {
+                    setNameInputHeight(Math.ceil(h));
+                  }
+                }}
                 onBlur={handleNameBlur}
                 placeholder={t("What needs to be done?")}
                 placeholderTextColor={colors.textSecondary}
                 multiline={true}
                 scrollEnabled={false}
-                textAlignVertical="center"
               />
             </View>
 
-            <View style={[styles.twoColumnRow, { marginBottom: 16 }]}>
-              <View style={styles.column}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Due date')}</Text>
-                <TouchableOpacity 
-                  accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : 'Not set'}`}
-                  style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 48, borderRadius: 12 }]}
-                  onPress={() => { setDatePickerType('due'); setShowDatePicker(true); }}
-                >
-                  <IconCalendar color={colors.textPrimary} />
-                  <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : t('Select')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.column}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Time')}</Text>
-                </View>
-                <TouchableOpacity 
-                  accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
-                  style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 48, borderRadius: 12 }]}
-                  onPress={() => setShowTimePicker(true)}
-                >
-                  <IconClock color={colors.textPrimary} />
-                  <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {formatDisplayTime(selectedTime)}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : 'Not set'}`}
+                style={[styles.dateTimePill, { borderColor: cardBorder, backgroundColor: cardBg }]}
+                onPress={() => { setDatePickerType('due'); setShowDatePicker(true); }}
+              >
+                <IconCalendar color={colors.textSecondary} />
+                <Text style={[styles.dateTimeText, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : t('Select date')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
+                style={[styles.dateTimePill, { borderColor: cardBorder, backgroundColor: cardBg }]}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <IconClock color={colors.textSecondary} />
+                <Text style={[styles.dateTimeText, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {formatDisplayTime(selectedTime) || t('Select time')}
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Collapsible Options Header */}
-            <TouchableOpacity
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('Priority, Reminder, Board, Repeat') || 'Priority, Reminder, Board, Repeat'}, ${isTaskOptionsCollapsed ? 'collapsed' : 'expanded'}`}
-              style={[
-                styles.optionsCollapsibleHeader,
-                { 
-                  borderColor: colors.borderColor,
-                  backgroundColor: surfaceLighter,
-                  marginBottom: isTaskOptionsCollapsed ? 16 : 12,
-                }
-              ]}
-              onPress={() => dispatch(toggleTaskOptionsCollapsed())}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-                <Text style={[styles.optionsCollapsibleTitle, { color: colors.textPrimary }]}>
-                  {t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}
-                </Text>
-                {isTaskOptionsCollapsed && (priority !== 'none' || reminder !== 'None' || keepNotificationAllDay || (repeatConfig && repeatConfig.preset !== 'None')) && (
-                  <View style={[styles.optionsSummaryBadge, { backgroundColor: `${colors.primary}18` }]}>
-                    <Text style={{ fontSize: 11, color: colors.primary, fontWeight: 'bold' }}>
-                      {[
-                        priority !== 'none' ? priority.toUpperCase() : null,
-                        reminder !== 'None' ? reminder : null,
-                        keepNotificationAllDay ? (t('All Day Notification') || 'All Day Notification') : null,
-                        repeatConfig?.preset && repeatConfig.preset !== 'None' ? (t('Repeating') || 'Repeating') : null
-                      ].filter(Boolean).join(' • ')}
-                    </Text>
+            {/* Collapsible Section Card: Priority, Reminder, Repeat */}
+            <View style={[styles.optionsCard, { borderColor: cardBorder, backgroundColor: cardBg }]}>
+              <TouchableOpacity
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}, ${isTaskOptionsCollapsed ? 'collapsed' : 'expanded'}`}
+                style={styles.optionsCardHeader}
+                onPress={() => dispatch(toggleTaskOptionsCollapsed())}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+                  <View style={[styles.tuneIconBadge, { backgroundColor: isDark ? 'rgba(0, 188, 212, 0.16)' : 'rgba(0, 150, 180, 0.12)' }]}>
+                    <IconTune color={colors.primary} />
                   </View>
-                )}
-              </View>
-              <IconChevronDown color={colors.textSecondary} isCollapsed={isTaskOptionsCollapsed} />
-            </TouchableOpacity>
-
-            {!isTaskOptionsCollapsed && (
-              <View style={styles.collapsibleContent}>
-                <View style={[styles.twoColumnRow, { marginBottom: 16 }]}>
-                  <View style={styles.column}>
-                    <CustomDropdown label={t("Priority")} value={priority.charAt(0).toUpperCase() + priority.slice(1)} options={[{label: t('None'), value: 'None'}, {label: t('Low'), value: 'Low'}, {label: t('Medium'), value: 'Medium'}, {label: t('High'), value: 'High'}]} onSelect={handlePrioritySelect} colors={colors} customBtnStyle={{ height: 48, borderRadius: 12 }} />
-                  </View>
-                  <View style={styles.column}>
-                    <CustomDropdown 
-                      label={t("Reminder")} 
-                      value={reminder === 'Nag Mode (Every 10 min)' ? t('Nag Mode (Every 10 min)') : reminder === 'Escalating Reminder' ? t('Escalating Reminder') : (t(reminder) || reminder)} 
-                      options={[
-                        {label: t('None'), value: 'None'}, 
-                        {label: t('15 min before'), value: '15 min before'}, 
-                        {label: t('30 min before'), value: '30 min before'}, 
-                        {label: t('1 hr before'), value: '1 hr before'}, 
-                        {label: t('1 day before'), value: '1 day before'}, 
-                        {label: t('Day of'), value: 'Day of'},
-                        {label: t('Custom...'), value: 'custom'},
-                        {label: t('Nag Mode (Every 10 min)'), value: 'Nag Mode (Every 10 min)', hidden: true, style: { display: 'none' }},
-                        {label: t('Escalating Reminder'), value: 'Escalating Reminder', hidden: true, style: { display: 'none' }}
-                      ]} 
-                      onSelect={handleReminderSelect} 
-                      colors={colors} 
-                      customBtnStyle={{ height: 48, borderRadius: 12 }} 
-                    />
-                  </View>
+                  <Text style={[styles.optionsCardTitle, { color: colors.textPrimary }]}>
+                    {t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}
+                  </Text>
                 </View>
+                <IconChevronDown color={colors.textSecondary} isCollapsed={isTaskOptionsCollapsed} />
+              </TouchableOpacity>
 
-                {boards.length > 1 && (
-                  <View style={{ marginBottom: 16 }}>
-                    <CustomDropdown 
-                      label={t("Board")} 
-                      value={boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))} 
-                      options={boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id }))} 
-                      onSelect={(val) => setSelectedBoardId(val)} 
-                      colors={colors} 
-                      customBtnStyle={{ height: 48, borderRadius: 12 }} 
-                    />
-                  </View>
-                )}
-
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
-                  <TouchableOpacity 
-                    style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 48, borderRadius: 12 }]}
-                    onPress={() => {
-                      setIsRepeatModalVisible(true);
-                    }}
-                  >
-                    <Text style={{ color: colors.textPrimary }}>
-                      {repeatConfig.preset === 'custom' ? t('Custom...') : 
-                       repeatConfig.preset === 'None' ? t('None') : 
-                       (t(repeatConfig.preset) || repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}
-                    </Text>
-                  </TouchableOpacity>
+              {isTaskOptionsCollapsed ? (
+                <View style={styles.optionsSummaryRow}>
+                  {priority !== 'none' && (
+                    <View style={[styles.priorityPillBadge, { backgroundColor: priorityBadgeStyle.bg }]}>
+                      <Text style={[styles.priorityPillText, { color: priorityBadgeStyle.text }]}>
+                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[styles.optionsSummaryText, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {[
+                      reminder !== 'None' ? (t(reminder) || reminder) : null,
+                      selectedBoardName,
+                      repeatConfig?.preset && repeatConfig.preset !== 'None' ? (t(repeatConfig.preset) || repeatConfig.preset) : null
+                    ].filter(Boolean).join(' · ')}
+                  </Text>
                 </View>
-
-                {reminder !== 'None' && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                    <Switch value={isAlarm} onValueChange={setIsAlarm} trackColor={{ true: colors.primary }} />
-                    <Text style={{ color: colors.textPrimary, marginLeft: 10, fontWeight: '600', fontSize: 14 }}>{t('Play Reminder as Alarm')}</Text>
-                  </View>
-                )}
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>
-                      {t('Keep notification all day')}
-                    </Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-                      {t('Cannot be closed until task is modified or completed')}
-                    </Text>
-                  </View>
-                  <Switch
-                    testID="keep_notification_all_day_switch"
-                    value={keepNotificationAllDay}
-                    onValueChange={setKeepNotificationAllDay}
-                    trackColor={{ true: colors.primary }}
-                  />
-                </View>
-
-                {repeatConfig.preset !== 'None' && (
-                  <View style={[styles.repeatConfigBox, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, borderRadius: 12, marginBottom: 16, padding: 14 }]}>
-                    <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('Repeat configuration')}</Text>
-                    <View style={styles.twoColumnRow}>
-                      <View style={styles.column}>
-                        <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('From')}</Text>
-                        <TouchableOpacity 
-                          style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 10 }]}
-                          onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
-                        >
-                          <IconCalendar color={colors.textPrimary} />
-                          <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                            {repeatStartDate || selectedDate ? dayjs(repeatStartDate || selectedDate).format('MM/DD/YYYY') : t('Select')}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.column}>
-                        <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('To')}</Text>
-                        <TouchableOpacity 
-                          style={[styles.dateBtn, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: 46, borderRadius: 10 }]}
-                          onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
-                        >
-                          <IconCalendar color={colors.textPrimary} />
-                          <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
-                            {repeatEndDate ? dayjs(repeatEndDate).format('MM/DD/YYYY') : t('Select')}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
+              ) : (
+                <View style={styles.optionsExpandedContent}>
+                  <View style={[styles.twoColumnRow, { marginBottom: 14 }]}>
+                    <View style={styles.column}>
+                      <CustomDropdown 
+                        label={t("Priority")} 
+                        value={priority.charAt(0).toUpperCase() + priority.slice(1)} 
+                        options={[
+                          {label: t('None'), value: 'None'}, 
+                          {label: t('Low'), value: 'Low'}, 
+                          {label: t('Medium'), value: 'Medium'}, 
+                          {label: t('High'), value: 'High'}
+                        ]} 
+                        onSelect={handlePrioritySelect} 
+                        colors={colors} 
+                        leftIcon={<IconFlag color={priority === 'high' ? '#f87171' : priority === 'medium' ? '#fb923c' : priority === 'low' ? '#4ade80' : colors.textSecondary} />}
+                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: isDark ? '#11181f' : '#f8fafc', borderColor: cardBorder }} 
+                      />
+                    </View>
+                    <View style={styles.column}>
+                      <CustomDropdown 
+                        label={t("Reminder")} 
+                        value={reminder === 'Nag Mode (Every 10 min)' ? t('Nag Mode (Every 10 min)') : reminder === 'Escalating Reminder' ? t('Escalating Reminder') : (t(reminder) || reminder)} 
+                        options={[
+                          {label: t('None'), value: 'None'}, 
+                          {label: t('15 min before'), value: '15 min before'}, 
+                          {label: t('30 min before'), value: '30 min before'}, 
+                          {label: t('1 hr before'), value: '1 hr before'}, 
+                          {label: t('1 day before'), value: '1 day before'}, 
+                          {label: t('Day of'), value: 'Day of'},
+                          {label: t('Custom...'), value: 'custom'}
+                        ]} 
+                        onSelect={handleReminderSelect} 
+                        colors={colors} 
+                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: isDark ? '#11181f' : '#f8fafc', borderColor: cardBorder }} 
+                      />
                     </View>
                   </View>
-                )}
-              </View>
-            )}
+
+                  {boards.length > 1 && (
+                    <View style={{ marginBottom: 14 }}>
+                      <CustomDropdown 
+                        label={t("Board")} 
+                        value={selectedBoardName} 
+                        options={boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id }))} 
+                        onSelect={(val) => setSelectedBoardId(val)} 
+                        colors={colors} 
+                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: isDark ? '#11181f' : '#f8fafc', borderColor: cardBorder }} 
+                      />
+                    </View>
+                  )}
+
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
+                    <TouchableOpacity 
+                      style={[styles.dropdownLikeBtn, { borderColor: cardBorder, backgroundColor: isDark ? '#11181f' : '#f8fafc', height: 48, borderRadius: 12 }]}
+                      onPress={() => setIsRepeatModalVisible(true)}
+                    >
+                      <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '500' }}>
+                        {repeatConfig.preset === 'custom' ? t('Custom...') : 
+                         repeatConfig.preset === 'None' ? t('None') : 
+                         (t(repeatConfig.preset) || repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}
+                      </Text>
+                      <IconChevronDown color={colors.textSecondary} isCollapsed={true} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {repeatConfig.preset !== 'None' && (
+                    <View style={[styles.repeatConfigBox, { borderColor: cardBorder, backgroundColor: isDark ? '#11181f' : '#f8fafc', borderRadius: 12, marginBottom: 16, padding: 14 }]}>
+                      <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('Repeat configuration')}</Text>
+                      <View style={styles.twoColumnRow}>
+                        <View style={styles.column}>
+                          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('From')}</Text>
+                          <TouchableOpacity 
+                            style={[styles.dateBtn, { borderColor: cardBorder, backgroundColor: cardBg, height: 46, borderRadius: 10 }]}
+                            onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
+                          >
+                            <IconCalendar color={colors.textPrimary} />
+                            <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
+                              {repeatStartDate || selectedDate ? dayjs(repeatStartDate || selectedDate).format('MM/DD/YYYY') : t('Select')}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.column}>
+                          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('To')}</Text>
+                          <TouchableOpacity 
+                            style={[styles.dateBtn, { borderColor: cardBorder, backgroundColor: cardBg, height: 46, borderRadius: 10 }]}
+                            onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
+                          >
+                            <IconCalendar color={colors.textPrimary} />
+                            <Text style={[styles.dateText, { color: colors.textPrimary }]} numberOfLines={1}>
+                              {repeatEndDate ? dayjs(repeatEndDate).format('MM/DD/YYYY') : t('Select')}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={[styles.cardDivider, { backgroundColor: cardBorder }]} />
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>
+                        {t('Play Reminder as Alarm')}
+                      </Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                        {t('Use an alarm instead of a notification.')}
+                      </Text>
+                    </View>
+                    <Switch 
+                      value={isAlarm} 
+                      onValueChange={setIsAlarm} 
+                      trackColor={{ true: colors.primary, false: colors.borderColor }} 
+                    />
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>
+                        {t('Keep notification all day')}
+                      </Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                        {t('Cannot be closed until task is modified or completed')}
+                      </Text>
+                    </View>
+                    <Switch
+                      testID="keep_notification_all_day_switch"
+                      value={keepNotificationAllDay}
+                      onValueChange={setKeepNotificationAllDay}
+                      trackColor={{ true: colors.primary, false: colors.borderColor }}
+                    />
+                  </View>
+                </View>
+              )}
+            </View>
 
             {showTimePicker && (
               <CustomTimePicker
@@ -1415,34 +1544,15 @@ useEffect(() => {
               />
             )}
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('Notes & attachments')}</Text>
-              {isPremium && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-                  <TouchableOpacity 
-                    accessible={true} accessibilityRole="button" accessibilityLabel="Add Photo"
-                    onPress={handleAttachPhoto} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                  >
-                    <IconCamera color={colors.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    accessible={true} accessibilityRole="button" accessibilityLabel="Add Document"
-                    onPress={handleAttachDocument} hitSlop={{top:10,bottom:10,left:10,right:10}} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-                  >
-                    <IconAttachment color={colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-            <View style={[styles.descContainer, { borderColor: colors.borderColor, backgroundColor: surfaceLighter, padding: 0, minHeight: 110, borderRadius: 12, marginBottom: 16 }]}>
+            <View style={[styles.notesCard, { borderColor: cardBorder, backgroundColor: cardBg, marginBottom: 14 }]}>
               <MemoizedNotesInput
                 ref={notesRef}
                 initialValue={notes}
-                placeholder={t("Add extra details or notes...")}
+                placeholder={t("Add notes...") || "Add notes..."}
                 placeholderTextColor={colors.textSecondary}
-                style={{ flex: 1, padding: 14, color: colors.textPrimary, fontSize: 15 }}
+                style={[styles.notesInput, { color: colors.textPrimary }]}
               />
-              
+
               {attachments.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.attachmentsScroll}>
                   {attachments.map(att => (
@@ -1469,66 +1579,100 @@ useEffect(() => {
                   ))}
                 </ScrollView>
               )}
-            </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0, marginBottom: 0 }]}>{t('Subtasks')}</Text>
-              <TouchableOpacity 
-                accessible={true} accessibilityRole="button" accessibilityLabel="Add new subtask"
-                onPress={addSubtask} hitSlop={{top:10,bottom:10,left:10,right:10}}
+              <TouchableOpacity
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Add attachment"
+                style={[styles.addAttachmentBtn, { display: 'none' }]}
+                onPress={handleOpenAttachmentOptions}
               >
-                <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 14 }}>{t('+ Add Subtask')}</Text>
+                <IconAttachment color={colors.primary} />
+                <Text style={[styles.addAttachmentText, { color: colors.primary }]}>
+                  {t('Add attachment') || 'Add attachment'}
+                </Text>
               </TouchableOpacity>
             </View>
-            
-            <View style={{ gap: 10 }}>
-              {subtasks.map((subtask) => (
-                <View key={subtask.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <TouchableOpacity 
-                    accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: subtask.completed }} accessibilityLabel="Toggle subtask completion"
-                    onPress={() => toggleSubtask(subtask.id)} style={{ justifyContent: 'center' }}
-                  >
-                    {subtask.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />}
-                  </TouchableOpacity>
-                  <TextInput
-                    accessible={true} accessibilityLabel="Subtask text"
-                    style={[
-                      { flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: surfaceLighter, borderColor: colors.borderColor, borderWidth: 1 }, 
-                      subtask.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
-                    ]}
-                    value={subtask.text}
-                    onChangeText={(text) => updateSubtask(subtask.id, text)}
-                    placeholder={t("Subtask...")}
-                    placeholderTextColor={colors.textSecondary}
-                    blurOnSubmit={true}
-                    multiline={true}
-                  />
-                  <TouchableOpacity 
-                    accessible={true} accessibilityRole="button" accessibilityLabel="Delete subtask"
-                    onPress={() => removeSubtask(subtask.id)} style={{ padding: 6 }}
-                  >
-                    <IconClose color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
 
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 28, marginBottom: 10 }}>
+            {/* Section: Subtasks */}
+            {subtasks.length > 0 && (
+              <Text style={styles.sectionTitle}>{t('Subtasks')}</Text>
+            )}
+            {subtasks.length > 0 && (
+              <View style={{ marginBottom: 4 }}>
+                {subtasks.map((subtask) => (
+                  <View 
+                    key={subtask.id} 
+                    style={[styles.subtaskPillRow, { borderColor: cardBorder, backgroundColor: cardBg }]}
+                  >
+                    <TouchableOpacity 
+                      accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: subtask.completed }} accessibilityLabel="Toggle subtask completion"
+                      onPress={() => toggleSubtask(subtask.id)} 
+                      style={styles.subtaskCheckBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      {subtask.completed ? <IconCheckCircle color={colors.primary} size={20} /> : <IconCircle color={colors.textSecondary} size={20} />}
+                    </TouchableOpacity>
+                    <TextInput
+                      accessible={true} accessibilityLabel="Subtask text"
+                      style={[
+                        styles.subtaskTextInput,
+                        { color: colors.textPrimary },
+                        subtask.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
+                      ]}
+                      value={subtask.text}
+                      onChangeText={(text) => updateSubtask(subtask.id, text)}
+                      placeholder={t("Subtask...")}
+                      placeholderTextColor={colors.textSecondary}
+                      blurOnSubmit={true}
+                    />
+                    <TouchableOpacity 
+                      accessible={true} accessibilityRole="button" accessibilityLabel="Delete subtask"
+                      onPress={() => removeSubtask(subtask.id)} 
+                      style={styles.subtaskDeleteBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <IconClose color={colors.textSecondary} size={18} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Add subtask"
+              style={[styles.addSubtaskPill, { borderColor: cardBorder, backgroundColor: cardBg }]}
+              onPress={addSubtask}
+            >
+              <IconPlus color={colors.primary} />
+              <Text style={[styles.addSubtaskText, { color: colors.primary }]}>{t('Add subtask') || 'Add subtask'}</Text>
+            </TouchableOpacity>
+
+            {/* Bottom Actions */}
+            <View style={{ marginTop: 28, marginBottom: 20 }}>
+              <TouchableOpacity 
+                testID="task_details_save_btn_bottom"
+                onPress={handleSave} 
+                style={[styles.saveBtnFull, { backgroundColor: colors.primary }]}
+                activeOpacity={0.85}
+              >
+                <IconCheck color={colors.textInverse || '#00363f'} />
+                <Text style={[styles.saveBtnText, { color: colors.textInverse || '#00363f' }]}>
+                  {t('Save changes') || 'Save changes'}
+                </Text>
+              </TouchableOpacity>
+
               <TouchableOpacity 
                 testID="task_details_delete_btn_bottom"
                 accessible={true} accessibilityRole="button" accessibilityLabel="Delete task"
                 onPress={handleDelete} 
-                style={{ flex: 1, height: 50, backgroundColor: 'rgba(244, 67, 54, 0.1)', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}
+                style={styles.deleteLink}
+                activeOpacity={0.7}
               >
-                <Text style={{ color: '#f44336', fontWeight: 'bold', fontSize: 16 }}>{t('Delete')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                testID="task_details_save_btn_bottom"
-                onPress={handleSave} 
-                style={{ flex: 1, height: 50, backgroundColor: colors.primary, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}
-              >
-                <Text style={{ color: colors.textInverse, fontWeight: 'bold', fontSize: 16 }}>{t('Save Changes')}</Text>
+                <IconTrash color="#f87171" />
+                <Text style={styles.deleteLinkText}>{t('Delete task') || 'Delete task'}</Text>
               </TouchableOpacity>
             </View>
             
@@ -1984,5 +2128,188 @@ const styles = StyleSheet.create({
   },
   collapsibleContent: {
     paddingTop: 4,
-  }
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8b9bb4',
+    marginBottom: 8,
+    marginTop: 18,
+  },
+  dateTimePill: {
+    flex: 1,
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 10,
+  },
+  dateTimeText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  optionsCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 8,
+  },
+  optionsCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tuneIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  optionsCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  optionsSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  priorityPillBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  priorityPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  optionsSummaryText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+  },
+  optionsExpandedContent: {
+    marginTop: 16,
+  },
+  dropdownLikeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    borderWidth: 1,
+  },
+  cardDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  notesCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    minHeight: 180,
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  notesInput: {
+    fontSize: 15,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    outlineStyle: 'none',
+    outlineWidth: 0,
+  },
+  addAttachmentBtn: {
+    display: 'none',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 12,
+  },
+  addAttachmentText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  subtaskPillRow: {
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  subtaskCheckBtn: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  subtaskTextInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    outlineStyle: 'none',
+    outlineWidth: 0,
+  },
+  subtaskDeleteBtn: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  addSubtaskPill: {
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 10,
+    marginBottom: 8,
+  },
+  addSubtaskText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  saveBtnFull: {
+    height: 52,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  saveBtnText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  deleteLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 6,
+    marginBottom: 10,
+    gap: 6,
+  },
+  deleteLinkText: {
+    color: '#f87171',
+    fontWeight: '600',
+    fontSize: 15,
+  },
 });

@@ -17,7 +17,8 @@ const CustomDropdown = ({
   layout = 'vertical', // 'vertical' or 'horizontal'
   customBtnStyle = {},
   searchable = false,
-  searchPlaceholder = 'Search...'
+  searchPlaceholder = 'Search...',
+  leftIcon = null
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,9 +60,12 @@ const CustomDropdown = ({
           style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }, customBtnStyle]} 
           onPress={() => { setIsOpen(true); setSearchQuery(''); }}
         >
-          <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]} numberOfLines={1}>
-            {selectedLabel}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, marginRight: 6 }}>
+            {leftIcon}
+            <Text style={[styles.dropdownBtnText, { color: colors.textPrimary }]} numberOfLines={1}>
+              {selectedLabel}
+            </Text>
+          </View>
           <IconChevronDown color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
