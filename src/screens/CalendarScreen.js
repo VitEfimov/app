@@ -21,6 +21,9 @@ import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, syncAll
 import { getBoardColor } from '../utils/boardColors';
 import { useTranslation } from 'react-i18next';
 
+const PAST_SCROLL_RANGE = 24;
+const FUTURE_SCROLL_RANGE = 36;
+
 export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
@@ -98,7 +101,7 @@ export default function CalendarScreen() {
       const [visY, visM] = visibleMonthRef.current.split('-').map(Number);
       const diffMonths = (visY - initY) * 12 + (visM - initM);
       const isRTLAndroid = Platform.OS === 'android' && I18nManager.isRTL;
-      const targetOffset = (isRTLAndroid ? 50 - diffMonths : 50 + diffMonths) * windowWidth;
+      const targetOffset = (isRTLAndroid ? PAST_SCROLL_RANGE - diffMonths : PAST_SCROLL_RANGE + diffMonths) * windowWidth;
 
       if (Math.abs(offsetX - targetOffset) >= 1) {
         calendarListRef.current?.scrollToMonth(`${visibleMonthRef.current}-01`);
@@ -434,15 +437,30 @@ export default function CalendarScreen() {
     });
 
     const finalMarks = {};
+    const boardColorMap = new Map();
+    boards.forEach(b => {
+      if (b && (b.id || b._id)) {
+        boardColorMap.set(b.id || b._id, getBoardColor(b, boards));
+      }
+    });
+    if (!boardColorMap.has('main')) {
+      boardColorMap.set('main', getBoardColor({ id: 'main', name: 'Main' }, boards));
+    }
+
     Object.keys(marks).forEach(dateStr => {
       const dayTasks = marks[dateStr].tasks;
       // Extract unique board IDs for tasks on this date
       const uniqueBoardIds = Array.from(new Set(dayTasks.map(t => t.boardId || 'main')));
       const dots = uniqueBoardIds.map(bId => {
-        const boardObj = boards.find(b => b && (b.id === bId || b._id === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Board' };
+        let color = boardColorMap.get(bId);
+        if (!color) {
+          const boardObj = boards.find(b => b && (b.id === bId || b._id === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Board' };
+          color = getBoardColor(boardObj, boards);
+          boardColorMap.set(bId, color);
+        }
         return {
           key: `${bId}_${dateStr}`,
-          color: getBoardColor(boardObj, boards),
+          color,
         };
       });
 
@@ -615,8 +633,8 @@ export default function CalendarScreen() {
           removeClippedSubviews={false}
           calendarWidth={windowWidth}
           calendarHeight={355}
-          pastScrollRange={50}
-          futureScrollRange={50}
+          pastScrollRange={PAST_SCROLL_RANGE}
+          futureScrollRange={FUTURE_SCROLL_RANGE}
           showScrollIndicator={false}
           animateScroll={true}
           hideArrows={false}

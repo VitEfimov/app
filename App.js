@@ -1,13 +1,13 @@
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import './src/i18n';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import store from './src/store';
 if (typeof window !== 'undefined') window.__store = store;
 import AppNavigator from './src/navigation/AppNavigator';
-import { View, Text, ActivityIndicator, TouchableOpacity, AppState, LogBox } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, AppState, LogBox, StyleSheet, Animated } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
 
@@ -16,7 +16,7 @@ import { hydrateThemeState } from './src/features/themeSlice';
 import { hydratePomodoroState } from './src/features/pomodoroSlice';
 import { hydrateStatsState } from './src/features/statsSlice';
 import { hydrateEntitlementState } from './src/features/entitlementSlice';
-import { fetchTasks } from './src/features/taskSlice';
+import { fetchTasks, hydrateTaskState } from './src/features/taskSlice';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
@@ -91,6 +91,9 @@ import AnimatedLoadingScreen from './src/components/AnimatedLoadingScreen';
 function InitApp() {
   const dispatch = useDispatch();
   const [ready, setReady] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [loadingDismissed, setLoadingDismissed] = useState(false);
+  const loadingFadeAnim = useRef(new Animated.Value(1)).current;
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [pendingNotificationPayload, setPendingNotificationPayload] = useState(null);
   const shareIntentResult = Platform.OS !== 'web' ? useShareIntent() : null;
@@ -131,8 +134,26 @@ function InitApp() {
 
   useEffect(() => {
     const loadStorage = async () => {
+      const startTime = Date.now();
       try {
-        const theme = await AsyncStorage.getItem('customTheme');
+        const keys = [
+          'customTheme',
+          'isTaskOptionsCollapsed',
+          'isGuest',
+          'rememberedUser',
+          'boards',
+          'dashboardFilterType',
+          'pomodoro',
+          'appLanguage',
+          'stats',
+          'entitlement',
+          'tasks',
+          'tasks_guest'
+        ];
+        const entries = await AsyncStorage.multiGet(keys);
+        const storageMap = Object.fromEntries(entries);
+
+        const theme = storageMap.customTheme;
         if (theme) {
           let themeData = JSON.parse(theme);
           
@@ -152,16 +173,16 @@ function InitApp() {
           dispatch(hydrateThemeState(themeData));
         }
 
-        const taskOptionsCollapsed = await AsyncStorage.getItem('isTaskOptionsCollapsed');
-        if (taskOptionsCollapsed !== null) {
+        const taskOptionsCollapsed = storageMap.isTaskOptionsCollapsed;
+        if (taskOptionsCollapsed !== null && taskOptionsCollapsed !== undefined) {
           dispatch(hydrateUserState({ isTaskOptionsCollapsed: taskOptionsCollapsed === 'true' }));
         }
 
-        await registerBackgroundFetchAsync();
-
-        const isGuestVal = await AsyncStorage.getItem('isGuest');
-        const rememberedVal = await AsyncStorage.getItem('rememberedUser');
+        const isGuestVal = storageMap.isGuest;
+        const rememberedVal = storageMap.rememberedUser;
         console.log("[InitApp Debug] isGuestVal from storage:", isGuestVal, "rememberedVal:", rememberedVal);
+        let authenticatedEmail = null;
+
         if (isGuestVal === 'true') {
           const { continueAsGuest } = require('./src/features/userSlice');
           dispatch(continueAsGuest());
@@ -170,6 +191,7 @@ function InitApp() {
             try {
               const remUser = JSON.parse(rememberedVal);
               if (remUser && remUser.rememberMe && remUser.email) {
+                authenticatedEmail = remUser.email;
                 const { hydrateUserState } = require('./src/features/userSlice');
                 dispatch(hydrateUserState({ isAuthenticated: true, userEmail: remUser.email, isGuest: false }));
               }
@@ -177,37 +199,79 @@ function InitApp() {
               console.error("Failed to parse rememberedUser", e);
             }
           }
+        }
+
+        const boardsJson = storageMap.boards;
+        if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
+
+        const dashboardFilterType = storageMap.dashboardFilterType;
+        if (dashboardFilterType) dispatch(hydrateUserState({ dashboardFilterType }));
+
+        const pomodoroJson = storageMap.pomodoro;
+        if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));
+
+        const appLanguage = storageMap.appLanguage;
+        if (appLanguage) {
+          i18n.changeLanguage(appLanguage);
+        }
+
+        const statsJson = storageMap.stats;
+        if (statsJson) dispatch(hydrateStatsState(JSON.parse(statsJson)));
+
+        const entitlementJson = storageMap.entitlement;
+        if (entitlementJson) dispatch(hydrateEntitlementState(JSON.parse(entitlementJson)));
+
+        // Immediately load cached tasks from local storage so Board and Calendar pre-render instantly
+        let cachedTasksJson = null;
+        if (authenticatedEmail) {
+          cachedTasksJson = await AsyncStorage.getItem(`tasks_${authenticatedEmail.toLowerCase().trim()}`);
+        }
+        if (!cachedTasksJson) {
+          cachedTasksJson = isGuestVal === 'true' ? storageMap.tasks_guest : (storageMap.tasks || storageMap.tasks_guest);
+        }
+        if (cachedTasksJson) {
+          try {
+            const parsedCached = JSON.parse(cachedTasksJson);
+            if (Array.isArray(parsedCached) && parsedCached.length > 0) {
+              dispatch(hydrateTaskState(parsedCached));
+            }
+          } catch (parseErr) {
+            console.error("Failed to parse cached tasks", parseErr);
+          }
+        }
+
+        // Signal that state is hydrated — mounts AppNavigator, BoardScreen & CalendarScreen behind the loading screen
+        setIsHydrated(true);
+
+        // Run background tasks registration
+        await registerBackgroundFetchAsync();
+
+        // Perform checkAuth if not in guest mode
+        if (isGuestVal !== 'true') {
           const { checkAuth } = require('./src/features/userSlice');
           const authRes = await dispatch(checkAuth());
           console.log("[InitApp Debug] checkAuth result:", authRes);
         }
 
-        const boardsJson = await AsyncStorage.getItem('boards');
-        if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
-
-        const dashboardFilterType = await AsyncStorage.getItem('dashboardFilterType');
-        if (dashboardFilterType) dispatch(hydrateUserState({ dashboardFilterType }));
-
-        const pomodoroJson = await AsyncStorage.getItem('pomodoro');
-        if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));
-
-        const appLanguage = await AsyncStorage.getItem('appLanguage');
-        if (appLanguage) {
-          i18n.changeLanguage(appLanguage);
-        }
-
-        const statsJson = await AsyncStorage.getItem('stats');
-        if (statsJson) dispatch(hydrateStatsState(JSON.parse(statsJson)));
-
-        const entitlementJson = await AsyncStorage.getItem('entitlement');
-        if (entitlementJson) dispatch(hydrateEntitlementState(JSON.parse(entitlementJson)));
-
-        // Load tasks from Vercel remote DB or local storage
+        // Fetch/sync latest tasks with remote DB
         await dispatch(fetchTasks());
       } catch (e) {
         console.error("Initialization failed", e);
       } finally {
-        setReady(true);
+        // Ensure the loading screen displays for at least a minimum smooth duration (~400ms)
+        // so background layout can complete cleanly without frame drop
+        const elapsed = Date.now() - startTime;
+        const remainingDelay = Math.max(0, 400 - elapsed);
+        setTimeout(() => {
+          setReady(true);
+          Animated.timing(loadingFadeAnim, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => {
+            setLoadingDismissed(true);
+          });
+        }, remainingDelay);
       }
     };
     loadStorage();
@@ -599,19 +663,38 @@ function InitApp() {
     return () => subscription.remove();
   }, [dispatch, isUnlocked]);
 
-  if (!ready) {
-    return <AnimatedLoadingScreen />;
-  }
-
-  if (themeReducer.appPin && !isUnlocked) {
-    return <PinLockScreen correctPin={themeReducer.appPin} onUnlock={() => setIsUnlocked(true)} />;
-  }
+  const isLocked = !!(themeReducer.appPin && !isUnlocked);
 
   return (
-    <>
-      <AppNavigator />
-      <AutomaticCleanupModal />
-    </>
+    <View style={{ flex: 1 }}>
+      {isHydrated && (
+        <>
+          <AppNavigator />
+          <AutomaticCleanupModal />
+        </>
+      )}
+
+      {isLocked && (
+        <View style={StyleSheet.absoluteFillObject}>
+          <PinLockScreen correctPin={themeReducer.appPin} onUnlock={() => setIsUnlocked(true)} />
+        </View>
+      )}
+
+      {!loadingDismissed && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              zIndex: 9999,
+              opacity: loadingFadeAnim,
+            },
+          ]}
+          pointerEvents={ready ? 'none' : 'auto'}
+        >
+          <AnimatedLoadingScreen />
+        </Animated.View>
+      )}
+    </View>
   );
 }
 

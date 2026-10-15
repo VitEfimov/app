@@ -97,8 +97,8 @@ function TabNavigator() {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: t('Dashboard'), tabBarTestID: 'tab_dashboard' }} />
-      <Tab.Screen name="Board" component={BoardScreen} options={{ tabBarLabel: t('Board'), tabBarTestID: 'tab_board' }} />
-      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: t('Calendar'), tabBarTestID: 'tab_calendar' }} />
+      <Tab.Screen name="Board" component={BoardScreen} options={{ tabBarLabel: t('Board'), tabBarTestID: 'tab_board', lazy: false }} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: t('Calendar'), tabBarTestID: 'tab_calendar', lazy: false }} />
       <Tab.Screen name="Pomodoro" component={PomodoroScreen} options={{ tabBarLabel: t('Pomodoro'), tabBarTestID: 'tab_pomodoro' }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('Settings'), tabBarTestID: 'tab_settings' }} />
       <Tab.Screen name="DevLogs" component={DevLogsScreen} options={{ tabBarLabel: 'Debug', tabBarTestID: 'tab_devlogs', tabBarItemStyle: { display: 'none' } }} />
