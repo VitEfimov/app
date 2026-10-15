@@ -59,7 +59,9 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     else setSelectedBoardId(activeBoardId);
   }, [defaultBoardId, activeBoardId]);
 
-  const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
+  const cardBg = colors.cardBg || (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)');
+  const cardBorder = colors.cardBorder || colors.borderColor;
+  const chipBg = colors.surfaceContainerHigh || (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)');
 
   const getCompletionDate = (id) => {
     const FILTERS = getFilters();
@@ -240,7 +242,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
             ref={inputRef}
             testID="inline_task_input"
             accessible={true} accessibilityLabel="New task name"
-            style={[styles.input, { color: colors.textPrimary, borderColor: colors.borderColor, backgroundColor: surfaceLighter, height: Math.max(50, inputHeight), maxHeight: 150 }]}
+            style={[styles.input, { color: colors.textPrimary, borderColor: cardBorder, backgroundColor: cardBg, height: Math.max(50, inputHeight), maxHeight: 150 }]}
             placeholder={t("What would you like to do?")}
             placeholderTextColor={colors.textSecondary}
             value={taskName}
@@ -262,7 +264,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
             >
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel={`Select date, currently ${dayjs(selectedDate).format('MM/DD/YYYY')}`}
-                style={[styles.chipBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]} 
+                style={[styles.chipBtn, { backgroundColor: chipBg, borderColor: cardBorder }]} 
                 onPress={() => setShowDatePicker(true)}
               >
                 <IconCalendar color={colors.primary} />
@@ -288,7 +290,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
 
             <TouchableOpacity 
               accessible={true} accessibilityRole="button" accessibilityLabel="Cancel"
-              style={[styles.cancelChipBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]} 
+              style={[styles.cancelChipBtn, { backgroundColor: chipBg, borderColor: cardBorder }]} 
               onPress={() => setIsEditing(false)}
             >
               <Text style={[styles.chipText, { color: colors.textSecondary }]}>

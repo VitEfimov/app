@@ -16,7 +16,7 @@ if (Platform.OS !== 'web') {
 }
 import { updateTask, deleteTask, updateRecurringSeries, deleteRecurringSeries } from '../features/taskSlice';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { useTheme } from '../styles/ThemeContext';
+import { useTheme, hexToRgba } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
 import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
@@ -231,30 +231,30 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [premiumFeatureName, setPremiumFeatureName] = useState('');
   const [selectedFullscreenImage, setSelectedFullscreenImage] = useState(null);
 
-  const surfaceLighter = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
-  const cardBg = isDark ? '#161f26' : 'rgba(0,0,0,0.03)';
-  const cardBorder = isDark ? '#24303a' : colors.borderColor;
+  const cardBg = colors.cardBg || (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)');
+  const cardBorder = colors.cardBorder || colors.outlineVariant || colors.borderColor;
+  const cardBgNested = colors.surfaceContainerHigh || (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.05)');
 
   const priorityBadgeStyle = useMemo(() => {
     switch (priority) {
       case 'high':
         return {
-          bg: isDark ? 'rgba(56, 189, 248, 0.16)' : 'rgba(2, 132, 199, 0.14)',
-          text: isDark ? '#38bdf8' : '#0284c7',
+          bg: isDark ? 'rgba(239, 68, 68, 0.18)' : 'rgba(220, 38, 38, 0.12)',
+          text: isDark ? '#f87171' : (colors.danger || '#dc2626'),
         };
       case 'medium':
         return {
-          bg: isDark ? 'rgba(251, 146, 60, 0.16)' : 'rgba(234, 88, 12, 0.14)',
+          bg: isDark ? 'rgba(251, 146, 60, 0.18)' : 'rgba(234, 88, 12, 0.12)',
           text: isDark ? '#fb923c' : '#ea580c',
         };
       case 'low':
         return {
-          bg: isDark ? 'rgba(74, 222, 128, 0.16)' : 'rgba(22, 163, 74, 0.14)',
+          bg: isDark ? 'rgba(74, 222, 128, 0.18)' : 'rgba(22, 163, 74, 0.12)',
           text: isDark ? '#4ade80' : '#16a34a',
         };
       default:
         return {
-          bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+          bg: colors.surfaceContainerHigh || (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'),
           text: colors.textSecondary,
         };
     }
@@ -1251,7 +1251,7 @@ useEffect(() => {
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           
-          <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', justifyContent: 'flex-end' }]}>
+          <View style={[styles.header, { borderBottomColor: cardBorder, justifyContent: 'flex-end' }]}>
             
             <View style={{ flexDirection: 'row' }}>
               <TouchableOpacity 
@@ -1297,8 +1297,8 @@ useEffect(() => {
                   {
                     flex: 1,
                     color: colors.textPrimary,
-                    borderColor: colors.borderColor,
-                    backgroundColor: surfaceLighter,
+                    borderColor: cardBorder,
+                    backgroundColor: cardBg,
                     minHeight: 48,
                     height: Math.max(48, nameInputHeight),
                     borderRadius: 12,
@@ -1362,7 +1362,7 @@ useEffect(() => {
                 activeOpacity={0.7}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-                  <View style={[styles.tuneIconBadge, { backgroundColor: isDark ? 'rgba(0, 188, 212, 0.16)' : 'rgba(0, 150, 180, 0.12)' }]}>
+                  <View style={[styles.tuneIconBadge, { backgroundColor: hexToRgba(colors.primary, isDark ? 0.16 : 0.12) }]}>
                     <IconTune color={colors.primary} />
                   </View>
                   <Text style={[styles.optionsCardTitle, { color: colors.textPrimary }]}>
@@ -1404,8 +1404,8 @@ useEffect(() => {
                         ]} 
                         onSelect={handlePrioritySelect} 
                         colors={colors} 
-                        leftIcon={<IconFlag color={priority === 'high' ? '#f87171' : priority === 'medium' ? '#fb923c' : priority === 'low' ? '#4ade80' : colors.textSecondary} />}
-                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: isDark ? '#11181f' : '#f8fafc', borderColor: cardBorder }} 
+                        leftIcon={<IconFlag color={priority === 'high' ? (colors.danger || '#f87171') : priority === 'medium' ? '#fb923c' : priority === 'low' ? '#4ade80' : colors.textSecondary} />}
+                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: cardBgNested, borderColor: cardBorder }} 
                       />
                     </View>
                     <View style={styles.column}>
@@ -1423,7 +1423,7 @@ useEffect(() => {
                         ]} 
                         onSelect={handleReminderSelect} 
                         colors={colors} 
-                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: isDark ? '#11181f' : '#f8fafc', borderColor: cardBorder }} 
+                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: cardBgNested, borderColor: cardBorder }} 
                       />
                     </View>
                   </View>
@@ -1436,7 +1436,7 @@ useEffect(() => {
                         options={boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id }))} 
                         onSelect={(val) => setSelectedBoardId(val)} 
                         colors={colors} 
-                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: isDark ? '#11181f' : '#f8fafc', borderColor: cardBorder }} 
+                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: cardBgNested, borderColor: cardBorder }} 
                       />
                     </View>
                   )}
@@ -1444,7 +1444,7 @@ useEffect(() => {
                   <View style={{ marginBottom: 16 }}>
                     <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
                     <TouchableOpacity 
-                      style={[styles.dropdownLikeBtn, { borderColor: cardBorder, backgroundColor: isDark ? '#11181f' : '#f8fafc', height: 48, borderRadius: 12 }]}
+                      style={[styles.dropdownLikeBtn, { borderColor: cardBorder, backgroundColor: cardBgNested, height: 48, borderRadius: 12 }]}
                       onPress={() => setIsRepeatModalVisible(true)}
                     >
                       <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '500' }}>
@@ -1457,7 +1457,7 @@ useEffect(() => {
                   </View>
 
                   {repeatConfig.preset !== 'None' && (
-                    <View style={[styles.repeatConfigBox, { borderColor: cardBorder, backgroundColor: isDark ? '#11181f' : '#f8fafc', borderRadius: 12, marginBottom: 16, padding: 14 }]}>
+                    <View style={[styles.repeatConfigBox, { borderColor: cardBorder, backgroundColor: cardBgNested, borderRadius: 12, marginBottom: 16, padding: 14 }]}>
                       <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('Repeat configuration')}</Text>
                       <View style={styles.twoColumnRow}>
                         <View style={styles.column}>
@@ -1596,7 +1596,7 @@ useEffect(() => {
 
             {/* Section: Subtasks */}
             {subtasks.length > 0 && (
-              <Text style={styles.sectionTitle}>{t('Subtasks')}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('Subtasks')}</Text>
             )}
             {subtasks.length > 0 && (
               <View style={{ marginBottom: 4 }}>
@@ -1658,8 +1658,8 @@ useEffect(() => {
                 style={[styles.saveBtnFull, { backgroundColor: colors.primary }]}
                 activeOpacity={0.85}
               >
-                <IconCheck color={colors.textInverse || '#00363f'} />
-                <Text style={[styles.saveBtnText, { color: colors.textInverse || '#00363f' }]}>
+                <IconCheck color={colors.textInverse || '#ffffff'} />
+                <Text style={[styles.saveBtnText, { color: colors.textInverse || '#ffffff' }]}>
                   {t('Save changes') || 'Save changes'}
                 </Text>
               </TouchableOpacity>
@@ -1671,8 +1671,8 @@ useEffect(() => {
                 style={styles.deleteLink}
                 activeOpacity={0.7}
               >
-                <IconTrash color="#f87171" />
-                <Text style={styles.deleteLinkText}>{t('Delete task') || 'Delete task'}</Text>
+                <IconTrash color={colors.danger || '#f87171'} />
+                <Text style={[styles.deleteLinkText, { color: colors.danger || '#f87171' }]}>{t('Delete task') || 'Delete task'}</Text>
               </TouchableOpacity>
             </View>
             
@@ -1746,7 +1746,7 @@ useEffect(() => {
                           accessible={true}
                           accessibilityRole="button"
                           accessibilityLabel={`Select year`}
-                          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}
+                          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: cardBgNested }}
                           onPress={() => setYearPickerVisible(true)}
                         >
                           <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
