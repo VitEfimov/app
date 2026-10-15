@@ -31,6 +31,7 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const initialDate = useMemo(() => selectedDate, []);
   const visibleMonthRef = useRef(dayjs(selectedDate).format('YYYY-MM'));
+  const calendarListRef = useRef(null);
   const { width: windowWidth } = useWindowDimensions();
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
