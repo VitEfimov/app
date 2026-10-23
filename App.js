@@ -22,7 +22,6 @@ import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
 import { registerBackgroundFetchAsync } from './src/utils/backgroundTasks';
 import i18n from './src/i18n';
-import PomodoroSettingsModal from './src/components/PomodoroSettingsModal';
 import AutomaticCleanupModal from './src/components/AutomaticCleanupModal';
 import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask, addMultipleTasks } from './src/features/taskSlice';
@@ -31,7 +30,6 @@ import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, ge
 import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
 import PinLockScreen from './src/screens/PinLockScreen';
-import { PomodoroGlobalWatcher } from './src/utils/pomodoroManager';
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -702,9 +700,7 @@ function RootWrapper({ children }) {
   const { colors } = useTheme();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgMain }}>
-      <PomodoroGlobalWatcher />
       {children}
-      <PomodoroSettingsModal />
     </View>
   );
 }

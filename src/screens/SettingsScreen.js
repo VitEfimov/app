@@ -8,7 +8,7 @@ import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWrit
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
 import { useTheme } from '../styles/ThemeContext';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
 import AutoManageSettings from '../components/AutoManageSettings';
 import ConfirmModal from '../components/ConfirmModal';
@@ -64,6 +64,13 @@ const IconSave = ({ color }) => (
     <Path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
     <Path d="M17 21v-8H7v8" />
     <Path d="M7 3v5h8V3" />
+  </Svg>
+);
+
+const IconBack = ({ color }) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Line x1="19" y1="12" x2="5" y2="12" />
+    <Polyline points="12 19 5 12 12 5" />
   </Svg>
 );
 
@@ -386,6 +393,18 @@ export default function SettingsScreen({ navigation }) {
 
         {/* Header Section */}
         <View style={styles.topHeader}>
+          <TouchableOpacity
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Back to calendar"
+            style={{ marginRight: 12, padding: 6 }}
+            onPress={() => {
+              if (navigation && navigation.canGoBack && navigation.canGoBack()) navigation.goBack();
+              else if (navigation) navigation.navigate('Calendar');
+            }}
+          >
+            <IconBack color={colors.textPrimary} />
+          </TouchableOpacity>
           <View style={{ flex: 1, marginRight: 10 }}>
             <Text style={[styles.pageTitle, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{t('Settings')}</Text>
             <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('App preferences & account')}</Text>
@@ -761,7 +780,8 @@ export default function SettingsScreen({ navigation }) {
         confirmText={t('OK')}
         onConfirm={() => {
           setSaveAlertVisible(false);
-          if (navigation) navigation.navigate('Board');
+          if (navigation && navigation.canGoBack && navigation.canGoBack()) navigation.goBack();
+          else if (navigation) navigation.navigate('Calendar');
         }}
         onCancel={() => setSaveAlertVisible(false)}
       />

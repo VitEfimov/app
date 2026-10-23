@@ -1,85 +1,73 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, Share, useWindowDimensions, Dimensions, I18nManager } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { View, StyleSheet, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, useWindowDimensions, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { CalendarList } from 'react-native-calendars';
+import dayjs from 'dayjs';
+import { useTranslation } from 'react-i18next';
+
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
-import TaskRow from '../components/TaskRow';
-import InlineAddTask from '../components/InlineAddTask';
+import { setThemeMode } from '../features/themeSlice';
+import { updateTask, deleteTask, addTask, batchCalendarSyncComplete } from '../features/taskSlice';
+import { addBoard } from '../features/userSlice';
+import { getBoardColor } from '../utils/boardColors';
+import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, syncAllTasksToCalendarAsync } from '../utils/calendarSync';
+
+// Google Calendar Components
+import GoogleTopBar from '../components/calendar/GoogleTopBar';
+import GoogleDrawer from '../components/calendar/GoogleDrawer';
+import GoogleFAB from '../components/calendar/GoogleFAB';
+import QuickAddTaskModal from '../components/calendar/QuickAddTaskModal';
+import { IconCheckCircle, IconClock, IconDotsVertical } from '../components/calendar/CalendarIcons';
+
+// Modals
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
 import SnoozeModal from '../components/SnoozeModal';
-import PremiumModal from '../components/PremiumModal';
-import ConfirmModal from '../components/ConfirmModal';
-import MoveBoardModal from '../components/MoveBoardModal';
 import YearPickerModal from '../components/YearPickerModal';
-import Modal from 'react-native-modal';
-import dayjs from 'dayjs';
-import { updateTask, deleteTask, addTask, updateTaskSync, batchCalendarSyncComplete } from '../features/taskSlice';
-import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, syncAllTasksToCalendarAsync } from '../utils/calendarSync';
-import { getBoardColor } from '../utils/boardColors';
-import { useTranslation } from 'react-i18next';
+import CreateBoardModal from '../components/CreateBoardModal';
+import ConfirmModal from '../components/ConfirmModal';
 
 const PAST_SCROLL_RANGE = 24;
 const FUTURE_SCROLL_RANGE = 36;
 
-export default function CalendarScreen() {
-  const { colors, isDark } = useTheme();
+export default function CalendarScreen({ navigation }) {
+  const { colors, mode, isDark } = useTheme();
   const { showToast } = useToast();
   const { t, i18n } = useTranslation();
-  const tasks = useSelector(state => state.taskReducer.tasks || []);
-  const boards = useSelector(state => state.userReducer.boards || []);
-  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
+  const dispatch = useDispatch();
+
+  const { width: windowWidth } = useWindowDimensions();
+  const calendarListRef = useRef(null);
+
+  // Redux state
+  const tasks = useSelector(state => state.taskReducer?.tasks || []);
+  const boards = useSelector(state => state.userReducer?.boards || []);
+
+  // Calendar State
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const initialDate = useMemo(() => selectedDate, []);
   const visibleMonthRef = useRef(dayjs(selectedDate).format('YYYY-MM'));
-  const calendarListRef = useRef(null);
-  const { width: windowWidth } = useWindowDimensions();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState([]); // Filtered categories
+
+  // Modals state
   const [selectedTask, setSelectedTask] = useState(null);
+  const [isQuickAddVisible, setIsQuickAddVisible] = useState(false);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
   const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
   const [isSnoozeVisible, setSnoozeVisible] = useState(false);
-  const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
-  const [premiumFeatureName, setPremiumFeatureName] = useState('');
-
-  const dispatch = useDispatch();
-
-  // Selection & Options State
-  const [sectionOptionsConfig, setSectionOptionsConfig] = useState(false);
-  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
-  const [selectionMode, setSelectionMode] = useState({ isActive: false, selectedTaskIds: [] });
-  const [sortConfig, setSortConfig] = useState('time'); // 'time' or 'priority'
-  const [collapsedBoardIds, setCollapsedBoardIds] = useState([]);
-  const [isMoveBoardVisible, setMoveBoardVisible] = useState(false);
   const [isYearPickerVisible, setYearPickerVisible] = useState(false);
+  const [isCreateCategoryVisible, setCreateCategoryVisible] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null });
 
-  const toggleBoardCollapse = (boardId) => {
-    setCollapsedBoardIds(prev =>
-      prev.includes(boardId)
-        ? prev.filter(id => id !== boardId)
-        : [...prev, boardId]
-    );
-  };
-
-  // Custom Bottom Sheet State
+  // Custom Bottom Sheet Animation State
   const MIN_Y = 0; // Fully expanded (covers calendar)
-  const maxYRef = useRef(360); // Default, updated onLayout
+  const maxYRef = useRef(355); // Default collapsed position below calendar
   const isInitialized = useRef(false);
-  
-  const panY = useRef(new Animated.Value(360)).current;
-  const lastY = useRef(360);
-
-  // Calendar Month Change Handler (pure ref update - zero re-renders during swipe)
-  const handleMonthChange = useCallback((monthObj) => {
-    const newMonth = monthObj?.dateString 
-      ? dayjs(monthObj.dateString).format('YYYY-MM') 
-      : (monthObj?.year && monthObj?.month ? `${monthObj.year}-${String(monthObj.month).padStart(2, '0')}` : null);
-
-    if (newMonth) {
-      visibleMonthRef.current = newMonth;
-    }
-  }, []);
+  const panY = useRef(new Animated.Value(355)).current;
+  const lastY = useRef(355);
 
   const handleCalendarLayout = useCallback((event) => {
     const { height } = event.nativeEvent.layout;
@@ -93,92 +81,24 @@ export default function CalendarScreen() {
     }
   }, [panY]);
 
-  // Ensure calendar list snaps cleanly to exact month boundary on device swipe
-  const handleMomentumScrollEnd = useCallback((event) => {
-    const offsetX = event?.nativeEvent?.contentOffset?.x;
-    if (typeof offsetX === 'number' && visibleMonthRef.current && windowWidth > 0) {
-      const [initY, initM] = initialDate.split('-').map(Number);
-      const [visY, visM] = visibleMonthRef.current.split('-').map(Number);
-      const diffMonths = (visY - initY) * 12 + (visM - initM);
-      const isRTLAndroid = Platform.OS === 'android' && I18nManager.isRTL;
-      const targetOffset = (isRTLAndroid ? PAST_SCROLL_RANGE - diffMonths : PAST_SCROLL_RANGE + diffMonths) * windowWidth;
-
-      if (Math.abs(offsetX - targetOffset) >= 1) {
-        calendarListRef.current?.scrollToMonth(`${visibleMonthRef.current}-01`);
-      }
-    }
-  }, [windowWidth, initialDate]);
-
-  const handleScrollEndDrag = useCallback((event) => {
-    const velocityX = event?.nativeEvent?.velocity?.x;
-    if (!velocityX || Math.abs(velocityX) < 0.05) {
-      handleMomentumScrollEnd(event);
-    }
-  }, [handleMomentumScrollEnd]);
-
-  const renderHeader = useCallback((date) => {
-    const dateObj = dayjs(date ? (typeof date.toString === 'function' ? date.toString('yyyy-MM-dd') : date) : selectedDate);
-    const monthStr = dateObj.format('MMMM YYYY');
-    return (
-      <TouchableOpacity
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Select year"
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingVertical: 4,
-          paddingHorizontal: 10,
-          borderRadius: 8,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-        }}
-        onPress={() => setYearPickerVisible(true)}
-      >
-        <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginRight: 6 }}>
-          {monthStr}
-        </Text>
-        <Text style={{ fontSize: 12, color: colors.primary }}>▼</Text>
-      </TouchableOpacity>
-    );
-  }, [colors, isDark, selectedDate]);
-
-  React.useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-      Animated.timing(panY, {
-        toValue: MIN_Y,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
-      lastY.current = MIN_Y;
-    });
-
-    return () => {
-      keyboardDidShowListener.remove();
-    };
-  }, []);
-  
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dy) > 5;
-      },
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 5,
       onPanResponderGrant: () => {
         panY.stopAnimation((value) => {
           lastY.current = value;
         });
       },
-      onPanResponderMove: (evt, gestureState) => {
+      onPanResponderMove: (_, gestureState) => {
         let newY = lastY.current + gestureState.dy;
         if (newY < MIN_Y) newY = MIN_Y;
         if (newY > maxYRef.current) newY = maxYRef.current;
         panY.setValue(newY);
       },
-      onPanResponderRelease: (evt, gestureState) => {
+      onPanResponderRelease: (_, gestureState) => {
         const currentY = lastY.current + gestureState.dy;
         let targetY = maxYRef.current;
-        
-        // Snap to nearest position
         const distToMin = Math.abs(currentY - MIN_Y);
         const distToMax = Math.abs(currentY - maxYRef.current);
 
@@ -189,200 +109,64 @@ export default function CalendarScreen() {
         }
 
         lastY.current = targetY;
-
         Animated.timing(panY, {
           toValue: targetY,
-          duration: 300,
+          duration: 250,
           useNativeDriver: false,
         }).start();
       }
     })
   ).current;
 
-  const handleTaskPress = (task) => {
-    setSelectedTask(task);
-    setDetailsVisible(true);
-  };
+  // Month change sync
+  const handleMonthChange = useCallback((monthObj) => {
+    const newMonth = monthObj?.dateString 
+      ? dayjs(monthObj.dateString).format('YYYY-MM') 
+      : (monthObj?.year && monthObj?.month ? `${monthObj.year}-${String(monthObj.month).padStart(2, '0')}` : null);
+    if (newMonth) visibleMonthRef.current = newMonth;
+  }, []);
 
-  // Selection Logic
-  const toggleTaskSelection = (taskId) => {
-    setSelectionMode(prev => {
-      const isSelected = prev.selectedTaskIds.includes(taskId);
-      return {
-        ...prev,
-        selectedTaskIds: isSelected 
-          ? prev.selectedTaskIds.filter(id => id !== taskId)
-          : [...prev.selectedTaskIds, taskId]
-      };
-    });
-  };
-
-  const handleSelectAll = () => {
-    const taskIds = selectedTasks.map(t => t.id);
-    setSelectionMode(prev => ({ ...prev, selectedTaskIds: taskIds }));
-  };
-
-  const handleCompleteSelected = () => {
-    setConfirmConfig({
-      isVisible: true,
-      title: 'Complete Tasks',
-      message: `Are you sure you want to complete ${selectionMode.selectedTaskIds.length} tasks?`,
-      confirmText: 'Complete',
-      isDestructive: false,
-      onConfirm: () => {
-        const ids = [...selectionMode.selectedTaskIds];
-        ids.forEach(id => {
-          dispatch(updateTask({ taskId: id, completed: true }));
-        });
-        setSelectionMode({ isActive: false, selectedTaskIds: [] });
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        
-        showToast(
-          `${ids.length} ${t('tasks completed')}`,
-          t('Undo'),
-          () => {
-            ids.forEach(id => {
-              const task = selectedTasks.find(t => t.id === id);
-              if (task) {
-                dispatch(updateTask({ taskId: id, completed: task.completed }));
-              }
-            });
-          }
-        );
+  // Category Toggle Handler
+  const handleToggleCategory = (boardId) => {
+    setSelectedCategoryIds(prev => {
+      if (prev.length === 0) {
+        const allIds = boards.map(b => b.id || b._id || 'main');
+        return allIds.filter(id => id !== boardId);
+      }
+      if (prev.includes(boardId)) {
+        return prev.filter(id => id !== boardId);
+      } else {
+        const next = [...prev, boardId];
+        if (next.length === boards.length) return [];
+        return next;
       }
     });
   };
 
-  const handleDeleteSelected = () => {
-    setConfirmConfig({
-      isVisible: true,
-      title: 'Delete Tasks',
-      message: `Are you sure you want to delete ${selectionMode.selectedTaskIds.length} tasks?`,
-      confirmText: 'Delete',
-      isDestructive: true,
-      onConfirm: () => {
-        const ids = [...selectionMode.selectedTaskIds];
-        const tasksToDelete = selectedTasks.filter(t => ids.includes(t.id));
-        
-        ids.forEach(id => dispatch(deleteTask({ taskId: id })));
-        setSelectionMode({ isActive: false, selectedTaskIds: [] });
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        
-        showToast(
-          `${ids.length} ${t('tasks deleted')}`,
-          t('Undo'),
-          () => {
-            tasksToDelete.forEach(task => {
-              dispatch(addTask({ task }));
-            });
-          }
-        );
+  // Theme Toggle Handler
+  const handleToggleTheme = () => {
+    const modes = ['light', 'dark', 'contrast'];
+    let currentIndex = modes.indexOf(mode);
+    if (currentIndex === -1) currentIndex = isDark ? 1 : 0;
+    const nextIndex = (currentIndex + 1) % modes.length;
+    dispatch(setThemeMode(modes[nextIndex]));
+  };
+
+  // Task Completion Toggle
+  const handleToggleComplete = (task) => {
+    const newCompleted = !task.completed;
+    dispatch(updateTask({ taskId: task.id || task._id, completed: newCompleted }));
+    showToast(
+      newCompleted ? (t('Task completed') || 'Task completed') : (t('Task marked incomplete') || 'Task marked incomplete'),
+      t('Undo') || 'Undo',
+      () => {
+        dispatch(updateTask({ taskId: task.id || task._id, completed: !newCompleted }));
       }
-    });
+    );
   };
 
-  const handleShareSelected = async () => {
-    try {
-      const selectedTasksObjects = selectedTasks.filter(t => selectionMode.selectedTaskIds.includes(t.id));
-      const shareText = selectedTasksObjects.map(t => {
-        const taskName = t.taskname;
-        const taskDate = t.completionDate;
-        const taskTime = t.time;
-        const notes = t.description?.text ? t.description.text.replace(/<[^>]+>/g, '').trim() : '';
-        const priority = t.priority && t.priority !== 'none' ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : '';
-
-        return `Task: ${taskName}\nDue: ${taskDate ? dayjs(taskDate).format('MMM D, YYYY') : 'Not set'}${taskTime ? ` at ${taskTime}` : ''}${priority ? `\nPriority: ${priority}` : ''}${notes ? `\n\nNotes:\n${notes}` : ''}`.trim();
-      }).join('\n\n------------------------\n\n');
-      
-      await Share.share({ message: `Tasks:\n\n${shareText}` });
-      setSelectionMode({ isActive: false, selectedTaskIds: [] });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  // Section Options Logic
-  const handleCompleteSection = () => {
-    setConfirmConfig({
-      isVisible: true,
-      title: 'Complete All',
-      message: `Are you sure you want to complete all tasks for this day?`,
-      confirmText: 'Complete',
-      isDestructive: false,
-      onConfirm: () => {
-        const uncompletedTasks = selectedTasks.filter(t => !t.completed);
-        
-        uncompletedTasks.forEach(task => {
-          dispatch(updateTask({ taskId: task.id, completed: true }));
-        });
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        
-        showToast(
-          `${uncompletedTasks.length} ${t('tasks completed')}`,
-          t('Undo'),
-          () => {
-            uncompletedTasks.forEach(task => {
-              dispatch(updateTask({ taskId: task.id, completed: false }));
-            });
-          }
-        );
-      }
-    });
-  };
-
-  const handleMoveForward = () => {
-    setConfirmConfig({
-      isVisible: true,
-      title: 'Move Forward',
-      message: `Are you sure you want to move all tasks to the next day?`,
-      confirmText: 'Move',
-      isDestructive: false,
-      onConfirm: () => {
-        const nextDate = dayjs(selectedDate).add(1, 'day').toISOString();
-        selectedTasks.forEach(task => {
-          if (!task.completed) {
-            dispatch(updateTask({ taskId: task.id, completionDate: nextDate, completed: false }));
-          }
-        });
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-      }
-    });
-  };
-
-  const handleDeleteSection = () => {
-    setConfirmConfig({
-      isVisible: true,
-      title: 'Delete All',
-      message: `Are you sure you want to delete all tasks for this day?`,
-      confirmText: 'Delete',
-      isDestructive: true,
-      onConfirm: () => {
-        const tasksToDelete = [...selectedTasks];
-        
-        tasksToDelete.forEach(task => {
-          dispatch(deleteTask({ taskId: task.id }));
-        });
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        
-        showToast(
-          `${tasksToDelete.length} ${t('tasks deleted')}`,
-          t('Undo'),
-          () => {
-            tasksToDelete.forEach(task => {
-              dispatch(addTask({ task }));
-            });
-          }
-        );
-      }
-    });
-  };
-
-  const handleSyncDayToCalendar = async () => {
-    if (!isPremium) {
-      setPremiumFeatureName(t('Calendar Synchronization') || 'Calendar Synchronization');
-      setPremiumModalVisible(true);
-      return;
-    }
+  // Calendar Sync
+  const handleSyncToCalendar = async () => {
     try {
       const hasPerm = await checkCalendarPermissionsAsync();
       if (!hasPerm) {
@@ -393,732 +177,551 @@ export default function CalendarScreen() {
         }
       }
       const themeState = { calendarSyncEnabled: true };
-      const { syncedCount, eventMap } = await syncAllTasksToCalendarAsync(selectedTasks, themeState);
+      const { syncedCount, eventMap } = await syncAllTasksToCalendarAsync(tasks, themeState);
       if (eventMap && Object.keys(eventMap).length > 0) {
         dispatch(batchCalendarSyncComplete({ eventMap }));
       }
       showToast(`${syncedCount} ${t('tasks synced to your calendar.') || 'tasks synced to your calendar.'}`);
     } catch (e) {
-      console.warn('Error syncing day to calendar:', e);
+      console.warn('Error syncing to calendar:', e);
     }
   };
 
-  // Prepare marked dates
-  const handleBatchMoveBoard = (targetBoardId) => {
-    const selectedIds = [...selectionMode.selectedTaskIds];
-    if (selectedIds.length === 0) return;
-    
-    selectedIds.forEach(id => {
-      dispatch(updateTask({ taskId: id, boardId: targetBoardId }));
-    });
-    
-    const targetBoard = boards.find(b => b.id === targetBoardId);
-    const boardName = targetBoard ? (targetBoard.name === 'Main' ? t('Main') : targetBoard.name) : t('Board');
-    setSelectionMode({ isActive: false, selectedTaskIds: [] });
-    
-    showToast(`${t('Moved')} ${selectedIds.length} ${t('Tasks to')} ${boardName}`);
-  };
-
-  const todayStr = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
-
-  // Prepare marked dates with distinct board dots
+  // Marked dates with category dots for the sliding calendar
   const markedDates = useMemo(() => {
     const marks = {};
-    tasks.forEach(task => {
-      if (task.completionDate) {
-        const dateStr = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
-        if (dateStr) {
-          if (!marks[dateStr]) {
-            marks[dateStr] = { tasks: [] };
-          }
-          marks[dateStr].tasks.push(task);
-        }
-      }
-    });
-
-    const finalMarks = {};
     const boardColorMap = new Map();
     boards.forEach(b => {
-      if (b && (b.id || b._id)) {
-        boardColorMap.set(b.id || b._id, getBoardColor(b, boards));
-      }
+      if (b && (b.id || b._id)) boardColorMap.set(b.id || b._id, getBoardColor(b, boards));
     });
-    if (!boardColorMap.has('main')) {
-      boardColorMap.set('main', getBoardColor({ id: 'main', name: 'Main' }, boards));
-    }
+    if (!boardColorMap.has('main')) boardColorMap.set('main', getBoardColor({ id: 'main', name: 'Main' }, boards));
 
-    Object.keys(marks).forEach(dateStr => {
-      const dayTasks = marks[dateStr].tasks;
-      // Extract unique board IDs for tasks on this date
-      const uniqueBoardIds = Array.from(new Set(dayTasks.map(t => t.boardId || 'main')));
-      const dots = uniqueBoardIds.map(bId => {
-        let color = boardColorMap.get(bId);
-        if (!color) {
-          const boardObj = boards.find(b => b && (b.id === bId || b._id === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Board' };
-          color = getBoardColor(boardObj, boards);
-          boardColorMap.set(bId, color);
-        }
-        return {
-          key: `${bId}_${dateStr}`,
-          color,
-        };
-      });
-
-      finalMarks[dateStr] = {
-        dots,
-        marked: dots.length > 0,
-      };
-    });
-
-    if (!finalMarks[selectedDate]) {
-      finalMarks[selectedDate] = { dots: [] };
-    }
-    if (!finalMarks[todayStr]) {
-      finalMarks[todayStr] = { dots: [] };
-    }
-
-    return finalMarks;
-  }, [tasks, boards, selectedDate, todayStr]);
-
-  const renderCustomDay = useCallback(({ date, state, marking }) => {
-    if (!date) return null;
-    const dateStr = date.dateString;
-    const isSelected = dateStr === selectedDate;
-    const isToday = dateStr === todayStr;
-    const isDisabled = state === 'disabled';
-    const dayDots = marking?.dots || markedDates[dateStr]?.dots || [];
-    const visibleDots = dayDots.slice(0, 4);
-
-    return (
-      <TouchableOpacity
-        testID={`calendar_day_${dateStr}`}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel={`${dateStr}${isSelected ? ', selected' : ''}${isToday ? ', today' : ''}`}
-        activeOpacity={0.7}
-        onPress={() => {
-          setSelectedDate(dateStr);
-          setSelectionMode({ isActive: false, selectedTaskIds: [] });
-        }}
-        style={styles.dayCellContainer}
-      >
-        <View
-          style={[
-            styles.dayCircle,
-            isSelected ? {
-              backgroundColor: colors.primary,
-            } : isToday ? {
-              backgroundColor: isDark ? 'rgba(33, 150, 243, 0.28)' : 'rgba(0, 102, 204, 0.16)',
-            } : null,
-          ]}
-        >
-          <Text
-            style={[
-              styles.dayText,
-              {
-                color: isSelected
-                  ? (colors.textInverse || '#ffffff')
-                  : isToday
-                  ? colors.primary
-                  : isDisabled
-                  ? (colors.surfaceContainerHigh || '#888888')
-                  : colors.textPrimary,
-                fontWeight: isSelected || isToday ? 'bold' : '600',
-              },
-            ]}
-          >
-            {date.day}
-          </Text>
-        </View>
-
-        <View style={styles.dotsRow}>
-          {visibleDots.map(dot => (
-            <View
-              key={dot.key}
-              style={[styles.boardDot, { backgroundColor: dot.color }]}
-            />
-          ))}
-        </View>
-      </TouchableOpacity>
-    );
-  }, [selectedDate, todayStr, markedDates, colors, isDark]);
-
-  // Get tasks for selected date
-  const selectedTasks = useMemo(() => {
-    const filteredTasks = tasks.filter(task => {
-      if (!task.completionDate) return false;
-      const d = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
-      return d === selectedDate;
-    });
-    
-    return filteredTasks.sort((a, b) => {
-      if (sortConfig === 'priority') {
-        const pValues = { high: 3, medium: 2, low: 1, none: 0 };
-        const pA = pValues[a.priority?.toLowerCase()] || 0;
-        const pB = pValues[b.priority?.toLowerCase()] || 0;
-        if (pA !== pB) return pB - pA;
-      }
+    tasks.forEach(task => {
+      const d = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : null);
+      if (!d) return;
+      if (!marks[d]) marks[d] = { dots: [] };
       
+      const bId = task.boardId || 'main';
+      const color = boardColorMap.get(bId) || '#4285F4';
+      if (!marks[d].dots.some(dot => dot.color === color)) {
+        marks[d].dots.push({ key: `${bId}_${d}`, color });
+      }
+    });
+
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    if (!marks[selectedDate]) marks[selectedDate] = { dots: [] };
+    if (!marks[todayStr]) marks[todayStr] = { dots: [] };
+
+    marks[selectedDate] = {
+      ...marks[selectedDate],
+      selected: true,
+      selectedColor: colors.primary,
+    };
+
+    return marks;
+  }, [tasks, boards, selectedDate, colors]);
+
+  // TASKS JUST RELEVANT TO CHOSEN DATE (Strict date filter!)
+  const dayTasks = useMemo(() => {
+    return tasks.filter(task => {
+      if (!task) return false;
+      
+      // Category filter
+      if (selectedCategoryIds.length > 0) {
+        const bId = task.boardId || 'main';
+        if (!selectedCategoryIds.includes(bId)) return false;
+      }
+
+      // Date match: MUST be equal to chosen selectedDate
+      const d = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
+      if (d !== selectedDate) return false;
+
+      // Search query filter
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase().trim();
+        const nameMatch = task.taskname?.toLowerCase().includes(q);
+        const descMatch = task.description?.text?.toLowerCase().includes(q);
+        if (!nameMatch && !descMatch) return false;
+      }
+
+      return true;
+    }).sort((a, b) => {
       const hasTimeA = !!(a.time && a.time.trim() !== '');
       const hasTimeB = !!(b.time && b.time.trim() !== '');
-      
       if (hasTimeA && !hasTimeB) return -1;
       if (!hasTimeA && hasTimeB) return 1;
-      if (hasTimeA && hasTimeB) {
-        const timeCompare = a.time.localeCompare(b.time);
-        if (timeCompare !== 0) return timeCompare;
-      }
-      
-      return parseInt(a.id || '0') - parseInt(b.id || '0');
+      if (hasTimeA && hasTimeB) return a.time.localeCompare(b.time);
+      return (b.id || '').localeCompare(a.id || '');
     });
-  }, [tasks, selectedDate, sortConfig]);
-
-  const groupedTasks = useMemo(() => {
-    if (!selectedTasks.length) return [];
-    if (boards.length < 2) return [{ id: 'main', title: '', totalCount: selectedTasks.length, data: selectedTasks }];
-    
-    const groups = {};
-    groups['main'] = { id: 'main', title: 'Main', data: [] };
-    
-    selectedTasks.forEach(task => {
-       const bId = task.boardId || 'main';
-       if (!groups[bId]) {
-          const boardName = boards.find(b => b.id === bId)?.name || 'Board';
-          groups[bId] = { id: bId, title: boardName, data: [] };
-       }
-       groups[bId].data.push(task);
-    });
-    
-    const activeGroups = Object.values(groups).filter(g => g.data.length > 0);
-    return activeGroups.map(g => ({
-      id: g.id,
-      title: g.title,
-      totalCount: g.data.length,
-      data: collapsedBoardIds.includes(g.id) ? [] : g.data,
-    }));
-  }, [selectedTasks, boards, collapsedBoardIds]);
-
-  const flattenedData = useMemo(() => {
-    const result = [];
-    groupedTasks.forEach(group => {
-      result.push({ type: 'header', group });
-      if (group.data && group.data.length > 0) {
-        group.data.forEach(task => {
-          result.push({ type: 'task', task, group });
-        });
-      }
-    });
-    return result;
-  }, [groupedTasks]);
+  }, [tasks, selectedDate, selectedCategoryIds, searchQuery]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
-      <View onLayout={handleCalendarLayout} style={{ width: windowWidth, overflow: 'hidden' }}>
-        <CalendarList
-          ref={calendarListRef}
-          testID="task_calendar"
-          key={`${colors.bgMain}-${isDark}-${i18n.language}`}
-          markingType={'multi-dot'}
-          current={initialDate}
-          firstDay={i18n.language === 'en' ? 0 : 1}
-          onDayPress={(day) => {
-            setSelectedDate(day.dateString);
-            setSelectionMode({ isActive: false, selectedTaskIds: [] });
-          }}
-          markedDates={markedDates}
-          horizontal={true}
-          pagingEnabled={true}
-          scrollEnabled={true}
-          nestedScrollEnabled={true}
-          removeClippedSubviews={false}
-          calendarWidth={windowWidth}
-          calendarHeight={355}
-          pastScrollRange={PAST_SCROLL_RANGE}
-          futureScrollRange={FUTURE_SCROLL_RANGE}
-          showScrollIndicator={false}
-          animateScroll={true}
-          hideArrows={false}
-          onMonthChange={handleMonthChange}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
-          onScrollEndDrag={handleScrollEndDrag}
-          dayComponent={renderCustomDay}
-          renderHeader={renderHeader}
-          theme={{
-            backgroundColor: colors.bgMain,
-            calendarBackground: colors.bgMain,
-            textSectionTitleColor: colors.textSecondary,
-            selectedDayBackgroundColor: colors.primary,
-            selectedDayTextColor: colors.textInverse,
-            todayTextColor: colors.primary,
-            dayTextColor: colors.textPrimary,
-            textDisabledColor: colors.surfaceContainerHigh,
-            dotColor: colors.primary,
-            selectedDotColor: colors.textInverse,
-            arrowColor: colors.primary,
-            monthTextColor: colors.textPrimary,
-            indicatorColor: colors.primary,
-            textDayFontWeight: '600',
-            todayButtonFontWeight: 'bold',
-            textMonthFontWeight: 'bold',
-            textDayHeaderFontWeight: '600',
-            textDayFontSize: 15,
-            textMonthFontSize: 18,
-            textDayHeaderFontSize: 14,
-            'stylesheet.calendar-list.main': {
-              calendar: {
-                paddingLeft: 0,
-                paddingRight: 0,
-                width: windowWidth,
-              },
-            },
-            'stylesheet.calendar.main': {
-              container: {
-                paddingLeft: 0,
-                paddingRight: 0,
-                width: windowWidth,
-              },
-            },
-          }}
-          style={[styles.calendar, { width: windowWidth }]}
-        />
-      </View>
-      
-      {/* Custom Bottom Sheet */}
-      <Animated.View 
-        style={[
-          styles.bottomSheet, 
-          { backgroundColor: colors.bgCard, top: panY }
-        ]}
-      >
-        <View {...panResponder.panHandlers}>
-          <View style={styles.dragHandleContainer}>
-            <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
-          </View>
+    <View style={[styles.screenContainer, { backgroundColor: colors.bgMain }]}>
+      {/* Google Top Bar */}
+      <GoogleTopBar
+        currentDate={selectedDate}
+        onPressMenu={() => setIsDrawerOpen(prev => !prev)}
+        onPressToday={() => {
+          const today = dayjs().format('YYYY-MM-DD');
+          setSelectedDate(today);
+          calendarListRef.current?.scrollToMonth(`${today.slice(0, 7)}-01`);
+        }}
+        onPressMonthPicker={() => setYearPickerVisible(true)}
+        activeView="month"
+        onSelectView={() => {}}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        colors={colors}
+        isDark={isDark}
+        onToggleTheme={handleToggleTheme}
+        onPressSettings={() => navigation && navigation.navigate('Settings')}
+        isDesktop={false}
+      />
 
-          <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
-            <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
-              {t('Tasks for')} {dayjs(selectedDate).format('MMM D, YYYY')}
-            </Text>
-            {selectedTasks.length > 0 && (
-              <TouchableOpacity 
-                style={styles.ellipsisBtn} 
-                onPress={() => setSectionOptionsConfig(true)}
-              >
-                <Text style={[styles.ellipsisText, { color: colors.textSecondary }]}>⋮</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+      {/* Main Container */}
+      <View style={styles.calendarContainer}>
+        {/* Sliding Month Calendar */}
+        <View onLayout={handleCalendarLayout} style={{ width: windowWidth, overflow: 'hidden' }}>
+          <CalendarList
+            ref={calendarListRef}
+            testID="task_calendar"
+            key={`${colors.bgMain}-${isDark}-${i18n.language}`}
+            markingType={'multi-dot'}
+            current={initialDate}
+            firstDay={i18n.language === 'en' ? 0 : 1}
+            horizontal={true}
+            pagingEnabled={true}
+            scrollEnabled={true}
+            calendarWidth={windowWidth}
+            calendarHeight={355}
+            pastScrollRange={PAST_SCROLL_RANGE}
+            futureScrollRange={FUTURE_SCROLL_RANGE}
+            showScrollIndicator={false}
+            onMonthChange={handleMonthChange}
+            onDayPress={(day) => {
+              setSelectedDate(day.dateString);
+            }}
+            markedDates={markedDates}
+            theme={{
+              backgroundColor: colors.bgMain,
+              calendarBackground: colors.bgMain,
+              textSectionTitleColor: colors.textSecondary,
+              selectedDayBackgroundColor: colors.primary,
+              selectedDayTextColor: colors.textInverse || '#ffffff',
+              todayTextColor: colors.primary,
+              dayTextColor: colors.textPrimary,
+              textDisabledColor: colors.surfaceContainerHigh || '#888',
+              dotColor: colors.primary,
+              selectedDotColor: colors.textInverse || '#ffffff',
+              arrowColor: colors.primary,
+              monthTextColor: colors.textPrimary,
+              textDayFontWeight: '600',
+              textMonthFontWeight: 'bold',
+              textDayHeaderFontWeight: '600',
+            }}
+          />
         </View>
 
-        {groupedTasks.length > 0 ? (
-          <FlashList
-            style={{ flex: 1 }}
-            data={flattenedData}
-            extraData={[collapsedBoardIds, selectionMode.selectedTaskIds, selectionMode.isActive, colors, flattenedData.length]}
-            keyExtractor={(item, index) => item.type === 'task' ? `cal_task_${item.task.id}` : `cal_header_${item.group.id}_${index}`}
-            getItemType={(item) => item.type}
-            overrideItemLayout={(layout, item) => {
-              layout.size = item.type === 'header' ? 36 : 65;
-            }}
-            renderItem={({ item }) => {
-              if (item.type === 'header') {
-                const section = item.group;
-                return section.title ? (
-                  <TouchableOpacity
-                    accessible={true}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Toggle ${section.title} board tasks`}
-                    style={[styles.sectionHeader, { backgroundColor: colors.bgCard, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
-                    onPress={() => toggleBoardCollapse(section.id)}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(section.id, boards), marginRight: 8 }} />
-                      <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
-                        {section.title === 'Main' ? t('Main') : section.title}
-                      </Text>
-                      <View style={{ backgroundColor: colors.surfaceContainerHigh, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 8 }}>
-                        <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
-                          {section.totalCount}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 'bold' }}>
-                      {collapsedBoardIds.includes(section.id) ? '▶' : '▼'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null;
-              }
-              if (item.type === 'task') {
+        {/* Adjustable Collapsible Bottom Sheet with Tasks relevant JUST to chosen date */}
+        <Animated.View 
+          style={[
+            styles.bottomSheet, 
+            { backgroundColor: colors.bgCard, top: panY }
+          ]}
+        >
+          {/* Drag Handle & Section Header */}
+          <View {...panResponder.panHandlers}>
+            <View style={styles.dragHandleContainer}>
+              <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
+            </View>
+
+            <View style={[styles.sheetHeader, { borderBottomColor: colors.borderColor }]}>
+              <View>
+                <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+                  {dayjs(selectedDate).format('dddd, MMMM D, YYYY')}
+                </Text>
+                <Text style={[styles.sheetSubtitle, { color: colors.textSecondary }]}>
+                  {dayTasks.length} {dayTasks.length === 1 ? t('task') : t('tasks')}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Task List for Chosen Date */}
+          <ScrollView 
+            style={styles.tasksScrollView}
+            contentContainerStyle={styles.tasksScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {dayTasks.length > 0 ? (
+              dayTasks.map(task => {
+                const bId = task.boardId || 'main';
+                const boardObj = boards.find(b => (b.id === bId || b._id === bId)) || { id: bId, name: 'Main' };
+                const categoryColor = getBoardColor(boardObj, boards);
+                const isCompleted = !!task.completed;
+
                 return (
-                  <TaskRow 
-                    task={item.task} 
-                    hideDate={true} 
-                    hideBoardBadge={true}
-                    disableInlineEdit={true} 
-                    testIDPrefix="calendar_"
-                    isSelectionMode={selectionMode.isActive}
-                    isSelected={selectionMode.selectedTaskIds.includes(item.task.id)}
-                    onToggleSelect={() => {
-                      if (!selectionMode.isActive) {
-                        setSelectionMode({ isActive: true, selectedTaskIds: [item.task.id] });
-                      } else {
-                        toggleTaskSelection(item.task.id);
+                  <TouchableOpacity
+                    key={task.id || task._id}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.taskCard,
+                      {
+                        backgroundColor: isDark ? colors.surfaceContainer : colors.bgCard,
+                        borderColor: colors.borderColor,
+                        borderLeftColor: categoryColor,
                       }
-                    }}
-                    onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
-                    onPressMore={(t) => { setSelectedTask(t); setQuickMenuVisible(true); }}
+                    ]}
                     onPress={() => {
-                      setSelectedTask(item.task);
+                      setSelectedTask(task);
                       setDetailsVisible(true);
                     }}
-                  />
-                );
-              }
-              return null;
-            }}
-            contentContainerStyle={styles.listContent}
-            estimatedItemSize={65}
-            drawDistance={1200}
-            removeClippedSubviews={Platform.OS === 'android'}
-          />
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('No tasks scheduled for this day.')}</Text>
-          </View>
-        )}
-        
-        <View style={{ marginBottom: selectionMode.isActive ? 70 : 20 }}>
-          <InlineAddTask 
-            sectionId={selectedDate} 
-            onToggle={(active) => {
-              if (active) setSelectionMode({ isActive: false, selectedTaskIds: [] });
-            }}
-            onAddTask={(task) => {
-              if (task?.boardId && collapsedBoardIds.includes(task.boardId)) {
-                setCollapsedBoardIds(prev => prev.filter(id => id !== task.boardId));
-              }
-            }}
-            onAddDetails={(task) => {
-              if (task?.boardId && collapsedBoardIds.includes(task.boardId)) {
-                setCollapsedBoardIds(prev => prev.filter(id => id !== task.boardId));
-              }
-              setSelectedTask(task);
-              setDetailsVisible(true);
-            }}
-          />
-        </View>
-      </Animated.View>
+                  >
+                    <TouchableOpacity
+                      style={styles.checkboxTouch}
+                      onPress={() => handleToggleComplete(task)}
+                    >
+                      <IconCheckCircle checked={isCompleted} color={categoryColor} size={20} />
+                    </TouchableOpacity>
 
-      <TaskDetailsModal 
+                    <View style={styles.taskInfo}>
+                      <Text
+                        style={[
+                          styles.taskTitle,
+                          {
+                            color: isCompleted ? colors.textSecondary : colors.textPrimary,
+                            textDecorationLine: isCompleted ? 'line-through' : 'none',
+                            opacity: isCompleted ? 0.6 : 1,
+                          }
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {task.taskname}
+                      </Text>
+
+                      <View style={styles.taskMetaRow}>
+                        <View style={styles.timeBadge}>
+                          <IconClock color={colors.textSecondary} size={12} />
+                          <Text style={[styles.timeBadgeText, { color: colors.textSecondary }]}>
+                            {task.time ? task.time : (t('All day') || 'All day')}
+                          </Text>
+                        </View>
+
+                        <View style={styles.categoryDotPill}>
+                          <View style={[styles.smallDot, { backgroundColor: categoryColor }]} />
+                          <Text style={[styles.categoryPillText, { color: colors.textSecondary }]}>
+                            {boardObj.name === 'Main' ? (t('Main') || 'Main') : boardObj.name}
+                          </Text>
+                        </View>
+
+                        {task.priority && task.priority !== 'none' && (
+                          <View style={[
+                            styles.priorityChip,
+                            {
+                              backgroundColor: task.priority === 'high' 
+                                ? (isDark ? 'rgba(234, 67, 53, 0.25)' : '#FCE8E6')
+                                : (isDark ? 'rgba(251, 188, 4, 0.25)' : '#FEF7E0')
+                            }
+                          ]}>
+                            <Text style={[
+                              styles.priorityText,
+                              { color: task.priority === 'high' ? '#D93025' : '#E37400' }
+                            ]}>
+                              {task.priority.toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.moreBtn}
+                      onPress={() => {
+                        setSelectedTask(task);
+                        setQuickMenuVisible(true);
+                      }}
+                    >
+                      <IconDotsVertical color={colors.textSecondary} size={16} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={{ fontSize: 32, marginBottom: 8 }}>📋</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  {t('No tasks scheduled for this day.') || 'No tasks scheduled for this day.'}
+                </Text>
+                <Text style={[styles.emptySubtext, { color: colors.textTertiary || '#888' }]}>
+                  {t('Tap the + button to add one.') || 'Tap the + button to add one.'}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </Animated.View>
+
+        {/* Google FAB */}
+        <GoogleFAB
+          onPress={() => setIsQuickAddVisible(true)}
+          colors={colors}
+          isDark={isDark}
+        />
+      </View>
+
+      {/* Google Drawer (overlay on mobile) */}
+      <GoogleDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        currentDate={selectedDate}
+        onSelectDate={(date) => {
+          setSelectedDate(date);
+          calendarListRef.current?.scrollToMonth(`${date.slice(0, 7)}-01`);
+        }}
+        activeView="month"
+        onSelectView={() => {}}
+        boards={boards}
+        selectedCategoryIds={selectedCategoryIds}
+        onToggleCategory={handleToggleCategory}
+        onOpenCreateCategory={(type) => {
+          if (type === 'task') {
+            setIsQuickAddVisible(true);
+          } else {
+            setCreateCategoryVisible(true);
+          }
+        }}
+        onPressSettings={() => navigation && navigation.navigate('Settings')}
+        onPressSync={handleSyncToCalendar}
+        tasks={tasks}
+        colors={colors}
+        isDark={isDark}
+        isDesktop={false}
+      />
+
+      {/* Quick Add Task Modal */}
+      <QuickAddTaskModal
+        isVisible={isQuickAddVisible}
+        onClose={() => setIsQuickAddVisible(false)}
+        initialDate={selectedDate}
+        boards={boards}
+        onOpenFullDetails={(draftTask) => {
+          setSelectedTask(draftTask);
+          setDetailsVisible(true);
+        }}
+        colors={colors}
+        isDark={isDark}
+      />
+
+      {/* Refactored Google Tasks Plain-Text Edit Modal */}
+      <TaskDetailsModal
         task={selectedTask}
         isVisible={isDetailsVisible}
         onClose={() => setDetailsVisible(false)}
       />
 
-      <TaskQuickMenuModal 
+      {/* Quick Actions Menu */}
+      <TaskQuickMenuModal
         isVisible={isQuickMenuVisible}
         onClose={() => setQuickMenuVisible(false)}
         task={selectedTask}
         colors={colors}
-        isDark={colors.background === '#121212'}
-        onPressEdit={(t) => { setSelectedTask(t); setDetailsVisible(true); }}
-        onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
+        isDark={isDark}
+        onPressEdit={(t) => {
+          setSelectedTask(t);
+          setDetailsVisible(true);
+        }}
+        onPressSnooze={(t) => {
+          setSelectedTask(t);
+          setSnoozeVisible(true);
+        }}
       />
-      
-      <SnoozeModal 
+
+      {/* Snooze Modal */}
+      <SnoozeModal
         isVisible={isSnoozeVisible}
         onClose={() => setSnoozeVisible(false)}
         task={selectedTask}
         colors={colors}
-        onOpenPremiumModal={(feature) => { setPremiumFeatureName(feature); setPremiumModalVisible(true); }}
-      />
-      
-      <PremiumModal 
-        isVisible={isPremiumModalVisible}
-        onClose={() => setPremiumModalVisible(false)}
-        featureName={premiumFeatureName}
+        onOpenPremiumModal={() => {}}
       />
 
-      <Modal 
-        isVisible={sectionOptionsConfig} 
-        onSwipeComplete={() => setSectionOptionsConfig(false)}
-        swipeDirection={['down']}
-        propagateSwipe={true}
-        onBackdropPress={() => setSectionOptionsConfig(false)}
-        style={{ margin: 0, justifyContent: 'flex-end' }}
-      >
-        <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
-          <View style={styles.optionsModalDragHandle} />
-          <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
-            {t('Options for')} {dayjs(selectedDate).format('MMM D, YYYY')}
-          </Text>
-          
+      {/* Year & Month Picker Modal */}
+      <YearPickerModal
+        isVisible={isYearPickerVisible}
+        onClose={() => setYearPickerVisible(false)}
+        currentYear={dayjs(selectedDate).year()}
+        onSelectYear={(year) => {
+          const month = dayjs(selectedDate).format('MM');
+          const newDate = `${year}-${month}-01`;
+          setSelectedDate(newDate);
+          calendarListRef.current?.scrollToMonth(`${year}-${month}-01`);
+          setYearPickerVisible(false);
+        }}
+        colors={colors}
+      />
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
-            setSelectionMode({ isActive: true, selectedTaskIds: [] }); 
-            setSectionOptionsConfig(false); 
-          }}>
-            <Text style={[styles.optionText, { color: colors.primary }]}>{t('Select Tasks')}</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleCompleteSection(), 400); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Complete all')}</Text>
-          </TouchableOpacity>
+      {/* Create Category Modal */}
+      <CreateBoardModal
+        isVisible={isCreateCategoryVisible}
+        onClose={() => setCreateCategoryVisible(false)}
+        onSubmit={(boardData) => {
+          dispatch(addBoard({ board: { id: Date.now().toString(), name: boardData.name || 'New Category', ...boardData } }));
+          setCreateCategoryVisible(false);
+          showToast(t('Category created') || 'Category created');
+        }}
+        colors={colors}
+      />
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleMoveForward(), 400); }}>
-            <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move forward')}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.optionBtn, { borderBottomColor: colors.borderColor, display: 'none' }]} 
-            onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleSyncDayToCalendar(), 400); }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.optionText, { color: colors.primary }]}>{t('Sync Day with Device Calendar') || 'Sync Day with Device Calendar'}</Text>
-              {!isPremium && (
-                <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 }}>
-                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#000' }}>PRO</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setSectionOptionsConfig(false); setTimeout(() => handleDeleteSection(), 400); }}>
-            <Text style={{ color: '#f44336', fontSize: 16, fontWeight: 'bold' }}>{t('Delete all')}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setSectionOptionsConfig(false)}>
-            <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
-
-      {selectionMode.isActive && (
-        <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor, zIndex: 100, elevation: 10 }]}>
-          <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
-            <TouchableOpacity onPress={handleSelectAll} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setMoveBoardVisible(true)} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Move')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleShareSelected} style={styles.actionBtn}>
-              <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>{t('Share')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleCompleteSelected} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Complete')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleDeleteSelected} style={styles.actionBtn}>
-              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Delete')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setSelectionMode({ isActive: false, selectedTaskIds: [] })} style={styles.actionBtn}>
-              <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>{t('Cancel')}</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      )}
-
+      {/* Confirm Modal */}
       <ConfirmModal
         isVisible={confirmConfig.isVisible}
         title={confirmConfig.title}
         message={confirmConfig.message}
-        confirmText={confirmConfig.confirmText}
-        isDestructive={confirmConfig.isDestructive}
-        onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
         onConfirm={confirmConfig.onConfirm}
-      />
-
-      <MoveBoardModal
-        isVisible={isMoveBoardVisible}
-        onClose={() => setMoveBoardVisible(false)}
-        onSelectBoard={handleBatchMoveBoard}
-        boards={boards}
-        taskCount={selectionMode.selectedTaskIds.length}
-        colors={colors}
-      />
-
-      <YearPickerModal
-        isVisible={isYearPickerVisible}
-        onClose={() => setYearPickerVisible(false)}
-        currentYear={dayjs(visibleMonthRef.current ? `${visibleMonthRef.current}-01` : selectedDate).year()}
-        onSelectYear={(year) => {
-          const currentM = visibleMonthRef.current ? dayjs(`${visibleMonthRef.current}-01`).month() : dayjs(selectedDate).month();
-          const targetDate = dayjs().year(year).month(currentM).date(1).format('YYYY-MM-DD');
-          setSelectedDate(targetDate);
-          visibleMonthRef.current = dayjs(targetDate).format('YYYY-MM');
-          calendarListRef.current?.scrollToMonth(targetDate);
-        }}
-        colors={colors}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screenContainer: {
     flex: 1,
   },
-  calendar: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  dayCellContainer: {
-    width: 38,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 1,
-  },
-  dayCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayText: {
-    fontSize: 15,
-    textAlign: 'center',
-    includeFontPadding: false,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 7,
-    marginTop: 2,
-  },
-  boardDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginHorizontal: 1,
-  },
-  taskListHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-  },
-  taskListTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  ellipsisBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  ellipsisText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  listContent: {
-    paddingVertical: 15,
-    paddingBottom: 40,
-  },
-  emptyContainer: {
+  calendarContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
+    position: 'relative',
+    overflow: 'hidden',
   },
   bottomSheet: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128,128,128,0.15)',
   },
   dragHandleContainer: {
-    padding: 15,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 10,
   },
   dragHandle: {
     width: 40,
-    height: 5,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
     opacity: 0.5,
   },
-  optionsModalContent: {
-    padding: 20,
-    paddingBottom: 40,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  optionsModalDragHandle: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#999',
-    borderRadius: 3,
-    marginBottom: 20,
-    opacity: 0.5,
-  },
-  sectionHeader: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    marginTop: 10,
-    marginBottom: 5,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)'
   },
-  sectionHeaderText: {
+  sheetTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  sheetSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  tasksScrollView: {
+    flex: 1,
+  },
+  tasksScrollContent: {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 80,
+    gap: 8,
+  },
+  taskCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  checkboxTouch: {
+    paddingRight: 10,
+    paddingVertical: 4,
+  },
+  taskInfo: {
+    flex: 1,
+  },
+  taskTitle: {
     fontSize: 14,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    marginBottom: 4,
   },
-  optionsModalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  optionBtn: {
-    width: '100%',
-    paddingVertical: 18,
-    borderBottomWidth: 1,
+  taskMetaRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  optionText: {
-    fontSize: 16,
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timeBadgeText: {
+    fontSize: 11,
     fontWeight: '500',
   },
-  actionBar: {
+  categoryDotPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 15,
-    borderTopWidth: 1,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    gap: 4,
   },
-  actionBarText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  smallDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  actionBarButtons: {
-    flexDirection: 'row',
-    gap: 15,
+  categoryPillText: {
+    fontSize: 11,
   },
-  actionBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  }
+  priorityChip: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  priorityText: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  moreBtn: {
+    padding: 6,
+    marginLeft: 4,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+  },
 });

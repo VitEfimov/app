@@ -55,7 +55,9 @@ export default function YearPickerModal({
                   }
                 ]}
                 onPress={() => {
-                  onSelectYear(year);
+                  if (typeof onSelectYear === 'function') {
+                    onSelectYear(year);
+                  }
                   onClose();
                 }}
               >

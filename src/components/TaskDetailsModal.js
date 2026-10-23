@@ -1297,13 +1297,14 @@ useEffect(() => {
                   {
                     flex: 1,
                     color: colors.textPrimary,
-                    borderColor: cardBorder,
-                    backgroundColor: cardBg,
-                    minHeight: 48,
-                    height: Math.max(48, nameInputHeight),
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
+                    borderColor: 'transparent',
+                    borderWidth: 0,
+                    backgroundColor: 'transparent',
+                    minHeight: 44,
+                    fontSize: 20,
+                    fontWeight: '600',
+                    paddingHorizontal: 0,
+                    paddingVertical: 4,
                     textAlignVertical: 'top',
                     overflow: 'hidden',
                     outlineStyle: 'none',
@@ -1327,32 +1328,32 @@ useEffect(() => {
               />
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : 'Not set'}`}
-                style={[styles.dateTimePill, { borderColor: cardBorder, backgroundColor: cardBg }]}
+                style={[styles.dateTimePill, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 20, height: 40, paddingHorizontal: 12 }]}
                 onPress={() => { setDatePickerType('due'); setShowDatePicker(true); }}
               >
-                <IconCalendar color={colors.textSecondary} />
-                <Text style={[styles.dateTimeText, { color: colors.textPrimary }]} numberOfLines={1}>
+                <IconCalendar color={colors.primary} />
+                <Text style={[styles.dateTimeText, { color: colors.textPrimary, fontSize: 13, fontWeight: '600' }]} numberOfLines={1}>
                   {selectedDate ? dayjs(selectedDate).format('MM/DD/YYYY') : t('Select date')}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
-                style={[styles.dateTimePill, { borderColor: cardBorder, backgroundColor: cardBg }]}
+                style={[styles.dateTimePill, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 20, height: 40, paddingHorizontal: 12 }]}
                 onPress={() => setShowTimePicker(true)}
               >
-                <IconClock color={colors.textSecondary} />
-                <Text style={[styles.dateTimeText, { color: colors.textPrimary }]} numberOfLines={1}>
+                <IconClock color={colors.primary} />
+                <Text style={[styles.dateTimeText, { color: colors.textPrimary, fontSize: 13, fontWeight: '600' }]} numberOfLines={1}>
                   {formatDisplayTime(selectedTime) || t('Select time')}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {/* Collapsible Section Card: Priority, Reminder, Repeat */}
-            <View style={[styles.optionsCard, { borderColor: cardBorder, backgroundColor: cardBg }]}>
+            <View style={[styles.optionsCard, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14 }]}>
               <TouchableOpacity
                 accessible={true}
                 accessibilityRole="button"
@@ -1405,7 +1406,7 @@ useEffect(() => {
                         onSelect={handlePrioritySelect} 
                         colors={colors} 
                         leftIcon={<IconFlag color={priority === 'high' ? (colors.danger || '#f87171') : priority === 'medium' ? '#fb923c' : priority === 'low' ? '#4ade80' : colors.textSecondary} />}
-                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: cardBgNested, borderColor: cardBorder }} 
+                        customBtnStyle={{ height: 46, borderRadius: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderWidth: 0 }} 
                       />
                     </View>
                     <View style={styles.column}>
@@ -1423,7 +1424,7 @@ useEffect(() => {
                         ]} 
                         onSelect={handleReminderSelect} 
                         colors={colors} 
-                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: cardBgNested, borderColor: cardBorder }} 
+                        customBtnStyle={{ height: 46, borderRadius: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderWidth: 0 }} 
                       />
                     </View>
                   </View>
@@ -1436,7 +1437,7 @@ useEffect(() => {
                         options={boards.map(b => ({ label: b.name === 'Main' ? t('Main') : b.name, value: b.id }))} 
                         onSelect={(val) => setSelectedBoardId(val)} 
                         colors={colors} 
-                        customBtnStyle={{ height: 48, borderRadius: 12, backgroundColor: cardBgNested, borderColor: cardBorder }} 
+                        customBtnStyle={{ height: 46, borderRadius: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderWidth: 0 }} 
                       />
                     </View>
                   )}
@@ -1444,7 +1445,7 @@ useEffect(() => {
                   <View style={{ marginBottom: 16 }}>
                     <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
                     <TouchableOpacity 
-                      style={[styles.dropdownLikeBtn, { borderColor: cardBorder, backgroundColor: cardBgNested, height: 48, borderRadius: 12 }]}
+                      style={[styles.dropdownLikeBtn, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', height: 46, borderRadius: 12 }]}
                       onPress={() => setIsRepeatModalVisible(true)}
                     >
                       <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '500' }}>
@@ -1457,13 +1458,13 @@ useEffect(() => {
                   </View>
 
                   {repeatConfig.preset !== 'None' && (
-                    <View style={[styles.repeatConfigBox, { borderColor: cardBorder, backgroundColor: cardBgNested, borderRadius: 12, marginBottom: 16, padding: 14 }]}>
+                    <View style={[styles.repeatConfigBox, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', borderRadius: 12, marginBottom: 16, padding: 14 }]}>
                       <Text style={[styles.repeatConfigTitle, { color: colors.textSecondary }]}>{t('Repeat configuration')}</Text>
                       <View style={styles.twoColumnRow}>
                         <View style={styles.column}>
                           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('From')}</Text>
                           <TouchableOpacity 
-                            style={[styles.dateBtn, { borderColor: cardBorder, backgroundColor: cardBg, height: 46, borderRadius: 10 }]}
+                            style={[styles.dateBtn, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', height: 46, borderRadius: 10 }]}
                             onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
                           >
                             <IconCalendar color={colors.textPrimary} />
@@ -1475,7 +1476,7 @@ useEffect(() => {
                         <View style={styles.column}>
                           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('To')}</Text>
                           <TouchableOpacity 
-                            style={[styles.dateBtn, { borderColor: cardBorder, backgroundColor: cardBg, height: 46, borderRadius: 10 }]}
+                            style={[styles.dateBtn, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', height: 46, borderRadius: 10 }]}
                             onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
                           >
                             <IconCalendar color={colors.textPrimary} />
@@ -1488,7 +1489,7 @@ useEffect(() => {
                     </View>
                   )}
 
-                  <View style={[styles.cardDivider, { backgroundColor: cardBorder }]} />
+                  <View style={[styles.cardDivider, { backgroundColor: colors.borderColor }]} />
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
                     <View style={{ flex: 1, marginRight: 12 }}>
@@ -1544,13 +1545,13 @@ useEffect(() => {
               />
             )}
 
-            <View style={[styles.notesCard, { borderColor: cardBorder, backgroundColor: cardBg, marginBottom: 14 }]}>
+            <View style={[styles.notesCard, { borderWidth: 0, backgroundColor: 'transparent', marginBottom: 14 }]}>
               <MemoizedNotesInput
                 ref={notesRef}
                 initialValue={notes}
-                placeholder={t("Add notes...") || "Add notes..."}
+                placeholder={t("Add details") || t("Add notes...") || "Add details"}
                 placeholderTextColor={colors.textSecondary}
-                style={[styles.notesInput, { color: colors.textPrimary }]}
+                style={[styles.notesInput, { color: colors.textPrimary, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }]}
               />
 
               {attachments.length > 0 && (
@@ -1603,7 +1604,7 @@ useEffect(() => {
                 {subtasks.map((subtask) => (
                   <View 
                     key={subtask.id} 
-                    style={[styles.subtaskPillRow, { borderColor: cardBorder, backgroundColor: cardBg }]}
+                    style={[styles.subtaskPillRow, { borderWidth: 0, backgroundColor: 'transparent' }]}
                   >
                     <TouchableOpacity 
                       accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: subtask.completed }} accessibilityLabel="Toggle subtask completion"
@@ -1617,7 +1618,7 @@ useEffect(() => {
                       accessible={true} accessibilityLabel="Subtask text"
                       style={[
                         styles.subtaskTextInput,
-                        { color: colors.textPrimary },
+                        { color: colors.textPrimary, borderWidth: 0, backgroundColor: 'transparent' },
                         subtask.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
                       ]}
                       value={subtask.text}
@@ -1643,11 +1644,11 @@ useEffect(() => {
               accessible={true}
               accessibilityRole="button"
               accessibilityLabel="Add subtask"
-              style={[styles.addSubtaskPill, { borderColor: cardBorder, backgroundColor: cardBg }]}
+              style={[styles.addSubtaskPill, { borderWidth: 0, backgroundColor: 'transparent' }]}
               onPress={addSubtask}
             >
               <IconPlus color={colors.primary} />
-              <Text style={[styles.addSubtaskText, { color: colors.primary }]}>{t('Add subtask') || 'Add subtask'}</Text>
+              <Text style={[styles.addSubtaskText, { color: colors.primary }]}>{t('Add subtasks') || t('Add subtask') || 'Add subtasks'}</Text>
             </TouchableOpacity>
 
             {/* Bottom Actions */}
@@ -2209,12 +2210,12 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   notesCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    minHeight: 180,
+    borderRadius: 8,
+    borderWidth: 0,
+    padding: 0,
+    minHeight: 120,
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   notesInput: {
     fontSize: 15,
@@ -2238,13 +2239,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   subtaskPillRow: {
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    marginBottom: 8,
+    paddingHorizontal: 0,
+    marginBottom: 4,
   },
   subtaskCheckBtn: {
     justifyContent: 'center',
@@ -2268,12 +2269,12 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   addSubtaskPill: {
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     gap: 10,
     marginBottom: 8,
   },
@@ -2282,16 +2283,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   saveBtnFull: {
-    height: 52,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 3,
+    elevation: 2,
   },
   saveBtnText: {
     fontWeight: 'bold',
