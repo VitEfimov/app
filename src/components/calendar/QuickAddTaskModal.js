@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask } from '../../features/taskSlice';
 import { getBoardColor } from '../../utils/boardColors';
+import { useToast } from '../../styles/ToastContext';
 import { IconClock, IconCalendar, IconClose } from './CalendarIcons';
 
 export default function QuickAddTaskModal({
@@ -15,10 +16,12 @@ export default function QuickAddTaskModal({
   initialHour,
   boards = [],
   onOpenFullDetails,
+  onTaskCreated,
   colors,
   isDark
 }) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const dispatch = useDispatch();
   const [taskName, setTaskName] = useState('');
   const [selectedDate, setSelectedDate] = useState(initialDate || dayjs().format('YYYY-MM-DD'));
@@ -49,22 +52,28 @@ export default function QuickAddTaskModal({
   }, [isVisible, initialDate, initialHour, boards]);
 
   const handleSave = () => {
-    if (!taskName.trim()) return;
+    const finalTitle = taskName.trim() || t('New Task') || 'New Task';
 
     const newTask = {
       id: Date.now().toString(),
-      taskname: taskName.trim(),
+      taskname: finalTitle,
       completionDate: dayjs(selectedDate).toISOString(),
       dateString: selectedDate,
       time: isAllDay ? '' : timeStr,
-      boardId: selectedBoardId,
-      priority: priority,
+      boardId: selectedBoardId || 'main',
+      priority: priority || 'none',
       completed: false,
       createdAt: new Date().toISOString(),
       description: { text: '' },
     };
 
     dispatch(addTask({ task: newTask }));
+    if (showToast) {
+      showToast(t('Task created') || 'Task created');
+    }
+    if (onTaskCreated) {
+      onTaskCreated(selectedDate);
+    }
     onClose();
   };
 
@@ -274,14 +283,15 @@ export default function QuickAddTaskModal({
           </TouchableOpacity>
 
           <TouchableOpacity
+            testID="quick_add_save_btn"
             style={[
               styles.saveBtn,
-              { backgroundColor: taskName.trim() ? colors.primary : colors.surfaceContainerHigh }
+              { backgroundColor: colors.primary }
             ]}
-            disabled={!taskName.trim()}
             onPress={handleSave}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.saveBtnText, { color: taskName.trim() ? '#fff' : colors.textSecondary }]}>
+            <Text style={[styles.saveBtnText, { color: colors.textInverse || '#ffffff' }]}>
               {t('Save') || 'Save'}
             </Text>
           </TouchableOpacity>
@@ -430,6 +440,7 @@ const styles = StyleSheet.create({
   },
   moreOptionsBtn: {
     paddingVertical: 8,
+    cursor: 'pointer',
   },
   moreOptionsText: {
     fontSize: 14,
@@ -439,6 +450,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 24,
     borderRadius: 20,
+    cursor: 'pointer',
   },
   saveBtnText: {
     fontSize: 14,

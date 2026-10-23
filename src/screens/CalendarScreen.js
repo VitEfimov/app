@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, useWindowDimensions, Dimensions } from 'react-native';
+import { View, StyleSheet, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, useWindowDimensions, Dimensions, Easing } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
 import dayjs from 'dayjs';
@@ -28,8 +28,18 @@ import YearPickerModal from '../components/YearPickerModal';
 import CreateBoardModal from '../components/CreateBoardModal';
 import ConfirmModal from '../components/ConfirmModal';
 
-const PAST_SCROLL_RANGE = 24;
-const FUTURE_SCROLL_RANGE = 36;
+const safeFlushSync = (fn) => {
+  if (Platform.OS === 'web') {
+    try {
+      const ReactDOM = require('react-dom');
+      if (ReactDOM && typeof ReactDOM.flushSync === 'function') {
+        ReactDOM.flushSync(fn);
+        return;
+      }
+    } catch (e) {}
+  }
+  fn();
+};
 
 export default function CalendarScreen({ navigation }) {
   const { colors, mode, isDark } = useTheme();
@@ -38,7 +48,6 @@ export default function CalendarScreen({ navigation }) {
   const dispatch = useDispatch();
 
   const { width: windowWidth } = useWindowDimensions();
-  const calendarListRef = useRef(null);
 
   // Redux state
   const tasks = useSelector(state => state.taskReducer?.tasks || []);
@@ -46,11 +55,108 @@ export default function CalendarScreen({ navigation }) {
 
   // Calendar State
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const initialDate = useMemo(() => selectedDate, []);
   const visibleMonthRef = useRef(dayjs(selectedDate).format('YYYY-MM'));
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]); // Filtered categories
+
+  // 3-Month Animated Sliding Carousel State
+  const initialWidth = windowWidth || Dimensions.get('window').width || 400;
+  const [containerWidth, setContainerWidth] = useState(initialWidth);
+  const containerWidthRef = useRef(initialWidth);
+  useEffect(() => {
+    containerWidthRef.current = containerWidth;
+  }, [containerWidth]);
+
+  const isAnimating = useRef(false);
+  const panX = useRef(new Animated.Value(-initialWidth)).current;
+
+  // Month strings for the 3 slots: [prev, current, next]
+  const currentMonthStr = useMemo(() => dayjs(selectedDate).format('YYYY-MM-01'), [selectedDate]);
+  const prevMonthStr = useMemo(() => dayjs(currentMonthStr).subtract(1, 'month').format('YYYY-MM-01'), [currentMonthStr]);
+  const nextMonthStr = useMemo(() => dayjs(currentMonthStr).add(1, 'month').format('YYYY-MM-01'), [currentMonthStr]);
+
+  // Smooth slide to prev/next month animation
+  const slideToMonth = useCallback((direction) => {
+    const w = containerWidthRef.current;
+    if (isAnimating.current || w <= 0) return;
+    isAnimating.current = true;
+    const targetValue = direction === 'next' ? -2 * w : 0;
+
+    Animated.timing(panX, {
+      toValue: targetValue,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(() => {
+      safeFlushSync(() => {
+        setSelectedDate(prev => {
+          const baseDate = dayjs(prev);
+          const targetMonth = direction === 'next'
+            ? baseDate.add(1, 'month')
+            : baseDate.subtract(1, 'month');
+          const newMonthStr = targetMonth.format('YYYY-MM');
+          visibleMonthRef.current = newMonthStr;
+
+          const todayStr = dayjs().format('YYYY-MM-DD');
+          if (todayStr.startsWith(newMonthStr)) {
+            return todayStr;
+          }
+          return `${newMonthStr}-01`;
+        });
+      });
+      panX.setValue(-w);
+      isAnimating.current = false;
+    });
+  }, [panX]);
+
+  // Calendar PanResponder for smooth animated swipe gestures
+  const calendarPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+      },
+      onPanResponderGrant: () => {
+        panX.stopAnimation();
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (isAnimating.current) return;
+        panX.setValue(-containerWidthRef.current + gestureState.dx);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (isAnimating.current) return;
+        const w = containerWidthRef.current;
+        const threshold = w * 0.18;
+        const isFastSwipeLeft = gestureState.vx < -0.3;
+        const isFastSwipeRight = gestureState.vx > 0.3;
+
+        if (gestureState.dx < -threshold || isFastSwipeLeft) {
+          slideToMonth('next');
+        } else if (gestureState.dx > threshold || isFastSwipeRight) {
+          slideToMonth('prev');
+        } else {
+          Animated.spring(panX, {
+            toValue: -w,
+            bounciness: 0,
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        if (isAnimating.current) return;
+        Animated.spring(panX, {
+          toValue: -containerWidthRef.current,
+          bounciness: 0,
+          useNativeDriver: false,
+        }).start();
+      },
+    })
+  ).current;
 
   // Modals state
   const [selectedTask, setSelectedTask] = useState(null);
@@ -70,7 +176,14 @@ export default function CalendarScreen({ navigation }) {
   const lastY = useRef(355);
 
   const handleCalendarLayout = useCallback((event) => {
-    const { height } = event.nativeEvent.layout;
+    const { height, width } = event.nativeEvent.layout;
+    if (width && width > 0 && Math.abs(containerWidthRef.current - width) > 1) {
+      containerWidthRef.current = width;
+      setContainerWidth(width);
+      if (!isAnimating.current) {
+        panX.setValue(-width);
+      }
+    }
     if (height && Math.abs(maxYRef.current - height) > 5) {
       maxYRef.current = height;
       if (!isInitialized.current) {
@@ -79,7 +192,7 @@ export default function CalendarScreen({ navigation }) {
         isInitialized.current = true;
       }
     }
-  }, [panY]);
+  }, [panY, panX]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -117,38 +230,6 @@ export default function CalendarScreen({ navigation }) {
       }
     })
   ).current;
-
-  // Month change sync
-  const handleMonthChange = useCallback((monthObj) => {
-    const newMonth = monthObj?.dateString 
-      ? dayjs(monthObj.dateString).format('YYYY-MM') 
-      : (monthObj?.year && monthObj?.month ? `${monthObj.year}-${String(monthObj.month).padStart(2, '0')}` : null);
-    if (newMonth) {
-      visibleMonthRef.current = newMonth;
-      setSelectedDate(prev => {
-        if (!prev.startsWith(newMonth)) {
-          return `${newMonth}-01`;
-        }
-        return prev;
-      });
-    }
-  }, []);
-
-  const handlePrevMonth = useCallback(() => {
-    setSelectedDate(prev => {
-      const newD = dayjs(prev).subtract(1, 'month').format('YYYY-MM-DD');
-      visibleMonthRef.current = dayjs(newD).format('YYYY-MM');
-      return newD;
-    });
-  }, []);
-
-  const handleNextMonth = useCallback(() => {
-    setSelectedDate(prev => {
-      const newD = dayjs(prev).add(1, 'month').format('YYYY-MM-DD');
-      visibleMonthRef.current = dayjs(newD).format('YYYY-MM');
-      return newD;
-    });
-  }, []);
 
   // Category Toggle Handler
   const handleToggleCategory = (boardId) => {
@@ -279,6 +360,25 @@ export default function CalendarScreen({ navigation }) {
     });
   }, [tasks, selectedDate, selectedCategoryIds, searchQuery]);
 
+  // Memoized calendar theme
+  const calendarTheme = useMemo(() => ({
+    backgroundColor: colors.bgMain,
+    calendarBackground: colors.bgMain,
+    textSectionTitleColor: colors.textSecondary,
+    selectedDayBackgroundColor: colors.primary,
+    selectedDayTextColor: colors.textInverse || '#ffffff',
+    todayTextColor: colors.primary,
+    dayTextColor: colors.textPrimary,
+    textDisabledColor: colors.surfaceContainerHigh || '#888',
+    dotColor: colors.primary,
+    selectedDotColor: colors.textInverse || '#ffffff',
+    arrowColor: colors.primary,
+    monthTextColor: colors.textPrimary,
+    textDayFontWeight: '600',
+    textMonthFontWeight: 'bold',
+    textDayHeaderFontWeight: '600',
+  }), [colors]);
+
   return (
     <View style={[styles.screenContainer, { backgroundColor: colors.bgMain }]}>
       {/* Google Top Bar */}
@@ -289,9 +389,10 @@ export default function CalendarScreen({ navigation }) {
           const today = dayjs().format('YYYY-MM-DD');
           setSelectedDate(today);
           visibleMonthRef.current = today.slice(0, 7);
+          panX.setValue(-containerWidthRef.current);
         }}
-        onPressPrevMonth={handlePrevMonth}
-        onPressNextMonth={handleNextMonth}
+        onPressPrevMonth={() => slideToMonth('prev')}
+        onPressNextMonth={() => slideToMonth('next')}
         onPressMonthPicker={() => setYearPickerVisible(true)}
         activeView="month"
         onSelectView={() => {}}
@@ -306,42 +407,90 @@ export default function CalendarScreen({ navigation }) {
 
       {/* Main Container */}
       <View style={styles.calendarContainer}>
-        {/* Sliding Month Calendar */}
-        <View onLayout={handleCalendarLayout} style={{ width: '100%', overflow: 'hidden' }}>
-          <Calendar
-            testID="task_calendar"
-            key={`${colors.bgMain}-${isDark}-${selectedDate.slice(0, 7)}-${i18n.language}`}
-            markingType={'multi-dot'}
-            current={selectedDate}
-            firstDay={i18n.language === 'en' ? 0 : 1}
-            enableSwipeMonths={true}
-            hideArrows={false}
-            onMonthChange={handleMonthChange}
-            onDayPress={(day) => {
-              setSelectedDate(day.dateString);
-            }}
-            markedDates={markedDates}
-            theme={{
-              backgroundColor: colors.bgMain,
-              calendarBackground: colors.bgMain,
-              textSectionTitleColor: colors.textSecondary,
-              selectedDayBackgroundColor: colors.primary,
-              selectedDayTextColor: colors.textInverse || '#ffffff',
-              todayTextColor: colors.primary,
-              dayTextColor: colors.textPrimary,
-              textDisabledColor: colors.surfaceContainerHigh || '#888',
-              dotColor: colors.primary,
-              selectedDotColor: colors.textInverse || '#ffffff',
-              arrowColor: colors.primary,
-              monthTextColor: colors.textPrimary,
-              textDayFontWeight: '600',
-              textMonthFontWeight: 'bold',
-              textDayHeaderFontWeight: '600',
-            }}
-            style={{
-              backgroundColor: colors.bgMain,
-            }}
-          />
+        {/* Sliding Month Calendar Carousel */}
+        <View 
+          onLayout={handleCalendarLayout} 
+          style={styles.calendarCarouselWrapper}
+          {...calendarPanResponder.panHandlers}
+        >
+          <Animated.View
+            style={[
+              styles.calendarCarouselTrack,
+              {
+                width: containerWidth * 3,
+                transform: [{ translateX: panX }],
+              }
+            ]}
+          >
+            {/* Slot 0: Previous Month */}
+            <View style={{ width: containerWidth }}>
+              <Calendar
+                key={`prev-${colors.bgMain}-${isDark}-${prevMonthStr}-${i18n.language}`}
+                markingType={'multi-dot'}
+                current={prevMonthStr}
+                firstDay={i18n.language === 'en' ? 0 : 1}
+                enableSwipeMonths={false}
+                hideArrows={false}
+                showSixWeeks={true}
+                hideExtraDays={false}
+                onPressArrowLeft={() => slideToMonth('prev')}
+                onPressArrowRight={() => slideToMonth('next')}
+                markedDates={markedDates}
+                theme={calendarTheme}
+                style={{ backgroundColor: colors.bgMain }}
+              />
+            </View>
+
+            {/* Slot 1: Current Active Month */}
+            <View style={{ width: containerWidth }}>
+              <Calendar
+                testID="task_calendar"
+                key={`curr-${colors.bgMain}-${isDark}-${currentMonthStr}-${i18n.language}`}
+                markingType={'multi-dot'}
+                current={selectedDate}
+                firstDay={i18n.language === 'en' ? 0 : 1}
+                enableSwipeMonths={false}
+                hideArrows={false}
+                showSixWeeks={true}
+                hideExtraDays={false}
+                onPressArrowLeft={() => slideToMonth('prev')}
+                onPressArrowRight={() => slideToMonth('next')}
+                onDayPress={(day) => {
+                  const pressedMonth = day.dateString.slice(0, 7);
+                  const currentMonth = currentMonthStr.slice(0, 7);
+                  if (pressedMonth > currentMonth) {
+                    slideToMonth('next');
+                  } else if (pressedMonth < currentMonth) {
+                    slideToMonth('prev');
+                  } else {
+                    setSelectedDate(day.dateString);
+                  }
+                }}
+                markedDates={markedDates}
+                theme={calendarTheme}
+                style={{ backgroundColor: colors.bgMain }}
+              />
+            </View>
+
+            {/* Slot 2: Next Month */}
+            <View style={{ width: containerWidth }}>
+              <Calendar
+                key={`next-${colors.bgMain}-${isDark}-${nextMonthStr}-${i18n.language}`}
+                markingType={'multi-dot'}
+                current={nextMonthStr}
+                firstDay={i18n.language === 'en' ? 0 : 1}
+                enableSwipeMonths={false}
+                hideArrows={false}
+                showSixWeeks={true}
+                hideExtraDays={false}
+                onPressArrowLeft={() => slideToMonth('prev')}
+                onPressArrowRight={() => slideToMonth('next')}
+                markedDates={markedDates}
+                theme={calendarTheme}
+                style={{ backgroundColor: colors.bgMain }}
+              />
+            </View>
+          </Animated.View>
         </View>
 
         {/* Adjustable Collapsible Bottom Sheet with Tasks relevant JUST to chosen date */}
@@ -498,6 +647,7 @@ export default function CalendarScreen({ navigation }) {
         onSelectDate={(date) => {
           setSelectedDate(date);
           visibleMonthRef.current = date.slice(0, 7);
+          panX.setValue(-containerWidthRef.current);
         }}
         activeView="month"
         onSelectView={() => {}}
@@ -525,6 +675,13 @@ export default function CalendarScreen({ navigation }) {
         onClose={() => setIsQuickAddVisible(false)}
         initialDate={selectedDate}
         boards={boards}
+        onTaskCreated={(date) => {
+          if (date && date !== selectedDate) {
+            setSelectedDate(date);
+            visibleMonthRef.current = date.slice(0, 7);
+            panX.setValue(-containerWidthRef.current);
+          }
+        }}
         onOpenFullDetails={(draftTask) => {
           setSelectedTask(draftTask);
           setDetailsVisible(true);
@@ -577,6 +734,7 @@ export default function CalendarScreen({ navigation }) {
           const newDate = `${year}-${month}-${day}`;
           setSelectedDate(newDate);
           visibleMonthRef.current = `${year}-${month}`;
+          panX.setValue(-containerWidthRef.current);
           setYearPickerVisible(false);
         }}
         colors={colors}
@@ -614,6 +772,17 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
     overflow: 'hidden',
+  },
+  calendarCarouselWrapper: {
+    width: '100%',
+    overflow: 'hidden',
+    ...(Platform.OS === 'web' ? {
+      userSelect: 'none',
+      cursor: 'grab',
+    } : {}),
+  },
+  calendarCarouselTrack: {
+    flexDirection: 'row',
   },
   bottomSheet: {
     position: 'absolute',
