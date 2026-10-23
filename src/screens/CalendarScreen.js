@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Text, Animated, PanResponder, Keyboard, Platform, TouchableOpacity, ScrollView, useWindowDimensions, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { CalendarList } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 
@@ -123,7 +123,31 @@ export default function CalendarScreen({ navigation }) {
     const newMonth = monthObj?.dateString 
       ? dayjs(monthObj.dateString).format('YYYY-MM') 
       : (monthObj?.year && monthObj?.month ? `${monthObj.year}-${String(monthObj.month).padStart(2, '0')}` : null);
-    if (newMonth) visibleMonthRef.current = newMonth;
+    if (newMonth) {
+      visibleMonthRef.current = newMonth;
+      setSelectedDate(prev => {
+        if (!prev.startsWith(newMonth)) {
+          return `${newMonth}-01`;
+        }
+        return prev;
+      });
+    }
+  }, []);
+
+  const handlePrevMonth = useCallback(() => {
+    setSelectedDate(prev => {
+      const newD = dayjs(prev).subtract(1, 'month').format('YYYY-MM-DD');
+      visibleMonthRef.current = dayjs(newD).format('YYYY-MM');
+      return newD;
+    });
+  }, []);
+
+  const handleNextMonth = useCallback(() => {
+    setSelectedDate(prev => {
+      const newD = dayjs(prev).add(1, 'month').format('YYYY-MM-DD');
+      visibleMonthRef.current = dayjs(newD).format('YYYY-MM');
+      return newD;
+    });
   }, []);
 
   // Category Toggle Handler
@@ -264,8 +288,10 @@ export default function CalendarScreen({ navigation }) {
         onPressToday={() => {
           const today = dayjs().format('YYYY-MM-DD');
           setSelectedDate(today);
-          calendarListRef.current?.scrollToMonth(`${today.slice(0, 7)}-01`);
+          visibleMonthRef.current = today.slice(0, 7);
         }}
+        onPressPrevMonth={handlePrevMonth}
+        onPressNextMonth={handleNextMonth}
         onPressMonthPicker={() => setYearPickerVisible(true)}
         activeView="month"
         onSelectView={() => {}}
@@ -281,22 +307,15 @@ export default function CalendarScreen({ navigation }) {
       {/* Main Container */}
       <View style={styles.calendarContainer}>
         {/* Sliding Month Calendar */}
-        <View onLayout={handleCalendarLayout} style={{ width: windowWidth, overflow: 'hidden' }}>
-          <CalendarList
-            ref={calendarListRef}
+        <View onLayout={handleCalendarLayout} style={{ width: '100%', overflow: 'hidden' }}>
+          <Calendar
             testID="task_calendar"
-            key={`${colors.bgMain}-${isDark}-${i18n.language}`}
+            key={`${colors.bgMain}-${isDark}-${selectedDate.slice(0, 7)}-${i18n.language}`}
             markingType={'multi-dot'}
-            current={initialDate}
+            current={selectedDate}
             firstDay={i18n.language === 'en' ? 0 : 1}
-            horizontal={true}
-            pagingEnabled={true}
-            scrollEnabled={true}
-            calendarWidth={windowWidth}
-            calendarHeight={355}
-            pastScrollRange={PAST_SCROLL_RANGE}
-            futureScrollRange={FUTURE_SCROLL_RANGE}
-            showScrollIndicator={false}
+            enableSwipeMonths={true}
+            hideArrows={false}
             onMonthChange={handleMonthChange}
             onDayPress={(day) => {
               setSelectedDate(day.dateString);
@@ -318,6 +337,9 @@ export default function CalendarScreen({ navigation }) {
               textDayFontWeight: '600',
               textMonthFontWeight: 'bold',
               textDayHeaderFontWeight: '600',
+            }}
+            style={{
+              backgroundColor: colors.bgMain,
             }}
           />
         </View>
@@ -475,7 +497,7 @@ export default function CalendarScreen({ navigation }) {
         currentDate={selectedDate}
         onSelectDate={(date) => {
           setSelectedDate(date);
-          calendarListRef.current?.scrollToMonth(`${date.slice(0, 7)}-01`);
+          visibleMonthRef.current = date.slice(0, 7);
         }}
         activeView="month"
         onSelectView={() => {}}
@@ -551,9 +573,10 @@ export default function CalendarScreen({ navigation }) {
         currentYear={dayjs(selectedDate).year()}
         onSelectYear={(year) => {
           const month = dayjs(selectedDate).format('MM');
-          const newDate = `${year}-${month}-01`;
+          const day = dayjs(selectedDate).format('DD');
+          const newDate = `${year}-${month}-${day}`;
           setSelectedDate(newDate);
-          calendarListRef.current?.scrollToMonth(`${year}-${month}-01`);
+          visibleMonthRef.current = `${year}-${month}`;
           setYearPickerVisible(false);
         }}
         colors={colors}

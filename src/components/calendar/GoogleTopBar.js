@@ -7,6 +7,8 @@ import {
   IconSearch,
   IconToday,
   IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
   IconClose,
   IconSchedule,
   IconDayView,
@@ -18,6 +20,8 @@ export default function GoogleTopBar({
   currentDate,
   onPressMenu,
   onPressToday,
+  onPressPrevMonth,
+  onPressNextMonth,
   onPressMonthPicker,
   activeView,
   onSelectView,
@@ -116,6 +120,30 @@ export default function GoogleTopBar({
                 {t('Today') || 'Today'}
               </Text>
             </TouchableOpacity>
+
+            {onPressPrevMonth && (
+              <TouchableOpacity
+                accessible={true}
+                accessibilityLabel="Previous month"
+                accessibilityRole="button"
+                style={styles.iconBtn}
+                onPress={onPressPrevMonth}
+              >
+                <IconChevronLeft color={colors.textPrimary} size={18} />
+              </TouchableOpacity>
+            )}
+
+            {onPressNextMonth && (
+              <TouchableOpacity
+                accessible={true}
+                accessibilityLabel="Next month"
+                accessibilityRole="button"
+                style={styles.iconBtn}
+                onPress={onPressNextMonth}
+              >
+                <IconChevronRight color={colors.textPrimary} size={18} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Right: Search + View Selector + Theme + Settings */}
