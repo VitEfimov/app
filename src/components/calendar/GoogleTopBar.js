@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Modal, Image } from 'react-native';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -78,7 +78,7 @@ export default function GoogleTopBar({
         </View>
       ) : (
         <View style={styles.standardHeaderRow}>
-          {/* Left: Hamburger + Month/Year + Today */}
+          {/* Left: Hamburger + Brand + Month/Year + Today */}
           <View style={styles.leftGroup}>
             <TouchableOpacity
               accessible={true}
@@ -89,6 +89,17 @@ export default function GoogleTopBar({
             >
               <IconMenu color={colors.textPrimary} size={22} />
             </TouchableOpacity>
+
+            <View style={styles.brandGroup}>
+              <Image 
+                source={require('../../../assets/favicon.png')} 
+                style={styles.brandIcon} 
+                resizeMode="contain"
+              />
+              <Text style={[styles.brandNameText, { color: colors.textPrimary }]}>
+                TaskCalendar
+              </Text>
+            </View>
 
             <TouchableOpacity
               accessible={true}
@@ -261,6 +272,23 @@ const styles = StyleSheet.create({
   leftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  brandGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+    marginLeft: 4,
+  },
+  brandIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  brandNameText: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   rightGroup: {
     flexDirection: 'row',

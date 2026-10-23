@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "TaskFlow: To-Do List & Planner",
-    "description": "A modern task manager, to-do list, daily planner, reminders, and focus timer.",
-    "slug": "taskflow",
+    "name": "TaskCalendar",
+    "description": "A modern Google Calendar-styled task manager, schedule planner, and to-do calendar.",
+    "slug": "taskcalendar",
     "version": "1.0.0",
-    "scheme": "taskflow",
+    "scheme": "taskcalendar",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,10 +16,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vitvalef.app",
+      "bundleIdentifier": "com.vitvalef.taskcalendar",
       "infoPlist": {
-        "NSRemindersUsageDescription": "TaskFlow needs access to your reminders to sync tasks.",
-        "NSCalendarsUsageDescription": "TaskFlow needs access to your calendar to sync tasks."
+        "NSRemindersUsageDescription": "TaskCalendar needs access to your reminders to sync tasks.",
+        "NSCalendarsUsageDescription": "TaskCalendar needs access to your calendar to sync tasks."
       }
     },
     "android": {
@@ -29,7 +29,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.vitvalef.app",
+      "package": "com.vitvalef.taskcalendar",
       "backgroundColor": "#121212",
       "softwareKeyboardLayoutMode": "pan",
       "allowBackup": false,
@@ -46,6 +46,8 @@
       ]
     },
     "web": {
+      "name": "TaskCalendar",
+      "shortName": "TaskCalendar",
       "favicon": "./assets/favicon.png"
     },
     "extra": {

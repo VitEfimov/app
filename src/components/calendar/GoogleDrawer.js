@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Dimensions, Platform, Image } from 'react-native';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -63,10 +63,14 @@ export default function GoogleDrawer({
       {/* App Branding & Title */}
       <View style={styles.brandRow}>
         <View style={styles.logoPill}>
-          <Text style={{ fontSize: 20 }}>📅</Text>
+          <Image 
+            source={require('../../../assets/favicon.png')} 
+            style={{ width: 26, height: 26, borderRadius: 6 }} 
+            resizeMode="contain"
+          />
         </View>
         <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>
-          {t('Calendar') || 'Calendar'}
+          TaskCalendar
         </Text>
         {!isDesktop && (
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
