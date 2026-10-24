@@ -54,8 +54,10 @@ export default function CalendarScreen({ navigation }) {
   const boards = useSelector(state => state.userReducer?.boards || []);
 
   // Calendar State
-  const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const visibleMonthRef = useRef(dayjs(selectedDate).format('YYYY-MM'));
+  const todayDateStr = dayjs().format('YYYY-MM-DD');
+  const [currentMonthStr, setCurrentMonthStr] = useState(dayjs().format('YYYY-MM-01'));
+  const [selectedDate, setSelectedDate] = useState(todayDateStr);
+  const visibleMonthRef = useRef(dayjs().format('YYYY-MM'));
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]); // Filtered categories
@@ -72,7 +74,6 @@ export default function CalendarScreen({ navigation }) {
   const panX = useRef(new Animated.Value(-initialWidth)).current;
 
   // Month strings for the 3 slots: [prev, current, next]
-  const currentMonthStr = useMemo(() => dayjs(selectedDate).format('YYYY-MM-01'), [selectedDate]);
   const prevMonthStr = useMemo(() => dayjs(currentMonthStr).subtract(1, 'month').format('YYYY-MM-01'), [currentMonthStr]);
   const nextMonthStr = useMemo(() => dayjs(currentMonthStr).add(1, 'month').format('YYYY-MM-01'), [currentMonthStr]);
 
@@ -90,19 +91,21 @@ export default function CalendarScreen({ navigation }) {
       useNativeDriver: false,
     }).start(() => {
       safeFlushSync(() => {
-        setSelectedDate(prev => {
-          const baseDate = dayjs(prev);
-          const targetMonth = direction === 'next'
-            ? baseDate.add(1, 'month')
-            : baseDate.subtract(1, 'month');
-          const newMonthStr = targetMonth.format('YYYY-MM');
-          visibleMonthRef.current = newMonthStr;
+        setCurrentMonthStr(prev => {
+          const nextMonth = direction === 'next'
+            ? dayjs(prev).add(1, 'month').format('YYYY-MM-01')
+            : dayjs(prev).subtract(1, 'month').format('YYYY-MM-01');
+          const newMonthPrefix = nextMonth.slice(0, 7);
+          visibleMonthRef.current = newMonthPrefix;
 
-          const todayStr = dayjs().format('YYYY-MM-DD');
-          if (todayStr.startsWith(newMonthStr)) {
-            return todayStr;
+          const today = dayjs().format('YYYY-MM-DD');
+          if (today.startsWith(newMonthPrefix)) {
+            setSelectedDate(today);
+          } else {
+            // FOCUS JUST ON TODAY DATE: remove focus from other months!
+            setSelectedDate(null);
           }
-          return `${newMonthStr}-01`;
+          return nextMonth;
         });
       });
       panX.setValue(-w);
@@ -185,8 +188,9 @@ export default function CalendarScreen({ navigation }) {
       }
     }
     if (height && Math.abs(maxYRef.current - height) > 5) {
+      const wasCollapsed = Math.abs(lastY.current - maxYRef.current) < 20;
       maxYRef.current = height;
-      if (!isInitialized.current) {
+      if (!isInitialized.current || wasCollapsed) {
         panY.setValue(height);
         lastY.current = height;
         isInitialized.current = true;
@@ -314,17 +318,29 @@ export default function CalendarScreen({ navigation }) {
     });
 
     const todayStr = dayjs().format('YYYY-MM-DD');
-    if (!marks[selectedDate]) marks[selectedDate] = { dots: [] };
-    if (!marks[todayStr]) marks[todayStr] = { dots: [] };
 
-    marks[selectedDate] = {
-      ...marks[selectedDate],
-      selected: true,
-      selectedColor: colors.primary,
-    };
+    // ONLY focus today date (solid circle) when today is in the active month or selected
+    if (todayStr.startsWith(currentMonthStr.slice(0, 7)) || selectedDate === todayStr) {
+      if (!marks[todayStr]) marks[todayStr] = { dots: [] };
+      marks[todayStr] = {
+        ...marks[todayStr],
+        selected: true,
+        selectedColor: colors.primary,
+      };
+    }
+
+    // If user explicitly clicked another date in this month, highlight it
+    if (selectedDate && selectedDate !== todayStr && selectedDate.startsWith(currentMonthStr.slice(0, 7))) {
+      if (!marks[selectedDate]) marks[selectedDate] = { dots: [] };
+      marks[selectedDate] = {
+        ...marks[selectedDate],
+        selected: true,
+        selectedColor: isDark ? 'rgba(66, 133, 244, 0.45)' : 'rgba(66, 133, 244, 0.25)',
+      };
+    }
 
     return marks;
-  }, [tasks, boards, selectedDate, colors]);
+  }, [tasks, boards, selectedDate, currentMonthStr, colors, isDark]);
 
   // TASKS JUST RELEVANT TO CHOSEN DATE (Strict date filter!)
   const dayTasks = useMemo(() => {
@@ -337,9 +353,13 @@ export default function CalendarScreen({ navigation }) {
         if (!selectedCategoryIds.includes(bId)) return false;
       }
 
-      // Date match: MUST be equal to chosen selectedDate
+      // Date match: MUST be equal to chosen selectedDate, or match visible month if no date is focused
       const d = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
-      if (d !== selectedDate) return false;
+      if (selectedDate) {
+        if (d !== selectedDate) return false;
+      } else {
+        if (!d.startsWith(currentMonthStr.slice(0, 7))) return false;
+      }
 
       // Search query filter
       if (searchQuery.trim() !== '') {
@@ -358,7 +378,7 @@ export default function CalendarScreen({ navigation }) {
       if (hasTimeA && hasTimeB) return a.time.localeCompare(b.time);
       return (b.id || '').localeCompare(a.id || '');
     });
-  }, [tasks, selectedDate, selectedCategoryIds, searchQuery]);
+  }, [tasks, selectedDate, currentMonthStr, selectedCategoryIds, searchQuery]);
 
   // Memoized calendar theme
   const calendarTheme = useMemo(() => ({
@@ -383,10 +403,12 @@ export default function CalendarScreen({ navigation }) {
     <View style={[styles.screenContainer, { backgroundColor: colors.bgMain }]}>
       {/* Google Top Bar */}
       <GoogleTopBar
-        currentDate={selectedDate}
+        currentDate={currentMonthStr}
         onPressMenu={() => setIsDrawerOpen(prev => !prev)}
         onPressToday={() => {
           const today = dayjs().format('YYYY-MM-DD');
+          const todayMonth = dayjs().format('YYYY-MM-01');
+          setCurrentMonthStr(todayMonth);
           setSelectedDate(today);
           visibleMonthRef.current = today.slice(0, 7);
           panX.setValue(-containerWidthRef.current);
@@ -431,8 +453,8 @@ export default function CalendarScreen({ navigation }) {
                 firstDay={i18n.language === 'en' ? 0 : 1}
                 enableSwipeMonths={false}
                 hideArrows={false}
-                showSixWeeks={true}
-                hideExtraDays={false}
+                showSixWeeks={false}
+                hideExtraDays={true}
                 onPressArrowLeft={() => slideToMonth('prev')}
                 onPressArrowRight={() => slideToMonth('next')}
                 renderHeader={() => (
@@ -454,12 +476,12 @@ export default function CalendarScreen({ navigation }) {
                 testID="task_calendar"
                 key={`curr-${colors.bgMain}-${isDark}-${currentMonthStr}-${i18n.language}`}
                 markingType={'multi-dot'}
-                current={selectedDate}
+                current={currentMonthStr}
                 firstDay={i18n.language === 'en' ? 0 : 1}
                 enableSwipeMonths={false}
                 hideArrows={false}
-                showSixWeeks={true}
-                hideExtraDays={false}
+                showSixWeeks={false}
+                hideExtraDays={true}
                 onPressArrowLeft={() => slideToMonth('prev')}
                 onPressArrowRight={() => slideToMonth('next')}
                 renderHeader={() => (
@@ -477,10 +499,10 @@ export default function CalendarScreen({ navigation }) {
                 )}
                 onDayPress={(day) => {
                   const pressedMonth = day.dateString.slice(0, 7);
-                  const currentMonth = currentMonthStr.slice(0, 7);
-                  if (pressedMonth > currentMonth) {
+                  const activeMonth = currentMonthStr.slice(0, 7);
+                  if (pressedMonth > activeMonth) {
                     slideToMonth('next');
-                  } else if (pressedMonth < currentMonth) {
+                  } else if (pressedMonth < activeMonth) {
                     slideToMonth('prev');
                   } else {
                     setSelectedDate(day.dateString);
@@ -501,8 +523,8 @@ export default function CalendarScreen({ navigation }) {
                 firstDay={i18n.language === 'en' ? 0 : 1}
                 enableSwipeMonths={false}
                 hideArrows={false}
-                showSixWeeks={true}
-                hideExtraDays={false}
+                showSixWeeks={false}
+                hideExtraDays={true}
                 onPressArrowLeft={() => slideToMonth('prev')}
                 onPressArrowRight={() => slideToMonth('next')}
                 renderHeader={() => (
@@ -536,7 +558,9 @@ export default function CalendarScreen({ navigation }) {
             <View style={[styles.sheetHeader, { borderBottomColor: colors.borderColor }]}>
               <View>
                 <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>
-                  {dayjs(selectedDate).format('dddd, MMMM D, YYYY')}
+                  {selectedDate 
+                    ? dayjs(selectedDate).format('dddd, MMMM D, YYYY') 
+                    : dayjs(currentMonthStr).format('MMMM YYYY')}
                 </Text>
                 <Text style={[styles.sheetSubtitle, { color: colors.textSecondary }]}>
                   {dayTasks.length} {dayTasks.length === 1 ? t('task') : t('tasks')}
@@ -648,7 +672,9 @@ export default function CalendarScreen({ navigation }) {
               <View style={styles.emptyContainer}>
                 <Text style={{ fontSize: 32, marginBottom: 8 }}>📋</Text>
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  {t('No tasks scheduled for this day.') || 'No tasks scheduled for this day.'}
+                  {selectedDate 
+                    ? (t('No tasks scheduled for this day.') || 'No tasks scheduled for this day.')
+                    : (t('No tasks scheduled for this month.') || 'No tasks scheduled for this month.')}
                 </Text>
                 <Text style={[styles.emptySubtext, { color: colors.textTertiary || '#888' }]}>
                   {t('Tap the + button to add one.') || 'Tap the + button to add one.'}
@@ -670,9 +696,10 @@ export default function CalendarScreen({ navigation }) {
       <GoogleDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        currentDate={selectedDate}
+        currentDate={selectedDate || currentMonthStr}
         onSelectDate={(date) => {
           setSelectedDate(date);
+          setCurrentMonthStr(dayjs(date).format('YYYY-MM-01'));
           visibleMonthRef.current = date.slice(0, 7);
           panX.setValue(-containerWidthRef.current);
         }}
@@ -700,11 +727,12 @@ export default function CalendarScreen({ navigation }) {
       <QuickAddTaskModal
         isVisible={isQuickAddVisible}
         onClose={() => setIsQuickAddVisible(false)}
-        initialDate={selectedDate}
+        initialDate={selectedDate || (dayjs().format('YYYY-MM-DD').startsWith(currentMonthStr.slice(0, 7)) ? dayjs().format('YYYY-MM-DD') : `${currentMonthStr.slice(0, 7)}-01`)}
         boards={boards}
         onTaskCreated={(date) => {
-          if (date && date !== selectedDate) {
+          if (date) {
             setSelectedDate(date);
+            setCurrentMonthStr(dayjs(date).format('YYYY-MM-01'));
             visibleMonthRef.current = date.slice(0, 7);
             panX.setValue(-containerWidthRef.current);
           }
@@ -754,13 +782,17 @@ export default function CalendarScreen({ navigation }) {
       <YearPickerModal
         isVisible={isYearPickerVisible}
         onClose={() => setYearPickerVisible(false)}
-        currentYear={dayjs(selectedDate).year()}
+        currentYear={dayjs(currentMonthStr).year()}
         onSelectYear={(year) => {
-          const month = dayjs(selectedDate).format('MM');
-          const day = dayjs(selectedDate).format('DD');
-          const newDate = `${year}-${month}-${day}`;
-          setSelectedDate(newDate);
-          visibleMonthRef.current = `${year}-${month}`;
+          const month = dayjs(currentMonthStr).format('MM');
+          const newMonth = `${year}-${month}-01`;
+          setCurrentMonthStr(newMonth);
+          const today = dayjs().format('YYYY-MM-DD');
+          if (today.startsWith(`${year}-${month}`)) {
+            setSelectedDate(today);
+          } else {
+            setSelectedDate(null);
+          }
           panX.setValue(-containerWidthRef.current);
           setYearPickerVisible(false);
         }}
