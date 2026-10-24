@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Modal, Image, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Modal, useWindowDimensions } from 'react-native';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -37,7 +37,6 @@ export default function GoogleTopBar({
   const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktopWidth = windowWidth >= 768;
-  const isMediumWidth = windowWidth >= 540;
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
@@ -82,7 +81,7 @@ export default function GoogleTopBar({
         </View>
       ) : (
         <View style={styles.standardHeaderRow}>
-          {/* Left: Hamburger + Brand (+ Month Selector on medium/desktop) */}
+          {/* Left: Hamburger + Month Selector (+ Chevrons on desktop) */}
           <View style={styles.leftGroup}>
             <TouchableOpacity
               accessible={true}
@@ -94,32 +93,19 @@ export default function GoogleTopBar({
               <IconMenu color={colors.textPrimary} size={22} />
             </TouchableOpacity>
 
-            <View style={styles.brandGroup}>
-              <Image 
-                source={require('../../../assets/favicon.png')} 
-                style={styles.brandIcon} 
-                resizeMode="contain"
-              />
-              <Text style={[styles.brandNameText, { color: colors.textPrimary }]} numberOfLines={1}>
-                TaskCalendar
+            {/* Month/Year Dropdown */}
+            <TouchableOpacity
+              accessible={true}
+              accessibilityLabel="Select month and year"
+              accessibilityRole="button"
+              style={[styles.monthSelectorBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+              onPress={onPressMonthPicker}
+            >
+              <Text style={[styles.monthText, { color: colors.textPrimary }]} numberOfLines={1}>
+                {monthYearLabel}
               </Text>
-            </View>
-
-            {/* Month/Year Dropdown on medium and desktop screens */}
-            {isMediumWidth && (
-              <TouchableOpacity
-                accessible={true}
-                accessibilityLabel="Select month and year"
-                accessibilityRole="button"
-                style={[styles.monthSelectorBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
-                onPress={onPressMonthPicker}
-              >
-                <Text style={[styles.monthText, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {monthYearLabel}
-                </Text>
-                <IconChevronDown color={colors.primary} size={15} />
-              </TouchableOpacity>
-            )}
+              <IconChevronDown color={colors.primary} size={15} />
+            </TouchableOpacity>
 
             {/* Desktop Month Chevrons */}
             {isDesktopWidth && onPressPrevMonth && (
@@ -284,26 +270,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
     overflow: 'hidden',
   },
-  brandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 6,
-    marginLeft: 2,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  brandIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    marginRight: 6,
-    flexShrink: 0,
-  },
-  brandNameText: {
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
   rightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -327,9 +293,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   monthText: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '700',
     marginRight: 4,
+    letterSpacing: -0.2,
   },
   todayBtn: {
     paddingVertical: 4,

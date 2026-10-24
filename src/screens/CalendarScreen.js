@@ -473,7 +473,6 @@ export default function CalendarScreen({ navigation }) {
                     <Text style={[styles.calendarMonthTitle, { color: colors.textPrimary }]}>
                       {dayjs(currentMonthStr).format('MMMM YYYY')}
                     </Text>
-                    <IconChevronDown color={colors.primary} size={15} style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
                 )}
                 onDayPress={(day) => {
