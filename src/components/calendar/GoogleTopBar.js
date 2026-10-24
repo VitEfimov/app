@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Modal, Image, useWindowDimensions } from 'react-native';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,6 +35,10 @@ export default function GoogleTopBar({
   showViewSelector = false
 }) {
   const { t } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWidth = windowWidth >= 768;
+  const isMediumWidth = windowWidth >= 540;
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
 
@@ -60,7 +64,7 @@ export default function GoogleTopBar({
               onSearchChange('');
             }}
           >
-            <IconClose color={colors.textPrimary} size={22} />
+            <IconClose color={colors.textPrimary} size={20} />
           </TouchableOpacity>
           <TextInput
             style={[styles.searchInput, { color: colors.textPrimary }]}
@@ -78,7 +82,7 @@ export default function GoogleTopBar({
         </View>
       ) : (
         <View style={styles.standardHeaderRow}>
-          {/* Left: Hamburger + Brand + Month/Year + Today */}
+          {/* Left: Hamburger + Brand (+ Month Selector on medium/desktop) */}
           <View style={styles.leftGroup}>
             <TouchableOpacity
               accessible={true}
@@ -96,24 +100,55 @@ export default function GoogleTopBar({
                 style={styles.brandIcon} 
                 resizeMode="contain"
               />
-              <Text style={[styles.brandNameText, { color: colors.textPrimary }]}>
+              <Text style={[styles.brandNameText, { color: colors.textPrimary }]} numberOfLines={1}>
                 TaskCalendar
               </Text>
             </View>
 
-            <TouchableOpacity
-              accessible={true}
-              accessibilityLabel="Select month and year"
-              accessibilityRole="button"
-              style={[styles.monthSelectorBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
-              onPress={onPressMonthPicker}
-            >
-              <Text style={[styles.monthText, { color: colors.textPrimary }]} numberOfLines={1}>
-                {monthYearLabel}
-              </Text>
-              <IconChevronDown color={colors.primary} size={16} />
-            </TouchableOpacity>
+            {/* Month/Year Dropdown on medium and desktop screens */}
+            {isMediumWidth && (
+              <TouchableOpacity
+                accessible={true}
+                accessibilityLabel="Select month and year"
+                accessibilityRole="button"
+                style={[styles.monthSelectorBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+                onPress={onPressMonthPicker}
+              >
+                <Text style={[styles.monthText, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {monthYearLabel}
+                </Text>
+                <IconChevronDown color={colors.primary} size={15} />
+              </TouchableOpacity>
+            )}
 
+            {/* Desktop Month Chevrons */}
+            {isDesktopWidth && onPressPrevMonth && (
+              <TouchableOpacity
+                accessible={true}
+                accessibilityLabel="Previous month"
+                accessibilityRole="button"
+                style={styles.iconBtn}
+                onPress={onPressPrevMonth}
+              >
+                <IconChevronLeft color={colors.textPrimary} size={18} />
+              </TouchableOpacity>
+            )}
+
+            {isDesktopWidth && onPressNextMonth && (
+              <TouchableOpacity
+                accessible={true}
+                accessibilityLabel="Next month"
+                accessibilityRole="button"
+                style={styles.iconBtn}
+                onPress={onPressNextMonth}
+              >
+                <IconChevronRight color={colors.textPrimary} size={18} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Right: Today + Search + Theme + Settings (Always pinned and visible) */}
+          <View style={styles.rightGroup}>
             <TouchableOpacity
               accessible={true}
               accessibilityLabel="Go to today"
@@ -132,33 +167,6 @@ export default function GoogleTopBar({
               </Text>
             </TouchableOpacity>
 
-            {onPressPrevMonth && (
-              <TouchableOpacity
-                accessible={true}
-                accessibilityLabel="Previous month"
-                accessibilityRole="button"
-                style={styles.iconBtn}
-                onPress={onPressPrevMonth}
-              >
-                <IconChevronLeft color={colors.textPrimary} size={18} />
-              </TouchableOpacity>
-            )}
-
-            {onPressNextMonth && (
-              <TouchableOpacity
-                accessible={true}
-                accessibilityLabel="Next month"
-                accessibilityRole="button"
-                style={styles.iconBtn}
-                onPress={onPressNextMonth}
-              >
-                <IconChevronRight color={colors.textPrimary} size={18} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Right: Search + View Selector + Theme + Settings */}
-          <View style={styles.rightGroup}>
             <TouchableOpacity
               accessible={true}
               accessibilityLabel="Search tasks"
@@ -166,7 +174,7 @@ export default function GoogleTopBar({
               style={styles.iconBtn}
               onPress={() => setIsSearchOpen(true)}
             >
-              <IconSearch color={colors.textPrimary} size={20} />
+              <IconSearch color={colors.textPrimary} size={19} />
             </TouchableOpacity>
 
             {/* View Selector Menu Pill */}
@@ -178,11 +186,11 @@ export default function GoogleTopBar({
                 style={[styles.viewSelectorBtn, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#fff' }]}
                 onPress={() => setIsViewMenuOpen(true)}
               >
-                <currentViewObj.icon color={colors.primary} size={16} />
+                <currentViewObj.icon color={colors.primary} size={15} />
                 <Text style={[styles.viewSelectorText, { color: colors.textPrimary }]}>
                   {currentViewObj.label}
                 </Text>
-                <IconChevronDown color={colors.textSecondary} size={14} />
+                <IconChevronDown color={colors.textSecondary} size={13} />
               </TouchableOpacity>
             )}
 
@@ -205,7 +213,7 @@ export default function GoogleTopBar({
               style={styles.iconBtn}
               onPress={onPressSettings}
             >
-              <IconSettings color={colors.textPrimary} size={20} />
+              <IconSettings color={colors.textPrimary} size={19} />
             </TouchableOpacity>
           </View>
         </View>
@@ -272,54 +280,63 @@ const styles = StyleSheet.create({
   leftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
+    minWidth: 0,
+    overflow: 'hidden',
   },
   brandGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 12,
-    marginLeft: 4,
+    marginRight: 6,
+    marginLeft: 2,
+    flexShrink: 1,
+    minWidth: 0,
   },
   brandIcon: {
     width: 24,
     height: 24,
     borderRadius: 6,
     marginRight: 6,
+    flexShrink: 0,
   },
   brandNameText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
   rightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   monthSelectorBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
     borderRadius: 8,
     marginLeft: 2,
-    marginRight: 6,
+    marginRight: 4,
+    flexShrink: 0,
   },
   monthText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     marginRight: 4,
   },
   todayBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 14,
     borderWidth: 1,
+    marginRight: 2,
   },
   todayText: {
     fontSize: 13,

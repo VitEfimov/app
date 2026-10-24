@@ -18,7 +18,7 @@ import GoogleTopBar from '../components/calendar/GoogleTopBar';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import GoogleFAB from '../components/calendar/GoogleFAB';
 import QuickAddTaskModal from '../components/calendar/QuickAddTaskModal';
-import { IconCheckCircle, IconClock, IconDotsVertical } from '../components/calendar/CalendarIcons';
+import { IconCheckCircle, IconClock, IconDotsVertical, IconChevronDown } from '../components/calendar/CalendarIcons';
 
 // Modals
 import TaskDetailsModal from '../components/TaskDetailsModal';
@@ -435,6 +435,13 @@ export default function CalendarScreen({ navigation }) {
                 hideExtraDays={false}
                 onPressArrowLeft={() => slideToMonth('prev')}
                 onPressArrowRight={() => slideToMonth('next')}
+                renderHeader={() => (
+                  <View style={styles.calendarHeaderTouchable}>
+                    <Text style={[styles.calendarMonthTitle, { color: colors.textPrimary }]}>
+                      {dayjs(prevMonthStr).format('MMMM YYYY')}
+                    </Text>
+                  </View>
+                )}
                 markedDates={markedDates}
                 theme={calendarTheme}
                 style={{ backgroundColor: colors.bgMain }}
@@ -455,6 +462,20 @@ export default function CalendarScreen({ navigation }) {
                 hideExtraDays={false}
                 onPressArrowLeft={() => slideToMonth('prev')}
                 onPressArrowRight={() => slideToMonth('next')}
+                renderHeader={() => (
+                  <TouchableOpacity
+                    accessible={true}
+                    accessibilityLabel="Select month and year"
+                    accessibilityRole="button"
+                    onPress={() => setYearPickerVisible(true)}
+                    style={styles.calendarHeaderTouchable}
+                  >
+                    <Text style={[styles.calendarMonthTitle, { color: colors.textPrimary }]}>
+                      {dayjs(currentMonthStr).format('MMMM YYYY')}
+                    </Text>
+                    <IconChevronDown color={colors.primary} size={15} style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                )}
                 onDayPress={(day) => {
                   const pressedMonth = day.dateString.slice(0, 7);
                   const currentMonth = currentMonthStr.slice(0, 7);
@@ -485,6 +506,13 @@ export default function CalendarScreen({ navigation }) {
                 hideExtraDays={false}
                 onPressArrowLeft={() => slideToMonth('prev')}
                 onPressArrowRight={() => slideToMonth('next')}
+                renderHeader={() => (
+                  <View style={styles.calendarHeaderTouchable}>
+                    <Text style={[styles.calendarMonthTitle, { color: colors.textPrimary }]}>
+                      {dayjs(nextMonthStr).format('MMMM YYYY')}
+                    </Text>
+                  </View>
+                )}
                 markedDates={markedDates}
                 theme={calendarTheme}
                 style={{ backgroundColor: colors.bgMain }}
@@ -783,6 +811,19 @@ const styles = StyleSheet.create({
   },
   calendarCarouselTrack: {
     flexDirection: 'row',
+  },
+  calendarHeaderTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  calendarMonthTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   bottomSheet: {
     position: 'absolute',
