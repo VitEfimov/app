@@ -23,7 +23,8 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
-import { setBoardsCollapsed } from '../features/themeSlice';
+import { setBoardsCollapsed, setGoogleDrawerOpen } from '../features/themeSlice';
+import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { getBoardColor, BOARD_COLORS } from '../utils/boardColors';
@@ -62,10 +63,11 @@ export default function BoardScreen({ route, navigation }) {
     dispatch(setBoardsCollapsed(!isBoardsCollapsed));
   };
 
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const { t } = useTranslation();
   const dispatch = useDispatch();
+  const isGoogleDrawerOpen = useSelector(state => state.themeReducer?.isGoogleDrawerOpen || false);
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || [{ id: 'main', name: 'Main' }]);
   const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
@@ -1170,6 +1172,32 @@ export default function BoardScreen({ route, navigation }) {
         isVisible={isPremiumModalVisible}
         onClose={() => setPremiumModalVisible(false)}
         featureName={premiumFeatureName}
+      />
+
+      {/* Google Navigation Drawer */}
+      <GoogleDrawer
+        isOpen={isGoogleDrawerOpen}
+        onClose={() => dispatch(setGoogleDrawerOpen(false))}
+        currentDate={dayjs().format('YYYY-MM-DD')}
+        onSelectDate={(date) => {
+          dispatch(setGoogleDrawerOpen(false));
+          navigation.navigate('Calendar');
+        }}
+        onSelectView={(view) => {
+          dispatch(setGoogleDrawerOpen(false));
+          if (view === 'calendar') {
+            navigation.navigate('Calendar');
+          }
+        }}
+        boards={boards}
+        tasks={tasks}
+        colors={colors}
+        isDark={isDark}
+        isDesktop={false}
+        onPressSettings={() => {
+          dispatch(setGoogleDrawerOpen(false));
+          navigation.navigate('Settings');
+        }}
       />
     </KeyboardAvoidingView>
   );

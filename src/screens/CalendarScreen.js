@@ -24,7 +24,9 @@ import TaskRow from '../components/TaskRow';
 import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import ConfirmModal from '../components/ConfirmModal';
+import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import { updateTask, deleteTask } from '../features/taskSlice';
+import { setGoogleDrawerOpen } from '../features/themeSlice';
 
 export default function CalendarScreen({ navigation }) {
   const { colors, isDark } = useTheme();
@@ -34,10 +36,22 @@ export default function CalendarScreen({ navigation }) {
 
   const tasks = useSelector(state => state.taskReducer?.tasks || []);
   const boards = useSelector(state => state.userReducer?.boards || []);
+  const jumpToTodayTrigger = useSelector(state => state.themeReducer?.jumpToTodayTrigger);
+  const isGoogleDrawerOpen = useSelector(state => state.themeReducer?.isGoogleDrawerOpen || false);
 
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
+  const [calendarMonth, setCalendarMonth] = useState(dayjs().format('YYYY-MM-DD'));
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDetailsVisible, setDetailsVisible] = useState(false);
+
+  // Jump to today whenever header Today button is pressed
+  useEffect(() => {
+    if (jumpToTodayTrigger) {
+      const todayStr = dayjs().format('YYYY-MM-DD');
+      setSelectedDate(todayStr);
+      setCalendarMonth(todayStr);
+    }
+  }, [jumpToTodayTrigger]);
 
   // Selection & Options State
   const [sectionOptionsConfig, setSectionOptionsConfig] = useState(false);
@@ -52,32 +66,19 @@ export default function CalendarScreen({ navigation }) {
   const [selectionMode, setSelectionMode] = useState({ isActive: false, selectedTaskIds: [] });
   const [sortConfig, setSortConfig] = useState('time'); // 'time' or 'priority'
 
-  // Custom Bottom Sheet State
+  // FIXED Bottom Sheet State: strictly constant height so it never adjusts with month size
+  const FIXED_CALENDAR_HEIGHT = 335;
   const MIN_Y = 0; // Fully expanded (covers calendar)
-  const maxYRef = useRef(360); // Default, updated onLayout
-  const isInitialized = useRef(false);
+  const COLLAPSED_Y = FIXED_CALENDAR_HEIGHT;
 
-  const panY = useRef(new Animated.Value(360)).current;
-  const lastY = useRef(360);
-
-  const handleCalendarLayout = (event) => {
-    const { height } = event.nativeEvent.layout;
-    if (height && Math.abs(maxYRef.current - height) > 5) {
-      const wasCollapsed = Math.abs(lastY.current - maxYRef.current) < 20;
-      maxYRef.current = height;
-      if (!isInitialized.current || wasCollapsed) {
-        panY.setValue(height);
-        lastY.current = height;
-        isInitialized.current = true;
-      }
-    }
-  };
+  const panY = useRef(new Animated.Value(COLLAPSED_Y)).current;
+  const lastY = useRef(COLLAPSED_Y);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
       Animated.timing(panY, {
         toValue: MIN_Y,
-        duration: 300,
+        duration: 250,
         useNativeDriver: false,
       }).start();
       lastY.current = MIN_Y;
@@ -100,29 +101,32 @@ export default function CalendarScreen({ navigation }) {
       onPanResponderMove: (_, gestureState) => {
         let newY = lastY.current + gestureState.dy;
         if (newY < MIN_Y) newY = MIN_Y;
-        if (newY > maxYRef.current) newY = maxYRef.current;
+        if (newY > COLLAPSED_Y) newY = COLLAPSED_Y;
         panY.setValue(newY);
       },
       onPanResponderRelease: (_, gestureState) => {
         const currentY = lastY.current + gestureState.dy;
-        let targetY = maxYRef.current;
+        let targetY = COLLAPSED_Y;
 
         // Snap to nearest position
         const distToMin = Math.abs(currentY - MIN_Y);
-        const distToMax = Math.abs(currentY - maxYRef.current);
+        const distToMax = Math.abs(currentY - COLLAPSED_Y);
 
         if (distToMin < distToMax) {
           targetY = MIN_Y;
         } else {
-          targetY = maxYRef.current;
+          targetY = COLLAPSED_Y;
         }
+
+        if (gestureState.vy < -0.5) targetY = MIN_Y;
+        if (gestureState.vy > 0.5) targetY = COLLAPSED_Y;
 
         lastY.current = targetY;
 
-        Animated.timing(panY, {
+        Animated.spring(panY, {
           toValue: targetY,
-          duration: 300,
           useNativeDriver: false,
+          bounciness: 4,
         }).start();
       }
     })
@@ -351,14 +355,18 @@ export default function CalendarScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
-      <View onLayout={handleCalendarLayout}>
+      <View style={styles.calendarContainer}>
         <Calendar
           testID="task_calendar"
-          key={`${colors.bgMain}-${isDark}-${i18n.language}`}
-          current={selectedDate}
+          key={`cal-${calendarMonth}-${colors.bgMain}-${isDark}-${i18n.language}`}
+          current={calendarMonth}
           onDayPress={(day) => {
             setSelectedDate(day.dateString);
+            setCalendarMonth(day.dateString);
             setSelectionMode({ isActive: false, selectedTaskIds: [] });
+          }}
+          onMonthChange={(month) => {
+            setCalendarMonth(month.dateString);
           }}
           markedDates={markedDates}
           enableSwipeMonths={true}
@@ -380,9 +388,20 @@ export default function CalendarScreen({ navigation }) {
             textDayFontWeight: '500',
             textMonthFontWeight: 'bold',
             textDayHeaderFontWeight: '600',
-            textDayFontSize: 16,
-            textMonthFontSize: 18,
-            textDayHeaderFontSize: 14
+            textDayFontSize: 15,
+            textMonthFontSize: 17,
+            textDayHeaderFontSize: 13,
+            'stylesheet.calendar.header': {
+              header: {
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                paddingLeft: 10,
+                paddingRight: 10,
+                marginTop: 2,
+                alignItems: 'center',
+                height: 38,
+              },
+            },
           }}
           style={styles.calendar}
         />
@@ -551,6 +570,33 @@ export default function CalendarScreen({ navigation }) {
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
         onConfirm={confirmConfig.onConfirm}
       />
+
+      {/* Google Navigation Drawer */}
+      <GoogleDrawer
+        isOpen={isGoogleDrawerOpen}
+        onClose={() => dispatch(setGoogleDrawerOpen(false))}
+        currentDate={selectedDate}
+        onSelectDate={(date) => {
+          setSelectedDate(date);
+          setCalendarMonth(date);
+          dispatch(setGoogleDrawerOpen(false));
+        }}
+        onSelectView={(view) => {
+          dispatch(setGoogleDrawerOpen(false));
+          if (view === 'board') {
+            navigation.navigate('Board');
+          }
+        }}
+        boards={boards}
+        tasks={tasks}
+        colors={colors}
+        isDark={isDark}
+        isDesktop={false}
+        onPressSettings={() => {
+          dispatch(setGoogleDrawerOpen(false));
+          navigation.navigate('Settings');
+        }}
+      />
     </View>
   );
 }
@@ -558,8 +604,17 @@ export default function CalendarScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    height: '100%',
+    maxHeight: '100%',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  calendarContainer: {
+    height: 335,
+    overflow: 'hidden',
   },
   calendar: {
+    paddingBottom: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,

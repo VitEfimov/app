@@ -22,6 +22,7 @@ function MainStack() {
       screenOptions={{
         header: (props) => <Header {...props} />,
         animation: 'fade',
+        contentStyle: { flex: 1, height: '100%', overflow: 'hidden' },
       }}
     >
       <Stack.Screen name="Board" component={BoardScreen} />

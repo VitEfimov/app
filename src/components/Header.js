@@ -1,12 +1,20 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, SafeAreaView, Platform } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import dayjs from 'dayjs';
 import { useTheme } from '../styles/ThemeContext';
-import { setThemeMode } from '../features/themeSlice';
+import { setThemeMode, setGoogleDrawerOpen, triggerJumpToToday } from '../features/themeSlice';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
+
+const IconMenu = ({ color = '#333', size = 22 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Line x1="3" y1="12" x2="21" y2="12" />
+    <Line x1="3" y1="6" x2="21" y2="6" />
+    <Line x1="3" y1="18" x2="21" y2="18" />
+  </Svg>
+);
 
 const IconCalendar = ({ color = '#4285F4', size = 18 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -108,10 +116,26 @@ export default function Header(props) {
     }
   };
 
+  const handlePressToday = () => {
+    dispatch(triggerJumpToToday());
+  };
+
   const renderHeaderContent = () => (
-    <View style={[styles.headerContainer, { backgroundColor: userPicture ? 'rgba(0,0,0,0.5)' : colors.bgHeader }]}>
-      {/* Left side: single button (icon) switcher for List / Calendar */}
+    <View style={[styles.headerContainer, { backgroundColor: userPicture ? 'rgba(0,0,0,0.5)' : colors.bgHeader, borderBottomColor: colors.borderColor }]}>
+      {/* Left side: Burger menu (☰) + View switch button (List / Calendar) */}
       <View style={styles.leftSection}>
+        <TouchableOpacity
+          testID="header_burger_menu"
+          activeOpacity={0.7}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Open navigation menu"
+          style={styles.iconBtn}
+          onPress={() => dispatch(setGoogleDrawerOpen(true))}
+        >
+          <IconMenu color={colors.textPrimary} size={22} />
+        </TouchableOpacity>
+
         <TouchableOpacity
           testID="toggle_view_btn"
           activeOpacity={0.7}
@@ -145,8 +169,29 @@ export default function Header(props) {
         </TouchableOpacity>
       </View>
 
-      {/* Right side: Pomodoro, Date, Theme, Settings */}
+      {/* Right side: Today button + Pomodoro + Date + Theme + Settings */}
       <View style={styles.rightSection}>
+        {/* Google-style "Today" Button */}
+        <TouchableOpacity
+          testID="header_today_btn"
+          activeOpacity={0.7}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Go to today"
+          style={[
+            styles.todayBtn,
+            {
+              borderColor: colors.borderColor || 'rgba(0,0,0,0.15)',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            }
+          ]}
+          onPress={handlePressToday}
+        >
+          <Text style={[styles.todayBtnText, { color: colors.primary }]}>
+            {t('Today') || 'Today'}
+          </Text>
+        </TouchableOpacity>
+
         {(!!isPomodoroActive && !isTimeOver) ? (
           <View style={styles.pomodoroBadge}>
             <Text style={styles.pomodoroText}>{t('Pomodoro')}: {formatBadgeTime(timeRemaining)}</Text>
@@ -180,7 +225,7 @@ export default function Header(props) {
           accessible={true}
           accessibilityRole="button"
           accessibilityLabel="Settings"
-          style={[styles.iconBtn, { backgroundColor: colors.surfaceContainerHigh, marginLeft: 8 }]}
+          style={[styles.iconBtn, { backgroundColor: colors.surfaceContainerHigh, marginLeft: 4 }]}
           onPress={() => navigation.navigate('Settings')}
         >
           <IconSettings color={colors.textPrimary} size={18} />
@@ -190,7 +235,16 @@ export default function Header(props) {
   );
 
   return (
-    <SafeAreaView style={{ backgroundColor: colors.bgHeader }}>
+    <SafeAreaView 
+      style={[
+        styles.safeArea, 
+        { 
+          backgroundColor: colors.bgHeader,
+          position: Platform.OS === 'web' ? 'sticky' : 'relative',
+          top: 0,
+        }
+      ]}
+    >
       {userPicture ? (
         <ImageBackground 
           source={{ uri: userPicture }} 
@@ -207,13 +261,20 @@ export default function Header(props) {
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    zIndex: 999,
+    elevation: 8,
+    width: '100%',
+  },
   headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    minHeight: 56,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minHeight: 54,
+    height: 54,
+    borderBottomWidth: 1,
   },
   bgImage: {
     width: '100%',
@@ -221,38 +282,51 @@ const styles = StyleSheet.create({
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
   viewSwitchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
     borderWidth: 1,
   },
   viewSwitchText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    marginLeft: 6,
+    marginLeft: 5,
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  todayBtn: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginRight: 4,
+  },
+  todayBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   dateText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
-    marginRight: 10,
+    marginRight: 4,
   },
   pomodoroBadge: {
     backgroundColor: 'rgba(255, 99, 71, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 12,
-    marginRight: 10,
+    marginRight: 6,
   },
   pomodoroText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#ff6347',
     fontWeight: 'bold',
   },

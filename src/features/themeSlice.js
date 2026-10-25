@@ -82,13 +82,23 @@ const initialState = {
   selectedCalendarId: loaded?.selectedCalendarId || null,
 
   // Per-Board Automations Map
-  boardAutomations: loaded?.boardAutomations || {}
+  boardAutomations: loaded?.boardAutomations || {},
+
+  // Navigation & Drawer
+  isGoogleDrawerOpen: false,
+  jumpToTodayTrigger: 0
 };
 
 const themeSlice = createSlice({
   name: 'theme',
   initialState,
   reducers: {
+    setGoogleDrawerOpen: (state, action) => {
+      state.isGoogleDrawerOpen = action.payload;
+    },
+    triggerJumpToToday: (state) => {
+      state.jumpToTodayTrigger = Date.now();
+    },
     hydrateThemeState: (state, action) => {
       return { ...state, ...action.payload };
     },
@@ -297,7 +307,8 @@ export const {
   setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
-  setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId
+  setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId,
+  setGoogleDrawerOpen, triggerJumpToToday
 } = themeSlice.actions;
 
 export default themeSlice.reducer;
