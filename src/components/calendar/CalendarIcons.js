@@ -131,6 +131,15 @@ export const IconDotsVertical = ({ color = '#000', size = 18 }) => (
   </Svg>
 );
 
+export const IconAlarm = ({ color = '#000', size = 14 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="13" r="8" />
+    <Path d="M12 9v4l2 2" />
+    <Path d="M5 3L2 6" />
+    <Path d="M19 3l3 3" />
+  </Svg>
+);
+
 export const IconCheckCircle = ({ checked = false, color = '#4285F4', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" fill={checked ? color : 'transparent'} />
@@ -139,3 +148,4 @@ export const IconCheckCircle = ({ checked = false, color = '#4285F4', size = 20 
     )}
   </Svg>
 );
+

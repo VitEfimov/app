@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import { IconClock, IconDotsVertical, IconCheckCircle } from './CalendarIcons';
+import { IconClock, IconAlarm, IconDotsVertical, IconCheckCircle } from './CalendarIcons';
 import { getBoardColor } from '../../utils/boardColors';
 
 export default function GoogleScheduleView({
@@ -153,14 +153,23 @@ export default function GoogleScheduleView({
                           {task.taskname}
                         </Text>
 
-                        {/* Meta info row: Time, Category badge, Priority */}
+                        {/* Meta info row: Time, Reminder, Category badge, Priority */}
                         <View style={styles.taskMetaRow}>
-                          <View style={styles.timeBadge}>
-                            <IconClock color={colors.textSecondary} size={12} />
-                            <Text style={[styles.timeBadgeText, { color: colors.textSecondary }]}>
-                              {task.time ? task.time : (t('All day') || 'All day')}
-                            </Text>
-                          </View>
+                          {task.reminder && task.reminder !== 'None' ? (
+                            <View style={styles.timeBadge}>
+                              <IconAlarm color={colors.textSecondary} size={12} />
+                              <Text style={[styles.timeBadgeText, { color: colors.textSecondary }]}>
+                                {task.reminder}
+                              </Text>
+                            </View>
+                          ) : (task.time && task.time.trim() !== '') ? (
+                            <View style={styles.timeBadge}>
+                              <IconClock color={colors.textSecondary} size={12} />
+                              <Text style={[styles.timeBadgeText, { color: colors.textSecondary }]}>
+                                {task.time}
+                              </Text>
+                            </View>
+                          ) : null}
 
                           <View style={styles.categoryDotPill}>
                             <View style={[styles.smallDot, { backgroundColor: categoryColor }]} />

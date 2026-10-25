@@ -40,6 +40,21 @@ const SwipeIconMore = ({ color }) => (
   </Svg>
 );
 
+const IconDotsVertical = ({ color = '#666', size = 18 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="5" r="1.5" fill={color} />
+    <Circle cx="12" cy="12" r="1.5" fill={color} />
+    <Circle cx="12" cy="19" r="1.5" fill={color} />
+  </Svg>
+);
+
+const IconClock = ({ color = '#666', size = 13 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="10" />
+    <Polyline points="12 6 12 12 16 14" />
+  </Svg>
+);
+
 const IconNote = ({ color }) => (
   <Svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -430,51 +445,58 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
           )}
         </View>
 
-        {/* Indicators under task name */}
-        {((boards.length > 1 && !hideBoardBadge) || hasSubtasks || hasNotes || (task.time && task.time.trim() !== '') || isRepeatingTask || (task.completionDate && dayjs(task.completionDate).year() !== dayjs().year())) ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12, paddingHorizontal: 8 }}>
-            {(boards.length > 1 && !hideBoardBadge) ? (
-              <View style={[styles.subtaskBadge, { backgroundColor: `${boardColor}20`, borderColor: boardColor, marginBottom: 0 }]}>
-                <Text style={{ fontSize: 9, color: boardColor, fontWeight: 'bold' }}>
-                  {boardName}
-                </Text>
-              </View>
-            ) : null}
-            {task.completionDate && dayjs(task.completionDate).year() !== dayjs().year() ? (
-              <View style={[styles.subtaskBadge, { backgroundColor: `${colors.primary}15`, borderColor: colors.primary, marginBottom: 0 }]}>
-                <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
-                  {dayjs(task.completionDate).format('YYYY')}
-                </Text>
-              </View>
-            ) : null}
+        {/* Indicators under task name: Reminder/time, Category badge, Recurring, Notes, Subtasks */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 10, paddingHorizontal: 4, flexWrap: 'wrap' }}>
+          {/* Reminder / Time: ONLY if reminder or time is actually applied! */}
+          {task.reminder && task.reminder !== 'None' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <IconAlarm color={colors.textSecondary} />
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                {task.reminder}
+              </Text>
+            </View>
+          ) : (task.time && task.time.trim() !== '') ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <IconClock color={colors.textSecondary} size={13} />
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                {formatDisplayTime(task.time)}
+              </Text>
+            </View>
+          ) : null}
 
-            {isRepeatingTask ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <IconRepeat color={colors.primary} />
-              </View>
-            ) : null}
+          {/* Board badge with colored dot like Image 3 */}
+          {!hideBoardBadge && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={[styles.categoryDot, { backgroundColor: boardColor }]} />
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                {boardName}
+              </Text>
+            </View>
+          )}
 
-            {(task.time && task.time.trim() !== '') ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                {task.reminder && task.reminder !== 'None' ? <IconAlarm color={colors.textSecondary} /> : null}
-                <Text style={[styles.time, { color: colors.textSecondary, marginLeft: 0 }]}>
-                  {formatDisplayTime(task.time)}
-                </Text>
-              </View>
-            ) : null}
+          {isRepeatingTask ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <IconRepeat color={colors.primary} />
+            </View>
+          ) : null}
 
-            {hasNotes ? <IconNote color={colors.primary} /> : null}
+          {hasNotes ? <IconNote color={colors.primary} /> : null}
 
-            {hasSubtasks ? (
-              <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard, marginBottom: 0 }]}>
-                <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+          {hasSubtasks ? (
+            <View style={[styles.subtaskBadge, { backgroundColor: colors.bgCard, marginBottom: 0 }]}>
+              <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>{completedSubtasksCount}/{totalSubtasksCount}</Text>
+            </View>
+          ) : null}
+
+          {task.completionDate && dayjs(task.completionDate).year() !== dayjs().year() ? (
+            <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
+              {dayjs(task.completionDate).format('YYYY')}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
-      {/* Region 4: Metadata */}
+      {/* Region 4: Metadata (Date) */}
       {(!hideDate && task.completionDate) ? (
         <TouchableOpacity
           style={styles.metadata}
@@ -492,6 +514,26 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
           </Text>
         </TouchableOpacity>
       ) : null}
+
+      {/* Region 5: Kebab Menu Button (⋮) */}
+      <TouchableOpacity
+        testID={`${testIDPrefix}task_kebab_menu`}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Task options"
+        style={styles.kebabBtn}
+        onPress={(e) => {
+          e?.stopPropagation?.();
+          if (onPressMore) {
+            onPressMore(task);
+          } else if (onPress) {
+            onPress(task);
+          }
+        }}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+        <IconDotsVertical color={colors.textSecondary} size={18} />
+      </TouchableOpacity>
 
     </TouchableOpacity>
   );
@@ -641,5 +683,21 @@ const styles = StyleSheet.create({
   actionIcon: {
     color: 'white',
     fontSize: 20
+  },
+  kebabBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  categoryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: '500',
   }
 });

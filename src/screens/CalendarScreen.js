@@ -67,7 +67,8 @@ export default function CalendarScreen({ navigation }) {
   const [sortConfig, setSortConfig] = useState('time'); // 'time' or 'priority'
 
   // FIXED Bottom Sheet State: strictly constant height so it never adjusts with month size
-  const FIXED_CALENDAR_HEIGHT = 335;
+  // 380px allows full 6-row months (like April 2028) to display without bottom sheet cutoff
+  const FIXED_CALENDAR_HEIGHT = 380;
   const MIN_Y = 0; // Fully expanded (covers calendar)
   const COLLAPSED_Y = FIXED_CALENDAR_HEIGHT;
 
@@ -449,6 +450,7 @@ export default function CalendarScreen({ navigation }) {
                 disableInlineEdit={true}
                 testIDPrefix="calendar_"
                 onPress={() => handleTaskPress(item)}
+                onPressMore={() => handleTaskPress(item)}
                 isSelectionMode={selectionMode.isActive}
                 isSelected={selectionMode.selectedTaskIds.includes(item.id || item._id)}
                 onToggleSelect={() => toggleTaskSelection(item.id || item._id)}
@@ -610,16 +612,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   calendarContainer: {
-    height: 335,
+    height: 380,
     overflow: 'hidden',
   },
   calendar: {
     paddingBottom: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
   },
   taskListHeader: {
     flexDirection: 'row',
@@ -667,8 +664,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(128,128,128,0.15)',
+    borderTopWidth: 0,
   },
   dragHandleContainer: {
     paddingVertical: 12,
