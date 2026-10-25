@@ -5,20 +5,29 @@ export const navigationRef = createNavigationContainerRef();
 import { useSelector } from 'react-redux';
 import { StatusBar } from 'react-native';
 
+import BoardScreen from '../screens/BoardScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import DevLogsScreen from '../screens/DevLogsScreen';
+import Header from '../components/Header';
 import { useTheme } from '../styles/ThemeContext';
 
 const Stack = createNativeStackNavigator();
 
 function MainStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <Stack.Navigator
+      initialRouteName="Board"
+      screenOptions={{
+        header: (props) => <Header {...props} />,
+        animation: 'fade',
+      }}
+    >
+      <Stack.Screen name="Board" component={BoardScreen} />
       <Stack.Screen name="Calendar" component={CalendarScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
-      <Stack.Screen name="DevLogs" component={DevLogsScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DevLogs" component={DevLogsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -27,6 +36,7 @@ const linking = {
   prefixes: ['taskmanager://'],
   config: {
     screens: {
+      Board: 'board',
       Calendar: 'calendar',
       Settings: 'settings',
       DevLogs: 'devlogs',
