@@ -651,10 +651,10 @@ export default function BoardScreen({ route, navigation }) {
     setCreateBoardVisible(true);
   };
 
-  const handleCreateBoardSubmit = ({ name, type }) => {
+  const handleCreateBoardSubmit = ({ name, type, color }) => {
     if (name && name.trim()) {
       const id = new Date().getTime().toString();
-      dispatch(addBoardAsync({ id, name: name.trim(), type: type || 'standard' }));
+      dispatch(addBoardAsync({ id, name: name.trim(), type: type || 'standard', color }));
       dispatch(setActiveBoardId(id));
     }
     setCreateBoardVisible(false);
@@ -805,9 +805,9 @@ export default function BoardScreen({ route, navigation }) {
                     })()}
                   </TouchableOpacity>
                 ))}
-                {boards.length < 3 && (
+                {boards.length < (isPremium ? 10 : 3) && (
                   <TouchableOpacity 
-                    accessible={true} accessibilityRole="button" accessibilityLabel="Add new board"
+                    accessible={true} accessibilityRole="button" accessibilityLabel="Add new category"
                     style={styles.addBoardBtn} onPress={handleAddBoard}
                   >
                     <Text style={[styles.addBoardText, { color: colors.textSecondary }]}>+</Text>
@@ -983,7 +983,7 @@ export default function BoardScreen({ route, navigation }) {
               borderColor: 'rgba(255,255,255,0.2)'
             }} />
             <Text style={[styles.optionsModalTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
-              {t('Board')}: {boardOptionsConfig.board?.name === 'Main' ? t('Main') : boardOptionsConfig.board?.name}
+              {t('Category') || 'Category'}: {boardOptionsConfig.board?.name === 'Main' ? (t('Main') || 'Main') : boardOptionsConfig.board?.name}
             </Text>
           </View>
           
@@ -994,7 +994,7 @@ export default function BoardScreen({ route, navigation }) {
           {/* Color Palette (Palitra) */}
           <View style={{ width: '100%', marginBottom: 18, alignItems: 'center' }}>
             <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 10, fontWeight: '600' }}>
-              {t('Board Color')}
+              {t('Category Color') || 'Category Color'}
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15, gap: 10, alignItems: 'center' }}>
               {BOARD_COLORS.map(c => {
@@ -1194,6 +1194,7 @@ export default function BoardScreen({ route, navigation }) {
         colors={colors}
         isDark={isDark}
         isDesktop={false}
+        onOpenCreateCategory={() => handleAddBoard()}
         onPressSettings={() => {
           dispatch(setGoogleDrawerOpen(false));
           navigation.navigate('Settings');

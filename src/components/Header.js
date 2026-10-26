@@ -141,7 +141,7 @@ export default function Header(props) {
           activeOpacity={0.7}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel={isCalendar ? "Switch to Board view" : "Switch to Calendar view"}
+          accessibilityLabel={isCalendar ? "Switch to Categories view" : "Switch to Calendar view"}
           style={[
             styles.viewSwitchBtn,
             {
@@ -155,7 +155,7 @@ export default function Header(props) {
             <>
               <IconBoard color={colors.primary} size={18} />
               <Text style={[styles.viewSwitchText, { color: colors.textPrimary }]}>
-                {t('Board') || 'Board'}
+                {t('Categories') || 'Categories'}
               </Text>
             </>
           ) : (

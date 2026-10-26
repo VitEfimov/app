@@ -10,7 +10,8 @@ import {
   Platform,
   TouchableOpacity,
   ScrollView,
-  Share
+  Share,
+  useWindowDimensions
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
@@ -25,8 +26,11 @@ import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import ConfirmModal from '../components/ConfirmModal';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
+import CreateBoardModal from '../components/CreateBoardModal';
 import { updateTask, deleteTask } from '../features/taskSlice';
 import { setGoogleDrawerOpen } from '../features/themeSlice';
+import { addBoardAsync } from '../features/userSlice';
+import { getBoardColor } from '../utils/boardColors';
 
 export default function CalendarScreen({ navigation }) {
   const { colors, isDark } = useTheme();
@@ -53,8 +57,11 @@ export default function CalendarScreen({ navigation }) {
     }
   }, [jumpToTodayTrigger]);
 
+  const todayStr = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
+
   // Selection & Options State
   const [sectionOptionsConfig, setSectionOptionsConfig] = useState(false);
+  const [isCreateCategoryVisible, setCreateCategoryVisible] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({
     isVisible: false,
     title: '',
@@ -66,14 +73,21 @@ export default function CalendarScreen({ navigation }) {
   const [selectionMode, setSelectionMode] = useState({ isActive: false, selectedTaskIds: [] });
   const [sortConfig, setSortConfig] = useState('time'); // 'time' or 'priority'
 
-  // FIXED Bottom Sheet State: strictly constant height so it never adjusts with month size
-  // 380px allows full 6-row months (like April 2028) to display without bottom sheet cutoff
-  const FIXED_CALENDAR_HEIGHT = 380;
+  // HALF-SCREEN Layout: half screen is calendar, half screen is adjustable task list
+  const { height: windowHeight } = useWindowDimensions();
+  const HALF_SCREEN_HEIGHT = Math.max(380, Math.round(windowHeight * 0.48));
   const MIN_Y = 0; // Fully expanded (covers calendar)
-  const COLLAPSED_Y = FIXED_CALENDAR_HEIGHT;
+  const COLLAPSED_Y = HALF_SCREEN_HEIGHT;
 
   const panY = useRef(new Animated.Value(COLLAPSED_Y)).current;
   const lastY = useRef(COLLAPSED_Y);
+
+  useEffect(() => {
+    if (lastY.current !== MIN_Y) {
+      panY.setValue(COLLAPSED_Y);
+      lastY.current = COLLAPSED_Y;
+    }
+  }, [COLLAPSED_Y]);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
@@ -263,7 +277,83 @@ export default function CalendarScreen({ navigation }) {
     });
   };
 
-  // Prepare marked dates
+  const handleCreateCategorySubmit = ({ name, type, color }) => {
+    if (name && name.trim()) {
+      const id = new Date().getTime().toString();
+      dispatch(addBoardAsync({ id, name: name.trim(), type: type || 'standard', color }));
+      if (showToast) showToast(t('Category created') || 'Category created');
+    }
+    setCreateCategoryVisible(false);
+  };
+
+  // Custom Day Component: date circle wraps ONLY number, category dots sit lower so focus does not intersect
+  const renderCustomDay = useCallback(({ date, state, marking }) => {
+    if (!date) return null;
+    const dateStr = date.dateString;
+    const isSelected = dateStr === selectedDate;
+    const isToday = dateStr === todayStr;
+    const isDisabled = state === 'disabled';
+    const dayDots = marking?.dots || [];
+    const visibleDots = dayDots.slice(0, 4);
+
+    return (
+      <TouchableOpacity
+        testID={`calendar_day_${dateStr}`}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`${dateStr}${isSelected ? ', selected' : ''}${isToday ? ', today' : ''}`}
+        activeOpacity={0.7}
+        onPress={() => {
+          setSelectedDate(dateStr);
+          setCalendarMonth(dateStr);
+          setSelectionMode({ isActive: false, selectedTaskIds: [] });
+        }}
+        style={styles.dayCellContainer}
+      >
+        <View
+          style={[
+            styles.dayCircle,
+            isSelected ? {
+              backgroundColor: colors.primary,
+            } : isToday ? {
+              backgroundColor: isDark ? 'rgba(103, 80, 164, 0.28)' : 'rgba(103, 80, 164, 0.16)',
+            } : null,
+          ]}
+        >
+          <Text
+            style={[
+              styles.dayText,
+              {
+                color: isSelected
+                  ? (colors.textInverse || '#ffffff')
+                  : isToday
+                  ? colors.primary
+                  : isDisabled
+                  ? (colors.surfaceContainerHigh || '#888888')
+                  : colors.textPrimary,
+                fontWeight: isSelected || isToday ? 'bold' : '600',
+              },
+            ]}
+          >
+            {date.day}
+          </Text>
+        </View>
+
+        {visibleDots.length > 0 && (
+          <View style={styles.dotsRow}>
+            {visibleDots.map((dot, idx) => (
+              <View
+                key={dot.key || idx}
+                style={[styles.boardDot, { backgroundColor: dot.color || colors.primary }]}
+              />
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }, [selectedDate, todayStr, colors, isDark]);
+
+  // Prepare marked dates with category-colored dots
   const markedDates = useMemo(() => {
     const marks = {};
     tasks.forEach(task => {
@@ -278,33 +368,29 @@ export default function CalendarScreen({ navigation }) {
 
     const finalMarks = {};
     Object.keys(marks).forEach(dateStr => {
-      const dayTasksList = marks[dateStr].tasks;
-      const allCompleted = dayTasksList.length > 0 && dayTasksList.every(t => t.completed);
-      const anyMissed = dayTasksList.some(t => !t.completed && dayjs(t.dateString || t.completionDate).isBefore(dayjs(), 'day'));
-      const anyNotes = dayTasksList.some(t => !t.completed && t.description?.text && t.description.text.trim() !== '');
-
-      let dotColor = colors.primary;
-      if (allCompleted) dotColor = '#4caf50';
-      else if (anyMissed) dotColor = '#f44336';
-      else if (anyNotes) dotColor = '#ff9800';
+      const dayTasks = marks[dateStr].tasks;
+      // Extract unique category IDs for tasks on this date
+      const uniqueBoardIds = Array.from(new Set(dayTasks.map(t => t.boardId || 'main')));
+      const dots = uniqueBoardIds.map(bId => {
+        const boardObj = boards.find(b => b && (b.id === bId || b._id === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Category' };
+        return {
+          key: `${bId}_${dateStr}`,
+          color: getBoardColor(boardObj, boards),
+        };
+      });
 
       finalMarks[dateStr] = {
-        marked: true,
-        dotColor: dotColor,
-        textColor: allCompleted ? colors.textSecondary : colors.textPrimary
+        dots,
+        marked: dots.length > 0,
       };
     });
 
-    // Highlight the currently selected date
-    if (finalMarks[selectedDate]) {
-      finalMarks[selectedDate].selected = true;
-      finalMarks[selectedDate].selectedColor = colors.primary;
-    } else {
-      finalMarks[selectedDate] = { selected: true, selectedColor: colors.primary };
+    if (!finalMarks[selectedDate]) {
+      finalMarks[selectedDate] = { dots: [] };
     }
 
     return finalMarks;
-  }, [tasks, selectedDate, colors]);
+  }, [tasks, boards, selectedDate]);
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
@@ -340,19 +426,28 @@ export default function CalendarScreen({ navigation }) {
     if (boards.length < 2) return [{ title: '', data: selectedTasks }];
 
     const groups = {};
-    groups['main'] = { title: 'Main', data: [] };
+    const mainBoard = boards.find(b => b.id === 'main' || b._id === 'main') || { id: 'main', name: 'Main' };
+    groups['main'] = { 
+      title: mainBoard.name === 'Main' ? (t('Main') || 'Main') : mainBoard.name, 
+      color: getBoardColor(mainBoard, boards),
+      data: [] 
+    };
 
     selectedTasks.forEach(task => {
       const bId = task.boardId || 'main';
       if (!groups[bId]) {
-        const boardName = boards.find(b => (b.id === bId || b._id === bId))?.name || 'Board';
-        groups[bId] = { title: boardName, data: [] };
+        const boardObj = boards.find(b => (b.id === bId || b._id === bId)) || { id: bId, name: 'Category' };
+        groups[bId] = { 
+          title: boardObj.name === 'Main' ? (t('Main') || 'Main') : boardObj.name, 
+          color: getBoardColor(boardObj, boards),
+          data: [] 
+        };
       }
       groups[bId].data.push(task);
     });
 
     return Object.values(groups).filter(g => g.data.length > 0);
-  }, [selectedTasks, boards]);
+  }, [selectedTasks, boards, t]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
@@ -369,7 +464,9 @@ export default function CalendarScreen({ navigation }) {
           onMonthChange={(month) => {
             setCalendarMonth(month.dateString);
           }}
+          markingType={'multi-dot'}
           markedDates={markedDates}
+          dayComponent={renderCustomDay}
           enableSwipeMonths={true}
           hideExtraDays={true}
           theme={{
@@ -386,12 +483,12 @@ export default function CalendarScreen({ navigation }) {
             arrowColor: colors.primary,
             monthTextColor: colors.textPrimary,
             indicatorColor: colors.primary,
-            textDayFontWeight: '500',
+            textDayFontWeight: '600',
             textMonthFontWeight: 'bold',
             textDayHeaderFontWeight: '600',
-            textDayFontSize: 15,
-            textMonthFontSize: 17,
-            textDayHeaderFontSize: 13,
+            textDayFontSize: 16,
+            textMonthFontSize: 18,
+            textDayHeaderFontSize: 14,
             'stylesheet.calendar.header': {
               header: {
                 flexDirection: 'row',
@@ -400,7 +497,7 @@ export default function CalendarScreen({ navigation }) {
                 paddingRight: 10,
                 marginTop: 2,
                 alignItems: 'center',
-                height: 38,
+                height: 40,
               },
             },
           }}
@@ -456,9 +553,10 @@ export default function CalendarScreen({ navigation }) {
                 onToggleSelect={() => toggleTaskSelection(item.id || item._id)}
               />
             )}
-            renderSectionHeader={({ section: { title } }) => (
+            renderSectionHeader={({ section: { title, color } }) => (
               title ? (
-                <View style={[styles.sectionHeader, { backgroundColor: colors.bgCard }]}>
+                <View style={[styles.sectionHeader, { backgroundColor: colors.bgCard, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                  {color && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />}
                   <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>{title}</Text>
                 </View>
               ) : null
@@ -594,10 +692,19 @@ export default function CalendarScreen({ navigation }) {
         colors={colors}
         isDark={isDark}
         isDesktop={false}
+        onOpenCreateCategory={() => setCreateCategoryVisible(true)}
         onPressSettings={() => {
           dispatch(setGoogleDrawerOpen(false));
           navigation.navigate('Settings');
         }}
+      />
+
+      {/* Create Category Modal */}
+      <CreateBoardModal
+        isVisible={isCreateCategoryVisible}
+        onClose={() => setCreateCategoryVisible(false)}
+        onSubmit={handleCreateCategorySubmit}
+        colors={colors}
       />
     </View>
   );
@@ -612,11 +719,43 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   calendarContainer: {
-    height: 380,
-    overflow: 'hidden',
+    minHeight: 380,
+    justifyContent: 'flex-start',
   },
   calendar: {
     paddingBottom: 4,
+  },
+  dayCellContainer: {
+    width: 44,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 2,
+  },
+  dayCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayText: {
+    fontSize: 16,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 8,
+    marginTop: 3,
+  },
+  boardDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginHorizontal: 1.5,
   },
   taskListHeader: {
     flexDirection: 'row',
