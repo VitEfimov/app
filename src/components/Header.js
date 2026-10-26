@@ -4,17 +4,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import dayjs from 'dayjs';
 import { useTheme } from '../styles/ThemeContext';
-import { setThemeMode, setGoogleDrawerOpen, triggerJumpToToday } from '../features/themeSlice';
+import { setThemeMode, triggerJumpToToday } from '../features/themeSlice';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
-
-const IconMenu = ({ color = '#333', size = 22 }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <Line x1="3" y1="12" x2="21" y2="12" />
-    <Line x1="3" y1="6" x2="21" y2="6" />
-    <Line x1="3" y1="18" x2="21" y2="18" />
-  </Svg>
-);
 
 const IconCalendar = ({ color = '#4285F4', size = 18 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -108,70 +100,57 @@ export default function Header(props) {
     );
   };
 
-  const handleToggleView = () => {
-    if (isCalendar) {
-      navigation.navigate('Board');
-    } else {
-      navigation.navigate('Calendar');
-    }
-  };
-
   const handlePressToday = () => {
     dispatch(triggerJumpToToday());
   };
 
   const renderHeaderContent = () => (
     <View style={[styles.headerContainer, { backgroundColor: userPicture ? 'rgba(0,0,0,0.5)' : colors.bgHeader, borderBottomColor: colors.borderColor }]}>
-      {/* Left side: Burger menu (☰) + View switch button (List / Calendar) */}
-      <View style={styles.leftSection}>
+      {/* Left: Segmented Switcher (Tasks | Calendar) */}
+      <View style={[styles.segmentedWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: colors.borderColor }]}>
         <TouchableOpacity
-          testID="header_burger_menu"
-          activeOpacity={0.7}
+          testID="segment_tasks"
           accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel="Open navigation menu"
-          style={styles.iconBtn}
-          onPress={() => dispatch(setGoogleDrawerOpen(true))}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: !isCalendar }}
+          accessibilityLabel="Tasks view"
+          style={[
+            styles.segmentItem,
+            !isCalendar && [styles.segmentActive, { backgroundColor: colors.bgCard }]
+          ]}
+          onPress={() => {
+            if (isCalendar) navigation.navigate('Board');
+          }}
         >
-          <IconMenu color={colors.textPrimary} size={22} />
+          <IconBoard color={!isCalendar ? colors.primary : colors.textSecondary} size={15} />
+          <Text style={[styles.segmentText, { color: !isCalendar ? colors.textPrimary : colors.textSecondary, fontWeight: !isCalendar ? '700' : '500' }]}>
+            {t('Tasks') || 'Tasks'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          testID="toggle_view_btn"
-          activeOpacity={0.7}
+          testID="segment_calendar"
           accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel={isCalendar ? "Switch to Categories view" : "Switch to Calendar view"}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: isCalendar }}
+          accessibilityLabel="Calendar view"
           style={[
-            styles.viewSwitchBtn,
-            {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-              borderColor: colors.borderColor || 'rgba(0,0,0,0.1)',
-            }
+            styles.segmentItem,
+            isCalendar && [styles.segmentActive, { backgroundColor: colors.bgCard }]
           ]}
-          onPress={handleToggleView}
+          onPress={() => {
+            if (!isCalendar) navigation.navigate('Calendar');
+          }}
         >
-          {isCalendar ? (
-            <>
-              <IconBoard color={colors.primary} size={18} />
-              <Text style={[styles.viewSwitchText, { color: colors.textPrimary }]}>
-                {t('Categories') || 'Categories'}
-              </Text>
-            </>
-          ) : (
-            <>
-              <IconCalendar color={colors.primary} size={18} />
-              <Text style={[styles.viewSwitchText, { color: colors.textPrimary }]}>
-                {t('Calendar') || 'Calendar'}
-              </Text>
-            </>
-          )}
+          <IconCalendar color={isCalendar ? colors.primary : colors.textSecondary} size={15} />
+          <Text style={[styles.segmentText, { color: isCalendar ? colors.textPrimary : colors.textSecondary, fontWeight: isCalendar ? '700' : '500' }]}>
+            {t('Calendar') || 'Calendar'}
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Right side: Today button + Pomodoro + Date + Theme + Settings */}
+      {/* Right side: Dynamic Today button + Pomodoro + Theme + Settings */}
       <View style={styles.rightSection}>
-        {/* Google-style "Today" Button */}
         <TouchableOpacity
           testID="header_today_btn"
           activeOpacity={0.7}
@@ -179,15 +158,21 @@ export default function Header(props) {
           accessibilityRole="button"
           accessibilityLabel="Go to today"
           style={[
-            styles.todayBtn,
+            styles.todayBadge,
             {
-              borderColor: colors.borderColor || 'rgba(0,0,0,0.15)',
+              borderColor: colors.borderColor || 'rgba(0,0,0,0.12)',
               backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
             }
           ]}
           onPress={handlePressToday}
         >
-          <Text style={[styles.todayBtnText, { color: colors.primary }]}>
+          <View style={[styles.todayIconBox, { borderColor: colors.primary }]}>
+            <View style={[styles.todayIconHeader, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.todayIconDate, { color: colors.primary }]}>
+              {dayjs().date()}
+            </Text>
+          </View>
+          <Text style={[styles.todayText, { color: colors.textPrimary }]}>
             {t('Today') || 'Today'}
           </Text>
         </TouchableOpacity>
@@ -203,10 +188,6 @@ export default function Header(props) {
             <Text style={[styles.pomodoroText, { color: '#fff' }]}>{t("Time's Up!")}</Text>
           </View>
         ) : null}
-
-        <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-          {dayjs().format('ddd, MMM D')}
-        </Text>
 
         <TouchableOpacity
           activeOpacity={0.7}
@@ -225,7 +206,7 @@ export default function Header(props) {
           accessible={true}
           accessibilityRole="button"
           accessibilityLabel="Settings"
-          style={[styles.iconBtn, { backgroundColor: colors.surfaceContainerHigh, marginLeft: 4 }]}
+          style={[styles.iconBtn, { backgroundColor: colors.surfaceContainerHigh }]}
           onPress={() => navigation.navigate('Settings')}
         >
           <IconSettings color={colors.textPrimary} size={18} />
@@ -270,60 +251,82 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    minHeight: 54,
-    height: 54,
+    minHeight: 52,
+    height: 52,
     borderBottomWidth: 1,
   },
   bgImage: {
     width: '100%',
   },
-  leftSection: {
+  segmentedWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  viewSwitchBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
+    padding: 2,
   },
-  viewSwitchText: {
+  segmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 17,
+    gap: 5,
+  },
+  segmentActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentText: {
     fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 5,
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
-  todayBtn: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+  todayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 16,
     borderWidth: 1,
-    marginRight: 4,
+    gap: 6,
   },
-  todayBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
+  todayIconBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 3.5,
+    borderWidth: 1.2,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
-  dateText: {
+  todayIconHeader: {
+    width: '100%',
+    height: 3.5,
+  },
+  todayIconDate: {
+    fontSize: 9,
+    fontWeight: '800',
+    lineHeight: 12,
+    textAlign: 'center',
+  },
+  todayText: {
     fontSize: 12,
-    fontWeight: '500',
-    marginRight: 4,
+    fontWeight: '700',
   },
   pomodoroBadge: {
     backgroundColor: 'rgba(255, 99, 71, 0.2)',
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 12,
-    marginRight: 6,
   },
   pomodoroText: {
     fontSize: 11,
