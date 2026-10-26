@@ -20,10 +20,10 @@ import Modal from 'react-native-modal';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard, getDateThresholds, classifyTaskDate, compareTasks, PRIORITY_SCORES } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
-import { setBoardsCollapsed, setGoogleDrawerOpen } from '../features/themeSlice';
+import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
@@ -63,10 +63,51 @@ export default function BoardScreen({ route, navigation }) {
     dispatch(setBoardsCollapsed(!isBoardsCollapsed));
   };
 
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, mode } = useTheme();
   const { showToast } = useToast();
   const { t } = useTranslation();
   const dispatch = useDispatch();
+
+  const handleToggleTheme = () => {
+    const modes = ['light', 'dark', 'contrast'];
+    let currentIndex = modes.indexOf(mode);
+    if (currentIndex === -1) {
+      currentIndex = isDark ? 1 : 0; 
+    }
+    const nextIndex = (currentIndex + 1) % modes.length;
+    dispatch(setThemeMode(modes[nextIndex]));
+  };
+
+  const renderThemeIcon = () => {
+    if (mode === 'contrast') {
+      return (
+        <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2">
+          <Circle cx="12" cy="12" r="10" />
+          <Path d="M12 2a10 10 0 0 0 0 20V2z" fill={colors.textPrimary} />
+        </Svg>
+      );
+    }
+    if (isDark) {
+      return (
+        <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill={`${colors.primary}33`} />
+        </Svg>
+      );
+    }
+    return (
+      <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <Circle cx="12" cy="12" r="5" fill={`${colors.primary}33`} />
+        <Line x1="12" y1="1" x2="12" y2="3" />
+        <Line x1="12" y1="21" x2="12" y2="23" />
+        <Line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <Line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <Line x1="1" y1="12" x2="3" y2="12" />
+        <Line x1="21" y1="12" x2="23" y2="12" />
+        <Line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <Line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+      </Svg>
+    );
+  };
   const isGoogleDrawerOpen = useSelector(state => state.themeReducer?.isGoogleDrawerOpen || false);
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || [{ id: 'main', name: 'Main' }]);
@@ -752,6 +793,16 @@ export default function BoardScreen({ route, navigation }) {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity 
+              accessible={true} 
+              accessibilityRole="button" 
+              accessibilityLabel="Toggle theme"
+              style={{ width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
+              onPress={handleToggleTheme}
+            >
+              {renderThemeIcon()}
+            </TouchableOpacity>
+
             <TouchableOpacity 
               accessible={true} 
               accessibilityRole="button" 

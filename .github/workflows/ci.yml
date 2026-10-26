@@ -7,12 +7,14 @@ on:
       - master
       - task_calendar
       - simpliest_v1
+      - simpliest_v2_new_design
   pull_request:
     branches:
       - main
       - master
       - task_calendar
       - simpliest_v1
+      - simpliest_v2_new_design
   workflow_dispatch:
 
 concurrency:

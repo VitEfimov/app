@@ -31,7 +31,7 @@ import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import CreateBoardModal from '../components/CreateBoardModal';
 import CalendarDayOptionsModal from '../components/calendar/CalendarDayOptionsModal';
 import { updateTask, deleteTask } from '../features/taskSlice';
-import { setGoogleDrawerOpen } from '../features/themeSlice';
+import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
 import { getBoardColor } from '../utils/boardColors';
 
@@ -74,7 +74,7 @@ const IconSubtasksLines = ({ color = '#888', size = 14 }) => (
 );
 
 export default function CalendarScreen({ navigation }) {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, mode } = useTheme();
   const { t, i18n } = useTranslation();
   const { showToast } = useToast ? useToast() : { showToast: () => {} };
   const dispatch = useDispatch();
@@ -92,6 +92,47 @@ export default function CalendarScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isInlineAddActive, setIsInlineAddActive] = useState(false);
+
+  const handleToggleTheme = () => {
+    const modes = ['light', 'dark', 'contrast'];
+    let currentIndex = modes.indexOf(mode);
+    if (currentIndex === -1) {
+      currentIndex = isDark ? 1 : 0; 
+    }
+    const nextIndex = (currentIndex + 1) % modes.length;
+    dispatch(setThemeMode(modes[nextIndex]));
+  };
+
+  const renderThemeIcon = () => {
+    if (mode === 'contrast') {
+      return (
+        <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2">
+          <Circle cx="12" cy="12" r="10" />
+          <Path d="M12 2a10 10 0 0 0 0 20V2z" fill={colors.textPrimary} />
+        </Svg>
+      );
+    }
+    if (isDark) {
+      return (
+        <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill={`${colors.primary}33`} />
+        </Svg>
+      );
+    }
+    return (
+      <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <Circle cx="12" cy="12" r="5" fill={`${colors.primary}33`} />
+        <Line x1="12" y1="1" x2="12" y2="3" />
+        <Line x1="12" y1="21" x2="12" y2="23" />
+        <Line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <Line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <Line x1="1" y1="12" x2="3" y2="12" />
+        <Line x1="21" y1="12" x2="23" y2="12" />
+        <Line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <Line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+      </Svg>
+    );
+  };
 
   // Jump to today whenever header Today button is pressed
   useEffect(() => {
@@ -348,6 +389,27 @@ export default function CalendarScreen({ navigation }) {
     return boards.find(b => b.id === filterBoardId || b._id === filterBoardId);
   }, [filterBoardId, boards]);
 
+  const groupedTasks = useMemo(() => {
+    if (!selectedTasks.length) return [];
+    
+    const groups = {};
+    selectedTasks.forEach(task => {
+      const bId = task.boardId || 'main';
+      if (!groups[bId]) {
+        const boardObj = boards.find(b => (b.id === bId || b._id === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Category' };
+        groups[bId] = {
+          id: bId,
+          title: boardObj.name === 'Main' ? (t('Main') || 'Main') : boardObj.name,
+          color: getBoardColor(boardObj, boards),
+          data: []
+        };
+      }
+      groups[bId].data.push(task);
+    });
+
+    return Object.values(groups);
+  }, [selectedTasks, boards, t]);
+
   const formattedDayTitle = useMemo(() => {
     return dayjs(selectedDate).format('dddd, MMMM D');
   }, [selectedDate]);
@@ -382,13 +444,27 @@ export default function CalendarScreen({ navigation }) {
             </Text>
           </View>
 
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => setIsSearchActive(!isSearchActive)}
-            style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
-          >
-            <IconSearch color={colors.textPrimary} size={18} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={handleToggleTheme}
+              style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+              accessibilityRole="button"
+              accessibilityLabel="Toggle theme"
+            >
+              {renderThemeIcon()}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setIsSearchActive(!isSearchActive)}
+              style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+              accessibilityRole="button"
+              accessibilityLabel="Search tasks"
+            >
+              <IconSearch color={colors.textPrimary} size={18} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search bar when toggled */}
@@ -506,152 +582,74 @@ export default function CalendarScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Day Header */}
-        <View style={styles.dayHeaderRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.dayTitle, { color: colors.textPrimary }]}>
-              {formattedDayTitle}
+        {/* Tasks List Card matching user picture */}
+        <View style={[styles.dayTaskListCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+          {/* Header row: Tasks for Oct 26, 2026 ... */}
+          <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
+            <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
+              {t('Tasks for')} {dayjs(selectedDate).format('MMM D, YYYY')}
             </Text>
-            <Text style={[styles.daySubtitle, { color: colors.textSecondary }]}>
-              {formattedDaySubtitle}
-            </Text>
+            <TouchableOpacity
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Day options"
+              style={styles.ellipsisBtn}
+              onPress={() => setIsDayOptionsVisible(true)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={[styles.ellipsisText, { color: colors.textSecondary }]}>⋯</Text>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setIsDayOptionsVisible(true)}
-            style={styles.optionsDotBtn}
-          >
-            <IconMoreHorizontal color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
+          {/* Grouped by Category */}
+          {groupedTasks.length > 0 ? (
+            groupedTasks.map(group => (
+              <View key={group.id} style={styles.categorySectionGroup}>
+                {/* Category Header: 🟠 DCFGH */}
+                <View style={[styles.categorySectionHeader, { borderBottomColor: colors.borderColor }]}>
+                  <View style={[styles.categoryHeaderDot, { backgroundColor: group.color }]} />
+                  <Text style={[styles.categoryHeaderText, { color: colors.textSecondary }]}>
+                    {group.title.toUpperCase()}
+                  </Text>
+                </View>
 
-        {/* Tasks List */}
-        {selectedTasks.length > 0 ? (
-          <View style={styles.tasksListContainer}>
-            {selectedTasks.map(task => {
-              const taskBoard = boards.find(b => (b.id === task.boardId || b._id === task.boardId)) || { name: 'Main' };
-              const boardColor = getBoardColor(taskBoard, boards);
-              const isSelected = selectionMode.selectedTaskIds.includes(task.id || task._id);
-
-              return (
-                <TouchableOpacity
-                  key={task.id || task._id}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    if (selectionMode.isActive) {
-                      toggleTaskSelection(task.id || task._id);
-                    } else {
-                      handleTaskPress(task);
-                    }
-                  }}
-                  style={[
-                    styles.taskCard,
-                    {
-                      backgroundColor: colors.bgCard,
-                      borderColor: isSelected ? primaryAccent : (colors.borderColor || '#ECECEF'),
-                    }
-                  ]}
-                >
-                  {/* Round Checkbox */}
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      dispatch(updateTask({ taskId: task.id || task._id, completed: !task.completed }));
-                    }}
-                    style={[
-                      styles.taskCheckbox,
-                      {
-                        borderColor: task.completed ? primaryAccent : (colors.textSecondary || '#BBB'),
-                        backgroundColor: task.completed ? primaryAccent : 'transparent',
-                      }
-                    ]}
-                  >
-                    {task.completed && (
-                      <Svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <Path d="M20 6L9 17l-5-5" />
-                      </Svg>
-                    )}
-                  </TouchableOpacity>
-
-                  {/* Task details */}
-                  <View style={{ flex: 1, marginHorizontal: 12 }}>
-                    <Text 
-                      style={[
-                        styles.taskName, 
-                        { 
-                          color: task.completed ? colors.textSecondary : colors.textPrimary,
-                          textDecorationLine: task.completed ? 'line-through' : 'none',
-                        }
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {task.taskname}
-                    </Text>
-
-                    {/* Metadata Sub-row */}
-                    <View style={styles.taskMetaRow}>
-                      <View style={[styles.boardDotSmall, { backgroundColor: boardColor }]} />
-                      <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                        {taskBoard.name}
-                      </Text>
-                      <Text style={[styles.metaText, { color: colors.textSecondary, marginHorizontal: 4 }]}>
-                        •
-                      </Text>
-                      <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                        {task.time || t('No time') || 'No time'}
-                      </Text>
-                      {task.subtasks && task.subtasks.length > 0 && (
-                        <View style={{ marginLeft: 6 }}>
-                          <IconSubtasksLines color={colors.textSecondary} size={12} />
-                        </View>
-                      )}
-                    </View>
+                {/* Tasks in Category */}
+                {group.data.map(task => (
+                  <View key={task.id || task._id} style={[styles.taskRowWrapper, { borderBottomColor: colors.borderColor }]}>
+                    <TaskRow
+                      task={task}
+                      hideDate={true}
+                      hideBoardBadge={false}
+                      isSelectionMode={selectionMode.isActive}
+                      isSelected={selectionMode.selectedTaskIds.includes(task.id || task._id)}
+                      onToggleSelect={() => toggleTaskSelection(task.id || task._id)}
+                      onPressSnooze={() => { setSelectedTask(task); setDetailsVisible(true); }}
+                      onPressMore={() => handleTaskPress(task)}
+                      onPress={() => handleTaskPress(task)}
+                    />
                   </View>
+                ))}
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {t('No tasks scheduled for this day.') || 'No tasks scheduled for this day.'}
+              </Text>
+            </View>
+          )}
 
-                  {/* Right Chevron */}
-                  <IconChevronRight color={colors.textSecondary} size={16} />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={[styles.emptyBox, { borderColor: colors.borderColor }]}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {t('No tasks scheduled for this day.') || 'No tasks scheduled for this day.'}
-            </Text>
-          </View>
-        )}
-
-        {/* Inline Add Task when opened */}
-        {isInlineAddActive && (
-          <View style={{ marginTop: 10 }}>
+          {/* Bottom + Add task */}
+          <View style={[styles.inlineAddWrapper, { borderTopColor: colors.borderColor }]}>
             <InlineAddTask
               sectionId={selectedDate}
               onAddDetails={(task) => {
                 setSelectedTask(task);
                 setDetailsVisible(true);
-                setIsInlineAddActive(false);
               }}
             />
           </View>
-        )}
-
-        {/* + Add task for this day Button (Light lavender pill matching Image 5) */}
-        {!isInlineAddActive && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setIsInlineAddActive(true)}
-            style={[
-              styles.addTaskDayBtn,
-              { backgroundColor: isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.10)' }
-            ]}
-          >
-            <Text style={[styles.addTaskDayText, { color: primaryAccent }]}>
-              + {t('Add task for this day') || 'Add task for this day'}
-            </Text>
-          </TouchableOpacity>
-        )}
+        </View>
       </ScrollView>
 
       {/* Multi-Selection Action Bar */}
@@ -878,70 +876,79 @@ const styles = StyleSheet.create({
   optionsDotBtn: {
     padding: 6,
   },
-  tasksListContainer: {
-    gap: 8,
-    marginBottom: 14,
-  },
-  taskCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 16,
+  dayTaskListCard: {
+    borderRadius: 20,
     borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: 6,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  taskCheckbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    justifyContent: 'center',
+  taskListHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
   },
-  taskName: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 3,
+  taskListTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
-  taskMetaRow: {
+  ellipsisBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  ellipsisText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    lineHeight: 22,
+  },
+  categorySectionGroup: {
+    borderBottomWidth: 0,
+  },
+  categorySectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+    gap: 8,
+    borderBottomWidth: 1,
   },
-  boardDotSmall: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 5,
+  categoryHeaderDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  metaText: {
+  categoryHeaderText: {
     fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
-  emptyBox: {
-    paddingVertical: 32,
+  taskRowWrapper: {
+    borderBottomWidth: 1,
+  },
+  inlineAddWrapper: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+  },
+  emptyContainer: {
+    paddingVertical: 36,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    marginBottom: 14,
   },
   emptyText: {
-    fontSize: 13,
-  },
-  addTaskDayBtn: {
-    height: 48,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addTaskDayText: {
     fontSize: 14,
-    fontWeight: '700',
+    textAlign: 'center',
   },
   actionBar: {
     position: 'absolute',

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync } from '../utils/calendarSync';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
@@ -58,6 +58,13 @@ const SOUND_ASSETS = {
   'xelof.mp3': require('../../assets/audio/xelof.mp3'),
   'xylo.mp3': require('../../assets/audio/xylo.mp3'),
 };
+
+const IconClock = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="10" />
+    <Path d="M12 6v6l4 2" />
+  </Svg>
+);
 
 const IconSliders = ({ color = '#000', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -139,6 +146,65 @@ export default function SettingsScreen({ navigation }) {
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
   const [premiumFeatureName, setPremiumFeatureName] = useState('');
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
+  const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
+  const [isSnoozePickerOpen, setSnoozePickerOpen] = useState(false);
+
+  const formatSnoozeTime = (val) => {
+    if (val >= 1440) return `${val / 1440} ${t('day') || 'day'}`;
+    if (val >= 60) return `${val / 60} ${val >= 120 ? (t('hours') || 'hours') : (t('hour') || 'hour')}`;
+    return `${val} ${t('min') || 'min'}`;
+  };
+
+  const snoozeOptions = [
+    { label: `5 ${t('min') || 'min'}`, value: 5 },
+    { label: `10 ${t('min') || 'min'}`, value: 10 },
+    { label: `15 ${t('min') || 'min'}`, value: 15 },
+    { label: `30 ${t('min') || 'min'}`, value: 30 },
+    { label: `1 ${t('hour') || 'hour'}`, value: 60 },
+    { label: `2 ${t('hours') || 'hours'}`, value: 120 },
+    { label: `1 ${t('day') || 'day'}`, value: 1440 },
+  ];
+
+  const handleToggleTheme = () => {
+    const modes = ['light', 'dark', 'contrast'];
+    let currentIndex = modes.indexOf(mode);
+    if (currentIndex === -1) {
+      currentIndex = isDark ? 1 : 0; 
+    }
+    const nextIndex = (currentIndex + 1) % modes.length;
+    dispatch(setThemeMode(modes[nextIndex]));
+  };
+
+  const renderThemeIcon = () => {
+    if (mode === 'contrast') {
+      return (
+        <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2">
+          <Circle cx="12" cy="12" r="10" />
+          <Path d="M12 2a10 10 0 0 0 0 20V2z" fill={colors.textPrimary} />
+        </Svg>
+      );
+    }
+    if (isDark) {
+      return (
+        <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill={`${colors.primary}33`} />
+        </Svg>
+      );
+    }
+    return (
+      <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <Circle cx="12" cy="12" r="5" fill={`${colors.primary}33`} />
+        <Line x1="12" y1="1" x2="12" y2="3" />
+        <Line x1="12" y1="21" x2="12" y2="23" />
+        <Line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <Line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <Line x1="1" y1="12" x2="3" y2="12" />
+        <Line x1="21" y1="12" x2="23" y2="12" />
+        <Line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <Line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+      </Svg>
+    );
+  };
 
   const currentSoundRef = useRef(null);
   const primaryAccent = colors.primary || '#5D45DB';
@@ -255,13 +321,27 @@ export default function SettingsScreen({ navigation }) {
             </Text>
           </View>
 
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => setThemeModalVisible(true)}
-            style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
-          >
-            <IconSliders color={colors.textPrimary} size={18} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={handleToggleTheme}
+              style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+              accessibilityRole="button"
+              accessibilityLabel="Toggle theme"
+            >
+              {renderThemeIcon()}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setThemeModalVisible(true)}
+              style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+              accessibilityRole="button"
+              accessibilityLabel="Appearance settings"
+            >
+              <IconSliders color={colors.textPrimary} size={18} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Section 1: Make it yours */}
@@ -436,6 +516,59 @@ export default function SettingsScreen({ navigation }) {
                     {snd.label}
                   </Text>
                   {theme.notificationSound === snd.value && (
+                    <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Default snooze */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setSnoozePickerOpen(!isSnoozePickerOpen)}
+            style={styles.cardItemRow}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+              <IconClock color={primaryAccent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Default Snooze') || 'Default snooze'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
+                {formatSnoozeTime(defaultSnoozeTime)}
+              </Text>
+              <IconChevronRight color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Expanded snooze options */}
+          {isSnoozePickerOpen && (
+            <View style={styles.expandedSubOptions}>
+              {snoozeOptions.map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={styles.soundItemRow}
+                  onPress={() => {
+                    dispatch(setDefaultSnoozeTime(opt.value));
+                    setSnoozePickerOpen(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.soundItemText, 
+                    { 
+                      color: defaultSnoozeTime === opt.value ? primaryAccent : colors.textPrimary,
+                      fontWeight: defaultSnoozeTime === opt.value ? '700' : '500'
+                    }
+                  ]}>
+                    {opt.label}
+                  </Text>
+                  {defaultSnoozeTime === opt.value && (
                     <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
                   )}
                 </TouchableOpacity>
