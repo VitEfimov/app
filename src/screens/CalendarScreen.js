@@ -277,10 +277,10 @@ export default function CalendarScreen({ navigation }) {
     });
   };
 
-  const handleCreateCategorySubmit = ({ name, type, color }) => {
+  const handleCreateCategorySubmit = ({ name, type, color, repeatConfig, repeatDuration }) => {
     if (name && name.trim()) {
       const id = new Date().getTime().toString();
-      dispatch(addBoardAsync({ id, name: name.trim(), type: type || 'standard', color }));
+      dispatch(addBoardAsync({ id, name: name.trim(), type: type || 'standard', color, repeatConfig, repeatDuration }));
       if (showToast) showToast(t('Category created') || 'Category created');
     }
     setCreateCategoryVisible(false);

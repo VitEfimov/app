@@ -8,6 +8,7 @@ import { addTask } from '../../features/taskSlice';
 import { getBoardColor } from '../../utils/boardColors';
 import { useToast } from '../../styles/ToastContext';
 import { IconClock, IconCalendar, IconClose } from './CalendarIcons';
+import useTaskRepeat from '../../custom-hooks/useTaskRepeat';
 
 export default function QuickAddTaskModal({
   isVisible,
@@ -33,6 +34,7 @@ export default function QuickAddTaskModal({
   );
   const [selectedBoardId, setSelectedBoardId] = useState('main');
   const [priority, setPriority] = useState('none');
+  const { generateRepeatingTasks } = useTaskRepeat();
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -53,6 +55,22 @@ export default function QuickAddTaskModal({
 
   const handleSave = () => {
     const finalTitle = taskName.trim() || t('New Task') || 'New Task';
+    const targetBoardId = selectedBoardId || 'main';
+    const targetBoard = boards.find(b => (b.id === targetBoardId || b._id === targetBoardId));
+    const isEventsBoard = targetBoard?.type === 'birthdays' || targetBoard?.type === 'events' || (targetBoard?.name && targetBoard.name.toLowerCase() === 'events');
+    const boardRepeatConfig = targetBoard?.repeatConfig || (isEventsBoard ? { preset: 'every_year' } : null);
+    const hasDefaultRepeat = Boolean(boardRepeatConfig && boardRepeatConfig.preset && boardRepeatConfig.preset !== 'None');
+
+    const startDateStr = dayjs(selectedDate).format('YYYY-MM-DD');
+    let endDateStr = startDateStr;
+    if (hasDefaultRepeat) {
+      const dur = targetBoard?.repeatDuration || { count: 10, unit: 'year' };
+      const count = parseInt(dur.count, 10) || (boardRepeatConfig.preset === 'every_year' ? 10 : 1);
+      const unit = dur.unit || (boardRepeatConfig.preset === 'every_year' ? 'year' : 'month');
+      endDateStr = dayjs(selectedDate).add(count, unit).format('YYYY-MM-DD');
+    }
+
+    const seriesId = hasDefaultRepeat ? ('series_' + Date.now().toString() + Math.random().toString(36).substr(2, 9)) : undefined;
 
     const newTask = {
       id: Date.now().toString(),
@@ -60,14 +78,42 @@ export default function QuickAddTaskModal({
       completionDate: dayjs(selectedDate).toISOString(),
       dateString: selectedDate,
       time: isAllDay ? '' : timeStr,
-      boardId: selectedBoardId || 'main',
+      boardId: targetBoardId,
       priority: priority || 'none',
       completed: false,
       createdAt: new Date().toISOString(),
       description: { text: '' },
+      ...(hasDefaultRepeat ? {
+        repeat: boardRepeatConfig.preset === 'every_year' ? 'yearly' : boardRepeatConfig.preset,
+        repeatFrequency: boardRepeatConfig.preset,
+        repeatConfig: boardRepeatConfig,
+        repeatStartDate: startDateStr,
+        repeatEndDate: endDateStr,
+        recurringSeriesId: seriesId,
+        isRecurring: true
+      } : {})
     };
 
     dispatch(addTask({ task: newTask }));
+    if (hasDefaultRepeat) {
+      generateRepeatingTasks(
+        newTask,
+        {
+          name: finalTitle,
+          priority: priority || 'none',
+          time: isAllDay ? null : timeStr,
+          reminder: 'None',
+          isAlarm: false,
+          description: { text: '' },
+          subtasks: []
+        },
+        {
+          ...boardRepeatConfig,
+          startDate: startDateStr,
+          endDate: endDateStr
+        }
+      );
+    }
     if (showToast) {
       showToast(t('Task created') || 'Task created');
     }

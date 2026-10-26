@@ -651,10 +651,10 @@ export default function BoardScreen({ route, navigation }) {
     setCreateBoardVisible(true);
   };
 
-  const handleCreateBoardSubmit = ({ name, type, color }) => {
+  const handleCreateBoardSubmit = ({ name, type, color, repeatConfig, repeatDuration }) => {
     if (name && name.trim()) {
       const id = new Date().getTime().toString();
-      dispatch(addBoardAsync({ id, name: name.trim(), type: type || 'standard', color }));
+      dispatch(addBoardAsync({ id, name: name.trim(), type: type || 'standard', color, repeatConfig, repeatDuration }));
       dispatch(setActiveBoardId(id));
     }
     setCreateBoardVisible(false);
@@ -1119,6 +1119,17 @@ export default function BoardScreen({ route, navigation }) {
             >
               <Text style={[styles.optionText, { color: colors.primary, fontWeight: 'bold' }]}>{t('Board Automations')}</Text>
             </TouchableOpacity>
+          )}
+
+          {boardOptionsConfig.board?.repeatConfig && (
+            <View style={[styles.optionBtn, { borderBottomColor: colors.borderColor, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+              <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Auto-Repeat')}</Text>
+              <View style={{ backgroundColor: 'rgba(236, 72, 153, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                <Text style={{ color: '#EC4899', fontSize: 12, fontWeight: '700' }}>
+                  🔁 {boardOptionsConfig.board.repeatConfig.preset.replace(/_/g, ' ')} ({boardOptionsConfig.board.repeatDuration?.count || 10} {boardOptionsConfig.board.repeatDuration?.unit || 'yr'}s)
+                </Text>
+              </View>
+            </View>
           )}
 
           {boardOptionsConfig.board?.id !== 'main' && (

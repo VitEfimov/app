@@ -134,9 +134,19 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     const targetBoardId = selectedBoardId || activeBoardId || 'main';
     const activeBoard = boards.find(b => b.id === targetBoardId);
     const isEventsBoard = activeBoard?.type === 'birthdays' || activeBoard?.type === 'events' || (activeBoard?.name && activeBoard.name.toLowerCase() === 'events');
+    const boardRepeatConfig = activeBoard?.repeatConfig || (isEventsBoard ? { preset: 'every_year' } : null);
+    const hasDefaultRepeat = Boolean(boardRepeatConfig && boardRepeatConfig.preset && boardRepeatConfig.preset !== 'None');
+
     const startDateStr = dayjs(selectedDate).format('YYYY-MM-DD');
-    const endDateStr = dayjs(selectedDate).add(10, 'year').format('YYYY-MM-DD');
-    const seriesId = isEventsBoard ? ('series_' + Date.now().toString() + Math.random().toString(36).substr(2, 9)) : undefined;
+    let endDateStr = startDateStr;
+    if (hasDefaultRepeat) {
+      const dur = activeBoard?.repeatDuration || { count: 10, unit: 'year' };
+      const count = parseInt(dur.count, 10) || (boardRepeatConfig.preset === 'every_year' ? 10 : 1);
+      const unit = dur.unit || (boardRepeatConfig.preset === 'every_year' ? 'year' : 'month');
+      endDateStr = dayjs(selectedDate).add(count, unit).format('YYYY-MM-DD');
+    }
+
+    const seriesId = hasDefaultRepeat ? ('series_' + Date.now().toString() + Math.random().toString(36).substr(2, 9)) : undefined;
 
     const newTask = {
       id: new Date().getTime().toString(),
@@ -149,10 +159,10 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       priority: 'none',
       completed: false,
       description: { text: '', img: '', url: '' },
-      ...(isEventsBoard ? {
-        repeat: 'yearly',
-        repeatFrequency: 'Every year',
-        repeatConfig: { preset: 'every_year' },
+      ...(hasDefaultRepeat ? {
+        repeat: boardRepeatConfig.preset === 'every_year' ? 'yearly' : boardRepeatConfig.preset,
+        repeatFrequency: boardRepeatConfig.preset,
+        repeatConfig: boardRepeatConfig,
         repeatStartDate: startDateStr,
         repeatEndDate: endDateStr,
         recurringSeriesId: seriesId,
@@ -163,7 +173,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     dispatch(addTask({ task: newTask }));
     if (onAddTask) onAddTask(newTask);
 
-    if (isEventsBoard) {
+    if (hasDefaultRepeat) {
       generateRepeatingTasks(
         newTask,
         {
@@ -176,7 +186,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
           subtasks: []
         },
         {
-          preset: 'every_year',
+          ...boardRepeatConfig,
           startDate: startDateStr,
           endDate: endDateStr
         }

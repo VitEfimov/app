@@ -94,19 +94,19 @@ export const changePassword = createAsyncThunk('user/changePassword', async ({ c
     }
 });
 
-export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name, type = 'standard', color }, thunkAPI) => {
+export const addBoardAsync = createAsyncThunk('user/addBoard', async ({ id, name, type = 'standard', color, repeatConfig, repeatDuration }, thunkAPI) => {
     const fullState = thunkAPI.getState();
     const state = fullState.userReducer;
     const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
     if (state.isAuthenticated && dbSyncEnabled) {
         try {
-            const response = await axios.post('/api/boards', { id, name, type, color }, { withCredentials: true });
+            const response = await axios.post('/api/boards', { id, name, type, color, repeatConfig, repeatDuration }, { withCredentials: true });
             return response.data;
         } catch (e) {
             // Optimistic fallback
         }
     }
-    return { id, name, type, color };
+    return { id, name, type, color, repeatConfig, repeatDuration };
 });
 
 export const renameBoardAsync = createAsyncThunk('user/renameBoard', async ({ id, name }, thunkAPI) => {
@@ -341,9 +341,9 @@ const userSlice = createSlice({
                 state.activeBoardId = 'main';
             })
             .addCase(addBoardAsync.pending, (state, action) => {
-                const { id, name, type = 'standard', color } = action.meta.arg;
+                const { id, name, type = 'standard', color, repeatConfig, repeatDuration } = action.meta.arg;
                 if (!state.boards.find(b => b.id === id)) {
-                    state.boards.push({ id, name, type, color });
+                    state.boards.push({ id, name, type, color, repeatConfig, repeatDuration });
                 }
                 AsyncStorage.setItem('boards', JSON.stringify(state.boards));
             })
