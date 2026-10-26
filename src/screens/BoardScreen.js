@@ -740,85 +740,93 @@ export default function BoardScreen({ route, navigation }) {
     >
       <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       
-      {/* Top Tabs */}
-      <Animated.View layout={LinearTransition.duration(300)} style={[styles.topBar, { borderBottomColor: colors.borderColor, paddingTop: isBoardsCollapsed ? 0 : 10, alignItems: 'center' }]}>
-        <View style={{ flex: 1, overflow: 'hidden' }}>
-          {isBoardsCollapsed ? (
-            <TouchableOpacity onPress={toggleBoardsCollapsed} activeOpacity={0.8} style={{ flex: 1, justifyContent: 'center' }}>
-              <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.miniBoardsContainer}>
-                {boards.map(board => (
-                  <View 
-                    key={board.id} 
-                    style={[
-                      styles.miniBoardLine, 
-                      { 
-                        backgroundColor: getBoardColor(board, boards),
-                        flex: activeBoardId === board.id ? 2 : 1, 
-                        opacity: activeBoardId === board.id ? 1 : 0.5,
-                      }
-                    ]} 
-                  />
-                ))}
-              </Animated.View>
+        {/* Screen Header matching new design */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 }}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={{ fontSize: 28, fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary, marginBottom: 2 }}>
+              {t('Tasks') || 'Tasks'}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+              {activeBoard ? (activeBoard.name === 'Main' ? (t('Focus on what matters most.') || 'Focus on what matters most.') : activeBoard.name) : (t('Focus on what matters most.') || 'Focus on what matters most.')}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity 
+              accessible={true} 
+              accessibilityRole="button" 
+              accessibilityLabel="Add new category"
+              style={{ width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
+              onPress={handleAddBoard}
+            >
+              <Text style={{ fontSize: 22, color: colors.textPrimary, fontWeight: '400' }}>+</Text>
             </TouchableOpacity>
-          ) : (
-            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.boardsScroll}>
-                {boards.map(board => (
-                  <TouchableOpacity 
-                    key={board.id} 
-                    testID={`board_tab_${board.id}`}
-                    accessible={true} accessibilityRole="tab" accessibilityLabel={`Board ${board.name === 'Main' ? t('Main') : board.name}`} accessibilityState={{ selected: activeBoardId === board.id }}
-                    style={[
-                      styles.mainTab, 
-                      activeBoardId === board.id && { borderBottomColor: colors.primary },
-                      { flexDirection: 'row', alignItems: 'center' }
-                    ]}
-                    onPress={() => dispatch(setActiveBoardId(board.id))}
-                    onLongPress={() => handleBoardOptions(board)}
-                  >
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getBoardColor(board, boards), marginRight: 6 }} />
-                    <Text style={[
-                      styles.mainTabText, 
-                      { color: activeBoardId === board.id ? colors.primary : colors.textSecondary }
-                    ]}>{board.name === 'Main' ? t('Main') : board.name}</Text>
-                    {(() => {
-                      const count = boardCounts[board.id] || 0;
-                      if (count > 0) {
-                        return (
-                          <View style={{
-                            backgroundColor: activeBoardId === board.id ? `${colors.primary}20` : `${colors.textSecondary}20`,
-                            borderRadius: 10,
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
-                            marginLeft: 6
-                          }}>
-                            <Text style={{
-                              color: activeBoardId === board.id ? colors.primary : colors.textSecondary,
-                              fontSize: 10,
-                              fontWeight: 'bold'
-                            }}>{count}</Text>
-                          </View>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </TouchableOpacity>
-                ))}
-                {boards.length < (isPremium ? 10 : 3) && (
-                  <TouchableOpacity 
-                    accessible={true} accessibilityRole="button" accessibilityLabel="Add new category"
-                    style={styles.addBoardBtn} onPress={handleAddBoard}
-                  >
-                    <Text style={[styles.addBoardText, { color: colors.textSecondary }]}>+</Text>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
-            </Animated.View>
-          )}
+          </View>
         </View>
 
-      </Animated.View>
+        {/* Board Pills Horizontal Scroll */}
+        <View style={{ marginBottom: 12 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+            {boards.map(board => {
+              const isSelected = activeBoardId === board.id;
+              const boardColor = getBoardColor(board, boards);
+              const count = boardCounts[board.id] || 0;
+
+              return (
+                <TouchableOpacity 
+                  key={board.id} 
+                  testID={`board_tab_${board.id}`}
+                  accessible={true} 
+                  accessibilityRole="tab" 
+                  accessibilityLabel={`Board ${board.name === 'Main' ? t('Main') : board.name}`} 
+                  accessibilityState={{ selected: isSelected }}
+                  style={[
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 18,
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? (boardColor || colors.primary) : (colors.borderColor || '#E5E5EA'),
+                      backgroundColor: isSelected 
+                        ? `${boardColor || colors.primary}18` 
+                        : colors.bgCard,
+                    }
+                  ]}
+                  onPress={() => dispatch(setActiveBoardId(board.id))}
+                  onLongPress={() => handleBoardOptions(board)}
+                >
+                  <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: boardColor, marginRight: 6 }} />
+                  <Text style={[
+                    { 
+                      fontSize: 13,
+                      fontWeight: isSelected ? '700' : '500',
+                      color: isSelected ? colors.textPrimary : colors.textSecondary 
+                    }
+                  ]}>
+                    {board.name === 'Main' ? (t('Main') || 'Main') : board.name}
+                  </Text>
+                  {count > 0 && (
+                    <View style={{
+                      backgroundColor: `${boardColor}25`,
+                      borderRadius: 10,
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      marginLeft: 6
+                    }}>
+                      <Text style={{
+                        color: boardColor,
+                        fontSize: 11,
+                        fontWeight: 'bold'
+                      }}>{count}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
       <FlashList
         key={activeBoardId}

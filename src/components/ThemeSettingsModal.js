@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSourceColor, resetTheme, setUserPicture, setThemeMode, setRandomColorDaily } from '../features/themeSlice';
@@ -10,36 +10,29 @@ import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDeviceLanguage } from '../i18n';
 import ConfirmModal from './ConfirmModal';
+import Svg, { Path, Circle, Rect, Line, Polyline } from 'react-native-svg';
 
-// const PREDEFINED_COLORS = [
-//   '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
-//   '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50',
-//   '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800',
-//   '#ff5722', '#795548', '#9e9e9e', '#607d8b'
-// ];
-
-const PREDEFINED_COLORS = [
-  '#C62828', // Red
-  '#AD1457', // Pink
-  '#8E24AA', // Purple
-  '#5E35B1', // Deep Purple
-  '#1E88E5', // Blue
-  '#00897B', // Teal
-  '#2E7D32', // Dark Green
-  '#6B8E6B', // Sage
-  '#C0CA33', // Lime
-  '#F9A825', // Yellow
-  '#FB8C00', // Orange
-  '#455A64'  // Slate
+const THEME_ACCENT_COLORS = [
+  { name: 'Violet', color: '#6750A4' },
+  { name: 'Green', color: '#2E7D32' },
+  { name: 'Blue', color: '#1E88E5' },
+  { name: 'Orange', color: '#FB8C00' },
+  { name: 'Purple', color: '#8E24AA' },
+  { name: 'Slate', color: '#455A64' },
 ];
 
-const FREE_COLORS = [
-  '#2E7D32', // Dark Green
-  '#1E88E5', // Blue
-  '#FB8C00', // Orange
-  '#8E24AA', // Purple
-  '#455A64'  // Slate
-];
+const IconArrowLeft = ({ color = '#000', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Line x1="19" y1="12" x2="5" y2="12" />
+    <Polyline points="12 19 5 12 12 5" />
+  </Svg>
+);
+
+const IconCheck = ({ color = '#fff', size = 14 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <Polyline points="20 6 9 17 4 12" />
+  </Svg>
+);
 
 export default function ThemeSettingsModal({ isVisible, onClose }) {
   const dispatch = useDispatch();
@@ -52,7 +45,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   const currentRandomColorDaily = useSelector(state => state.themeReducer.randomColorDaily);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
-  const [tempColor, setTempColor] = useState(currentSourceColor);
+  const [tempColor, setTempColor] = useState(currentSourceColor || '#6750A4');
   const [tempImage, setTempImage] = useState(currentUserPicture);
   const [tempThemeMode, setTempThemeMode] = useState(currentThemeMode || 'system');
   const [tempRandomColorDaily, setTempRandomColorDaily] = useState(currentRandomColorDaily || false);
@@ -60,7 +53,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
 
   useEffect(() => {
     if (isVisible) {
-      setTempColor(currentSourceColor);
+      setTempColor(currentSourceColor || '#6750A4');
       setTempImage(currentUserPicture);
       setTempThemeMode(currentThemeMode || 'system');
       setTempRandomColorDaily(currentRandomColorDaily || false);
@@ -116,23 +109,87 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
     onClose();
   };
 
-  const handleReset = () => {
-    setConfirmConfig({
-      isVisible: true,
-      title: t("Reset Defaults"),
-      message: t("Are you sure you want to reset all theme settings to defaults?"),
-      confirmText: t("Reset"),
-      cancelText: t("Cancel"),
-      isDestructive: true,
-      hideCancel: false,
-      onConfirm: () => {
-        dispatch(resetTheme());
-        AsyncStorage.removeItem('appLanguage');
-        i18n.changeLanguage(getDeviceLanguage());
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        onClose();
-      }
-    });
+  const currentColorObj = THEME_ACCENT_COLORS.find(
+    c => c.color.toLowerCase() === (tempColor || '').toLowerCase()
+  ) || { name: 'Custom', color: tempColor };
+
+  const renderPhonePreview = (modeOption) => {
+    const isSelected = tempThemeMode === modeOption.value;
+    const isDarkCard = modeOption.value === 'dark';
+    const isContrastCard = modeOption.value === 'contrast';
+
+    return (
+      <TouchableOpacity
+        key={modeOption.value}
+        activeOpacity={0.75}
+        onPress={() => setTempThemeMode(modeOption.value)}
+        style={styles.modeCardWrapper}
+        accessibilityRole="radio"
+        accessibilityState={{ selected: isSelected }}
+      >
+        <View style={[
+          styles.miniPhone,
+          {
+            backgroundColor: isDarkCard ? '#1F1E26' : '#FFFFFF',
+            borderColor: isSelected 
+              ? (colors.primary || '#6750A4') 
+              : isContrastCard 
+              ? (isDark ? '#555555' : '#000000') 
+              : (isDark ? '#2E2D38' : '#E5E5EB'),
+            borderWidth: isSelected ? 2 : (isContrastCard ? 1.5 : 1),
+          }
+        ]}>
+          {/* Header pill */}
+          <View style={[
+            styles.miniPhoneBar, 
+            { backgroundColor: isDarkCard ? '#FFFFFF' : '#1A1A24' }
+          ]} />
+          {/* Main preview box */}
+          <View style={[
+            styles.miniPhoneBox, 
+            { 
+              backgroundColor: isDarkCard 
+                ? '#2B2936' 
+                : (modeOption.value === 'system' ? '#EEEEF2' : '#EDE8FA') 
+            }
+          ]} />
+          {/* Text lines */}
+          <View style={[
+            styles.miniPhoneLine, 
+            { backgroundColor: isDarkCard ? '#3A3848' : '#EEEEF2' }
+          ]} />
+          <View style={[
+            styles.miniPhoneLineShort, 
+            { backgroundColor: isDarkCard ? '#3A3848' : '#EEEEF2' }
+          ]} />
+        </View>
+
+        <Text style={[
+          styles.modeCardLabel, 
+          { 
+            color: isSelected ? (colors.primary || '#6750A4') : colors.textSecondary,
+            fontWeight: isSelected ? '700' : '500' 
+          }
+        ]}>
+          {modeOption.label}
+        </Text>
+
+        {/* Radio circle */}
+        <View style={[
+          styles.radioCircle,
+          {
+            borderColor: isSelected ? (colors.primary || '#6750A4') : colors.borderColor,
+          }
+        ]}>
+          {isSelected && (
+            <View style={[
+              styles.radioDot, 
+              { backgroundColor: colors.primary || '#6750A4' }
+            ]} />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -145,299 +202,331 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
       onBackButtonPress={onClose}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
-          <View style={styles.dragHandleContainer}>
-            <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
+      <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#18171E' : '#FAF9F6') }]}>
+        {/* Drag handle for mobile */}
+        <View style={styles.dragHandleContainer}>
+          <View style={[styles.dragHandle, { backgroundColor: colors.borderColor || '#DDD' }]} />
+        </View>
+
+        {/* Header with back button and Cancel */}
+        <View style={styles.topNavRow}>
+          <TouchableOpacity 
+            onPress={onClose} 
+            activeOpacity={0.7}
+            style={[styles.backCircle, { backgroundColor: isDark ? '#262530' : '#FFFFFF', borderColor: colors.borderColor }]}
+          >
+            <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <Path d="M19 12H5M12 19l-7-7 7-7" />
+            </Svg>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
+            <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('Cancel') || 'Cancel'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
+          {/* Screen Title & Subtitle */}
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>{t('Appearance') || 'Appearance'}</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('Find your focus, in your style.') || 'Find your focus, in your style.'}</Text>
+
+          {/* Section: Appearance mode */}
+          <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>{t('Appearance mode') || 'Appearance mode'}</Text>
+          <View style={styles.modesRow}>
+            {[
+              { label: t('System') || 'System', value: 'system' },
+              { label: t('Light') || 'Light', value: 'light' },
+              { label: t('Dark') || 'Dark', value: 'dark' },
+              { label: t('Contrast') || 'Contrast', value: 'contrast' },
+            ].map(renderPhonePreview)}
           </View>
+
+          {/* Section: Material You theme */}
+          <Text style={[styles.sectionHeading, { color: colors.textPrimary, marginTop: 24 }]}>{t('Material You theme') || 'Material You theme'}</Text>
           
-          <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Theme Settings')}</Text>
-            <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Close theme settings"
-              onPress={onClose} style={styles.closeBtn}
-            >
-              <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
+          <View style={[styles.themeCard, { backgroundColor: isDark ? '#22212C' : '#FFFFFF', borderColor: colors.borderColor }]}>
+            {/* Accent Color Header */}
+            <View style={styles.accentHeaderRow}>
+              <Text style={[styles.accentLabel, { color: colors.textPrimary }]}>{t('Accent color') || 'Accent color'}</Text>
+              <Text style={[styles.accentValue, { color: colors.primary || '#6750A4' }]}>{currentColorObj.name}</Text>
+            </View>
 
-          <ScrollView style={styles.scrollArea}>
-            
-            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Appearance Mode')}</Text>
-              
-              <View style={styles.themeModeRow}>
-                {[
-                  { label: t('System'), value: 'system' },
-                  { label: t('Light'), value: 'light' },
-                  { label: t('Dark'), value: 'dark' },
-                  { label: t('Contrast'), value: 'contrast' }
-                ].map((modeOption) => (
+            {/* Accent Color Circles */}
+            <View style={styles.colorSwatchesRow}>
+              {THEME_ACCENT_COLORS.map((item) => {
+                const isSelected = (tempColor || '').toLowerCase() === item.color.toLowerCase();
+                return (
                   <TouchableOpacity
-                    key={modeOption.value}
-                    accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${modeOption.label} mode`}
+                    key={item.color}
+                    activeOpacity={0.75}
+                    onPress={() => setTempColor(item.color)}
                     style={[
-                      styles.themeModeBtn, 
-                      { borderColor: colors.borderColor },
-                      tempThemeMode === modeOption.value && { backgroundColor: colors.primary, borderColor: colors.primary }
+                      styles.colorDot,
+                      { backgroundColor: item.color }
                     ]}
-                    onPress={() => setTempThemeMode(modeOption.value)}
                   >
-                    <Text style={[
-                      styles.themeModeText, 
-                      { color: colors.textPrimary },
-                      tempThemeMode === modeOption.value && { color: colors.textInverse, fontWeight: 'bold' }
-                    ]}>
-                      {modeOption.label}
-                    </Text>
+                    {isSelected && <IconCheck color="#FFFFFF" size={16} />}
                   </TouchableOpacity>
-                ))}
-              </View>
+                );
+              })}
             </View>
 
-            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Material You Theme')}</Text>
-              
-              <View style={styles.colorRow}>
-                {(isPremium ? PREDEFINED_COLORS : FREE_COLORS).map((c, i) => (
-                  <TouchableOpacity 
-                    key={i} 
-                    accessible={true} accessibilityRole="button" accessibilityLabel={`Select predefined color ${i + 1}`}
-                    style={[
-                      styles.colorCircle, 
-                      { backgroundColor: c, borderColor: colors.borderColor }, 
-                      tempColor === c && [styles.selectedColor, { borderColor: isDark ? '#ffffff' : '#000000' }]
-                    ]} 
-                    onPress={() => setTempColor(c)}
-                  />
-                ))}
+            <View style={[styles.divider, { backgroundColor: colors.borderColor || (isDark ? '#2E2D3A' : '#F0F0F4') }]} />
+
+            {/* Randomize Daily Switch */}
+            <View style={styles.randomizeRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={[styles.randomizeTitle, { color: colors.textPrimary }]}>{t('Randomize daily') || 'Randomize daily'}</Text>
+                <Text style={[styles.randomizeSubtitle, { color: colors.textSecondary }]}>{t('A fresh accent each morning') || 'A fresh accent each morning'}</Text>
               </View>
-
-              {/* Accent Color custom input hidden for now
-              {isPremium && (
-                <View style={styles.customColorRow}>
-                  <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Accent Color')}</Text>
-                  <TextInput 
-                    accessible={true} accessibilityLabel="Custom hex color input"
-                    style={[styles.colorInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: colors.textPrimary, borderColor: colors.borderColor, borderWidth: 1 }]}
-                    value={tempColor}
-                    onChangeText={setTempColor}
-                    autoCapitalize="none"
-                  />
-                </View>
-              )}
-              */}
-
-              <View style={[styles.customColorRow, { marginTop: 15 }]}>
-                <Text style={[styles.customColorLabel, { color: colors.textPrimary }]}>{t('Randomize daily')}</Text>
-                <Switch 
-                  value={tempRandomColorDaily}
-                  onValueChange={setTempRandomColorDaily}
-                  trackColor={{ false: '#767577', true: colors.primary }}
-                />
-              </View>
+              <Switch
+                value={tempRandomColorDaily}
+                onValueChange={setTempRandomColorDaily}
+                trackColor={{ false: colors.borderColor || '#CCC', true: colors.primary || '#6750A4' }}
+              />
             </View>
-
-            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('Background Picture')}</Text>
-              <TouchableOpacity 
-                accessible={true} accessibilityRole="button" accessibilityLabel="Upload background image"
-                style={[styles.uploadBox, { borderColor: colors.borderColor, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fa' }]} onPress={handlePickImage}
-              >
-                {tempImage ? (
-                  <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('Image selected. Tap to change.')}</Text>
-                ) : (
-                  <Text style={[styles.uploadText, { color: colors.textSecondary }]}>{t('📷 Tap to upload')}</Text>
-                )}
-              </TouchableOpacity>
-              {tempImage && (
-                <TouchableOpacity onPress={() => setTempImage(null)} style={{ marginTop: 10, alignSelf: 'center' }} accessible={true} accessibilityRole="button" accessibilityLabel="Remove background image">
-                  <Text style={{ color: colors.danger || colors.error || '#c62828', fontSize: 13, fontWeight: 'bold' }}>{t('Remove Image')}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <View style={{ height: 20 }} />
-          </ScrollView>
-
-          <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
-            <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Reset to default theme"
-              style={[styles.resetBtn, { backgroundColor: colors.danger || colors.error || '#c62828' }]} onPress={handleReset}
-            >
-              <Text style={styles.resetText}>{t('Reset Defaults')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              accessible={true} accessibilityRole="button" accessibilityLabel="Save theme"
-              style={[styles.doneBtn, { backgroundColor: colors.primary }]} onPress={handleSave}
-            >
-              <Text style={[styles.doneText, { color: colors.textInverse }]}>{t('Done')}</Text>
-            </TouchableOpacity>
           </View>
 
-          <ConfirmModal
-            isVisible={confirmConfig.isVisible}
-            title={confirmConfig.title}
-            message={confirmConfig.message}
-            confirmText={confirmConfig.confirmText}
-            cancelText={confirmConfig.cancelText}
-            isDestructive={confirmConfig.isDestructive}
-            hideCancel={confirmConfig.hideCancel}
-            onConfirm={confirmConfig.onConfirm}
-            onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
-          />
+          {/* Caption text */}
+          <Text style={[styles.captionText, { color: colors.textSecondary }]}>
+            {t('System follows your device. Contrast uses stronger borders and clearer text.') || 'System follows your device. Contrast uses stronger borders and clearer text.'}
+          </Text>
+
+          {/* Background image upload option (retained as modification) */}
+          <TouchableOpacity 
+            onPress={handlePickImage}
+            style={[styles.bgPictureBtn, { borderColor: colors.borderColor }]}
+          >
+            <Text style={[styles.bgPictureText, { color: colors.textSecondary }]}>
+              {tempImage ? t('🖼 Custom background active (Tap to change)') : t('🖼 Add custom background image')}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Bottom Save Action Button */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handleSave}
+            style={[styles.saveButton, { backgroundColor: colors.primary || '#6750A4' }]}
+          >
+            <Text style={styles.saveButtonText}>{t('Save appearance') || 'Save appearance'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ConfirmModal
+          isVisible={confirmConfig.isVisible}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmText={confirmConfig.confirmText}
+          cancelText={confirmConfig.cancelText}
+          isDestructive={confirmConfig.isDestructive}
+          hideCancel={confirmConfig.hideCancel}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
+        />
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
   modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-    paddingTop: 10,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '92%',
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
   },
   dragHandleContainer: {
-    paddingBottom: 10,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 10,
   },
   dragHandle: {
-    width: 40,
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+  },
+  topNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  backCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  scrollBody: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  pageSubtitle: {
+    fontSize: 14,
+    marginBottom: 24,
+  },
+  sectionHeading: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 14,
+  },
+  modesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  modeCardWrapper: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  miniPhone: {
+    width: 68,
+    height: 94,
+    borderRadius: 14,
+    padding: 6,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  miniPhoneBar: {
+    width: 26,
+    height: 3.5,
+    borderRadius: 2,
+    marginBottom: 8,
+  },
+  miniPhoneBox: {
+    width: '100%',
+    height: 22,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  miniPhoneLine: {
+    width: '100%',
     height: 5,
     borderRadius: 3,
-    backgroundColor: '#666',
-    opacity: 0.5,
+    marginBottom: 4,
   },
-  header: {
+  miniPhoneLineShort: {
+    width: '55%',
+    alignSelf: 'flex-start',
+    height: 5,
+    borderRadius: 3,
+  },
+  modeCardLabel: {
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  radioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  themeCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 12,
+  },
+  accentHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginBottom: 14,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
+  accentLabel: {
+    fontSize: 15,
+    fontWeight: '600',
   },
-  closeBtn: {
-    padding: 5,
-  },
-  closeText: {
-    fontSize: 20,
-    color: '#666',
-  },
-  scrollArea: {
-    padding: 20,
-    flexShrink: 1,
-  },
-  card: {
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
-  },
-  themeModeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  themeModeBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  themeModeText: {
+  accentValue: {
     fontSize: 14,
+    fontWeight: '600',
   },
-  colorRow: {
+  colorSwatchesRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 15,
-    marginBottom: 20,
-    justifyContent: 'flex-start'
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  colorCircle: {
+  colorDot: {
     width: 40,
     height: 40,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: '#333',
-  },
-  selectedColor: {
-    borderWidth: 3.5,
-    transform: [{ scale: 1.12 }],
-  },
-  customColorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  customColorLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginRight: 10,
-  },
-  colorInput: {
-    flex: 1,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    fontSize: 14,
-    maxWidth: 150,
-  },
-  uploadBox: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: 10,
-    padding: 30,
-    alignItems: 'center',
+    borderRadius: 20,
     justifyContent: 'center',
-    marginTop: 10,
+    alignItems: 'center',
   },
-  uploadText: {
-    fontSize: 14,
+  divider: {
+    height: 1,
+    marginVertical: 14,
   },
-  footer: {
+  randomizeRow: {
     flexDirection: 'row',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  resetBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    flex: 0.45,
+  randomizeTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  randomizeSubtitle: {
+    fontSize: 12,
+  },
+  captionText: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginHorizontal: 4,
+    marginBottom: 16,
+  },
+  bgPictureBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
+    marginBottom: 10,
   },
-  resetText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
+  bgPictureText: {
+    fontSize: 12,
   },
-  doneBtn: {
-    paddingVertical: 12,
+  bottomBar: {
     paddingHorizontal: 20,
-    borderRadius: 10,
-    flex: 0.45,
-    alignItems: 'center',
+    paddingTop: 8,
   },
-  doneText: {
-    fontWeight: 'bold',
-    textAlign: 'center',
-  }
+  saveButton: {
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });

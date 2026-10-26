@@ -41,13 +41,13 @@ export const ThemeProvider = ({ children }) => {
 
     const primaryHex = hexFromArgb(scheme.primary);
 
-    // Build our custom color mapping similar to CSS variables
+    // Build our custom color mapping matching the new modern design aesthetic
     const colors = {
       primary: primaryHex,
       primaryContainer: hexFromArgb(scheme.primaryContainer),
       onPrimary: hexFromArgb(scheme.onPrimary),
       onPrimaryContainer: hexFromArgb(scheme.onPrimaryContainer),
-      primaryLight: hexToRgba(primaryHex, 0.4),
+      primaryLight: isDark ? hexToRgba(primaryHex, 0.22) : hexToRgba(primaryHex, 0.12),
       textInverse: hexFromArgb(scheme.onPrimary),
       textTertiary: hexFromArgb(scheme.onSurfaceVariant),
       secondary: hexFromArgb(scheme.secondary),
@@ -68,12 +68,12 @@ export const ThemeProvider = ({ children }) => {
     if (themeMode === 'contrast') {
       colors.bgMain = '#000000';
       colors.bgSidebar = '#0a0a0a';
-      colors.bgCard = '#141414';
+      colors.bgCard = '#121212';
       colors.bgHeader = '#0a0a0a';
       colors.surfaceContainer = '#121212';
       colors.surfaceContainerHigh = '#202020';
       colors.surfaceContainerHighest = '#2a2a2a';
-      colors.cardBg = '#141414';
+      colors.cardBg = '#121212';
       colors.cardBorder = primaryHex;
       colors.textPrimary = '#ffffff';
       colors.textSecondary = '#dddddd';
@@ -82,18 +82,18 @@ export const ThemeProvider = ({ children }) => {
       colors.errorContainer = '#3b0d0d';
       colors.onErrorContainer = '#ff9999';
     } else {
-      colors.bgMain = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(16)) : hexFromArgb(matTheme.palettes.neutral.tone(94));
-      colors.bgSidebar = hexFromArgb(scheme.surfaceVariant);
-      colors.bgCard = hexFromArgb(scheme.surface);
-      colors.bgHeader = hexFromArgb(scheme.surface);
-      colors.surfaceContainer = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(12)) : hexFromArgb(matTheme.palettes.neutral.tone(94));
-      colors.surfaceContainerHigh = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(17)) : hexFromArgb(matTheme.palettes.neutral.tone(90));
-      colors.surfaceContainerHighest = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(22)) : hexFromArgb(matTheme.palettes.neutral.tone(86));
-      colors.cardBg = isDark ? hexFromArgb(matTheme.palettes.neutral.tone(12)) : hexFromArgb(matTheme.palettes.neutral.tone(96));
-      colors.cardBorder = isDark ? hexFromArgb(matTheme.palettes.neutralVariant.tone(26)) : hexFromArgb(matTheme.palettes.neutralVariant.tone(86));
-      colors.textPrimary = hexFromArgb(scheme.onSurface);
-      colors.textSecondary = hexFromArgb(scheme.onSurfaceVariant);
-      colors.borderColor = isDark ? hexFromArgb(matTheme.palettes.neutralVariant.tone(26)) : hexFromArgb(matTheme.palettes.neutralVariant.tone(86));
+      colors.bgMain = isDark ? '#141419' : '#FAF9F6';
+      colors.bgSidebar = isDark ? '#1C1B24' : '#F0EEF8';
+      colors.bgCard = isDark ? '#1F1E26' : '#FFFFFF';
+      colors.bgHeader = isDark ? '#141419' : '#FAF9F6';
+      colors.surfaceContainer = isDark ? '#23222E' : '#F4F3F8';
+      colors.surfaceContainerHigh = isDark ? '#2B2A38' : '#EEEEF4';
+      colors.surfaceContainerHighest = isDark ? '#333242' : '#E8E8EE';
+      colors.cardBg = isDark ? '#1F1E26' : '#FFFFFF';
+      colors.cardBorder = isDark ? '#2E2D3A' : '#ECECEF';
+      colors.textPrimary = isDark ? '#FFFFFF' : '#1A1A24';
+      colors.textSecondary = isDark ? '#9E9EB2' : '#7D7D8E';
+      colors.borderColor = isDark ? '#2E2D3A' : '#ECECEF';
       colors.danger = hexFromArgb(scheme.error);
       colors.errorContainer = hexFromArgb(scheme.errorContainer);
       colors.onErrorContainer = hexFromArgb(scheme.onErrorContainer);
