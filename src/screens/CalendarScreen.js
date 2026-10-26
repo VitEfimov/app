@@ -75,7 +75,7 @@ export default function CalendarScreen({ navigation }) {
 
   // HALF-SCREEN Layout: half screen is calendar, half screen is adjustable task list
   const { height: windowHeight } = useWindowDimensions();
-  const HALF_SCREEN_HEIGHT = Math.max(380, Math.round(windowHeight * 0.48));
+  const HALF_SCREEN_HEIGHT = Math.max(380, Math.round(windowHeight * 0.1));
   const MIN_Y = 0; // Fully expanded (covers calendar)
   const COLLAPSED_Y = HALF_SCREEN_HEIGHT;
 
