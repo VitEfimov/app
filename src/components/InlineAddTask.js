@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    width: '90%',
+    width: '95%',
     alignSelf: 'center',
   },
   iconWrapper: {

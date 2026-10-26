@@ -850,7 +850,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)'
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+    width: '95%',
+    alignSelf: 'center',
   },
   sectionHeaderText: {
     fontSize: 13,
