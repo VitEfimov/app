@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
@@ -106,11 +106,28 @@ export default function CreateBoardModal({
           autoFocus={true}
         />
 
-        {/* Category Color Palette */}
+        {/* Category Color Palette with Custom Color Picker */}
         <View style={styles.colorSection}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            {t('Category Color') || 'Category Color'}
-          </Text>
+          <View style={styles.colorHeaderRow}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {t('Category Color') || 'Category Color'}
+            </Text>
+            <View style={[styles.hexBadge, { borderColor: colors.borderColor, backgroundColor: colors.bgMain }]}>
+              <View style={[styles.hexDot, { backgroundColor: selectedColor }]} />
+              <TextInput
+                style={[styles.hexInput, { color: colors.textPrimary }]}
+                value={selectedColor}
+                onChangeText={(val) => {
+                  let formatted = val.trim();
+                  if (!formatted.startsWith('#') && formatted.length > 0) formatted = `#${formatted}`;
+                  setSelectedColor(formatted);
+                }}
+                maxLength={9}
+                placeholder="#HEX"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorRow}>
             {BOARD_COLORS.map(c => {
               const isSelected = selectedColor.toLowerCase() === c.toLowerCase();
@@ -134,6 +151,38 @@ export default function CreateBoardModal({
                 </TouchableOpacity>
               );
             })}
+            {Platform.OS === 'web' && (
+              <label 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: 'rgba(128,128,128,0.12)',
+                  border: '2px dashed ' + (colors.borderColor || '#999'),
+                  cursor: 'pointer',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}
+                title={t('Custom Color') || 'Custom Color'}
+              >
+                <span style={{ fontSize: 16 }}>🎨</span>
+                <input
+                  type="color"
+                  value={selectedColor.startsWith('#') && selectedColor.length === 7 ? selectedColor : '#4CAF50'}
+                  onChange={(e) => setSelectedColor(e.target.value)}
+                  style={{
+                    position: 'absolute',
+                    opacity: 0,
+                    width: '100%',
+                    height: '100%',
+                    cursor: 'pointer'
+                  }}
+                />
+              </label>
+            )}
           </ScrollView>
         </View>
 
@@ -251,6 +300,33 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
+  },
+  colorHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  hexBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    gap: 6,
+  },
+  hexDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  hexInput: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    padding: 0,
+    width: 65,
   },
   colorRow: {
     paddingVertical: 4,

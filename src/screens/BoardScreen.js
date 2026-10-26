@@ -991,11 +991,35 @@ export default function BoardScreen({ route, navigation }) {
             {t('What would you like to do?')}
           </Text>
 
-          {/* Color Palette (Palitra) */}
+          {/* Color Palette (Palitra) with Custom Color Picker */}
           <View style={{ width: '100%', marginBottom: 18, alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 10, fontWeight: '600' }}>
-              {t('Category Color') || 'Category Color'}
-            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '90%', marginBottom: 10 }}>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '600' }}>
+                {t('Category Color') || 'Category Color'}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.borderColor, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, gap: 6, backgroundColor: colors.bgMain }}>
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: getBoardColor(boardOptionsConfig.board, boards) }} />
+                <TextInput
+                  style={{ fontSize: 12, fontWeight: '600', color: colors.textPrimary, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', padding: 0, width: 65 }}
+                  value={boardOptionsConfig.board?.color || getBoardColor(boardOptionsConfig.board, boards)}
+                  onChangeText={(val) => {
+                    let formatted = val.trim();
+                    if (!formatted.startsWith('#') && formatted.length > 0) formatted = `#${formatted}`;
+                    if (boardOptionsConfig.board) {
+                      const boardId = boardOptionsConfig.board.id;
+                      dispatch(updateBoardColorAsync({ id: boardId, color: formatted }));
+                      setBoardOptionsConfig(prev => ({
+                        ...prev,
+                        board: prev.board ? { ...prev.board, color: formatted } : null
+                      }));
+                    }
+                  }}
+                  maxLength={9}
+                  placeholder="#HEX"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15, gap: 10, alignItems: 'center' }}>
               {BOARD_COLORS.map(c => {
                 const currentColor = getBoardColor(boardOptionsConfig.board, boards);
@@ -1036,6 +1060,48 @@ export default function BoardScreen({ route, navigation }) {
                   </TouchableOpacity>
                 );
               })}
+              {Platform.OS === 'web' && (
+                <label 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    backgroundColor: 'rgba(128,128,128,0.12)',
+                    border: '2px dashed ' + (colors.borderColor || '#999'),
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}
+                  title={t('Custom Color') || 'Custom Color'}
+                >
+                  <span style={{ fontSize: 16 }}>🎨</span>
+                  <input
+                    type="color"
+                    value={getBoardColor(boardOptionsConfig.board, boards)}
+                    onChange={(e) => {
+                      const newColor = e.target.value;
+                      if (boardOptionsConfig.board) {
+                        const boardId = boardOptionsConfig.board.id;
+                        dispatch(updateBoardColorAsync({ id: boardId, color: newColor }));
+                        setBoardOptionsConfig(prev => ({
+                          ...prev,
+                          board: prev.board ? { ...prev.board, color: newColor } : null
+                        }));
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      opacity: 0,
+                      width: '100%',
+                      height: '100%',
+                      cursor: 'pointer'
+                    }}
+                  />
+                </label>
+              )}
             </ScrollView>
           </View>
           
