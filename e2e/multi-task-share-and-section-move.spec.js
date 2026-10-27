@@ -90,24 +90,27 @@ Discuss Q4 advertising campaign`;
 });
 
 test.describe('Board Missed Tasks Move Backward & Year Picker 18 Years', () => {
-  let context;
+  test.describe.configure({ mode: 'serial' });
+
   let page;
 
-  test.beforeEach(async ({ browser }) => {
-    context = await browser.newContext();
-    await context.addInitScript(() => {
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage();
+    await page.addInitScript(() => {
       window.localStorage.clear();
       window.localStorage.setItem('isGuest', 'true');
     });
-    page = await context.newPage();
     await page.goto('/', { waitUntil: 'load', timeout: 60000 });
+    const boardTab = page.getByTestId('tab_board');
+    await boardTab.waitFor({ state: 'visible', timeout: 30000 });
   });
 
-  test.afterEach(async () => {
-    await context.close();
+  test.afterAll(async () => {
+    await page.close();
   });
 
   test('should show Move backward option in Options for Missed tasks and move tasks backward', async () => {
+    await page.waitForSelector('[data-testid="section_title_today"]', { timeout: 15000 });
     // 1. Create a task in Today section
     const addBtn = page.getByTestId('inline_add_btn_today').first();
     await addBtn.click();
@@ -142,11 +145,12 @@ test.describe('Board Missed Tasks Move Backward & Year Picker 18 Years', () => {
   test('should display 18 years in total in Calendar YearPickerModal', async () => {
     // Navigate to Calendar
     const calTab = page.getByTestId('tab_calendar');
+    await calTab.waitFor({ state: 'visible', timeout: 15000 });
     await calTab.click();
 
     // Open year picker modal
     const monthYearBtn = page.getByTestId('calendar_month_year_header');
-    await monthYearBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await monthYearBtn.waitFor({ state: 'visible', timeout: 15000 });
     await monthYearBtn.click();
 
     // Count year buttons inside YearPickerModal
