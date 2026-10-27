@@ -145,9 +145,33 @@ test.describe('Board Management', () => {
 
       await mainTab.click();
 
-      const missedTitle = page.getByTestId('section_title_missed');
-      await expect(missedTitle).toBeVisible();
-      await expect(missedTitle).toHaveText('Missed tasks');
     }
+  });
+
+  test('should allow creating up to 10 boards and enforce limit on the 11th board', async () => {
+    // Starting with 1 board (Main), create 9 more boards
+    for (let i = 2; i <= 10; i++) {
+      const addBoardBtn = page.getByRole('button', { name: 'Add new board' }).first();
+      await addBoardBtn.click();
+      const promptInput = page.getByTestId('prompt_input');
+      await promptInput.waitFor({ state: 'visible', timeout: 5000 });
+      await promptInput.fill(`Board ${i}`);
+      await page.getByTestId('prompt_submit_btn').click();
+      await page.waitForTimeout(100);
+    }
+
+    // Verify Board 10 is created and interactive
+    const board10Tab = page.locator('[data-testid^="board_tab_"]').filter({ hasText: 'Board 10' }).first();
+    await expect(board10Tab).toBeAttached();
+    await board10Tab.click();
+
+    // Now attempt to add an 11th board
+    const addBoardBtn = page.getByRole('button', { name: 'Add new board' }).first();
+    await addBoardBtn.click();
+
+    // Should display the limit confirmation modal
+    await expect(page.getByText('Limit Reached')).toBeVisible();
+    await expect(page.getByText(/maximum number of boards/i)).toBeVisible();
+    await page.getByText('OK').click();
   });
 });

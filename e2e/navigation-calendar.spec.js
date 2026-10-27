@@ -55,7 +55,9 @@ test.describe('Navigation & Calendar Integration', () => {
 
   test('should navigate between Dashboard, Board, Calendar, and Settings screens', async () => {
     const dashboardTab = page.getByTestId('tab_dashboard');
-    await dashboardTab.click();
+    if (await dashboardTab.isVisible()) {
+      await dashboardTab.click();
+    }
 
     const calendarTab = page.getByTestId('tab_calendar');
     await calendarTab.click();

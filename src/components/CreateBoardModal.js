@@ -270,7 +270,7 @@ export default function CreateBoardModal({
                   <TouchableOpacity
                     key={tmpl.id}
                     activeOpacity={0.75}
-                    testID={`category_type_${tmpl.id}`}
+                    testID={`create_board_type_${tmpl.id}`}
                     style={[
                       styles.templateCard,
                       {
@@ -427,6 +427,7 @@ export default function CreateBoardModal({
         {/* Bottom submit button */}
         <View style={styles.bottomBar}>
           <TouchableOpacity
+            testID="prompt_submit_btn"
             activeOpacity={0.85}
             onPress={handleCreate}
             style={[

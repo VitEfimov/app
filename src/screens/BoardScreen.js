@@ -682,7 +682,7 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleAddBoard = () => {
-    const boardLimit = isPremium ? 10 : 3;
+    const boardLimit = isPremium ? 20 : 10;
     if (boards.length >= boardLimit) {
       setConfirmConfig({
         isVisible: true,
@@ -821,9 +821,10 @@ export default function BoardScreen({ route, navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity 
+              testID="add_board_btn"
               accessible={true} 
               accessibilityRole="button" 
-              accessibilityLabel="Add new category"
+              accessibilityLabel="Add new board"
               style={{ width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
               onPress={handleAddBoard}
             >
@@ -864,6 +865,10 @@ export default function BoardScreen({ route, navigation }) {
                   ]}
                   onPress={() => dispatch(setActiveBoardId(board.id))}
                   onLongPress={() => handleBoardOptions(board)}
+                  onContextMenu={(e) => {
+                    if (e && e.preventDefault) e.preventDefault();
+                    handleBoardOptions(board);
+                  }}
                 >
                   <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: boardColor, marginRight: 6 }} />
                   <Text style={[

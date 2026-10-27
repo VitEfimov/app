@@ -85,6 +85,7 @@ export default function CalendarScreen({ navigation }) {
   const boards = useSelector(state => state.userReducer?.boards || []);
   const jumpToTodayTrigger = useSelector(state => state.themeReducer?.jumpToTodayTrigger);
   const isGoogleDrawerOpen = useSelector(state => state.themeReducer?.isGoogleDrawerOpen || false);
+  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [calendarMonth, setCalendarMonth] = useState(dayjs().format('YYYY-MM-DD'));
@@ -245,6 +246,22 @@ export default function CalendarScreen({ navigation }) {
     } catch (error) {
       console.log(error);
     }
+  };
+
+  const handleOpenCreateCategory = () => {
+    const boardLimit = isPremium ? 20 : 10;
+    if ((boards || []).length >= boardLimit) {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Limit Reached') || 'Limit Reached',
+        message: `${t('You have reached the maximum number of boards')} (${boardLimit}).`,
+        confirmText: t('OK'),
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
+      return;
+    }
+    setCreateCategoryVisible(true);
   };
 
   const handleCreateCategorySubmit = ({ name, type, color, repeatConfig, repeatDuration }) => {
@@ -799,7 +816,7 @@ export default function CalendarScreen({ navigation }) {
         colors={colors}
         isDark={isDark}
         isDesktop={false}
-        onOpenCreateCategory={() => setCreateCategoryVisible(true)}
+        onOpenCreateCategory={handleOpenCreateCategory}
         onPressSettings={() => {
           dispatch(setGoogleDrawerOpen(false));
           navigation.navigate('Settings');
