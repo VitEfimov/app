@@ -87,6 +87,53 @@ Discuss Q4 advertising campaign`;
     expect(tasks[0].priority).toBe('high');
     expect(tasks[0].time).toBe('15:00');
   });
+
+  test('should parse birthday and task strings with dates, years, priorities, and clean titles', () => {
+    const birthdayLines = `Мама 1957 21.08
+Жена 23.01.1988
+День Свадьбы 2017 21.10
+Mira 24.10.2020
+Наталья Лысенкова 24.01`;
+
+    const tasks = parseSharedTasks(birthdayLines);
+    expect(tasks).toHaveLength(5);
+    expect(tasks[0].taskname).toBe('Мама');
+    expect(tasks[0].completionDate).toContain('1957-08-21');
+
+    expect(tasks[1].taskname).toBe('Жена');
+    expect(tasks[1].completionDate).toContain('1988-01-23');
+
+    expect(tasks[2].taskname).toBe('День Свадьбы');
+    expect(tasks[2].completionDate).toContain('2017-10-21');
+
+    expect(tasks[3].taskname).toBe('Mira');
+    expect(tasks[3].completionDate).toContain('2020-10-24');
+
+    expect(tasks[4].taskname).toBe('Наталья Лысенкова');
+    expect(tasks[4].completionDate).toContain('-01-24');
+  });
+
+  test('should extract dates, times, priorities, and notes from checklist items', () => {
+    const checklistWithDates = `- [ ] Buy groceries 28.10.2026 at 14:00 (Priority: High)
+- [x] Send report 2026-11-05
+- [ ] Doctor appointment Oct 30 at 3pm Notes: Bring medical records`;
+
+    const tasks = parseSharedTasks(checklistWithDates);
+    expect(tasks).toHaveLength(3);
+    expect(tasks[0].taskname).toBe('Buy groceries');
+    expect(tasks[0].completionDate).toContain('2026-10-28');
+    expect(tasks[0].time).toBe('14:00');
+    expect(tasks[0].priority).toBe('high');
+
+    expect(tasks[1].taskname).toBe('Send report');
+    expect(tasks[1].completionDate).toContain('2026-11-05');
+    expect(tasks[1].completed).toBe(true);
+
+    expect(tasks[2].taskname).toBe('Doctor appointment');
+    expect(tasks[2].completionDate).toContain('2026-10-30');
+    expect(tasks[2].time).toBe('15:00');
+    expect(tasks[2].description.text).toContain('Bring medical records');
+  });
 });
 
 test.describe('Board Missed Tasks Move Backward & Year Picker 18 Years', () => {

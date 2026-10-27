@@ -244,8 +244,10 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
     return (
       <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.borderColor }]}>
         <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, { transform: [{ scale }] }]}>
-          <SwipeIconComplete color={colors.primary} />
-          <Text style={[styles.actionText, { color: colors.primary, marginLeft: 8 }]}>{t('Complete')}</Text>
+          <View style={styles.leftActionIconWrapper}>
+            <SwipeIconComplete color={colors.primary} />
+          </View>
+          <Text style={[styles.actionText, { color: colors.primary, marginLeft: 10 }]}>{t('Complete')}</Text>
         </Animated.View>
       </View>
     );
@@ -728,8 +730,15 @@ const styles = StyleSheet.create({
   leftAction: {
     flex: 1,
     justifyContent: 'center',
-    paddingLeft: 24,
+    marginLeft: '2.5%',
+    paddingLeft: 20,
     borderBottomWidth: 1,
+  },
+  leftActionIconWrapper: {
+    width: 24,
+    height: 24,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   actionText: {
     fontWeight: '600',

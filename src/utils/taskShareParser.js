@@ -1,29 +1,252 @@
 import dayjs from 'dayjs';
 
+const RU_MONTHS = {
+  янв: 1, января: 1, 'янв.': 1,
+  фев: 2, февраля: 2, 'фев.': 2,
+  мар: 3, марта: 3, 'мар.': 3,
+  апр: 4, апреля: 4, 'апр.': 4,
+  май: 5, мая: 5,
+  июн: 6, июня: 6, 'июн.': 6,
+  июл: 7, июля: 7, 'июл.': 7,
+  авг: 8, августа: 8, 'авг.': 8,
+  сен: 9, сентября: 9, 'сен.': 9, сент: 9,
+  окт: 10, октября: 10, 'окт.': 10,
+  ноя: 11, ноября: 11, 'ноя.': 11,
+  дек: 12, декабря: 12, 'дек.': 12
+};
+
+const EN_MONTHS = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12
+};
+
+/**
+ * Extracts date, time, priority, reminder, notes, and clean title from any task string.
+ */
+export function extractTaskAttributes(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    return {
+      cleanTitle: '',
+      completionDate: null,
+      hasExplicitDate: false,
+      taskTime: null,
+      priority: 'none',
+      notes: '',
+      reminder: null,
+    };
+  }
+
+  let text = rawText.trim();
+  let hasExplicitDate = false;
+  let completionDate = null;
+  let taskTime = null;
+  let priority = 'none';
+  let reminder = null;
+  let notes = '';
+
+  // 1. Extract explicit Notes: / Description: / Заметки:
+  const notesMatch = text.match(/\b(?:Notes|Note|Description|Заметки|Описание)\s*:\s*([\s\S]+)/i);
+  if (notesMatch) {
+    notes = notesMatch[1].trim();
+    text = text.replace(notesMatch[0], '').trim();
+  }
+
+  // 2. Extract Priority: "Priority: High", "!high", "высокий приоритет", "!!!", "[high]", "[P1]"
+  const priorityMatch = text.match(/(?:^|[,\s\(\[])(?:Priority:\s*|Приоритет:\s*|!|p:)?(high|medium|low|высокий|средний|низкий)(?:[,\s\)\]]|$)/i) ||
+                        text.match(/(?:^|\s)(!{1,3})(?:$|\s)/);
+  if (priorityMatch) {
+    const pStr = (priorityMatch[1] || '').toLowerCase();
+    if (pStr === 'high' || pStr === 'высокий' || pStr === '!!!') priority = 'high';
+    else if (pStr === 'medium' || pStr === 'средний' || pStr === '!!') priority = 'medium';
+    else if (pStr === 'low' || pStr === 'низкий' || pStr === '!') priority = 'low';
+    text = text.replace(priorityMatch[0], ' ').trim();
+  }
+
+  // 3. Extract Reminder: "Reminder: 09:00", "Напомнить в 09:00"
+  const reminderMatch = text.match(/\b(?:Reminder|Напомнить|Напоминание)\s*(?:at|в|:)?\s*(\d{1,2}:\d{2})\b/i);
+  if (reminderMatch) {
+    reminder = reminderMatch[1];
+    text = text.replace(reminderMatch[0], ' ').trim();
+  }
+
+  // 4. Extract Time: "at 14:00", "14:00", "2:30pm", "3pm", "время: 15:30"
+  const timeMatch = text.match(/(?:(?:due\s+time|at|в|time:\s*|время:\s*)\s*)?\b(\d{1,2}:\d{2}(?:\s*(?:am|pm))?|\d{1,2}\s*(?:am|pm))\b/i);
+  if (timeMatch) {
+    const rawTime = timeMatch[1].trim();
+    let t = rawTime;
+    const pm = /pm/i.test(t);
+    const am = /am/i.test(t);
+    t = t.replace(/(?:am|pm)/i, '').trim();
+    let [hStr, mStr] = t.split(':');
+    let h = parseInt(hStr, 10);
+    let m = mStr ? parseInt(mStr, 10) : 0;
+    if (!isNaN(h) && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      if (pm && h < 12) h += 12;
+      if (am && h === 12) h = 0;
+      taskTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      text = text.replace(timeMatch[0], ' ').trim();
+    }
+  }
+
+  // 5. Extract Date
+  // A) Relative words (today, tomorrow, yesterday, сегодня, завтра, вчера)
+  const relMatch = text.match(/\b(today|tomorrow|yesterday|сегодня|завтра|вчера)\b/i);
+  if (relMatch) {
+    const relStr = relMatch[1].toLowerCase();
+    if (relStr === 'today' || relStr === 'сегодня') {
+      completionDate = dayjs().format('YYYY-MM-DD');
+    } else if (relStr === 'tomorrow' || relStr === 'завтра') {
+      completionDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
+    } else if (relStr === 'yesterday' || relStr === 'вчера') {
+      completionDate = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+    }
+    hasExplicitDate = true;
+    text = text.replace(relMatch[0], ' ').trim();
+  }
+
+  // B) ISO: YYYY-MM-DD
+  if (!hasExplicitDate) {
+    const isoMatch = text.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+    if (isoMatch) {
+      const y = parseInt(isoMatch[1], 10);
+      const m = parseInt(isoMatch[2], 10);
+      const d = parseInt(isoMatch[3], 10);
+      const dObj = dayjs(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+      if (dObj.isValid()) {
+        completionDate = dObj.format('YYYY-MM-DD');
+        hasExplicitDate = true;
+        text = text.replace(isoMatch[0], ' ').trim();
+      }
+    }
+  }
+
+  // C) Named months (English and Russian) e.g. "Oct 28, 2026", "28 Oct 2026", "21 авг 1957", "Aug 21"
+  if (!hasExplicitDate) {
+    const namedMonthRegex = /\b(?:(?:due|date|deadline|on)\s*:?\s*)?(?:(\d{1,2})(?:st|nd|rd|th)?\s+([a-zA-Zа-яА-ЯёЁ]+)|([a-zA-Zа-яА-ЯёЁ]+)\s+(\d{1,2})(?:st|nd|rd|th)?)(?:,?\s+(\d{2,4}))?\b/i;
+    const nmMatch = text.match(namedMonthRegex);
+    if (nmMatch) {
+      const dayRaw = nmMatch[1] || nmMatch[4];
+      const monthRaw = (nmMatch[2] || nmMatch[3] || '').toLowerCase().replace(/\.$/, '');
+      const yearRaw = nmMatch[5];
+
+      const mNum = EN_MONTHS[monthRaw] || RU_MONTHS[monthRaw] || RU_MONTHS[monthRaw.slice(0, 3)] || EN_MONTHS[monthRaw.slice(0, 3)];
+      const dNum = parseInt(dayRaw, 10);
+
+      if (mNum && dNum >= 1 && dNum <= 31) {
+        let y = dayjs().year();
+        if (yearRaw) {
+          let yr = parseInt(yearRaw, 10);
+          if (yr < 100) yr += yr > 50 ? 1900 : 2000;
+          y = yr;
+        }
+        const dObj = dayjs(`${y}-${String(mNum).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`);
+        if (dObj.isValid()) {
+          completionDate = dObj.format('YYYY-MM-DD');
+          hasExplicitDate = true;
+          text = text.replace(nmMatch[0], ' ').trim();
+        }
+      }
+    }
+  }
+
+  // D) Numeric dates: DD.MM.YYYY, DD/MM/YYYY, DD.MM, DD/MM (with optional birth year nearby, e.g. "Мама 1957 21.08")
+  if (!hasExplicitDate) {
+    const numDateRegex = /(?:(?:due|date|deadline)\s*:?\s*)?\(?\b(\d{1,2})[\.\/-](\d{1,2})(?:[\.\/-](\d{2,4}))?\b\)?/i;
+    const ndMatch = text.match(numDateRegex);
+    if (ndMatch) {
+      let p1 = parseInt(ndMatch[1], 10);
+      let p2 = parseInt(ndMatch[2], 10);
+      let yearStr = ndMatch[3];
+
+      let day, month;
+      if (p1 > 12 && p2 <= 12) {
+        day = p1;
+        month = p2;
+      } else if (p2 > 12 && p1 <= 12) {
+        day = p2;
+        month = p1;
+      } else {
+        day = p1;
+        month = p2;
+      }
+
+      // Check if a 4-digit birth year exists in remaining text (e.g. "Мама 1957")
+      if (!yearStr) {
+        const nearbyYearMatch = text.match(/\b(19\d{2}|20\d{2})\b/);
+        if (nearbyYearMatch) {
+          yearStr = nearbyYearMatch[1];
+          text = text.replace(nearbyYearMatch[0], ' ');
+        }
+      }
+
+      let y = dayjs().year();
+      if (yearStr) {
+        let yr = parseInt(yearStr, 10);
+        if (yr < 100) yr += yr > 50 ? 1900 : 2000;
+        y = yr;
+      }
+
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        const dObj = dayjs(`${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+        if (dObj.isValid()) {
+          completionDate = dObj.format('YYYY-MM-DD');
+          hasExplicitDate = true;
+          text = text.replace(ndMatch[0], ' ').trim();
+        }
+      }
+    }
+  }
+
+  // Clean title: remove empty brackets, parenthesis, leading/trailing punctuation
+  let cleanTitle = text
+    .replace(/\(\s*\)/g, '')
+    .replace(/\[\s*\]/g, '')
+    .replace(/\b(?:due|date|deadline)\s*:?/gi, '')
+    .replace(/^\s*[-–—:]+\s*/, '')
+    .replace(/\s*[-–—:]+\s*$/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return {
+    cleanTitle,
+    completionDate: hasExplicitDate ? completionDate : null,
+    hasExplicitDate,
+    taskTime,
+    priority,
+    reminder,
+    notes,
+  };
+}
+
 /**
  * Parses a single block of text into a structured task object.
  */
 export function parseSingleTaskBlock(blockText, options = {}) {
   const { defaultImg = '', defaultAttachments = [], themeReducer = {}, index = 0 } = options;
-  let taskname = '';
-  let notes = [];
-  let subtasks = [];
-  let completionDate = dayjs().format('YYYY-MM-DD');
-  let taskTime = null;
-  let priority = 'none';
-
   let textToParse = (blockText || '').trim();
 
-  // 1. Check for explicit "Task: ..." or "Title: ..." header
+  // 1. Explicit Task / Title header
+  let explicitTaskName = '';
   const taskHeaderMatch = textToParse.match(/^(?:Task|Title)\s*:\s*([^\n]+)/i);
   if (taskHeaderMatch) {
-    taskname = taskHeaderMatch[1].trim();
+    explicitTaskName = taskHeaderMatch[1].trim();
     textToParse = textToParse.replace(taskHeaderMatch[0], '').trim();
   }
 
-  // 2. Check for "Subtasks:" and "Notes:" sections
+  // 2. Subtasks & Notes sections
   let notesSection = '';
   let subtasksSection = '';
+  let subtasks = [];
 
   const subtasksSplit = textToParse.split(/\n\s*Subtasks\s*:\s*\n?/i);
   if (subtasksSplit.length > 1) {
@@ -35,10 +258,6 @@ export function parseSingleTaskBlock(blockText, options = {}) {
   if (notesSplit.length > 1) {
     textToParse = notesSplit[0];
     notesSection = notesSplit.slice(1).join('\n');
-  }
-
-  if (notesSection) {
-    notes.push(notesSection.trim());
   }
 
   if (subtasksSection) {
@@ -64,136 +283,44 @@ export function parseSingleTaskBlock(blockText, options = {}) {
     }
   }
 
-  // 3. Parse remaining lines for Priority, Due date, Time, Subtasks, Notes
-  const lines = textToParse.split('\n');
-  let hasFoundSubtasks = false;
-  let remainingLines = [];
+  // 3. Extract attributes from lines of textToParse
+  const lines = textToParse.split('\n').map(l => l.trim()).filter(Boolean);
+  let taskname = explicitTaskName;
+  let completionDate = dayjs().format('YYYY-MM-DD');
+  let taskTime = null;
+  let priority = 'none';
+  let reminder = null;
+  let notesList = notesSection ? [notesSection.trim()] : [];
 
-  for (let line of lines) {
-    let trimmed = line.trim();
-    if (!trimmed) continue;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const attrs = extractTaskAttributes(line);
 
-    const priorityMatch = trimmed.match(/Priority:\s*(low|medium|high)/i);
-    if (priorityMatch) {
-      priority = priorityMatch[1].toLowerCase();
-      trimmed = trimmed.replace(priorityMatch[0], '').trim();
-      if (!trimmed) continue;
+    if (attrs.hasExplicitDate) {
+      completionDate = attrs.completionDate;
+    }
+    if (attrs.taskTime) {
+      taskTime = attrs.taskTime;
+    }
+    if (attrs.priority !== 'none') {
+      priority = attrs.priority;
+    }
+    if (attrs.reminder) {
+      reminder = attrs.reminder;
+    }
+    if (attrs.notes) {
+      notesList.push(attrs.notes);
     }
 
-    const dRegex = /\b(today|tomorrow|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)\b/i;
-    const tRegex = /\b(\d{1,2}:\d{2}(?:\s*(?:am|pm))?|\d{1,2}\s*(?:am|pm))\b/i;
-    const keywordRegex = /\b(due time|due|deadline at|deadline|date\(due\)|date)\b/i;
-
-    if (keywordRegex.test(trimmed)) {
-      let foundAny = false;
-
-      const dMatch = trimmed.match(dRegex);
-      if (dMatch) {
-        const dateStr = dMatch[1];
-        if (dateStr.toLowerCase() === 'today') {
-          completionDate = dayjs().format('YYYY-MM-DD');
-        } else if (dateStr.toLowerCase() === 'tomorrow') {
-          completionDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
-        } else {
-          let cleanDateStr = dateStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
-          if (/[a-z]+\s+\d{1,2}$/i.test(cleanDateStr)) {
-            cleanDateStr += `, ${dayjs().year()}`;
-          }
-          const parsedDate = dayjs(cleanDateStr);
-          if (parsedDate.isValid()) {
-            completionDate = parsedDate.format('YYYY-MM-DD');
-          }
-        }
-        trimmed = trimmed.replace(dMatch[0], '');
-        foundAny = true;
+    if (!taskname) {
+      if (attrs.cleanTitle) {
+        taskname = attrs.cleanTitle;
       }
-
-      const tMatch = trimmed.match(tRegex);
-      if (tMatch) {
-        const timeStr = tMatch[1];
-        let t = timeStr.trim();
-        const pm = /pm/i.test(t);
-        const am = /am/i.test(t);
-        t = t.replace(/(?:am|pm)/i, '').trim();
-
-        let [h, m] = t.split(':');
-        h = parseInt(h, 10);
-        m = m ? parseInt(m, 10) : 0;
-
-        if (pm && h < 12) h += 12;
-        if (am && h === 12) h = 0;
-
-        taskTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        trimmed = trimmed.replace(tMatch[0], '');
-        foundAny = true;
-      }
-
-      if (foundAny) {
-        trimmed = trimmed.replace(keywordRegex, '').replace(/\bat\b/i, '').replace(/:\s*$/, '').replace(/^\s*:\s*/, '').trim();
-      }
-
-      if (!trimmed) continue;
-    }
-
-    if (!subtasksSection) {
-      const subtaskMatch = trimmed.match(/^(\[ \]|\[x\]|-|\*|\d+\.)\s+(.+)/i);
-      if (subtaskMatch) {
-        hasFoundSubtasks = true;
-        subtasks.push({
-          id: `${Date.now()}_${index}_${subtasks.length}`,
-          text: subtaskMatch[2].trim(),
-          completed: subtaskMatch[1].toLowerCase() === '[x]'
-        });
-        continue;
-      }
-    }
-
-    if (!hasFoundSubtasks) {
-      remainingLines.push(trimmed);
     } else {
-      notes.push(trimmed);
-    }
-  }
-
-  if (!taskname) {
-    let preText = remainingLines.join('\n');
-    let extraNotes = [];
-
-    if (preText) {
-      const words = preText.split(/\s+/);
-      if (words.length > 5) {
-        taskname = words.slice(0, 5).join(' ') + '...';
-        let wordCount = 0;
-        let splitIndex = 0;
-        let inWord = false;
-        for (let i = 0; i < preText.length; i++) {
-          if (/\s/.test(preText[i])) {
-            inWord = false;
-          } else {
-            if (!inWord) {
-              wordCount++;
-              inWord = true;
-            }
-          }
-          if (wordCount === 6) {
-            splitIndex = i;
-            break;
-          }
-        }
-        if (splitIndex > 0) {
-          extraNotes.push(preText.substring(splitIndex).trim());
-        } else {
-          extraNotes.push(words.slice(5).join(' '));
-        }
-      } else {
-        taskname = preText;
+      if (attrs.cleanTitle && attrs.cleanTitle !== taskname) {
+        notesList.push(attrs.cleanTitle);
       }
     }
-    notes = [...extraNotes, ...notes];
-  }
-
-  if (!taskname && notes.length > 0) {
-    taskname = notes.shift();
   }
 
   if (!taskname) {
@@ -203,7 +330,7 @@ export function parseSingleTaskBlock(blockText, options = {}) {
   return {
     id: (Date.now() + index).toString(),
     taskname: taskname.slice(0, 100),
-    description: { text: notes.join('\n'), img: defaultImg, attachments: defaultAttachments, url: '' },
+    description: { text: notesList.join('\n'), img: defaultImg, attachments: defaultAttachments, url: '' },
     subtasks,
     completed: false,
     priority,
@@ -211,13 +338,13 @@ export function parseSingleTaskBlock(blockText, options = {}) {
     time: taskTime,
     isShared: true,
     doNotOverrideDate: true,
-    reminder: themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null
+    reminder: reminder || (themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null)
   };
 }
 
 /**
  * Main parser that accepts shared text from any source (single task, Task Flow transfer, JSON, checklists, multi-task blocks)
- * and returns an array of valid task objects.
+ * and returns an array of valid task objects with extracted dates, times, priorities, reminders, and notes.
  */
 export function parseSharedTasks(text, options = {}) {
   if (!text || typeof text !== 'string') return [];
@@ -233,12 +360,20 @@ export function parseSharedTasks(text, options = {}) {
       const rawArray = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.tasks) ? parsed.tasks : null);
       if (Array.isArray(rawArray) && rawArray.length > 0) {
         return rawArray.map((item, idx) => {
-          const title = item.taskname || item.title || item.name || item.text || `Task ${idx + 1}`;
-          const dueDate = item.completionDate || item.dueDate || item.due || item.date;
-          const time = item.time || item.dueTime || null;
-          const priority = (item.priority || 'none').toLowerCase();
+          const rawTitle = item.taskname || item.title || item.name || item.text || `Task ${idx + 1}`;
+          const attrs = extractTaskAttributes(String(rawTitle));
+          const title = attrs.cleanTitle || String(rawTitle);
+
+          let dueDate = item.completionDate || item.dueDate || item.due || item.date;
+          if (!dueDate && attrs.hasExplicitDate) {
+            dueDate = attrs.completionDate;
+          }
+
+          const time = item.time || item.dueTime || attrs.taskTime || null;
+          const priority = (item.priority || (attrs.priority !== 'none' ? attrs.priority : 'none')).toLowerCase();
           const completed = !!item.completed;
-          const notes = typeof item.description === 'string' ? item.description : (item.description?.text || item.notes || '');
+          const rawNotes = typeof item.description === 'string' ? item.description : (item.description?.text || item.notes || '');
+          const notes = [rawNotes, attrs.notes].filter(Boolean).join('\n');
           const subtasks = Array.isArray(item.subtasks) ? item.subtasks.map((s, sIdx) => ({
             id: `${Date.now()}_${idx}_${sIdx}`,
             text: typeof s === 'string' ? s : (s.text || s.title || ''),
@@ -256,7 +391,7 @@ export function parseSharedTasks(text, options = {}) {
             time,
             isShared: true,
             doNotOverrideDate: true,
-            reminder: themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null
+            reminder: attrs.reminder || (themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null)
           };
         });
       }
@@ -265,61 +400,9 @@ export function parseSharedTasks(text, options = {}) {
     }
   }
 
-  // 2. Check for date-first tabular entries (e.g. "23.01.1988 Wife", "24/08 Grandma")
-  const textLines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const lineRegex = /^(\d{1,2})[\s\t\.\/]+(\d{1,2})(?:[\s\t\.\/]+\.?(\d{2,4}))?[\s\t]+(.+)$/;
-  const matchingDateLines = textLines.filter(l => lineRegex.test(l));
-
-  if (matchingDateLines.length > 0 && matchingDateLines.length === textLines.length) {
-    return textLines.map((l, i) => {
-      const m = l.match(lineRegex);
-      let p1 = parseInt(m[1], 10);
-      let p2 = parseInt(m[2], 10);
-      let yearStr = m[3];
-      const title = m[4].trim();
-
-      let day, month;
-      if (p1 > 12 && p2 <= 12) {
-        day = p1;
-        month = p2;
-      } else if (p2 > 12 && p1 <= 12) {
-        day = p2;
-        month = p1;
-      } else {
-        day = p1;
-        month = p2;
-      }
-
-      let year = dayjs().year();
-      if (yearStr) {
-        let y = parseInt(yearStr, 10);
-        if (y < 100) y += y > 50 ? 1900 : 2000;
-        year = y;
-      }
-
-      const dObj = dayjs(`${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`);
-      let dateFormatted = dObj.isValid() ? dObj.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
-
-      return {
-        id: (Date.now() + i).toString(),
-        taskname: title.slice(0, 100),
-        description: { text: '', img: i === 0 ? defaultImg : '', attachments: i === 0 ? defaultAttachments : [], url: '' },
-        subtasks: [],
-        completed: false,
-        priority: 'none',
-        completionDate: dayjs(dateFormatted).toISOString(),
-        isShared: true,
-        doNotOverrideDate: true,
-        reminder: themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null
-      };
-    });
-  }
-
-  // 3. Multi-task blocks separated by divider line (e.g. "------------------------" or "---" or "===")
-  // or explicitly repeating "Task: "
+  // 2. Multi-task blocks separated by divider line (---, ===, ___, ***)
   let cleanText = trimmed.replace(/^Tasks\s*:\s*\n+/i, '');
   const dividerRegex = /\n\s*(?:-{3,}|={3,}|_{3,}|\*{3,})\s*\n/;
-
   if (dividerRegex.test(cleanText)) {
     const rawBlocks = cleanText.split(dividerRegex).map(b => b.trim()).filter(Boolean);
     if (rawBlocks.length > 1) {
@@ -332,7 +415,7 @@ export function parseSharedTasks(text, options = {}) {
     }
   }
 
-  // Check if multiple "Task: " patterns exist in text
+  // 3. Repeating "Task: ..." headers
   const taskHeaderMatches = cleanText.match(/(?:^|\n)\s*Task\s*:\s*/gi);
   if (taskHeaderMatches && taskHeaderMatches.length > 1) {
     const rawBlocks = cleanText.split(/(?=(?:^|\n)\s*Task\s*:\s*)/i).map(b => b.trim()).filter(Boolean);
@@ -346,32 +429,60 @@ export function parseSharedTasks(text, options = {}) {
     }
   }
 
-  // 4. Checklist / Bullet / Numbered list transfer (e.g. copy-pasted 5 checklist items from Task Flow / Notes)
+  // 4. Multiple lines check (checklist items OR one task per line, e.g. birthdays list!)
+  const textLines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (textLines.length >= 2) {
-    const isAllListItems = textLines.every(l => /^(?:[-*•]|\d+[\.)]|\[[ xX]\])/i.test(l));
+    // Check if every line is a checklist/bullet item
+    const isAllListItems = textLines.every(l => /^(?:[-*•]|\d+[\.)]|\[[ xX]\]|☑️|🔲)/i.test(l));
     if (isAllListItems) {
       return textLines.map((line, idx) => {
-        const match = line.match(/^(?:[-*•]|\d+[\.)])?\s*(?:\[([ xX])\])?\s*(.+)/i);
-        const isCompleted = match && match[1] ? match[1].toLowerCase() === 'x' : false;
-        const title = match && match[2] ? match[2].trim() : line;
+        const match = line.match(/^(?:[-*•]|\d+[\.)]|☑️|🔲)?\s*(?:\[([ xX])\])?\s*(.+)/i);
+        const isCompleted = match && match[1] ? match[1].toLowerCase() === 'x' : line.startsWith('☑️');
+        const rawContent = match && match[2] ? match[2].trim() : line;
+        const attrs = extractTaskAttributes(rawContent);
+
         return {
           id: (Date.now() + idx).toString(),
-          taskname: title.slice(0, 100),
-          description: { text: '', img: idx === 0 ? defaultImg : '', attachments: idx === 0 ? defaultAttachments : [], url: '' },
+          taskname: (attrs.cleanTitle || rawContent).slice(0, 100),
+          description: { text: attrs.notes, img: idx === 0 ? defaultImg : '', attachments: idx === 0 ? defaultAttachments : [], url: '' },
           subtasks: [],
           completed: isCompleted,
-          priority: 'none',
-          completionDate: dayjs().toISOString(),
-          time: null,
+          priority: attrs.priority,
+          completionDate: attrs.completionDate ? dayjs(attrs.completionDate).toISOString() : dayjs().toISOString(),
+          time: attrs.taskTime,
           isShared: true,
           doNotOverrideDate: true,
-          reminder: themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null
+          reminder: attrs.reminder || (themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null)
+        };
+      });
+    }
+
+    // Check if multiple lines have explicit dates (like birthdays list in Image 5!)
+    const linesWithAttrs = textLines.map(l => ({ line: l, attrs: extractTaskAttributes(l) }));
+    const linesWithDateCount = linesWithAttrs.filter(item => item.attrs.hasExplicitDate).length;
+
+    // If at least 2 lines (and at least 40% of lines) have explicit dates, it is a multi-task list!
+    if (linesWithDateCount >= 2 && linesWithDateCount >= textLines.length * 0.4) {
+      return linesWithAttrs.map((item, idx) => {
+        const { line, attrs } = item;
+        return {
+          id: (Date.now() + idx).toString(),
+          taskname: (attrs.cleanTitle || line).slice(0, 100),
+          description: { text: attrs.notes, img: idx === 0 ? defaultImg : '', attachments: idx === 0 ? defaultAttachments : [], url: '' },
+          subtasks: [],
+          completed: false,
+          priority: attrs.priority,
+          completionDate: attrs.completionDate ? dayjs(attrs.completionDate).toISOString() : dayjs().toISOString(),
+          time: attrs.taskTime,
+          isShared: true,
+          doNotOverrideDate: true,
+          reminder: attrs.reminder || (themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null)
         };
       });
     }
   }
 
-  // 5. Fallback: Parse as a single rich task
+  // 5. Fallback: Parse as a single rich task block
   return [parseSingleTaskBlock(trimmed, {
     defaultImg,
     defaultAttachments,
