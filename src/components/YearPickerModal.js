@@ -44,6 +44,7 @@ export default function YearPickerModal({
             return (
               <TouchableOpacity
                 key={year}
+                testID={`year_option_${year}`}
                 accessible={true}
                 accessibilityRole="button"
                 accessibilityLabel={`Select year ${year}`}

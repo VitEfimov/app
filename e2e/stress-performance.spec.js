@@ -228,4 +228,32 @@ test.describe('Performance & Stress Test Suite', () => {
     const fatalErrors = consoleErrors.filter(e => e.includes('TypeError') || e.includes('Crash'));
     expect(fatalErrors).toHaveLength(0);
   });
+
+  test('Benchmark 6: Year Picker Modal Navigation (current to current + 10)', async () => {
+    const tabCalendar = page.getByTestId('tab_calendar');
+    await tabCalendar.click();
+    await page.waitForTimeout(300);
+
+    // Month and year header button
+    const headerBtn = page.getByTestId('calendar_month_year_header');
+    await expect(headerBtn).toBeVisible({ timeout: 10000 });
+    await headerBtn.click();
+
+    // Verify modal opened
+    const currentYear = new Date().getFullYear();
+    const targetYear = currentYear + 3;
+
+    // Verify current year and current + 10 are visible
+    const yearCurrentBtn = page.getByTestId(`year_option_${currentYear}`);
+    const yearPlus10Btn = page.getByTestId(`year_option_${currentYear + 10}`);
+    await expect(yearCurrentBtn).toBeVisible();
+    await expect(yearPlus10Btn).toBeVisible();
+
+    // Click on target year
+    const targetYearBtn = page.getByTestId(`year_option_${targetYear}`);
+    await targetYearBtn.click();
+
+    // Verify calendar header updated to target year
+    await expect(headerBtn).toContainText(String(targetYear));
+  });
 });

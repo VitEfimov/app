@@ -30,6 +30,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import CreateBoardModal from '../components/CreateBoardModal';
 import CalendarDayOptionsModal from '../components/calendar/CalendarDayOptionsModal';
+import YearPickerModal from '../components/YearPickerModal';
 import { updateTask, deleteTask } from '../features/taskSlice';
 import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
@@ -93,6 +94,16 @@ export default function CalendarScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isInlineAddActive, setIsInlineAddActive] = useState(false);
+  const [isYearPickerVisible, setIsYearPickerVisible] = useState(false);
+
+  const handleSelectYear = (year) => {
+    const currentMonthMoment = dayjs(calendarMonth);
+    const newMonthStr = currentMonthMoment.set('year', year).format('YYYY-MM-DD');
+    setCalendarMonth(newMonthStr);
+    const newSelectedDate = dayjs(selectedDate).set('year', year).format('YYYY-MM-DD');
+    setSelectedDate(newSelectedDate);
+    setIsYearPickerVisible(false);
+  };
 
   const handleToggleTheme = () => {
     const modes = ['light', 'dark', 'contrast'];
@@ -544,6 +555,29 @@ export default function CalendarScreen({ navigation }) {
             markingType={'multi-dot'}
             markedDates={markedDates}
             dayComponent={renderCustomDay}
+            renderHeader={(date) => {
+              let dateObj = dayjs(date ? (date.dateString || date.toString()) : calendarMonth);
+              if (!dateObj.isValid()) {
+                dateObj = dayjs(calendarMonth);
+              }
+              const monthYearStr = dateObj.format('MMMM YYYY');
+              return (
+                <TouchableOpacity
+                  testID="calendar_month_year_header"
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select year, current month ${monthYearStr}`}
+                  activeOpacity={0.7}
+                  style={styles.monthYearHeaderBtn}
+                  onPress={() => setIsYearPickerVisible(true)}
+                >
+                  <Text style={[styles.monthYearHeaderText, { color: colors.textPrimary }]}>
+                    {monthYearStr}
+                  </Text>
+                  <Text style={[styles.monthYearChevron, { color: primaryAccent }]}>▾</Text>
+                </TouchableOpacity>
+              );
+            }}
             enableSwipeMonths={true}
             hideExtraDays={true}
             theme={{
@@ -779,6 +813,17 @@ export default function CalendarScreen({ navigation }) {
         onSubmit={handleCreateCategorySubmit}
         colors={colors}
       />
+
+      {/* Year Picker Modal (current year to current year + 10) */}
+      <YearPickerModal
+        isVisible={isYearPickerVisible}
+        onClose={() => setIsYearPickerVisible(false)}
+        currentYear={dayjs(calendarMonth).year()}
+        minYear={Math.min(dayjs().year(), dayjs(calendarMonth).year())}
+        maxYear={Math.max(dayjs().year() + 10, dayjs(calendarMonth).year() + 10)}
+        onSelectYear={handleSelectYear}
+        colors={colors}
+      />
       </View>
     </ScreenErrorBoundary>
   );
@@ -844,6 +889,23 @@ const styles = StyleSheet.create({
   },
   calendar: {
     borderRadius: 16,
+  },
+  monthYearHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+  },
+  monthYearHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  monthYearChevron: {
+    fontSize: 11,
+    marginLeft: 5,
+    fontWeight: '700',
   },
   dayCellContainer: {
     width: 36,
