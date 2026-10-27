@@ -32,7 +32,7 @@ const IconDetails = ({ color }) => (
   </Svg>
 );
 
-export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDetails, onAddTask, defaultBoardId }) {
+export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDetails, onAddTask, defaultBoardId, hideUnderline = false }) {
   const { generateRepeatingTasks } = useTaskRepeat();
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const isEditing = isActive !== undefined ? isActive : internalIsEditing;
@@ -212,7 +212,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       <TouchableOpacity 
         testID={`inline_add_btn_${sectionId}`}
         accessible={true} accessibilityRole="button" accessibilityLabel={`Create new task for ${sectionId}`}
-        style={[styles.addBtn, { borderBottomColor: colors.borderColor }]} 
+        style={[styles.addBtn, { borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]} 
         onPress={() => setIsEditing(true)}
       >
         <View style={styles.iconWrapper}>

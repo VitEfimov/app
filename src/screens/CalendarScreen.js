@@ -694,7 +694,7 @@ export default function CalendarScreen({ navigation }) {
 
           {/* Grouped by Category */}
           {groupedTasks.length > 0 ? (
-            groupedTasks.map(group => (
+            groupedTasks.map((group, groupIndex) => (
               <View key={group.id} style={styles.categorySectionGroup}>
                 {/* Category Header: 🟠 DCFGH */}
                 <View style={[styles.categorySectionHeader, { borderBottomColor: colors.borderColor }]}>
@@ -705,21 +705,34 @@ export default function CalendarScreen({ navigation }) {
                 </View>
 
                 {/* Tasks in Category */}
-                {group.data.map(task => (
-                  <View key={task.id || task._id} style={[styles.taskRowWrapper, { borderBottomColor: colors.borderColor }]}>
-                    <TaskRow
-                      task={task}
-                      hideDate={true}
-                      hideBoardBadge={false}
-                      isSelectionMode={selectionMode.isActive}
-                      isSelected={selectionMode.selectedTaskIds.includes(task.id || task._id)}
-                      onToggleSelect={() => toggleTaskSelection(task.id || task._id)}
-                      onPressSnooze={() => { setSelectedTask(task); setDetailsVisible(true); }}
-                      onPressMore={() => handleTaskPress(task)}
-                      onPress={() => handleTaskPress(task)}
-                    />
-                  </View>
-                ))}
+                {group.data.map((task, taskIndex) => {
+                  const isLastTaskOverall =
+                    groupIndex === groupedTasks.length - 1 &&
+                    taskIndex === group.data.length - 1;
+                  return (
+                    <View
+                      key={task.id || task._id}
+                      style={[
+                        styles.taskRowWrapper,
+                        { borderBottomColor: colors.borderColor },
+                        isLastTaskOverall && { borderBottomWidth: 0 }
+                      ]}
+                    >
+                      <TaskRow
+                        task={task}
+                        hideUnderline={true}
+                        hideDate={true}
+                        hideBoardBadge={false}
+                        isSelectionMode={selectionMode.isActive}
+                        isSelected={selectionMode.selectedTaskIds.includes(task.id || task._id)}
+                        onToggleSelect={() => toggleTaskSelection(task.id || task._id)}
+                        onPressSnooze={() => { setSelectedTask(task); setDetailsVisible(true); }}
+                        onPressMore={() => handleTaskPress(task)}
+                        onPress={() => handleTaskPress(task)}
+                      />
+                    </View>
+                  );
+                })}
               </View>
             ))
           ) : (
@@ -734,6 +747,7 @@ export default function CalendarScreen({ navigation }) {
           <View style={[styles.inlineAddWrapper, { borderTopColor: colors.borderColor }]}>
             <InlineAddTask
               sectionId={selectedDate}
+              hideUnderline={true}
               onAddDetails={(task) => {
                 setSelectedTask(task);
                 setDetailsVisible(true);

@@ -77,4 +77,32 @@ test.describe('Navigation & Calendar Integration', () => {
 
     await expect(page.getByText('Calendar Event Task').first()).toBeAttached();
   });
+
+  test('should render multiple tasks with single separator lines in calendar view', async () => {
+    const themeBtn = page.getByTestId('header_theme_toggle_btn');
+    if (await themeBtn.isVisible()) {
+      await themeBtn.click();
+      await page.waitForTimeout(300);
+    }
+
+    const boardTab = page.getByTestId('tab_board');
+    await boardTab.click();
+    await page.waitForTimeout(300);
+
+    await createTask(page, 'today', 'Task Alpha');
+    await createTask(page, 'today', 'Task Beta');
+    await createTask(page, 'today', 'Task Gamma');
+
+    const calendarTab = page.getByTestId('tab_calendar');
+    await calendarTab.click();
+    const alpha = page.getByText('Task Alpha').first();
+    await expect(alpha).toBeAttached();
+    await page.mouse.wheel(0, 300);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: 'e2e/screenshots/calendar_multi_task_lines.png' });
+    await expect(alpha).toBeAttached();
+    await expect(page.getByText('Task Beta').first()).toBeAttached();
+    await expect(page.getByText('Task Gamma').first()).toBeAttached();
+  });
 });
+

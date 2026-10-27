@@ -111,7 +111,7 @@ const IconCheckCircle = ({ color }) => (
 
 const EMPTY_BOARDS = [];
 
-const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardBadge = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
+const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   const { showToast } = useToast();
@@ -242,7 +242,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       extrapolate: 'clamp',
     });
     return (
-      <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.borderColor }]}>
+      <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]}>
         <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, { transform: [{ scale }] }]}>
           <View style={styles.leftActionIconWrapper}>
             <SwipeIconComplete color={colors.primary} />
@@ -251,7 +251,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
         </Animated.View>
       </View>
     );
-  }, [colors.surfaceContainer, colors.borderColor, colors.primary, t, middleCompleteThreshold]);
+  }, [colors.surfaceContainer, colors.borderColor, colors.primary, t, middleCompleteThreshold, hideUnderline]);
 
   const renderRightActions = useCallback((progress, dragX) => {
     if (!dragX || typeof dragX.interpolate !== 'function') return null;
@@ -261,7 +261,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       extrapolate: 'clamp',
     });
     return (
-      <View style={[styles.rightActionContainer, { borderBottomColor: colors.borderColor }]}>
+      <View style={[styles.rightActionContainer, { borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]}>
         <TouchableOpacity
           style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]}
           onPress={handleSwipeSnooze}
@@ -291,7 +291,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
         </TouchableOpacity>
       </View>
     );
-  }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.borderColor, colors.textPrimary, colors.textSecondary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore]);
+  }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.borderColor, colors.textPrimary, colors.textSecondary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore, hideUnderline]);
 
   const handleTextPress = useCallback(() => {
     if (isSelectionMode) {
@@ -370,7 +370,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       accessibilityRole="button"
       accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
       accessibilityState={{ checked: task.completed }}
-      style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: 'transparent' }]}
+      style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: 'transparent' }, hideUnderline && { borderBottomWidth: 0 }]}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onLongPress={() => {
