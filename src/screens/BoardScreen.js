@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
@@ -20,7 +20,7 @@ import Modal from 'react-native-modal';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard, getDateThresholds, classifyTaskDate, compareTasks, PRIORITY_SCORES } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import Svg, { Path, Circle, Line } from 'react-native-svg';
+import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
@@ -50,6 +50,26 @@ const IconMoreHorizontal = ({ color }) => (
     <Circle cx="12" cy="12" r="1.5" fill={color} />
     <Circle cx="19" cy="12" r="1.5" fill={color} />
     <Circle cx="5" cy="12" r="1.5" fill={color} />
+  </Svg>
+);
+
+const IconSquare = ({ color, size = 18 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+  </Svg>
+);
+
+const IconCheckSquare = ({ color, size = 18 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <Path d="M9 12l2 2 4-4" />
+  </Svg>
+);
+
+const IconMinusSquare = ({ color, size = 18 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <Path d="M8 12h8" />
   </Svg>
 );
 
@@ -175,6 +195,10 @@ export default function BoardScreen({ route, navigation }) {
   }, [boardIdsKey, dispatch]);
 
   const toggleSection = (sectionId) => {
+    if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (collapsedSections.includes(sectionId)) {
       setCollapsedSections(collapsedSections.filter(id => id !== sectionId));
     } else {
@@ -183,6 +207,10 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const toggleTaskSelection = useCallback((taskId) => {
+    if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectionMode(prev => {
       const isSelected = prev.selectedTaskIds.includes(taskId);
       return {
@@ -198,6 +226,11 @@ export default function BoardScreen({ route, navigation }) {
     const selectedIds = [...selectionMode.selectedTaskIds];
     if (selectedIds.length === 0) return;
     
+    if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
     selectedIds.forEach(id => {
       dispatch(updateTask({ taskId: id, boardId: targetBoardId }));
     });
@@ -224,6 +257,10 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: 'Complete',
       isDestructive: false,
       onConfirm: () => {
+        if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+          UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         selectionMode.selectedTaskIds.forEach(id => {
           dispatch(updateTask({ taskId: id, completed: true }));
         });
@@ -243,6 +280,10 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: t('Delete') || 'Delete',
       isDestructive: true,
       onConfirm: () => {
+        if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+          UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         selectionMode.selectedTaskIds.forEach(id => dispatch(deleteTask({ taskId: id })));
         setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
@@ -335,6 +376,11 @@ export default function BoardScreen({ route, navigation }) {
   }, []);
 
   const handleToggleSelectTask = useCallback((taskId, sectionId) => {
+    if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
     setSelectionMode(prev => {
       if (!prev.isActive) {
         return { isActive: true, sectionId, selectedTaskIds: [taskId] };
@@ -552,6 +598,10 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: 'Complete',
       isDestructive: false,
       onConfirm: () => {
+        if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+          UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         tasksToComplete.forEach(task => {
           dispatch(updateTask({ taskId: task.id, completed: true }));
         });
@@ -580,6 +630,10 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: t('Move'),
       isDestructive: false,
       onConfirm: () => {
+        if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+          UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         const today = dayjs().startOf('day');
         let newDate;
         switch (section.id) {
@@ -619,6 +673,10 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: t('Move'),
       isDestructive: false,
       onConfirm: () => {
+        if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+          UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         const today = dayjs().startOf('day');
         let newDate;
         switch (section.id) {
@@ -723,8 +781,41 @@ export default function BoardScreen({ route, navigation }) {
     setPromptConfig({ isVisible: false, type: null, targetBoard: null });
   };
 
+  const handleToggleSelectSection = useCallback((section) => {
+    if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+    const sectionTasks = getSectionTasks(section);
+    const sectionTaskIds = sectionTasks.map(t => t.id);
+    if (sectionTaskIds.length === 0) return;
+
+    setSelectionMode(prev => {
+      const allSelected = sectionTaskIds.every(id => prev.selectedTaskIds.includes(id));
+      let newSelected;
+      if (allSelected) {
+        newSelected = prev.selectedTaskIds.filter(id => !sectionTaskIds.includes(id));
+      } else {
+        newSelected = Array.from(new Set([...prev.selectedTaskIds, ...sectionTaskIds]));
+      }
+      return {
+        ...prev,
+        isActive: true,
+        sectionId: section.id,
+        selectedTaskIds: newSelected
+      };
+    });
+  }, [getSectionTasks]);
+
   const renderSectionHeader = ({ section }) => {
     const isCollapsed = collapsedSections.includes(section.id);
+    const sectionTasks = getSectionTasks(section);
+    const sectionTaskIds = sectionTasks.map(t => t.id);
+    const selectedCountInSection = sectionTaskIds.filter(id => selectedTaskIdsSet.has(id)).length;
+    const isAllSectionSelected = sectionTasks.length > 0 && selectedCountInSection === sectionTasks.length;
+    const isPartiallySelected = selectedCountInSection > 0 && !isAllSectionSelected;
+
     return (
       <View style={[styles.sectionHeader, { backgroundColor: colors.bgMain, borderBottomColor: `${section.color}33` }]}>
         <TouchableOpacity 
@@ -747,14 +838,35 @@ export default function BoardScreen({ route, navigation }) {
           <IconChevronDown color={isCollapsed ? section.color : colors.textSecondary} isCollapsed={isCollapsed} />
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          testID={`section_menu_${section.id}`}
-          accessible={true} accessibilityRole="button" accessibilityLabel={`Options for ${section.title} section`}
-          style={styles.ellipsisBtn} 
-          onPress={() => handleMenuPress(section)}
-        >
-          <IconMoreHorizontal color={colors.textSecondary} />
-        </TouchableOpacity>
+        {selectionMode.isActive ? (
+          <TouchableOpacity
+            testID={`section_select_all_${section.id}`}
+            accessible={true}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isAllSectionSelected }}
+            accessibilityLabel={`Select all tasks in ${section.title}`}
+            style={styles.sectionCheckboxBtn}
+            onPress={() => handleToggleSelectSection(section)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            {isAllSectionSelected ? (
+              <IconCheckSquare color={colors.primary} size={20} />
+            ) : isPartiallySelected ? (
+              <IconMinusSquare color={colors.primary} size={20} />
+            ) : (
+              <IconSquare color={colors.textSecondary} size={20} />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            testID={`section_menu_${section.id}`}
+            accessible={true} accessibilityRole="button" accessibilityLabel={`Options for ${section.title} section`}
+            style={styles.ellipsisBtn} 
+            onPress={() => handleMenuPress(section)}
+          >
+            <IconMoreHorizontal color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -1257,8 +1369,8 @@ export default function BoardScreen({ route, navigation }) {
       />
 
       {selectionMode.isActive && (
-        <View style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
-          <Text style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
+        <View testID="selection_action_bar" style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
+          <Text testID="selection_count_text" style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
             <TouchableOpacity testID="action_bar_all" accessible={true} accessibilityRole="button" accessibilityLabel="Select all" onPress={handleSelectAll} style={styles.actionBtn}>
               <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
@@ -1455,6 +1567,12 @@ const styles = StyleSheet.create({
   ellipsisBtn: {
     padding: 5,
     marginLeft: 10,
+  },
+  sectionCheckboxBtn: {
+    padding: 5,
+    marginLeft: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   ellipsisText: {
     fontSize: 20,

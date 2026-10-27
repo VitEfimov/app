@@ -158,5 +158,52 @@ test.describe('Board Missed Tasks Move Backward & Year Picker 18 Years', () => {
     await yearOptions.first().waitFor({ state: 'visible', timeout: 5000 });
     const count = await yearOptions.count();
     expect(count).toBe(18);
+
+    // Close modal by selecting a year
+    await yearOptions.first().click();
+  });
+
+  test('should show checkbox on right side of section name in selection mode and select all tasks in section', async () => {
+    // Navigate back to Board
+    const boardTab = page.getByTestId('tab_board');
+    await boardTab.waitFor({ state: 'visible', timeout: 15000 });
+    await boardTab.click();
+
+    // Ensure we have tasks in Today section
+    const todayHeader = page.getByTestId('section_title_today');
+    await todayHeader.waitFor({ state: 'visible', timeout: 15000 });
+
+    const addBtn = page.getByTestId('inline_add_btn_today').first();
+    await addBtn.click();
+    const input = page.getByTestId('inline_task_input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('Section Task 1');
+    await page.getByTestId('inline_submit_btn').click();
+
+    // Open options for Today section and trigger Select Tasks
+    const todayOptionsBtn = page.getByRole('button', { name: /Options for Today section/i }).first();
+    await todayOptionsBtn.click();
+
+    const selectTasksBtn = page.getByTestId('section_option_select_tasks');
+    await selectTasksBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await selectTasksBtn.click();
+
+    // Verify section select-all checkbox is visible on right side of section name
+    const sectionCheckbox = page.getByTestId('section_select_all_today');
+    await expect(sectionCheckbox).toBeVisible();
+
+    // Click section select-all checkbox to select all tasks in section
+    await sectionCheckbox.click();
+
+    // Verify selection bar is visible
+    const selectionBar = page.getByTestId('selection_action_bar');
+    await expect(selectionBar).toBeVisible();
+
+    // Click cancel button to exit selection mode
+    const cancelBtn = page.getByTestId('action_bar_cancel');
+    await cancelBtn.click();
+    await expect(selectionBar).not.toBeVisible();
+    await expect(sectionCheckbox).not.toBeVisible();
   });
 });
+
