@@ -129,6 +129,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(taskTitleText);
   const [cursorSelection, setCursorSelection] = useState(null);
+  const [isHovered, setIsHovered] = useState(false);
   const kebabOpacity = useRef(new Animated.Value(1)).current;
   const swipeableRef = useRef(null);
 
@@ -368,6 +369,8 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
       accessibilityState={{ checked: task.completed }}
       style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: 'transparent' }]}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onLongPress={() => {
         if (isSelectionMode || isPremium) {
           if (onToggleSelect) onToggleSelect();
@@ -534,27 +537,38 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
         </TouchableOpacity>
       ) : null}
 
-      {/* Region 5: Kebab Menu Button (⋮) */}
-      <Animated.View style={[styles.kebabBtnWrapper, { opacity: kebabOpacity }]}>
-        <TouchableOpacity
-          testID={`task_more_btn_${taskTitleText}`}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel="Task options"
-          style={styles.kebabBtn}
-          onPress={(e) => {
-            e?.stopPropagation?.();
-            if (onPressMore) {
-              onPressMore(task);
-            } else if (onPress) {
-              onPress(task);
+      {/* Region 5: Kebab Menu Button (⋮) - Platform Adaptive (Web/Desktop hover only; hidden on mobile touch) */}
+      {Platform.OS === 'web' ? (
+        <Animated.View 
+          style={[
+            styles.kebabBtnWrapper, 
+            { 
+              opacity: isHovered ? 1 : 0,
+              transition: 'opacity 0.15s ease'
             }
-          }}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          ]}
         >
-          <IconDotsVertical color={colors.textSecondary} size={18} />
-        </TouchableOpacity>
-      </Animated.View>
+          <TouchableOpacity
+            testID={`task_more_btn_${taskTitleText}`}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Task options"
+            style={styles.kebabBtn}
+            onMouseEnter={() => setIsHovered(true)}
+            onPress={(e) => {
+              e?.stopPropagation?.();
+              if (onPressMore) {
+                onPressMore(task);
+              } else if (onPress) {
+                onPress(task);
+              }
+            }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <IconDotsVertical color={colors.textSecondary} size={18} />
+          </TouchableOpacity>
+        </Animated.View>
+      ) : null}
 
     </TouchableOpacity>
   );
