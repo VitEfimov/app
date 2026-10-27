@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard, Platform, Dimensions } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 import { useDispatch, useSelector } from 'react-redux';
@@ -129,7 +129,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(taskTitleText);
   const [cursorSelection, setCursorSelection] = useState(null);
-  const [isSwipeActionsOpen, setIsSwipeActionsOpen] = useState(false);
+  const kebabOpacity = useRef(new Animated.Value(1)).current;
   const swipeableRef = useRef(null);
 
   const isRepeatingTask = !!(task?.recurringSeriesId || task?.isRecurring || (task?.repeatConfig && task?.repeatConfig?.preset && task?.repeatConfig?.preset !== 'None') || (task?.repeatFrequency && task?.repeatFrequency !== 'None'));
@@ -148,11 +148,11 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   });
 
   const closeSwipeable = useCallback(() => {
-    setIsSwipeActionsOpen(false);
+    Animated.timing(kebabOpacity, { toValue: 1, duration: 80, useNativeDriver: true }).start();
     if (swipeableRef.current) {
       swipeableRef.current.close();
     }
-  }, []);
+  }, [kebabOpacity]);
 
   const handleToggleComplete = useCallback(() => {
     if (!task) return;
@@ -230,22 +230,25 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
     if (onPressMore && task) onPressMore(task);
   }, [closeSwipeable, onPressMore, task]);
 
+  const screenWidth = Dimensions.get('window').width;
+  const middleCompleteThreshold = screenWidth * 0.5;
+
   const renderLeftActions = useCallback((progress, dragX) => {
     if (!dragX || typeof dragX.interpolate !== 'function') return null;
     const scale = dragX.interpolate({
-      inputRange: [0, 100],
-      outputRange: [0, 1],
+      inputRange: [0, middleCompleteThreshold * 0.5, middleCompleteThreshold],
+      outputRange: [0.6, 1, 1.15],
       extrapolate: 'clamp',
     });
     return (
-      <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer }]}>
+      <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.borderColor }]}>
         <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, { transform: [{ scale }] }]}>
-          <SwipeIconComplete color={colors.textPrimary} />
-          <Text style={[styles.actionText, { color: colors.textPrimary, marginLeft: 8 }]}>{t('Complete')}</Text>
+          <SwipeIconComplete color={colors.primary} />
+          <Text style={[styles.actionText, { color: colors.primary, marginLeft: 8 }]}>{t('Complete')}</Text>
         </Animated.View>
       </View>
     );
-  }, [colors.surfaceContainer, colors.textPrimary, t]);
+  }, [colors.surfaceContainer, colors.borderColor, colors.primary, t, middleCompleteThreshold]);
 
   const renderRightActions = useCallback((progress, dragX) => {
     if (!dragX || typeof dragX.interpolate !== 'function') return null;
@@ -255,25 +258,37 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       extrapolate: 'clamp',
     });
     return (
-      <View style={styles.rightActionContainer}>
-        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]} onPress={handleSwipeSnooze}>
+      <View style={[styles.rightActionContainer, { borderBottomColor: colors.borderColor }]}>
+        <TouchableOpacity
+          style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]}
+          onPress={handleSwipeSnooze}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
           <Animated.View style={{ transform: [{ scale }] }}>
             <SwipeIconSnooze color={colors.textPrimary} />
           </Animated.View>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainerHigh }]} onPress={handleSwipeDelete}>
+        <TouchableOpacity
+          style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainerHigh }]}
+          onPress={handleSwipeDelete}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
           <Animated.View style={{ transform: [{ scale }] }}>
             <SwipeIconDelete color="#f44336" />
           </Animated.View>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]} onPress={handleSwipeMore}>
+        <TouchableOpacity
+          style={[styles.rightActionKebabBtn, { backgroundColor: colors.surfaceContainer }]}
+          onPress={handleSwipeMore}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
           <Animated.View style={{ transform: [{ scale }] }}>
-            <SwipeIconMore color={colors.textPrimary} />
+            <IconDotsVertical color={colors.textSecondary} size={18} />
           </Animated.View>
         </TouchableOpacity>
       </View>
     );
-  }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.textPrimary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore]);
+  }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.borderColor, colors.textPrimary, colors.textSecondary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore]);
 
   const handleTextPress = useCallback(() => {
     if (isSelectionMode) {
@@ -520,24 +535,26 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       ) : null}
 
       {/* Region 5: Kebab Menu Button (⋮) */}
-      <TouchableOpacity
-        testID={`task_more_btn_${taskTitleText}`}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Task options"
-        style={[styles.kebabBtn, isSwipeActionsOpen && { display: 'none' }]}
-        onPress={(e) => {
-          e?.stopPropagation?.();
-          if (onPressMore) {
-            onPressMore(task);
-          } else if (onPress) {
-            onPress(task);
-          }
-        }}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-      >
-        <IconDotsVertical color={colors.textSecondary} size={18} />
-      </TouchableOpacity>
+      <Animated.View style={[styles.kebabBtnWrapper, { opacity: kebabOpacity }]}>
+        <TouchableOpacity
+          testID={`task_more_btn_${taskTitleText}`}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Task options"
+          style={styles.kebabBtn}
+          onPress={(e) => {
+            e?.stopPropagation?.();
+            if (onPressMore) {
+              onPressMore(task);
+            } else if (onPress) {
+              onPress(task);
+            }
+          }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <IconDotsVertical color={colors.textSecondary} size={18} />
+        </TouchableOpacity>
+      </Animated.View>
 
     </TouchableOpacity>
   );
@@ -573,14 +590,18 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
         renderRightActions={renderRightActions}
         onSwipeableLeftOpen={handleSwipeComplete}
         onSwipeableWillOpen={(direction) => {
-          if (direction === 'right') setIsSwipeActionsOpen(true);
+          if (direction === 'right') {
+            Animated.timing(kebabOpacity, { toValue: 0, duration: 80, useNativeDriver: true }).start();
+          }
         }}
-        onSwipeableOpen={(direction) => {
-          if (direction === 'right') setIsSwipeActionsOpen(true);
+        onSwipeableWillClose={() => {
+          Animated.timing(kebabOpacity, { toValue: 1, duration: 80, useNativeDriver: true }).start();
         }}
-        onSwipeableWillClose={() => setIsSwipeActionsOpen(false)}
-        onSwipeableClose={() => setIsSwipeActionsOpen(false)}
+        onSwipeableClose={() => {
+          Animated.timing(kebabOpacity, { toValue: 1, duration: 50, useNativeDriver: true }).start();
+        }}
         friction={2}
+        leftThreshold={middleCompleteThreshold}
         rightThreshold={40}
       >
         {taskRowContent}
@@ -693,27 +714,36 @@ const styles = StyleSheet.create({
   leftAction: {
     flex: 1,
     justifyContent: 'center',
-    paddingLeft: 20
+    paddingLeft: 24,
+    borderBottomWidth: 1,
   },
   actionText: {
-    color: 'white',
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 16,
   },
   rightActionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: 150
+    marginRight: '2.5%',
+    paddingRight: 10,
+    borderBottomWidth: 1,
   },
   rightActionBtn: {
-    flex: 1,
+    width: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100%'
+    height: '100%',
   },
-  actionIcon: {
-    color: 'white',
-    fontSize: 20
+  rightActionKebabBtn: {
+    width: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100%',
+    marginLeft: 4,
+  },
+  kebabBtnWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   kebabBtn: {
     paddingHorizontal: 8,
