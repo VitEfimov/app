@@ -338,223 +338,55 @@ function InitApp() {
 
       const text = shareIntent.value || shareIntent.text || shareIntent.description || '';
       if (typeof text === 'string' && text.trim().length > 0) {
-        const textLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-        const structuredTasks = [];
+        const { parseSharedTasks } = require('./src/utils/taskShareParser');
+        const parsedTasks = parseSharedTasks(text, {
+          defaultImg: imgUri,
+          defaultAttachments: attachments,
+          themeReducer
+        });
 
-        // Regex to match tabular or space-separated date entries:
-        // e.g. "23\t01\t.1988\tЖена", "24\t08\t\tБабушка", "01\t24\t\tНаталья Лысенкова", "15/05/2024 Party"
-        const lineRegex = /^(\d{1,2})[\s\t\.\/]+(\d{1,2})(?:[\s\t\.\/]+\.?(\d{2,4}))?[\s\t]+(.+)$/;
-
-        for (let i = 0; i < textLines.length; i++) {
-          const l = textLines[i];
-          const m = l.match(lineRegex);
-          if (m) {
-            let p1 = parseInt(m[1], 10);
-            let p2 = parseInt(m[2], 10);
-            let yearStr = m[3];
-            const title = m[4].trim();
-
-            let day, month;
-            if (p1 > 12 && p2 <= 12) {
-              day = p1;
-              month = p2;
-            } else if (p2 > 12 && p1 <= 12) {
-              day = p2;
-              month = p1;
+        if (parsedTasks && parsedTasks.length > 0) {
+          if (parsedTasks.length === 1) {
+            const singleTask = parsedTasks[0];
+            dispatch(addTask({ task: singleTask }));
+            resetShareIntent();
+            if (navigationRef.isReady()) {
+              navigationRef.navigate('Board', { editTaskId: singleTask.id });
             } else {
-              day = p1;
-              month = p2;
+              setPendingNotificationPayload({ type: 'task', taskId: singleTask.id, actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER });
             }
-
-            let year = dayjs().year();
-            if (yearStr) {
-              let y = parseInt(yearStr, 10);
-              if (y < 100) y += y > 50 ? 1900 : 2000;
-              year = y;
+          } else {
+            const { addMultipleTasks } = require('./src/features/taskSlice');
+            dispatch(addMultipleTasks({ tasks: parsedTasks }));
+            resetShareIntent();
+            if (navigationRef.isReady()) {
+              navigationRef.navigate('Board', {});
             }
-
-            const dObj = dayjs(`${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`);
-            let dateFormatted = dObj.isValid() ? dObj.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
-
-            structuredTasks.push({
-              id: (Date.now() + i).toString(),
-              taskname: title.slice(0, 100),
-              description: { text: '', img: '', url: '' },
-              subtasks: [],
-              completed: false,
-              priority: 'none',
-              completionDate: dayjs(dateFormatted).toISOString(),
-              isShared: true,
-              doNotOverrideDate: true,
-              reminder: themeReducer?.defaultReminderEnabled ? (themeReducer?.defaultReminderTime || '09:00') : null
-            });
-          }
-        }
-
-        if (structuredTasks.length > 0) {
-          dispatch(addMultipleTasks({ tasks: structuredTasks }));
-          resetShareIntent();
-          if (navigationRef.isReady()) {
-            navigationRef.navigate('Board', { editTaskId: structuredTasks[0].id });
           }
           return;
         }
-
-        const lines = text.split('\n');
-        let hasFoundSubtasks = false;
-        let remainingLines = [];
-
-        for (let line of lines) {
-            let trimmed = line.trim();
-            if (!trimmed) continue;
-            
-            const priorityMatch = trimmed.match(/Priority:\s*(low|medium|high)/i);
-            if (priorityMatch) {
-                priority = priorityMatch[1].toLowerCase();
-                trimmed = trimmed.replace(priorityMatch[0], '').trim();
-                if (!trimmed) continue;
-            }
-
-            const dRegex = /\b(today|tomorrow|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)\b/i;
-            const tRegex = /\b(\d{1,2}:\d{2}(?:\s*[aA][pP][mM])?|\d{1,2}\s*[aA][pP][mM])\b/i;
-            const keywordRegex = /\b(due time|due|deadline at|deadline|date\(due\)|date)\b/i;
-            
-            if (keywordRegex.test(trimmed)) {
-                let foundAny = false;
-                
-                const dMatch = trimmed.match(dRegex);
-                if (dMatch) {
-                    const dateStr = dMatch[1];
-                    if (dateStr.toLowerCase() === 'today') {
-                        completionDate = dayjs().format('YYYY-MM-DD');
-                    } else if (dateStr.toLowerCase() === 'tomorrow') {
-                        completionDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
-                    } else {
-                        let cleanDateStr = dateStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
-                        if (/[a-z]+\s+\d{1,2}$/i.test(cleanDateStr)) {
-                            cleanDateStr += `, ${dayjs().year()}`;
-                        }
-                        const parsedDate = dayjs(cleanDateStr);
-                        if (parsedDate.isValid()) {
-                            completionDate = parsedDate.format('YYYY-MM-DD');
-                        }
-                    }
-                    trimmed = trimmed.replace(dMatch[0], '');
-                    foundAny = true;
-                }
-                
-                const tMatch = trimmed.match(tRegex);
-                if (tMatch) {
-                    const timeStr = tMatch[1];
-                    let t = timeStr.trim();
-                    const pm = /pm/i.test(t);
-                    const am = /am/i.test(t);
-                    t = t.replace(/[aA][pP][mM]/i, '').trim();
-                    
-                    let [h, m] = t.split(':');
-                    h = parseInt(h, 10);
-                    m = m ? parseInt(m, 10) : 0;
-                    
-                    if (pm && h < 12) h += 12;
-                    if (am && h === 12) h = 0;
-                    
-                    taskTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                    trimmed = trimmed.replace(tMatch[0], '');
-                    foundAny = true;
-                }
-                
-                if (foundAny) {
-                    trimmed = trimmed.replace(keywordRegex, '').replace(/\bat\b/i, '').replace(/:\s*$/, '').replace(/^\s*:\s*/, '').trim();
-                }
-                
-                if (!trimmed) continue;
-            }
-
-            const subtaskMatch = trimmed.match(/^(\[ \]|\[x\]|-|\*|\d+\.)\s+(.+)/i);
-            if (subtaskMatch) {
-                hasFoundSubtasks = true;
-                subtasks.push({
-                    id: Date.now().toString() + Math.random().toString(),
-                    text: subtaskMatch[2].trim(),
-                    completed: subtaskMatch[1].toLowerCase() === '[x]'
-                });
-                continue;
-            }
-
-            if (!hasFoundSubtasks) {
-                remainingLines.push(trimmed);
-            } else {
-                notes.push(trimmed);
-            }
+      } else if (attachments.length > 0 || imgUri) {
+        const newTaskId = Date.now().toString();
+        dispatch(addTask({
+          task: {
+            id: newTaskId,
+            taskname: 'Shared Media',
+            description: { text: notes.join('\n'), img: imgUri, attachments: attachments, url: '' },
+            subtasks: [],
+            completed: false,
+            priority: 'none',
+            completionDate: dayjs().toISOString(),
+            time: null,
+            isShared: true,
+            doNotOverrideDate: true
+          }
+        }));
+        resetShareIntent();
+        if (navigationRef.isReady()) {
+          navigationRef.navigate('Board', { editTaskId: newTaskId });
+        } else {
+          setPendingNotificationPayload({ type: 'task', taskId: newTaskId, actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER });
         }
-
-        let preText = remainingLines.join('\n');
-        let extraNotes = [];
-
-        if (preText) {
-            const words = preText.split(/\s+/);
-            if (words.length > 5) {
-                taskname = words.slice(0, 5).join(' ') + '...';
-                let wordCount = 0;
-                let splitIndex = 0;
-                let inWord = false;
-                for (let i = 0; i < preText.length; i++) {
-                    if (/\s/.test(preText[i])) {
-                        inWord = false;
-                    } else {
-                        if (!inWord) {
-                            wordCount++;
-                            inWord = true;
-                        }
-                    }
-                    if (wordCount === 6) {
-                        splitIndex = i;
-                        break;
-                    }
-                }
-                if (splitIndex > 0) {
-                    extraNotes.push(preText.substring(splitIndex).trim());
-                } else {
-                    extraNotes.push(words.slice(5).join(' '));
-                }
-            } else {
-                taskname = preText;
-            }
-        }
-
-        notes = [...extraNotes, ...notes];
-      }
-
-      if (!taskname && notes.length > 0) {
-          taskname = notes.shift();
-      }
-      
-      if (!taskname) {
-          taskname = 'Shared Task';
-      }
-
-      const newTaskId = Date.now().toString();
-
-      dispatch(addTask({
-        task: {
-          id: newTaskId,
-          taskname: taskname.slice(0, 100), // Limit title length
-          description: { text: notes.join('\n'), img: imgUri, attachments: attachments, url: '' },
-          subtasks: subtasks,
-          completed: false,
-          priority: priority,
-          completionDate: dayjs(completionDate).toISOString(),
-          time: taskTime,
-          isShared: true,
-          doNotOverrideDate: true
-        }
-      }));
-      resetShareIntent();
-
-      if (navigationRef.isReady()) {
-        navigationRef.navigate('Board', { editTaskId: newTaskId });
-      } else {
-        setPendingNotificationPayload({ type: 'task', taskId: newTaskId, actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER });
       }
     }
   }, [hasShareIntent, shareIntent, ready, dispatch, resetShareIntent]);

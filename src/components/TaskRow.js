@@ -129,6 +129,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(taskTitleText);
   const [cursorSelection, setCursorSelection] = useState(null);
+  const [isSwipeActionsOpen, setIsSwipeActionsOpen] = useState(false);
   const swipeableRef = useRef(null);
 
   const isRepeatingTask = !!(task?.recurringSeriesId || task?.isRecurring || (task?.repeatConfig && task?.repeatConfig?.preset && task?.repeatConfig?.preset !== 'None') || (task?.repeatFrequency && task?.repeatFrequency !== 'None'));
@@ -147,6 +148,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   });
 
   const closeSwipeable = useCallback(() => {
+    setIsSwipeActionsOpen(false);
     if (swipeableRef.current) {
       swipeableRef.current.close();
     }
@@ -523,7 +525,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
         accessible={true}
         accessibilityRole="button"
         accessibilityLabel="Task options"
-        style={styles.kebabBtn}
+        style={[styles.kebabBtn, isSwipeActionsOpen && { display: 'none' }]}
         onPress={(e) => {
           e?.stopPropagation?.();
           if (onPressMore) {
@@ -541,7 +543,26 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   );
 
   if (Platform.OS === 'web') {
-    return taskRowContent;
+    return (
+      <>
+        {taskRowContent}
+        {confirmConfig.isVisible && (
+          <ConfirmModal
+            isVisible={confirmConfig.isVisible}
+            title={confirmConfig.title}
+            message={confirmConfig.message}
+            confirmText={confirmConfig.confirmText}
+            cancelText={confirmConfig.cancelText}
+            isDestructive={confirmConfig.isDestructive}
+            secondaryIsDestructive={confirmConfig.secondaryIsDestructive}
+            secondaryConfirmText={confirmConfig.secondaryConfirmText}
+            onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
+            onConfirm={confirmConfig.onConfirm}
+            onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
+          />
+        )}
+      </>
+    );
   }
 
   return (
@@ -551,6 +572,14 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
         renderLeftActions={renderLeftActions}
         renderRightActions={renderRightActions}
         onSwipeableLeftOpen={handleSwipeComplete}
+        onSwipeableWillOpen={(direction) => {
+          if (direction === 'right') setIsSwipeActionsOpen(true);
+        }}
+        onSwipeableOpen={(direction) => {
+          if (direction === 'right') setIsSwipeActionsOpen(true);
+        }}
+        onSwipeableWillClose={() => setIsSwipeActionsOpen(false)}
+        onSwipeableClose={() => setIsSwipeActionsOpen(false)}
         friction={2}
         rightThreshold={40}
       >

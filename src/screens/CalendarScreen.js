@@ -831,13 +831,13 @@ export default function CalendarScreen({ navigation }) {
         colors={colors}
       />
 
-      {/* Year Picker Modal (current year to current year + 10) */}
+      {/* Year Picker Modal (total 18 years from current year) */}
       <YearPickerModal
         isVisible={isYearPickerVisible}
         onClose={() => setIsYearPickerVisible(false)}
         currentYear={dayjs(calendarMonth).year()}
         minYear={Math.min(dayjs().year(), dayjs(calendarMonth).year())}
-        maxYear={Math.max(dayjs().year() + 10, dayjs(calendarMonth).year() + 10)}
+        maxYear={Math.max(dayjs().year() + 17, dayjs(calendarMonth).year())}
         onSelectYear={handleSelectYear}
         colors={colors}
       />

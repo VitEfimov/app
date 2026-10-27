@@ -1019,7 +1019,7 @@ export default function BoardScreen({ route, navigation }) {
                 </TouchableOpacity>
               )}
 
-              {sectionOptionsConfig.section?.id !== 'completed' && sectionOptionsConfig.section?.id !== 'missed' && (
+              {sectionOptionsConfig.section?.id !== 'completed' && (
                 <TouchableOpacity testID="section_option_move_backward" accessible={true} accessibilityRole="button" accessibilityLabel="Move tasks backward" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { const s = sectionOptionsConfig.section; setSectionOptionsConfig({ isVisible: false, section: null }); setTimeout(() => handleMoveBackward(s), 400); }}>
                   <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Move backward')}</Text>
                 </TouchableOpacity>
