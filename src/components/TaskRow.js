@@ -109,6 +109,8 @@ const IconCheckCircle = ({ color }) => (
   </Svg>
 );
 
+const EMPTY_BOARDS = [];
+
 const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardBadge = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
@@ -117,7 +119,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
 
   const taskNameWrap = useSelector(state => state.themeReducer?.taskNameWrap || 'nowrap');
   const fontSizeSetting = useSelector(state => state.themeReducer?.fontSize || 'normal');
-  const boards = useSelector(state => state.userReducer?.boards || []);
+  const boards = useSelector(state => state.userReducer?.boards ?? EMPTY_BOARDS);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
   const titleFontSize = fontSizeSetting === 'small' ? 13 : fontSizeSetting === 'big' ? 18 : 15;
@@ -488,7 +490,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
             </View>
           ) : null}
 
-          {task.completionDate && dayjs(task.completionDate).year() !== dayjs().year() ? (
+          {task.completionDate && dayjs(task.completionDate).isValid() && dayjs(task.completionDate).year() !== dayjs().year() ? (
             <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
               {dayjs(task.completionDate).format('YYYY')}
             </Text>
@@ -497,7 +499,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       </View>
 
       {/* Region 4: Metadata (Date) */}
-      {(!hideDate && task.completionDate) ? (
+      {(!hideDate && task.completionDate && dayjs(task.completionDate).isValid()) ? (
         <TouchableOpacity
           style={styles.metadata}
           onPress={() => {
@@ -517,7 +519,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
 
       {/* Region 5: Kebab Menu Button (⋮) */}
       <TouchableOpacity
-        testID={`${testIDPrefix}task_kebab_menu`}
+        testID={`task_more_btn_${taskTitleText}`}
         accessible={true}
         accessibilityRole="button"
         accessibilityLabel="Task options"

@@ -34,6 +34,7 @@ import { updateTask, deleteTask } from '../features/taskSlice';
 import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
 import { getBoardColor } from '../utils/boardColors';
+import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
 
 const IconSearch = ({ color = '#000', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -314,11 +315,33 @@ export default function CalendarScreen({ navigation }) {
     );
   }, [selectedDate, todayStr, colors, isDark]);
 
-  // Prepare marked dates with category-colored dots
+  // Prepare marked dates with category-colored dots (cached for peak stress performance)
   const markedDates = useMemo(() => {
     const marks = {};
+    if (!Array.isArray(tasks) || tasks.length === 0) return marks;
+
+    const safeBoards = Array.isArray(boards) ? boards : [];
+    const boardMap = new Map();
+    const boardColorMap = new Map();
+    safeBoards.forEach(b => {
+      if (b) {
+        const id = b.id || b._id;
+        if (id) {
+          boardMap.set(String(id), b);
+          boardColorMap.set(String(id), getBoardColor(b, safeBoards));
+        }
+      }
+    });
+
     tasks.forEach(task => {
-      const dateStr = task.dateString || (task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : null);
+      if (!task) return;
+      let dateStr = task.dateString;
+      if (!dateStr && task.completionDate) {
+        try {
+          const parsed = dayjs(task.completionDate);
+          if (parsed.isValid()) dateStr = parsed.format('YYYY-MM-DD');
+        } catch (e) {}
+      }
       if (dateStr) {
         if (!marks[dateStr]) {
           marks[dateStr] = { tasks: [] };
@@ -330,12 +353,17 @@ export default function CalendarScreen({ navigation }) {
     const finalMarks = {};
     Object.keys(marks).forEach(dateStr => {
       const dayTasks = marks[dateStr].tasks;
-      const uniqueBoardIds = Array.from(new Set(dayTasks.map(t => t.boardId || 'main')));
+      const uniqueBoardIds = Array.from(new Set(dayTasks.map(t => String(t?.boardId || 'main'))));
       const dots = uniqueBoardIds.map(bId => {
-        const boardObj = boards.find(b => b && (b.id === bId || b._id === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Category' };
+        let color = boardColorMap.get(bId);
+        if (!color) {
+          const boardObj = boardMap.get(bId) || { id: bId, name: bId === 'main' ? 'Main' : 'Category' };
+          color = getBoardColor(boardObj, safeBoards);
+          boardColorMap.set(bId, color);
+        }
         return {
           key: `${bId}_${dateStr}`,
-          color: getBoardColor(boardObj, boards),
+          color,
         };
       });
 
@@ -354,15 +382,24 @@ export default function CalendarScreen({ navigation }) {
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
+    if (!Array.isArray(tasks)) return [];
     let filteredTasks = tasks.filter(task => {
-      const d = task.dateString || (task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : '');
+      if (!task) return false;
+      let d = task.dateString;
+      if (!d && task.completionDate) {
+        try {
+          const parsed = dayjs(task.completionDate);
+          if (parsed.isValid()) d = parsed.format('YYYY-MM-DD');
+        } catch (e) {}
+      }
       const matchesDate = d === selectedDate;
-      const matchesBoard = !filterBoardId || task.boardId === filterBoardId;
-      const matchesSearch = !searchQuery || (task.taskname && task.taskname.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesBoard = !filterBoardId || String(task.boardId) === String(filterBoardId);
+      const matchesSearch = !searchQuery || (task.taskname && String(task.taskname).toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesDate && matchesBoard && matchesSearch;
     });
 
     return filteredTasks.sort((a, b) => {
+      if (!a || !b) return 0;
       if (sortConfig === 'priority') {
         const pValues = { high: 3, medium: 2, low: 1, none: 0 };
         const pA = pValues[a.priority?.toLowerCase()] || 0;
@@ -370,37 +407,39 @@ export default function CalendarScreen({ navigation }) {
         if (pA !== pB) return pB - pA;
       }
 
-      const hasTimeA = !!(a.time && a.time.trim() !== '');
-      const hasTimeB = !!(b.time && b.time.trim() !== '');
+      const hasTimeA = !!(a.time && String(a.time).trim() !== '');
+      const hasTimeB = !!(b.time && String(b.time).trim() !== '');
 
       if (hasTimeA && !hasTimeB) return -1;
       if (!hasTimeA && hasTimeB) return 1;
       if (hasTimeA && hasTimeB) {
-        const timeCompare = a.time.localeCompare(b.time);
+        const timeCompare = String(a.time || '').localeCompare(String(b.time || ''));
         if (timeCompare !== 0) return timeCompare;
       }
 
-      return (b.id || b._id || '').localeCompare(a.id || a._id || '');
+      return String(b.id || b._id || '').localeCompare(String(a.id || a._id || ''));
     });
   }, [tasks, selectedDate, filterBoardId, searchQuery, sortConfig]);
 
   const activeBoard = useMemo(() => {
     if (!filterBoardId) return null;
-    return boards.find(b => b.id === filterBoardId || b._id === filterBoardId);
+    return (boards || []).find(b => b && (String(b.id) === String(filterBoardId) || String(b._id) === String(filterBoardId)));
   }, [filterBoardId, boards]);
 
   const groupedTasks = useMemo(() => {
     if (!selectedTasks.length) return [];
     
+    const safeBoards = Array.isArray(boards) ? boards : [];
     const groups = {};
     selectedTasks.forEach(task => {
-      const bId = task.boardId || 'main';
+      if (!task) return;
+      const bId = String(task.boardId || 'main');
       if (!groups[bId]) {
-        const boardObj = boards.find(b => (b.id === bId || b._id === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Category' };
+        const boardObj = safeBoards.find(b => b && (String(b.id) === bId || String(b._id) === bId)) || { id: bId, name: bId === 'main' ? 'Main' : 'Category' };
         groups[bId] = {
           id: bId,
           title: boardObj.name === 'Main' ? (t('Main') || 'Main') : boardObj.name,
-          color: getBoardColor(boardObj, boards),
+          color: getBoardColor(boardObj, safeBoards),
           data: []
         };
       }
@@ -427,9 +466,10 @@ export default function CalendarScreen({ navigation }) {
   const primaryAccent = colors.primary || '#5D45DB';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
+    <ScreenErrorBoundary screenName="CalendarScreen">
+      <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.mainScrollContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -739,7 +779,8 @@ export default function CalendarScreen({ navigation }) {
         onSubmit={handleCreateCategorySubmit}
         colors={colors}
       />
-    </View>
+      </View>
+    </ScreenErrorBoundary>
   );
 }
 

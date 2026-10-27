@@ -30,6 +30,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getBoardColor, BOARD_COLORS } from '../utils/boardColors';
 import * as FileSystem from 'expo-file-system';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
+import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
 
 let RNShare;
 if (Platform.OS !== 'web') {
@@ -163,11 +164,15 @@ export default function BoardScreen({ route, navigation }) {
     }
   }, [route?.params?.editTaskId, tasks, navigation]);
 
+  const boardIdsKey = useMemo(() => {
+    return (boards || []).map(b => b?.id || b?._id).join(',');
+  }, [boards]);
+
   useEffect(() => {
     if (boards && boards.length > 0) {
       dispatch(purgeOrphanedTasksThunk(boards));
     }
-  }, [boards, dispatch]);
+  }, [boardIdsKey, dispatch]);
 
   const toggleSection = (sectionId) => {
     if (collapsedSections.includes(sectionId)) {
@@ -773,13 +778,25 @@ export default function BoardScreen({ route, navigation }) {
 
   const selectedTaskIdsSet = useMemo(() => new Set(selectionMode.selectedTaskIds), [selectionMode.selectedTaskIds]);
 
+  const flashListExtraData = useMemo(() => ({
+    activeBoardId,
+    activeAddSectionId,
+    tasksCount: tasks.length,
+    collapsedKey: collapsedSections.join(','),
+    sortKey: JSON.stringify(sortConfig),
+    selectionActive: selectionMode.isActive,
+    selectedCount: selectedTaskIdsSet.size,
+    flattenedLength: flattenedData.length
+  }), [activeBoardId, activeAddSectionId, tasks.length, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length]);
+
   return (
-    <KeyboardAvoidingView 
-      style={{ flex: 1, backgroundColor: colors.bgMain }} 
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
-    >
-      <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
+    <ScreenErrorBoundary screenName="BoardScreen">
+      <KeyboardAvoidingView 
+        style={{ flex: 1, backgroundColor: colors.bgMain }} 
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
+      >
+        <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       
         {/* Screen Header matching new design */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 }}>
@@ -882,11 +899,12 @@ export default function BoardScreen({ route, navigation }) {
       <FlashList
         key={activeBoardId}
         data={flattenedData}
-        extraData={[activeBoardId, tasks, collapsedSections, sortConfig, isBoardsCollapsed, activeAddSectionId, selectionMode.isActive, selectedTaskIdsSet, flattenedData]}
+        extraData={flashListExtraData}
         keyExtractor={(item) => item.type === 'task' ? `task_${item.task?.id || ''}_${item.section?.id || ''}` : `${item.type}_${item.section?.id || ''}`}
         getItemType={(item) => item.type}
         overrideItemLayout={(layout, item) => {
-          layout.size = item.type === 'header' ? 48 : item.type === 'footer' ? 52 : 65;
+          if (!layout) return;
+          layout.size = item?.type === 'header' ? 48 : item?.type === 'footer' ? 52 : 65;
         }}
         renderItem={({ item }) => {
           if (item.type === 'header') return renderSectionHeader({ section: item.section });
@@ -1337,7 +1355,8 @@ export default function BoardScreen({ route, navigation }) {
         }}
       />
     </KeyboardAvoidingView>
-  );
+  </ScreenErrorBoundary>
+);
 }
 
 const styles = StyleSheet.create({

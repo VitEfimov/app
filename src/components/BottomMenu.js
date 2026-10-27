@@ -88,6 +88,7 @@ export default function BottomMenu(props) {
         return (
           <TouchableOpacity
             key={tab.name}
+            testID={`tab_${tab.name.toLowerCase()}`}
             onPress={() => handlePress(tab.name)}
             activeOpacity={0.7}
             style={styles.tabButton}

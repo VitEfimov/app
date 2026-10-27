@@ -43,6 +43,28 @@ if (typeof queueMicrotask === 'undefined') {
   };
 }
 
+// Global unhandled error and promise rejection listeners
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    console.warn('[Global Guard] Handled unhandledrejection:', event.reason);
+    // Prevent unhandled rejection from killing the app
+    event.preventDefault();
+  });
+  window.addEventListener('error', (event) => {
+    console.error('[Global Guard] Handled window error:', event.error || event.message);
+  });
+}
+if (global.ErrorUtils && !global.__customErrorUtilsGuardSet) {
+  global.__customErrorUtilsGuardSet = true;
+  const originalHandler = global.ErrorUtils.getGlobalHandler();
+  global.ErrorUtils.setGlobalHandler((error, isFatal) => {
+    console.error('[Global ErrorUtils Guard]', error, 'isFatal:', isFatal);
+    if (originalHandler) {
+      originalHandler(error, false);
+    }
+  });
+}
+
 // Configure Axios for remote Vercel backend
 axios.defaults.baseURL = process.env.EXPO_PUBLIC_API_URL || 'https://task-manager-v2-indol.vercel.app';
 axios.defaults.withCredentials = true;

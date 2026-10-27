@@ -213,17 +213,32 @@ const taskSlice = createSlice({
         },
         addMultipleTasksSync(state, action) {
             const { tasks } = action.payload;
+            if (!Array.isArray(tasks) || tasks.length === 0) return;
+
             let currentTasks = [...state.tasks];
-            for (const t of tasks) {
-                if (t) {
-                    const updated = { ...t };
-                    if (updated.completionDate && !updated.dateString) {
-                        updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
+            if (tasks.length > 15) {
+                for (const t of tasks) {
+                    if (t) {
+                        const updated = { ...t };
+                        if (updated.completionDate && !updated.dateString) {
+                            updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
+                        }
+                        currentTasks.push(updated);
                     }
-                    currentTasks = insertTaskSorted(currentTasks, updated);
                 }
+                state.tasks = sortTasksChronologically(currentTasks);
+            } else {
+                for (const t of tasks) {
+                    if (t) {
+                        const updated = { ...t };
+                        if (updated.completionDate && !updated.dateString) {
+                            updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
+                        }
+                        currentTasks = insertTaskSorted(currentTasks, updated);
+                    }
+                }
+                state.tasks = currentTasks;
             }
-            state.tasks = currentTasks;
         },
         deleteTaskSync(state, action) {
              const { taskId } = action.payload;

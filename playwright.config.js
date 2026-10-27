@@ -12,7 +12,7 @@ module.exports = defineConfig({
   workers: 1,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
-    baseURL: 'http://127.0.0.1:8089',
+    baseURL: process.env.BASE_URL || 'http://127.0.0.1:8081',
     navigationTimeout: 30000,
     actionTimeout: 15000,
     trace: 'on',
@@ -20,12 +20,12 @@ module.exports = defineConfig({
     headless: true,
     viewport: { width: 1280, height: 800 },
   },
-  webServer: {
+  webServer: process.env.CI ? {
     command: 'npx serve -s dist -l 8089',
     url: 'http://127.0.0.1:8089',
     reuseExistingServer: false,
     timeout: 30000,
-  },
+  } : undefined,
   projects: [
     {
       name: 'chromium',
