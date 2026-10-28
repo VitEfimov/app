@@ -235,6 +235,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
   const [premiumFeatureName, setPremiumFeatureName] = useState('');
   const [selectedFullscreenImage, setSelectedFullscreenImage] = useState(null);
+  const [isAttachmentOptionsVisible, setAttachmentOptionsVisible] = useState(false);
 
   const cardBg = colors.cardBg || (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)');
   const cardBorder = colors.cardBorder || colors.outlineVariant || colors.borderColor;
@@ -833,6 +834,9 @@ useEffect(() => {
   };
 
   const saveFileToDocuments = async (uri, name) => {
+    if (Platform.OS === 'web' || !FileSystem.documentDirectory) {
+      return uri;
+    }
     try {
       const fileExt = name.split('.').pop();
       const newFileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -848,57 +852,15 @@ useEffect(() => {
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
   const handleAttachPhoto = () => {
-    if (!isPremium) {
-      setConfirmConfig({
-        isVisible: true,
-        title: t('Pro Feature'),
-        message: t('Photo & camera attachments are available in the Pro version.'),
-        confirmText: t('OK'),
-        hideCancel: true,
-        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
-      });
-      return;
-    }
     launchCamera();
   };
 
   const handleAttachDocument = () => {
-    if (!isPremium) {
-      setConfirmConfig({
-        isVisible: true,
-        title: t('Pro Feature'),
-        message: t('File & document attachments are available in the Pro version.'),
-        confirmText: t('OK'),
-        hideCancel: true,
-        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
-      });
-      return;
-    }
     requestAnimationFrame(() => pickDocument());
   };
 
   const handleOpenAttachmentOptions = () => {
-    if (!isPremium) {
-      setConfirmConfig({
-        isVisible: true,
-        title: t('Pro Feature'),
-        message: t('Photo & document attachments are available in the Pro version.'),
-        confirmText: t('OK'),
-        hideCancel: true,
-        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
-      });
-      return;
-    }
-    Alert.alert(
-      t('Add Attachment'),
-      t('Choose an attachment type:'),
-      [
-        { text: t('Take Photo'), onPress: launchCamera },
-        { text: t('Choose from Gallery'), onPress: launchImageLibrary },
-        { text: t('Attach Document'), onPress: pickDocument },
-        { text: t('Cancel'), style: 'cancel' }
-      ]
-    );
+    setAttachmentOptionsVisible(true);
   };
 
   const processPickedImages = async (result) => {
@@ -1110,6 +1072,12 @@ useEffect(() => {
 
   const openDocument = async (uri, mimeType) => {
     try {
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined') {
+          window.open(uri, '_blank');
+        }
+        return;
+      }
       if (Platform.OS === 'android') {
         await nativeOpenDocumentAsync(uri, mimeType);
       } else {
@@ -1766,6 +1734,118 @@ useEffect(() => {
           onClose={() => setPremiumModalVisible(false)}
           featureName={premiumFeatureName}
         />
+
+        <RNModal
+          visible={isAttachmentOptionsVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAttachmentOptionsVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.calendarOverlay}
+            onPress={() => setAttachmentOptionsVisible(false)}
+          >
+            <View
+              style={[
+                styles.calendarContainer,
+                {
+                  backgroundColor: colors.bgCard,
+                  maxWidth: 360,
+                  width: '90%',
+                  padding: 18,
+                  borderRadius: 20,
+                }
+              ]}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 }}>
+                {t('Add Attachment') || 'Add Attachment'}
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 14 }}>
+                {t('Choose an attachment type:') || 'Choose an attachment type:'}
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  marginBottom: 8,
+                  gap: 12,
+                }}
+                onPress={() => {
+                  setAttachmentOptionsVisible(false);
+                  setTimeout(() => launchCamera(), 150);
+                }}
+              >
+                <IconCamera color={colors.primary} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
+                  {t('Take Photo') || 'Take Photo'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  marginBottom: 8,
+                  gap: 12,
+                }}
+                onPress={() => {
+                  setAttachmentOptionsVisible(false);
+                  setTimeout(() => launchImageLibrary(), 150);
+                }}
+              >
+                <IconImage color={colors.primary} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
+                  {t('Choose Image') || t('Choose from Gallery') || 'Choose Image'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  marginBottom: 12,
+                  gap: 12,
+                }}
+                onPress={() => {
+                  setAttachmentOptionsVisible(false);
+                  setTimeout(() => pickDocument(), 150);
+                }}
+              >
+                <IconFile color={colors.primary} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
+                  {t('Attach File') || t('Attach Document') || 'Attach File'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={{ alignItems: 'center', paddingVertical: 8 }}
+                onPress={() => setAttachmentOptionsVisible(false)}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>
+                  {t('Cancel') || 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </RNModal>
 
 
         <RNModal visible={showDatePicker} transparent animationType="fade">

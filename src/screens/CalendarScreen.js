@@ -23,7 +23,7 @@ import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
-import TaskRow from '../components/TaskRow';
+import TaskRow, { closeOpenSwipeableRow } from '../components/TaskRow';
 import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
@@ -515,9 +515,10 @@ export default function CalendarScreen({ navigation }) {
       <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
         <ScrollView 
           showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.mainScrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+          contentContainerStyle={styles.mainScrollContent}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={closeOpenSwipeableRow}
+        >
         {/* Screen Header */}
         <View style={styles.topHeaderRow}>
           <View style={{ flex: 1, marginRight: 12 }}>

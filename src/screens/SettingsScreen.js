@@ -101,6 +101,13 @@ const IconRepeat = ({ color = '#6246EA', size = 20 }) => (
   </Svg>
 );
 
+const IconLock = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <Path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </Svg>
+);
+
 const IconBell = ({ color = '#6246EA', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -144,9 +151,35 @@ export default function SettingsScreen({ navigation }) {
   const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
   const [premiumFeatureName, setPremiumFeatureName] = useState('');
+  const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
   const [isSnoozePickerOpen, setSnoozePickerOpen] = useState(false);
+
+  const handleTogglePin = (value) => {
+    if (value) {
+      setPinPromptVisible(true);
+    } else {
+      dispatch(setAppPin(null));
+    }
+  };
+
+  const handleSetPin = (pin) => {
+    const cleaned = String(pin || '').replace(/[^0-9]/g, '');
+    if (cleaned.length === 4) {
+      dispatch(setAppPin(cleaned));
+      setPinPromptVisible(false);
+    } else {
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Invalid PIN') || 'Invalid PIN',
+        message: t('Please enter a 4-digit PIN') || 'Please enter a 4-digit PIN',
+        confirmText: t('OK') || 'OK',
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
+    }
+  };
 
   const formatSnoozeTime = (val) => {
     if (val >= 1440) return `${val / 1440} ${t('day') || 'day'}`;
@@ -425,6 +458,34 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
             />
           </View>
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* App PIN Lock */}
+          <View style={styles.cardItemRow}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+              <IconLock color={primaryAccent} />
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setPinPromptVisible(true)}
+              style={{ flex: 1, marginRight: 10 }}
+            >
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('App PIN Lock') || 'App PIN Lock'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: theme.appPin ? primaryAccent : colors.textSecondary }]}>
+                {theme.appPin
+                  ? `PIN: ${theme.appPin} · ${t('Tap to change') || 'Tap to change'}`
+                  : (t('Protect app with a 4-digit PIN') || 'Protect app with a 4-digit PIN')}
+              </Text>
+            </TouchableOpacity>
+            <Switch
+              value={!!theme.appPin}
+              onValueChange={handleTogglePin}
+              trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+            />
+          </View>
         </View>
 
         {/* Section 2: Notifications */}
@@ -645,6 +706,18 @@ export default function SettingsScreen({ navigation }) {
       <AutoManageSettings
         isVisible={isAutoManageModalVisible}
         onClose={() => setAutoManageModalVisible(false)}
+      />
+
+      <PromptModal
+        isVisible={pinPromptVisible}
+        title={t('Set PIN') || 'Set PIN'}
+        message={t('Enter a 4-digit PIN') || 'Enter a 4-digit PIN'}
+        defaultValue={theme.appPin || ''}
+        onCancel={() => setPinPromptVisible(false)}
+        onSubmit={handleSetPin}
+        submitText={t('Save') || 'Save'}
+        maxLength={4}
+        keyboardType="numeric"
       />
 
       <ConfirmModal

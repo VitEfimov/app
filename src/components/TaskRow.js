@@ -118,9 +118,19 @@ const SYSTEM_USES_24H = (() => {
   }
 })();
 
+let activeOpenSwipeable = null;
+export const closeOpenSwipeableRow = () => {
+  if (activeOpenSwipeable) {
+    try {
+      activeOpenSwipeable.close();
+    } catch (e) {}
+    activeOpenSwipeable = null;
+  }
+};
+
 const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const { t } = useTranslation();
 
@@ -139,6 +149,14 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   const [isHovered, setIsHovered] = useState(false);
   const kebabOpacity = useRef(new Animated.Value(1)).current;
   const swipeableRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (activeOpenSwipeable === swipeableRef.current) {
+        activeOpenSwipeable = null;
+      }
+    };
+  }, []);
 
   const isRepeatingTask = !!(task?.recurringSeriesId || task?.isRecurring || (task?.repeatConfig && task?.repeatConfig?.preset && task?.repeatConfig?.preset !== 'None') || (task?.repeatFrequency && task?.repeatFrequency !== 'None'));
 
@@ -239,22 +257,33 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   }, [closeSwipeable, onPressMore, task]);
 
   const screenWidth = Dimensions.get('window').width;
-  const middleCompleteThreshold = screenWidth * 0.5;
+  // Trigger completion reliably at horizontal median (~35%-40% of screen width, max 160px)
+  const middleCompleteThreshold = Math.min(160, Math.round(screenWidth * 0.38));
 
   const renderLeftActions = useCallback((progress, dragX) => {
     if (!dragX || typeof dragX.interpolate !== 'function') return null;
     const scale = dragX.interpolate({
       inputRange: [0, middleCompleteThreshold * 0.5, middleCompleteThreshold],
-      outputRange: [0.6, 1, 1.15],
+      outputRange: [0.75, 1, 1.1],
+      extrapolate: 'clamp',
+    });
+    const opacity = dragX.interpolate({
+      inputRange: [0, 20, 50],
+      outputRange: [0, 0.4, 1],
+      extrapolate: 'clamp',
+    });
+    const transX = dragX.interpolate({
+      inputRange: [0, middleCompleteThreshold],
+      outputRange: [-24, 0],
       extrapolate: 'clamp',
     });
     return (
       <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]}>
-        <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, { transform: [{ scale }] }]}>
+        <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, { opacity, transform: [{ scale }, { translateX: transX }] }]}>
           <View style={styles.leftActionIconWrapper}>
             <SwipeIconComplete color={colors.primary} />
           </View>
-          <Text style={[styles.actionText, { color: colors.primary, marginLeft: 10 }]}>{t('Complete')}</Text>
+          <Text style={[styles.actionText, { color: colors.primary, marginLeft: 8 }]}>{t('Complete')}</Text>
         </Animated.View>
       </View>
     );
@@ -371,6 +400,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   const boardColor = !hideBoardBadge ? getBoardColor(taskBoardId, boards) : null;
 
   const handleLongPress = useCallback(() => {
+    closeOpenSwipeableRow();
     if (onLongPress) {
       onLongPress(task);
       return;
@@ -389,11 +419,19 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
       accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
       accessibilityState={{ checked: task.completed }}
-      style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: 'transparent' }, hideUnderline && { borderBottomWidth: 0 }]}
+      style={[
+        styles.container,
+        {
+          borderBottomColor: colors.borderColor,
+          backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6')
+        },
+        hideUnderline && { borderBottomWidth: 0 }
+      ]}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onLongPress={handleLongPress}
       onPress={() => {
+        closeOpenSwipeableRow();
         if (isSelectionMode) {
           if (onToggleSelect) onToggleSelect(task.id, sectionId);
           return;
@@ -418,6 +456,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         accessibilityLabel={isSelectionMode ? "Select task" : "Toggle task completion"}
         style={styles.checkbox}
         onPress={() => {
+          closeOpenSwipeableRow();
           if (isSelectionMode) {
             if (onToggleSelect) onToggleSelect(task.id, sectionId);
           } else {
@@ -533,7 +572,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         </View>
       </View>
 
-      {/* Region 4: Metadata (Date) */}
+      {/* Region 4: Metadata (Date) - Aligned with section header kebab menu */}
       {(!hideDate && task.completionDate && dayjs(task.completionDate).isValid()) ? (
         <TouchableOpacity
           style={styles.metadata}
@@ -550,39 +589,6 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
             {dayjs(task.completionDate).format('MMM D')}
           </Text>
         </TouchableOpacity>
-      ) : null}
-
-      {/* Region 5: Kebab Menu Button (⋮) - Platform Adaptive (Web/Desktop hover only; hidden on mobile touch) */}
-      {Platform.OS === 'web' ? (
-        <Animated.View 
-          style={[
-            styles.kebabBtnWrapper, 
-            { 
-              opacity: isHovered ? 1 : 0,
-              transition: 'opacity 0.15s ease'
-            }
-          ]}
-        >
-          <TouchableOpacity
-            testID={`task_more_btn_${taskTitleText}`}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Task options"
-            style={styles.kebabBtn}
-            onMouseEnter={() => setIsHovered(true)}
-            onPress={(e) => {
-              e?.stopPropagation?.();
-              if (onPressMore) {
-                onPressMore(task);
-              } else if (onPress) {
-                onPress(task);
-              }
-            }}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <IconDotsVertical color={colors.textSecondary} size={18} />
-          </TouchableOpacity>
-        </Animated.View>
       ) : null}
 
     </TouchableOpacity>
@@ -619,6 +625,12 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         renderRightActions={renderRightActions}
         onSwipeableLeftOpen={handleSwipeComplete}
         onSwipeableWillOpen={(direction) => {
+          if (activeOpenSwipeable && activeOpenSwipeable !== swipeableRef.current) {
+            try {
+              activeOpenSwipeable.close();
+            } catch (e) {}
+          }
+          activeOpenSwipeable = swipeableRef.current;
           if (direction === 'right') {
             Animated.timing(kebabOpacity, { toValue: 0, duration: 80, useNativeDriver: true }).start();
           }
@@ -627,9 +639,12 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
           Animated.timing(kebabOpacity, { toValue: 1, duration: 80, useNativeDriver: true }).start();
         }}
         onSwipeableClose={() => {
+          if (activeOpenSwipeable === swipeableRef.current) {
+            activeOpenSwipeable = null;
+          }
           Animated.timing(kebabOpacity, { toValue: 1, duration: 50, useNativeDriver: true }).start();
         }}
-        friction={2}
+        friction={1}
         leftThreshold={middleCompleteThreshold}
         rightThreshold={40}
       >
@@ -664,7 +679,7 @@ const styles = StyleSheet.create({
     width: '95%',
     alignSelf: 'center',
     paddingVertical: 8,
-    paddingRight: 10,
+    paddingRight: 15,
     paddingLeft: 20,
     position: 'relative',
   },
@@ -715,6 +730,8 @@ const styles = StyleSheet.create({
   metadata: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 46,
   },
   metadataStack: {
     alignItems: 'flex-end',

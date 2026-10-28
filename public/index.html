@@ -29,6 +29,16 @@
       [id*="expo-dev-menu"] {
         display: none !important;
       }
+      /* Hide all native scrollbars across browsers */
+      *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      * {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
     </style>
   </head>
 

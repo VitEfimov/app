@@ -5,7 +5,7 @@ import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanim
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
-import TaskRow from '../components/TaskRow';
+import TaskRow, { closeOpenSwipeableRow } from '../components/TaskRow';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
 import SnoozeModal from '../components/SnoozeModal';
@@ -1074,8 +1074,10 @@ export default function BoardScreen({ route, navigation }) {
           return null;
         }}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         stickyHeaderIndices={undefined}
         keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={closeOpenSwipeableRow}
         estimatedItemSize={65}
         drawDistance={1200}
       />
