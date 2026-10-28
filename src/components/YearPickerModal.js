@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    maxHeight: 380,
+    maxHeight: 460,
   },
   dragHandleContainer: {
     alignItems: 'center',

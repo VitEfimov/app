@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal as RNModal, StyleSheet, ScrollView, TextInput, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, Modal as RNModal, StyleSheet, ScrollView, TextInput, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 const IconChevronDown = ({ color }) => (
@@ -58,7 +58,7 @@ const CustomDropdown = ({
         <TouchableOpacity 
           accessible={true} accessibilityRole="button" accessibilityLabel={`${label || 'Select option'}, current value ${selectedLabel}`}
           style={[styles.dropdownBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.borderColor }, customBtnStyle]} 
-          onPress={() => { setIsOpen(true); setSearchQuery(''); }}
+          onPress={() => { Keyboard.dismiss(); setIsOpen(true); setSearchQuery(''); }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, marginRight: 6 }}>
             {leftIcon}
@@ -90,21 +90,24 @@ const CustomDropdown = ({
                 </View>
               )}
               <ScrollView style={{ maxHeight: 400 }} keyboardShouldPersistTaps="handled">
-                {filteredOptions.map(opt => (
-                  <TouchableOpacity 
-                    key={opt.value} 
-                    accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${opt.label}`}
-                    style={[styles.modalMenuItem, { borderBottomColor: colors.borderColor }]} 
-                    onPress={() => { onSelect(opt.value); setIsOpen(false); }}
-                  >
-                    <Text style={[styles.modalMenuItemText, { 
-                      color: opt.value === value ? colors.primary : colors.textPrimary, 
-                      fontWeight: opt.value === value ? 'bold' : 'normal' 
-                    }]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {filteredOptions.map((opt, idx) => {
+                  const isLast = idx === filteredOptions.length - 1;
+                  return (
+                    <TouchableOpacity 
+                      key={opt.value} 
+                      accessible={true} accessibilityRole="button" accessibilityLabel={`Select ${opt.label}`}
+                      style={[styles.modalMenuItem, { borderBottomColor: colors.borderColor }, isLast && { borderBottomWidth: 0 }]} 
+                      onPress={() => { onSelect(opt.value); setIsOpen(false); }}
+                    >
+                      <Text style={[styles.modalMenuItemText, { 
+                        color: opt.value === value ? colors.primary : colors.textPrimary, 
+                        fontWeight: opt.value === value ? 'bold' : 'normal' 
+                      }]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
@@ -148,7 +151,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    minHeight: 44,
+    paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 15, // Using SettingsScreen radius
     borderWidth: 1,
@@ -157,6 +161,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     marginRight: 8,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   dropdownOverlay: {
     flex: 1,
@@ -185,7 +191,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalMenuItem: {
-    padding: 19,
+    paddingVertical: 14,
+    paddingHorizontal: 19,
     borderBottomWidth: 1,
   },
   searchContainer: {
@@ -201,6 +208,7 @@ const styles = StyleSheet.create({
   modalMenuItemText: {
     fontSize: 16,
     textAlign: 'center',
+    includeFontPadding: false,
   },
 });
 

@@ -68,6 +68,7 @@ export default function CustomRepeatModal({ isVisible, onClose, onSave, initialC
       swipeDirection={['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
+      avoidKeyboard={true}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
@@ -80,7 +81,7 @@ export default function CustomRepeatModal({ isVisible, onClose, onSave, initialC
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.scroll}>
+        <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
           {presetOptions.map(opt => (
             <TouchableOpacity 
               key={opt.id} 
@@ -117,7 +118,7 @@ export default function CustomRepeatModal({ isVisible, onClose, onSave, initialC
                     ]}
                     onSelect={setCustomFreq}
                     colors={colors}
-                    customBtnStyle={{ height: 40 }}
+                    customBtnStyle={{ height: 44, paddingVertical: 0, justifyContent: 'center' }}
                   />
                 </View>
               </View>
@@ -181,7 +182,7 @@ export default function CustomRepeatModal({ isVisible, onClose, onSave, initialC
                         ]}
                         onSelect={(v) => setCustomNthWeekday({...customNthWeekday, n: parseInt(v, 10)})}
                         colors={colors}
-                        customBtnStyle={{ height: 40, flex: 1, marginRight: 5 }}
+                        customBtnStyle={{ height: 44, flex: 1, marginRight: 5, paddingVertical: 0, justifyContent: 'center' }}
                       />
                       <CustomDropdown
                         value={String(customNthWeekday.weekday)}
@@ -196,7 +197,7 @@ export default function CustomRepeatModal({ isVisible, onClose, onSave, initialC
                         ]}
                         onSelect={(v) => setCustomNthWeekday({...customNthWeekday, weekday: parseInt(v, 10)})}
                         colors={colors}
-                        customBtnStyle={{ height: 40, flex: 1, marginLeft: 5 }}
+                        customBtnStyle={{ height: 44, flex: 1, marginLeft: 5, paddingVertical: 0, justifyContent: 'center' }}
                       />
                     </View>
                   )}
@@ -277,12 +278,15 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   numberInput: {
-    width: 50,
-    height: 40,
+    width: 54,
+    height: 44,
     borderWidth: 1,
     borderRadius: 8,
     textAlign: 'center',
-    fontSize: 16
+    fontSize: 16,
+    paddingVertical: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   daysContainer: {
     marginBottom: 20
