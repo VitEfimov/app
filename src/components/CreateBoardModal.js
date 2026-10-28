@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, useWindowDimensions } from 'react-native';
 import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
@@ -60,6 +60,11 @@ export default function CreateBoardModal({
   colors
 }) {
   const { t } = useTranslation();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isCompact = windowHeight < 820;
+  const isVeryCompact = windowHeight < 700;
+  const isWideScreen = windowWidth >= 768;
+
   const [boardName, setBoardName] = useState('');
   const [selectedType, setSelectedType] = useState('standard');
   const [selectedColor, setSelectedColor] = useState(BOARD_COLORS[1]); // Blue by default
@@ -70,6 +75,14 @@ export default function CreateBoardModal({
   const [repeatDurationUnit, setRepeatDurationUnit] = useState('month'); // 'year' | 'month' | 'week'
   const [isRepeatModalVisible, setIsRepeatModalVisible] = useState(false);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
+
+  // Always open in standard (unexpanded) state so Events auto-repeat is not left open
+  useEffect(() => {
+    if (isVisible) {
+      setSelectedType('standard');
+      setShowDurationDropdown(false);
+    }
+  }, [isVisible]);
 
   const durationText = `${repeatDurationCount} ${
     repeatDurationUnit === 'year' 
@@ -164,20 +177,39 @@ export default function CreateBoardModal({
       onBackButtonPress={handleBack}
       style={styles.modalContainer}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors?.bgCard || '#FAF9F6' }]}>
-        <View style={styles.dragHandleContainer}>
+      <View style={[
+        styles.modalContent,
+        {
+          backgroundColor: colors?.bgCard || '#FAF9F6',
+          paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 6 : 12),
+          paddingBottom: Platform.OS === 'ios' ? 16 : (isCompact ? 8 : 12),
+        }
+      ]}>
+        <View style={[styles.dragHandleContainer, isCompact && { paddingVertical: 4 }]}>
           <View style={[styles.dragHandle, { backgroundColor: colors?.borderColor || '#DDD' }]} />
         </View>
 
         {/* Header navigation row */}
-        <View style={styles.topNavRow}>
+        <View style={[
+          styles.topNavRow,
+          {
+            maxWidth: isWideScreen ? 640 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+            marginBottom: isCompact ? 4 : 8,
+          }
+        ]}>
           <TouchableOpacity 
             onPress={handleBack} 
             activeOpacity={0.7}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel={isEvents ? "Back to category types" : "Close"}
-            style={[styles.backCircle, { borderColor: colors?.borderColor || '#E5E5EA', backgroundColor: colors?.bgCard || '#FFF' }]}
+            style={[
+              styles.backCircle,
+              isCompact && { width: 34, height: 34, borderRadius: 17 },
+              { borderColor: colors?.borderColor || '#E5E5EA', backgroundColor: colors?.bgCard || '#FFF' }
+            ]}
           >
             <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors?.textPrimary || '#000'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <Path d="M19 12H5M12 19l-7-7 7-7" />
@@ -191,136 +223,205 @@ export default function CreateBoardModal({
 
         <ScrollView 
           style={styles.scrollBody} 
-          contentContainerStyle={styles.scrollBodyContent}
+          contentContainerStyle={[
+            styles.scrollBodyContent,
+            {
+              maxWidth: isWideScreen ? 640 : '100%',
+              width: '100%',
+              alignSelf: 'center',
+              flexGrow: 1,
+              justifyContent: !isEvents ? 'space-between' : 'flex-start',
+              paddingBottom: isCompact ? 4 : 10,
+            }
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Title and subtitle */}
-          <Text style={[styles.pageTitle, { color: colors?.textPrimary || '#1A1A24' }]}>
-            {isEvents ? (t('Create category') || 'Create category') : (t('Create category') || 'Create category')}
-          </Text>
-          <Text style={[styles.pageSubtitle, { color: colors?.textSecondary || '#8E8E93' }]}>
-            {isEvents 
-              ? (t('Let the important dates come back.') || 'Let the important dates come back.')
-              : (t('Give your tasks a place to belong.') || 'Give your tasks a place to belong.')}
-          </Text>
-
-          {/* Category name input */}
-          <Text style={[styles.inputLabel, { color: colors?.textPrimary || '#1A1A24' }]}>
-            {t('Category name') || 'Category name'}
-          </Text>
-          <TextInput
-            testID="prompt_input"
-            style={[
-              styles.input,
+          <View>
+            {/* Title and subtitle */}
+            <Text style={[
+              styles.pageTitle,
               {
-                backgroundColor: colors?.bgCard || '#FFFFFF',
                 color: colors?.textPrimary || '#1A1A24',
-                borderColor: colors?.borderColor || '#E5E5EA',
-              },
-            ]}
-            placeholder={t('e.g. Birthdays, Sprint, Work') || 'e.g. Birthdays, Sprint, Work'}
-            placeholderTextColor={colors?.textSecondary || '#999'}
-            value={boardName}
-            onChangeText={setBoardName}
-            autoFocus={true}
-          />
-
-          {/* Category color section */}
-          <View style={styles.colorHeaderRow}>
-            <Text style={[styles.inputLabel, { color: colors?.textPrimary || '#1A1A24', marginBottom: 0 }]}>
-              {t('Category color') || 'Category color'}
+                fontSize: isVeryCompact ? 22 : (isCompact ? 24 : 26),
+              }
+            ]}>
+              {isEvents ? (t('Create category') || 'Create category') : (t('Create category') || 'Create category')}
             </Text>
-            <Text style={[styles.hexCodeText, { color: colors?.textSecondary || '#999' }]}>
-              {selectedColor.toUpperCase()}
+            <Text style={[
+              styles.pageSubtitle,
+              {
+                color: colors?.textSecondary || '#8E8E93',
+                marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 14),
+              }
+            ]}>
+              {isEvents 
+                ? (t('Let the important dates come back.') || 'Let the important dates come back.')
+                : (t('Give your tasks a place to belong.') || 'Give your tasks a place to belong.')}
             </Text>
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorRow}>
-            {BOARD_COLORS.map(c => {
-              const isSelected = selectedColor.toLowerCase() === c.toLowerCase();
-              return (
-                <TouchableOpacity
-                  key={c}
-                  activeOpacity={0.75}
-                  onPress={() => setSelectedColor(c)}
-                  style={[
-                    styles.colorCircle,
-                    { backgroundColor: c }
-                  ]}
-                >
-                  {isSelected && (
-                    <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <Path d="M20 6L9 17l-5-5" />
-                    </Svg>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
 
-          {/* Category type selection */}
-          <View style={styles.typeHeaderRow}>
-            <Text style={[styles.inputLabel, { color: colors?.textPrimary || '#1A1A24', marginBottom: 0 }]}>
-              {isEvents ? (t('Category type') || 'Category type') : (t('Choose a category type') || 'Choose a category type')}
+            {/* Category name input */}
+            <Text style={[
+              styles.inputLabel,
+              {
+                color: colors?.textPrimary || '#1A1A24',
+                marginBottom: isCompact ? 4 : 6,
+              }
+            ]}>
+              {t('Category name') || 'Category name'}
             </Text>
-            {isEvents && (
-              <TouchableOpacity onPress={() => setSelectedType('standard')} activeOpacity={0.7}>
-                <Text style={[styles.changeTypeText, { color: colors?.textSecondary || '#888' }]}>{t('Change') || 'Change'}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+            <TextInput
+              testID="prompt_input"
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors?.bgCard || '#FFFFFF',
+                  color: colors?.textPrimary || '#1A1A24',
+                  borderColor: colors?.borderColor || '#E5E5EA',
+                  height: isVeryCompact ? 40 : (isCompact ? 42 : 46),
+                  marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 14),
+                },
+                Platform.OS === 'web' && { outlineStyle: 'none' },
+              ]}
+              placeholder={t('e.g. Birthdays, Sprint, Work') || 'e.g. Birthdays, Sprint, Work'}
+              placeholderTextColor={colors?.textSecondary || '#999'}
+              value={boardName}
+              onChangeText={setBoardName}
+              autoFocus={true}
+            />
 
-          <View style={styles.templateList}>
-            {templates
-              .filter(tmpl => !isEvents || tmpl.id === 'birthdays')
-              .map(tmpl => {
-                const isSelected = selectedType === tmpl.id;
-                const { Icon } = tmpl;
+            {/* Category color section */}
+            <View style={[styles.colorHeaderRow, { marginBottom: isCompact ? 6 : 8 }]}>
+              <Text style={[styles.inputLabel, { color: colors?.textPrimary || '#1A1A24', marginBottom: 0 }]}>
+                {t('Category color') || 'Category color'}
+              </Text>
+              <Text style={[styles.hexCodeText, { color: colors?.textSecondary || '#999' }]}>
+                {selectedColor.toUpperCase()}
+              </Text>
+            </View>
+            
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={[
+                styles.colorRow,
+                { marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 14) }
+              ]}
+            >
+              {BOARD_COLORS.map(c => {
+                const isSelected = selectedColor.toLowerCase() === c.toLowerCase();
                 return (
                   <TouchableOpacity
-                    key={tmpl.id}
+                    key={c}
                     activeOpacity={0.75}
-                    testID={`create_board_type_${tmpl.id}`}
+                    onPress={() => setSelectedColor(c)}
                     style={[
-                      styles.templateCard,
-                      {
-                        borderColor: isSelected ? primaryAccent : (colors?.borderColor || '#E5E5EA'),
-                        backgroundColor: isSelected ? `${primaryAccent}0D` : (colors?.bgCard || '#FFFFFF'),
-                      },
+                      styles.colorCircle,
+                      isCompact && { width: 32, height: 32, borderRadius: 16 },
+                      { backgroundColor: c }
                     ]}
-                    onPress={() => setSelectedType(tmpl.id)}
                   >
-                    <View style={styles.cardHeader}>
-                      <View style={[styles.iconWrapper, { backgroundColor: `${primaryAccent}18` }]}>
-                        <Icon color={primaryAccent} />
-                      </View>
-                      
-                      <View style={{ flex: 1, marginRight: 8 }}>
-                        <Text style={[styles.cardTitle, { color: colors?.textPrimary || '#1A1A24' }]}>
-                          {tmpl.title}
-                        </Text>
-                        <Text style={[styles.cardDesc, { color: colors?.textSecondary || '#8E8E93' }]}>
-                          {tmpl.desc}
-                        </Text>
-                        <View style={[styles.badge, { backgroundColor: 'transparent' }]}>
-                          <Text style={[styles.badgeText, { color: primaryAccent }]}>
-                            {tmpl.badge}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Radio Selection Indicator */}
-                      <View style={[
-                        styles.radioOuter,
-                        { borderColor: isSelected ? primaryAccent : (colors?.borderColor || '#CCC') }
-                      ]}>
-                        {isSelected && <View style={[styles.radioInner, { backgroundColor: primaryAccent }]} />}
-                      </View>
-                    </View>
+                    {isSelected && (
+                      <Svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <Path d="M20 6L9 17l-5-5" />
+                      </Svg>
+                    )}
                   </TouchableOpacity>
                 );
               })}
+            </ScrollView>
+
+            {/* Category type selection */}
+            <View style={[styles.typeHeaderRow, { marginBottom: isCompact ? 6 : 8 }]}>
+              <Text style={[styles.inputLabel, { color: colors?.textPrimary || '#1A1A24', marginBottom: 0 }]}>
+                {isEvents ? (t('Category type') || 'Category type') : (t('Choose a category type') || 'Choose a category type')}
+              </Text>
+              {isEvents && (
+                <TouchableOpacity onPress={() => setSelectedType('standard')} activeOpacity={0.7}>
+                  <Text style={[styles.changeTypeText, { color: colors?.textSecondary || '#888' }]}>{t('Change') || 'Change'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={[
+              styles.templateList,
+              {
+                gap: isVeryCompact ? 6 : (isCompact ? 8 : 10),
+                marginBottom: isCompact ? 6 : 10,
+              }
+            ]}>
+              {templates
+                .filter(tmpl => !isEvents || tmpl.id === 'birthdays')
+                .map(tmpl => {
+                  const isSelected = selectedType === tmpl.id;
+                  const { Icon } = tmpl;
+                  return (
+                    <TouchableOpacity
+                      key={tmpl.id}
+                      activeOpacity={0.75}
+                      testID={`create_board_type_${tmpl.id}`}
+                      style={[
+                        styles.templateCard,
+                        {
+                          borderColor: isSelected ? primaryAccent : (colors?.borderColor || '#E5E5EA'),
+                          backgroundColor: isSelected ? `${primaryAccent}0D` : (colors?.bgCard || '#FFFFFF'),
+                          paddingVertical: isVeryCompact ? 8 : (isCompact ? 10 : 12),
+                          paddingHorizontal: isCompact ? 12 : 14,
+                        },
+                      ]}
+                      onPress={() => setSelectedType(tmpl.id)}
+                    >
+                      <View style={styles.cardHeader}>
+                        <View style={[
+                          styles.iconWrapper,
+                          isCompact && { width: 38, height: 38, borderRadius: 10, marginRight: 10 },
+                          { backgroundColor: `${primaryAccent}18` }
+                        ]}>
+                          <Icon color={primaryAccent} />
+                        </View>
+                        
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={[
+                            styles.cardTitle,
+                            isCompact && { fontSize: 15, marginBottom: 1 },
+                            { color: colors?.textPrimary || '#1A1A24' }
+                          ]}>
+                            {tmpl.title}
+                          </Text>
+                          <Text
+                            numberOfLines={2}
+                            style={[
+                              styles.cardDesc,
+                              isCompact && { fontSize: 11.5, lineHeight: 15, marginBottom: 3 },
+                              { color: colors?.textSecondary || '#8E8E93' }
+                            ]}
+                          >
+                            {tmpl.desc}
+                          </Text>
+                          <View style={[styles.badge, { backgroundColor: 'transparent' }]}>
+                            <Text style={[
+                              styles.badgeText,
+                              isCompact && { fontSize: 11 },
+                              { color: primaryAccent }
+                            ]}>
+                              {tmpl.badge}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Radio Selection Indicator */}
+                        <View style={[
+                          styles.radioOuter,
+                          { borderColor: isSelected ? primaryAccent : (colors?.borderColor || '#CCC') }
+                        ]}>
+                          {isSelected && <View style={[styles.radioInner, { backgroundColor: primaryAccent }]} />}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+            </View>
           </View>
 
           {/* Default Auto-Repeat Card (when Events is selected) */}
@@ -370,7 +471,7 @@ export default function CreateBoardModal({
               </View>
 
               {/* Repeat for Dropdown */}
-              <Text style={[styles.fieldLabel, { color: colors?.textSecondary || '#8E8E93', marginTop: 14 }]}>
+              <Text style={[styles.fieldLabel, { color: colors?.textSecondary || '#8E8E93', marginTop: 12 }]}>
                 {t('Repeat for') || 'Repeat for'}
               </Text>
               <TouchableOpacity
@@ -436,13 +537,22 @@ export default function CreateBoardModal({
         </ScrollView>
 
         {/* Bottom submit button */}
-        <View style={styles.bottomBar}>
+        <View style={[
+          styles.bottomBar,
+          {
+            maxWidth: isWideScreen ? 640 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+            paddingTop: isCompact ? 4 : 8,
+          }
+        ]}>
           <TouchableOpacity
             testID="prompt_submit_btn"
             activeOpacity={0.85}
             onPress={handleCreate}
             style={[
               styles.createBtn,
+              isCompact && { height: 46, borderRadius: 23 },
               { backgroundColor: primaryAccent, opacity: boardName.trim() ? 1 : 0.6 }
             ]}
             disabled={!boardName.trim()}

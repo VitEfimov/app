@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
 import Modal from 'react-native-modal';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,9 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
   const { t } = useTranslation();
   const { colors } = useTheme();
   const dispatch = useDispatch();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isCompact = windowHeight < 820;
+  const isWideScreen = windowWidth >= 768;
   const themeState = useSelector(state => state.themeReducer);
   const tasks = useSelector(state => state.taskReducer.tasks);
 
@@ -188,12 +191,27 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
       style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
-        <View style={styles.dragHandleContainer}>
+      <View style={[
+        styles.modalContent,
+        {
+          backgroundColor: colors.bgCard,
+          paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 8 : 16),
+        }
+      ]}>
+        <View style={[styles.dragHandleContainer, isCompact && { paddingBottom: 6 }]}>
           <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
         </View>
         
-        <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
+        <View style={[
+          styles.header,
+          isCompact && { paddingVertical: 12, paddingHorizontal: 16 },
+          {
+            borderBottomColor: colors.borderColor,
+            maxWidth: isWideScreen ? 680 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+          }
+        ]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>
               {boardId ? `${t('Board Automation')}: ${boardName || ''}` : t('Auto-Manage Tasks')}
@@ -216,6 +234,11 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
           onContentSizeChange={(_, h) => setScrollContentHeight(h)}
           scrollEventThrottle={16}
           style={[styles.scrollArea, { flex: 1 }]}
+          contentContainerStyle={{
+            maxWidth: isWideScreen ? 680 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+          }}
         >
           {boardId && (
             <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer, padding: 12, marginBottom: 15, borderRadius: 10, borderWidth: 1, borderColor: colors.primary }]}>

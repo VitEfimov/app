@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -30,7 +30,7 @@ import CustomReminderModal from './CustomReminderModal';
 import YearPickerModal from './YearPickerModal';
 import ConfirmModal from './ConfirmModal';
 import PremiumModal from './PremiumModal';
-import { toggleTaskOptionsCollapsed } from '../features/userSlice';
+import { toggleTaskOptionsCollapsed, setTaskOptionsCollapsed } from '../features/userSlice';
 import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 
@@ -191,6 +191,10 @@ const IconChevronDown = ({ color, isCollapsed }) => (
 
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isCompact = windowHeight < 820;
+  const isVeryCompact = windowHeight < 700;
+  const isWideScreen = windowWidth >= 768;
   const dispatch = useDispatch();
   const themeState = useSelector(state => state.themeReducer);
   const boards = useSelector(state => state.userReducer.boards || []);
@@ -388,6 +392,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       setReminder(initialReminderVal);
       setIsAlarm(initialAlarmVal);
       setKeepNotificationAllDay(initialKeepNotificationVal);
+      dispatch(setTaskOptionsCollapsed(true));
 
       initialSnapshotRef.current = {
         taskName: initialTaskName,
@@ -1247,29 +1252,29 @@ useEffect(() => {
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
       style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
-          <View style={styles.dragHandleContainer}>
+      <View style={[styles.modalContent, { backgroundColor: colors.bgCard, paddingTop: Platform.OS === 'ios' ? (isCompact ? 34 : 42) : (isVeryCompact ? 6 : 10) }]}>
+          <View style={[styles.dragHandleContainer, { paddingBottom: isVeryCompact ? 2 : 4 }]}>
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           
           {/* Top navigation row with Back button and Cancel */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: isWideScreen ? 32 : 20, marginBottom: isVeryCompact ? 4 : (isCompact ? 6 : 10), maxWidth: isWideScreen ? 680 : '100%', width: '100%', alignSelf: 'center' }}>
             <TouchableOpacity 
               onPress={handleClose} 
               activeOpacity={0.7}
-              style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
+              style={{ width: isVeryCompact ? 32 : 36, height: isVeryCompact ? 32 : 36, borderRadius: 18, borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
             >
-              <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <Svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <Path d="M19 12H5M12 19l-7-7 7-7" />
               </Svg>
             </TouchableOpacity>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <TouchableOpacity onPress={handleShare} activeOpacity={0.7} style={{ padding: 6 }}>
+              <TouchableOpacity onPress={handleShare} activeOpacity={0.7} style={{ padding: 4 }}>
                 <IconShare color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleClose} activeOpacity={0.7}>
-                <Text style={{ fontSize: 15, fontWeight: '500', color: colors.textSecondary }}>{t('Cancel') || 'Cancel'}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '500', color: colors.textSecondary }}>{t('Cancel') || 'Cancel'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1280,24 +1285,39 @@ useEffect(() => {
             onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
             onContentSizeChange={(_, h) => setScrollContentHeight(h)}
             scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
             style={styles.body} 
-            contentContainerStyle={[styles.bodyContent, { paddingHorizontal: 20 }]} 
+            contentContainerStyle={[
+              styles.bodyContent,
+              {
+                paddingHorizontal: isWideScreen ? 32 : 20,
+                paddingTop: 2,
+                paddingBottom: isVeryCompact ? 6 : 12,
+                maxWidth: isWideScreen ? 680 : '100%',
+                width: '100%',
+                alignSelf: 'center',
+                justifyContent: (isTaskOptionsCollapsed && subtasks.length === 0 && attachments.length === 0) ? 'space-between' : 'flex-start',
+              }
+            ]} 
             keyboardShouldPersistTaps="handled"
           >
+            <View>
             {/* Screen Title: Edit task */}
-            <Text style={{ fontSize: 28, fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary, marginBottom: 16 }}>
+            <Text style={{ fontSize: isVeryCompact ? 20 : (isCompact ? 22 : 25), fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary, marginBottom: isVeryCompact ? 6 : (isCompact ? 8 : 12) }}>
               {t('Edit task') || 'Edit task'}
             </Text>
             
             {/* Task Name Section */}
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+            <View style={{ marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 2 }}>
                 {t('Task name') || 'Task name'}
               </Text>
               
               <TextInput
                 testID="task_details_name_input"
                 accessible={true} accessibilityLabel="Task Name"
+                rows={1}
                 style={[
                   styles.input,
                   {
@@ -1305,11 +1325,13 @@ useEffect(() => {
                     borderColor: 'transparent',
                     borderWidth: 0,
                     backgroundColor: 'transparent',
-                    minHeight: 38,
-                    fontSize: 22,
+                    minHeight: 26,
+                    fontSize: isVeryCompact ? 18 : 20,
+                    lineHeight: isVeryCompact ? 22 : 25,
                     fontWeight: '700',
+                    padding: 0,
                     paddingHorizontal: 0,
-                    paddingVertical: 2,
+                    paddingVertical: 0,
                     textAlignVertical: 'top',
                     overflow: 'hidden',
                     outlineStyle: 'none',
@@ -1333,19 +1355,19 @@ useEffect(() => {
               />
 
               {/* Category indicator below task name */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: getBoardColor(boards.find(b => b.id === selectedBoardId || b._id === selectedBoardId), boards), marginRight: 6 }} />
-                <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>
+                <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '500' }}>
                   {selectedBoardName}
                 </Text>
               </View>
             </View>
 
             {/* Date and Time picker pills row */}
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }}>
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}`}
-                style={[styles.dateTimePill, { borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, borderRadius: 14, height: 46, paddingHorizontal: 14, flex: 1, justifyContent: 'space-between' }]}
+                style={[styles.dateTimePill, { borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, borderRadius: 12, height: isVeryCompact ? 38 : (isCompact ? 42 : 44), paddingHorizontal: 12, flex: 1, justifyContent: 'space-between', outlineStyle: 'none' }]}
                 onPress={() => { setDatePickerType('due'); setShowDatePicker(true); }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1359,7 +1381,7 @@ useEffect(() => {
 
               <TouchableOpacity 
                 accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
-                style={[styles.dateTimePill, { borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, borderRadius: 14, height: 46, paddingHorizontal: 14, flex: 1, justifyContent: 'space-between' }]}
+                style={[styles.dateTimePill, { borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, borderRadius: 12, height: isVeryCompact ? 38 : (isCompact ? 42 : 44), paddingHorizontal: 12, flex: 1, justifyContent: 'space-between', outlineStyle: 'none' }]}
                 onPress={() => setShowTimePicker(true)}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1373,20 +1395,20 @@ useEffect(() => {
             </View>
 
             {/* Collapsible Section Card: Priority, Reminder, Repeat */}
-            <View style={[styles.optionsCard, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14 }]}>
+            <View style={[styles.optionsCard, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingVertical: isVeryCompact ? 8 : (isCompact ? 10 : 12), paddingHorizontal: 12, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }]}>
               <TouchableOpacity
                 accessible={true}
-                accessibilityRole="button"
+                accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
                 accessibilityLabel={`${t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}, ${isTaskOptionsCollapsed ? 'collapsed' : 'expanded'}`}
-                style={styles.optionsCardHeader}
+                style={[styles.optionsCardHeader, { borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' }]}
                 onPress={() => dispatch(toggleTaskOptionsCollapsed())}
                 activeOpacity={0.7}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-                  <View style={[styles.tuneIconBadge, { backgroundColor: hexToRgba(colors.primary, isDark ? 0.16 : 0.12) }]}>
+                  <View style={[styles.tuneIconBadge, { width: 30, height: 30, borderRadius: 8, marginRight: 10, backgroundColor: hexToRgba(colors.primary, isDark ? 0.16 : 0.12) }]}>
                     <IconTune color={colors.primary} />
                   </View>
-                  <Text style={[styles.optionsCardTitle, { color: colors.textPrimary }]}>
+                  <Text style={[styles.optionsCardTitle, { color: colors.textPrimary, fontSize: 14 }]}>
                     {t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}
                   </Text>
                 </View>
@@ -1394,7 +1416,7 @@ useEffect(() => {
               </TouchableOpacity>
 
               {isTaskOptionsCollapsed ? (
-                <View style={styles.optionsSummaryRow}>
+                <View style={[styles.optionsSummaryRow, { marginTop: isVeryCompact ? 4 : 6 }]}>
                   {priority !== 'none' && (
                     <View style={[styles.priorityPillBadge, { backgroundColor: priorityBadgeStyle.bg }]}>
                       <Text style={[styles.priorityPillText, { color: priorityBadgeStyle.text }]}>
@@ -1566,18 +1588,18 @@ useEffect(() => {
             )}
 
             {/* Notes & Attachments Card */}
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 8 }}>
+            <View style={{ marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 4 }}>
                 {t('Notes & attachments') || 'Notes & attachments'}
               </Text>
               
-              <View style={{ borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', borderRadius: 16, padding: 14, backgroundColor: colors.bgCard }}>
+              <View style={{ borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', borderRadius: 14, paddingVertical: isVeryCompact ? 8 : 10, paddingHorizontal: 12, backgroundColor: colors.bgCard }}>
                 <MemoizedNotesInput
                   ref={notesRef}
                   initialValue={notes}
                   placeholder={t("Add details") || t("Add notes...") || "Add details"}
                   placeholderTextColor={colors.textSecondary}
-                  style={[styles.notesInput, { color: colors.textPrimary, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0, minHeight: 60 }]}
+                  style={[styles.notesInput, { color: colors.textPrimary, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0, minHeight: isVeryCompact ? 32 : (isCompact ? 38 : 48) }]}
                 />
 
                 {attachments.length > 0 && (
@@ -1609,12 +1631,12 @@ useEffect(() => {
 
                 <TouchableOpacity
                   accessible={true}
-                  accessibilityRole="button"
+                  accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
                   accessibilityLabel="Add attachment"
-                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: isVeryCompact ? 4 : 6, gap: 6, borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' }}
                   onPress={handleOpenAttachmentOptions}
                 >
-                  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <Svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <Path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                   </Svg>
                   <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
@@ -1625,18 +1647,18 @@ useEffect(() => {
             </View>
 
             {/* Section: Subtasks */}
-            <View style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary }}>
+            <View style={{ marginBottom: isVeryCompact ? 6 : (isCompact ? 8 : 10) }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
                   {t('Subtasks') || 'Subtasks'}
                 </Text>
-                <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
                   {subtasks.length}
                 </Text>
               </View>
 
               {subtasks.length > 0 && (
-                <View style={{ marginBottom: 8 }}>
+                <View style={{ marginBottom: 6 }}>
                   {subtasks.map((subtask) => (
                     <View 
                       key={subtask.id} 
@@ -1678,28 +1700,29 @@ useEffect(() => {
 
               <TouchableOpacity
                 accessible={true}
-                accessibilityRole="button"
+                accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
                 accessibilityLabel="Add subtask"
-                style={{ height: 46, borderRadius: 14, backgroundColor: isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.10)', justifyContent: 'center', alignItems: 'center' }}
+                style={{ height: isVeryCompact ? 36 : (isCompact ? 40 : 42), borderRadius: 12, backgroundColor: isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.10)', justifyContent: 'center', alignItems: 'center', borderWidth: 0, outlineStyle: 'none' }}
                 onPress={addSubtask}
               >
-                <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>
                   + {t('Add subtask') || 'Add subtask'}
                 </Text>
               </TouchableOpacity>
             </View>
+            </View>
 
             {/* Bottom Actions */}
-            <View style={{ marginTop: 20, marginBottom: 20 }}>
+            <View style={{ marginTop: isVeryCompact ? 6 : 10, marginBottom: 4 }}>
               <TouchableOpacity 
                 testID="task_details_save_btn_bottom"
                 onPress={handleSave} 
-                style={[styles.saveBtnFull, { backgroundColor: colors.primary, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center' }]}
+                style={[styles.saveBtnFull, { backgroundColor: colors.primary, height: isVeryCompact ? 42 : (isCompact ? 46 : 48), borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 0, outlineStyle: 'none' }]}
                 activeOpacity={0.85}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <IconCheck color="#ffffff" />
-                  <Text style={[styles.saveBtnText, { color: '#ffffff', fontSize: 16, fontWeight: '700' }]}>
+                  <Text style={[styles.saveBtnText, { color: '#ffffff', fontSize: 15, fontWeight: '700' }]}>
                     {t('Save changes') || 'Save changes'}
                   </Text>
                 </View>
@@ -1707,13 +1730,13 @@ useEffect(() => {
 
               <TouchableOpacity 
                 testID="task_details_delete_btn_bottom"
-                accessible={true} accessibilityRole="button" accessibilityLabel="Delete task"
+                accessible={true} accessibilityRole={Platform.OS === 'web' ? undefined : 'button'} accessibilityLabel="Delete task"
                 onPress={handleDelete} 
-                style={[styles.deleteLink, { marginTop: 14 }]}
+                style={[styles.deleteLink, { marginTop: isVeryCompact ? 4 : 6, marginBottom: 0, paddingVertical: isVeryCompact ? 4 : 6, borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' }]}
                 activeOpacity={0.7}
               >
                 <IconTrash color={colors.danger || '#f87171'} />
-                <Text style={[styles.deleteLinkText, { color: colors.danger || '#f87171', fontSize: 14, fontWeight: '600', marginLeft: 6 }]}>
+                <Text style={[styles.deleteLinkText, { color: colors.danger || '#f87171', fontSize: 13, fontWeight: '600', marginLeft: 6 }]}>
                   {t('Delete task') || 'Delete task'}
                 </Text>
               </TouchableOpacity>

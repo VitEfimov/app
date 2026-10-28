@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, useWindowDimensions } from 'react-native';
 import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,6 +22,9 @@ const LANGUAGES = [
 export default function ChooseLanguageModal({ isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const { t, i18n } = useTranslation();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isCompact = windowHeight < 820;
+  const isWideScreen = windowWidth >= 768;
   const [selectedLang, setSelectedLang] = useState(i18n.language || 'en');
 
   useEffect(() => {
@@ -50,13 +53,28 @@ export default function ChooseLanguageModal({ isVisible, onClose }) {
       onBackButtonPress={onClose}
       style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF') }]}>
-        <View style={styles.dragHandleContainer}>
+      <View style={[
+        styles.modalContent,
+        {
+          backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF'),
+          paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 6 : 14),
+          paddingBottom: Platform.OS === 'ios' ? 16 : (isCompact ? 8 : 12),
+        }
+      ]}>
+        <View style={[styles.dragHandleContainer, isCompact && { paddingVertical: 4 }]}>
           <View style={[styles.dragHandle, { backgroundColor: colors.borderColor || '#DDD' }]} />
         </View>
 
         {/* Title row */}
-        <View style={styles.headerRow}>
+        <View style={[
+          styles.headerRow,
+          {
+            maxWidth: isWideScreen ? 640 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+            marginBottom: isCompact ? 10 : 16,
+          }
+        ]}>
           <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Choose your language') || 'Choose your language'}</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('Make planning feel more familiar.') || 'Make planning feel more familiar.'}</Text>
@@ -72,7 +90,15 @@ export default function ChooseLanguageModal({ isVisible, onClose }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.languagesList}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.languagesList}
+          contentContainerStyle={{
+            maxWidth: isWideScreen ? 640 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+          }}
+        >
           {LANGUAGES.map((lang) => {
             const isSelected = selectedLang === lang.code;
 
@@ -83,6 +109,7 @@ export default function ChooseLanguageModal({ isVisible, onClose }) {
                 onPress={() => setSelectedLang(lang.code)}
                 style={[
                   styles.languageCard,
+                  isCompact && { paddingVertical: 10, marginBottom: 8 },
                   {
                     backgroundColor: isSelected ? activeBg : (isDark ? '#23222E' : '#FFFFFF'),
                     borderColor: isSelected ? (colors.primary || '#6750A4') : (colors.borderColor || '#ECECEF'),
@@ -121,11 +148,19 @@ export default function ChooseLanguageModal({ isVisible, onClose }) {
         </ScrollView>
 
         {/* Apply language button */}
-        <View style={styles.bottomBar}>
+        <View style={[
+          styles.bottomBar,
+          {
+            maxWidth: isWideScreen ? 640 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+            paddingTop: isCompact ? 6 : 12,
+          }
+        ]}>
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={handleApply}
-            style={[styles.applyBtn, { backgroundColor: colors.primary || '#6750A4' }]}
+            style={[styles.applyBtn, isCompact && { height: 46, borderRadius: 23 }, { backgroundColor: colors.primary || '#6750A4' }]}
           >
             <Text style={styles.applyBtnText}>{t('Apply language') || 'Apply language'}</Text>
           </TouchableOpacity>

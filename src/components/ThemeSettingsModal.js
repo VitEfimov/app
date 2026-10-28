@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform, useWindowDimensions } from 'react-native';
 import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSourceColor, resetTheme, setUserPicture, setThemeMode, setRandomColorDaily } from '../features/themeSlice';
@@ -38,6 +38,9 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
   const dispatch = useDispatch();
   const { colors, isDark } = useTheme();
   const { t, i18n } = useTranslation();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isCompact = windowHeight < 820;
+  const isWideScreen = windowWidth >= 768;
   
   const currentSourceColor = useSelector(state => state.themeReducer.sourceColor);
   const currentUserPicture = useSelector(state => state.themeReducer.userPicture);
@@ -202,18 +205,37 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
       onBackButtonPress={onClose}
       style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#18171E' : '#FAF9F6') }]}>
+      <View style={[
+        styles.modalContent,
+        {
+          backgroundColor: colors.bgCard || (isDark ? '#18171E' : '#FAF9F6'),
+          paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 6 : 14),
+          paddingBottom: Platform.OS === 'ios' ? 16 : (isCompact ? 8 : 12),
+        }
+      ]}>
         {/* Drag handle for mobile */}
-        <View style={styles.dragHandleContainer}>
+        <View style={[styles.dragHandleContainer, isCompact && { paddingVertical: 4 }]}>
           <View style={[styles.dragHandle, { backgroundColor: colors.borderColor || '#DDD' }]} />
         </View>
 
         {/* Header with back button and Cancel */}
-        <View style={styles.topNavRow}>
+        <View style={[
+          styles.topNavRow,
+          {
+            maxWidth: isWideScreen ? 640 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+            marginBottom: isCompact ? 6 : 12,
+          }
+        ]}>
           <TouchableOpacity 
             onPress={onClose} 
             activeOpacity={0.7}
-            style={[styles.backCircle, { backgroundColor: isDark ? '#262530' : '#FFFFFF', borderColor: colors.borderColor }]}
+            style={[
+              styles.backCircle,
+              isCompact && { width: 34, height: 34, borderRadius: 17 },
+              { backgroundColor: isDark ? '#262530' : '#FFFFFF', borderColor: colors.borderColor }
+            ]}
           >
             <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <Path d="M19 12H5M12 19l-7-7 7-7" />
@@ -225,90 +247,115 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
-          {/* Screen Title & Subtitle */}
-          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>{t('Appearance') || 'Appearance'}</Text>
-          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('Find your focus, in your style.') || 'Find your focus, in your style.'}</Text>
+        <ScrollView
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollBody,
+            {
+              maxWidth: isWideScreen ? 640 : '100%',
+              width: '100%',
+              alignSelf: 'center',
+              flexGrow: 1,
+              justifyContent: 'space-between',
+              paddingBottom: isCompact ? 6 : 16,
+            }
+          ]}
+        >
+          <View>
+            {/* Screen Title & Subtitle */}
+            <Text style={[styles.pageTitle, isCompact && { fontSize: 24 }, { color: colors.textPrimary }]}>{t('Appearance') || 'Appearance'}</Text>
+            <Text style={[styles.pageSubtitle, isCompact && { marginBottom: 14 }, { color: colors.textSecondary }]}>{t('Find your focus, in your style.') || 'Find your focus, in your style.'}</Text>
 
-          {/* Section: Appearance mode */}
-          <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>{t('Appearance mode') || 'Appearance mode'}</Text>
-          <View style={styles.modesRow}>
-            {[
-              { label: t('System') || 'System', value: 'system' },
-              { label: t('Light') || 'Light', value: 'light' },
-              { label: t('Dark') || 'Dark', value: 'dark' },
-              { label: t('Contrast') || 'Contrast', value: 'contrast' },
-            ].map(renderPhonePreview)}
-          </View>
-
-          {/* Section: Material You theme */}
-          <Text style={[styles.sectionHeading, { color: colors.textPrimary, marginTop: 24 }]}>{t('Material You theme') || 'Material You theme'}</Text>
-          
-          <View style={[styles.themeCard, { backgroundColor: isDark ? '#22212C' : '#FFFFFF', borderColor: colors.borderColor }]}>
-            {/* Accent Color Header */}
-            <View style={styles.accentHeaderRow}>
-              <Text style={[styles.accentLabel, { color: colors.textPrimary }]}>{t('Accent color') || 'Accent color'}</Text>
-              <Text style={[styles.accentValue, { color: colors.primary || '#6750A4' }]}>{currentColorObj.name}</Text>
+            {/* Section: Appearance mode */}
+            <Text style={[styles.sectionHeading, isCompact && { marginBottom: 10 }, { color: colors.textPrimary }]}>{t('Appearance mode') || 'Appearance mode'}</Text>
+            <View style={styles.modesRow}>
+              {[
+                { label: t('System') || 'System', value: 'system' },
+                { label: t('Light') || 'Light', value: 'light' },
+                { label: t('Dark') || 'Dark', value: 'dark' },
+                { label: t('Contrast') || 'Contrast', value: 'contrast' },
+              ].map(renderPhonePreview)}
             </View>
 
-            {/* Accent Color Circles */}
-            <View style={styles.colorSwatchesRow}>
-              {THEME_ACCENT_COLORS.map((item) => {
-                const isSelected = (tempColor || '').toLowerCase() === item.color.toLowerCase();
-                return (
-                  <TouchableOpacity
-                    key={item.color}
-                    activeOpacity={0.75}
-                    onPress={() => setTempColor(item.color)}
-                    style={[
-                      styles.colorDot,
-                      { backgroundColor: item.color }
-                    ]}
-                  >
-                    {isSelected && <IconCheck color="#FFFFFF" size={16} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={[styles.divider, { backgroundColor: colors.borderColor || (isDark ? '#2E2D3A' : '#F0F0F4') }]} />
-
-            {/* Randomize Daily Switch */}
-            <View style={styles.randomizeRow}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={[styles.randomizeTitle, { color: colors.textPrimary }]}>{t('Randomize daily') || 'Randomize daily'}</Text>
-                <Text style={[styles.randomizeSubtitle, { color: colors.textSecondary }]}>{t('A fresh accent each morning') || 'A fresh accent each morning'}</Text>
+            {/* Section: Material You theme */}
+            <Text style={[styles.sectionHeading, { color: colors.textPrimary, marginTop: isCompact ? 14 : 22, marginBottom: isCompact ? 10 : 14 }]}>{t('Material You theme') || 'Material You theme'}</Text>
+            
+            <View style={[styles.themeCard, isCompact && { padding: 14, marginBottom: 8 }, { backgroundColor: isDark ? '#22212C' : '#FFFFFF', borderColor: colors.borderColor }]}>
+              {/* Accent Color Header */}
+              <View style={[styles.accentHeaderRow, isCompact && { marginBottom: 10 }]}>
+                <Text style={[styles.accentLabel, { color: colors.textPrimary }]}>{t('Accent color') || 'Accent color'}</Text>
+                <Text style={[styles.accentValue, { color: colors.primary || '#6750A4' }]}>{currentColorObj.name}</Text>
               </View>
-              <Switch
-                value={tempRandomColorDaily}
-                onValueChange={setTempRandomColorDaily}
-                trackColor={{ false: colors.borderColor || '#CCC', true: colors.primary || '#6750A4' }}
-              />
+
+              {/* Accent Color Circles */}
+              <View style={[styles.colorSwatchesRow, isCompact && { marginBottom: 10 }]}>
+                {THEME_ACCENT_COLORS.map((item) => {
+                  const isSelected = (tempColor || '').toLowerCase() === item.color.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={item.color}
+                      activeOpacity={0.75}
+                      onPress={() => setTempColor(item.color)}
+                      style={[
+                        styles.colorDot,
+                        isCompact && { width: 36, height: 36, borderRadius: 18 },
+                        { backgroundColor: item.color }
+                      ]}
+                    >
+                      {isSelected && <IconCheck color="#FFFFFF" size={16} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={[styles.divider, isCompact && { marginVertical: 10 }, { backgroundColor: colors.borderColor || (isDark ? '#2E2D3A' : '#F0F0F4') }]} />
+
+              {/* Randomize Daily Switch */}
+              <View style={styles.randomizeRow}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={[styles.randomizeTitle, { color: colors.textPrimary }]}>{t('Randomize daily') || 'Randomize daily'}</Text>
+                  <Text style={[styles.randomizeSubtitle, { color: colors.textSecondary }]}>{t('A fresh accent each morning') || 'A fresh accent each morning'}</Text>
+                </View>
+                <Switch
+                  value={tempRandomColorDaily}
+                  onValueChange={setTempRandomColorDaily}
+                  trackColor={{ false: colors.borderColor || '#CCC', true: colors.primary || '#6750A4' }}
+                />
+              </View>
             </View>
-          </View>
 
-          {/* Caption text */}
-          <Text style={[styles.captionText, { color: colors.textSecondary }]}>
-            {t('System follows your device. Contrast uses stronger borders and clearer text.') || 'System follows your device. Contrast uses stronger borders and clearer text.'}
-          </Text>
-
-          {/* Background image upload option (retained as modification) */}
-          <TouchableOpacity 
-            onPress={handlePickImage}
-            style={[styles.bgPictureBtn, { borderColor: colors.borderColor }]}
-          >
-            <Text style={[styles.bgPictureText, { color: colors.textSecondary }]}>
-              {tempImage ? t('🖼 Custom background active (Tap to change)') : t('🖼 Add custom background image')}
+            {/* Caption text */}
+            <Text style={[styles.captionText, isCompact && { marginBottom: 10 }, { color: colors.textSecondary }]}>
+              {t('System follows your device. Contrast uses stronger borders and clearer text.') || 'System follows your device. Contrast uses stronger borders and clearer text.'}
             </Text>
-          </TouchableOpacity>
+
+            {/* Background image upload option (retained as modification) */}
+            <TouchableOpacity 
+              onPress={handlePickImage}
+              style={[styles.bgPictureBtn, isCompact && { paddingVertical: 8, marginBottom: 4 }, { borderColor: colors.borderColor }]}
+            >
+              <Text style={[styles.bgPictureText, { color: colors.textSecondary }]}>
+                {tempImage ? t('🖼 Custom background active (Tap to change)') : t('🖼 Add custom background image')}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
 
         {/* Bottom Save Action Button */}
-        <View style={styles.bottomBar}>
+        <View style={[
+          styles.bottomBar,
+          {
+            maxWidth: isWideScreen ? 640 : '100%',
+            width: '100%',
+            alignSelf: 'center',
+            paddingTop: isCompact ? 4 : 8,
+          }
+        ]}>
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={handleSave}
-            style={[styles.saveButton, { backgroundColor: colors.primary || '#6750A4' }]}
+            style={[styles.saveButton, isCompact && { height: 46, borderRadius: 23 }, { backgroundColor: colors.primary || '#6750A4' }]}
           >
             <Text style={styles.saveButtonText}>{t('Save appearance') || 'Save appearance'}</Text>
           </TouchableOpacity>
