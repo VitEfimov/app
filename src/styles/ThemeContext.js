@@ -104,7 +104,7 @@ export const ThemeProvider = ({ children }) => {
       isDark,
       mode: themeMode
     };
-  }, [sourceColor, themeMode]);
+  }, [sourceColor, themeMode, systemColorScheme]);
 
   return (
     <ThemeContext.Provider value={theme}>

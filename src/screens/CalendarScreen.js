@@ -32,7 +32,7 @@ import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import CreateBoardModal from '../components/CreateBoardModal';
 import CalendarDayOptionsModal from '../components/calendar/CalendarDayOptionsModal';
 import YearPickerModal from '../components/YearPickerModal';
-import { updateTask, deleteTask } from '../features/taskSlice';
+import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks } from '../features/taskSlice';
 import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
 import { getBoardColor } from '../utils/boardColors';
@@ -206,6 +206,8 @@ export default function CalendarScreen({ navigation }) {
     });
   }, []);
 
+  const selectedTaskIdsSet = useMemo(() => new Set(selectionMode.selectedTaskIds), [selectionMode.selectedTaskIds]);
+
   const handleSelectAll = () => {
     const taskIds = selectedTasks.map(t => t.id || t._id);
     setSelectionMode(prev => ({ ...prev, selectedTaskIds: taskIds }));
@@ -219,9 +221,7 @@ export default function CalendarScreen({ navigation }) {
       confirmText: t('Complete') || 'Complete',
       isDestructive: false,
       onConfirm: () => {
-        selectionMode.selectedTaskIds.forEach(id => {
-          dispatch(updateTask({ taskId: id, completed: true }));
-        });
+        dispatch(updateMultipleTasks({ taskIds: selectionMode.selectedTaskIds, changes: { completed: true } }));
         setSelectionMode({ isActive: false, selectedTaskIds: [] });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
         if (showToast) showToast(t('Tasks completed') || 'Tasks completed');
@@ -237,7 +237,7 @@ export default function CalendarScreen({ navigation }) {
       confirmText: t('Delete') || 'Delete',
       isDestructive: true,
       onConfirm: () => {
-        selectionMode.selectedTaskIds.forEach(id => dispatch(deleteTask({ taskId: id })));
+        dispatch(deleteMultipleTasks({ taskIds: selectionMode.selectedTaskIds }));
         setSelectionMode({ isActive: false, selectedTaskIds: [] });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
         if (showToast) showToast(t('Tasks deleted') || 'Tasks deleted');
@@ -743,12 +743,12 @@ export default function CalendarScreen({ navigation }) {
                         disableInlineEdit={true}
                         testIDPrefix="calendar_"
                         isSelectionMode={selectionMode.isActive}
-                        isSelected={selectionMode.selectedTaskIds.includes(task.id || task._id)}
-                        onToggleSelect={() => toggleTaskSelection(task.id || task._id)}
-                        onLongPress={() => handleLongPressTask(task)}
-                        onPressSnooze={() => { setSelectedTask(task); setDetailsVisible(true); }}
-                        onPressMore={() => handleQuickMenuPress(task)}
-                        onPress={() => handleTaskPress(task)}
+                        isSelected={selectedTaskIdsSet.has(task.id || task._id)}
+                        onToggleSelect={toggleTaskSelection}
+                        onLongPress={handleLongPressTask}
+                        onPressSnooze={handleTaskPress}
+                        onPressMore={handleQuickMenuPress}
+                        onPress={handleTaskPress}
                       />
                     </View>
                   );

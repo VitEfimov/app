@@ -125,8 +125,11 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
                 }
 
                 const mergedTasks = sortTasksChronologically(purgeOrphanedTasks(mergeTasks(unsyncedTasks, remoteTasks), boards));
-                await AsyncStorage.setItem(taskKey, JSON.stringify(mergedTasks));
-                await AsyncStorage.setItem('tasks', JSON.stringify(mergedTasks));
+                const serializedMerged = JSON.stringify(mergedTasks);
+                await AsyncStorage.setItem(taskKey, serializedMerged);
+                if (taskKey !== 'tasks') {
+                    await AsyncStorage.setItem('tasks', serializedMerged);
+                }
                 return mergedTasks;
             }
         } catch (err) {
@@ -135,8 +138,11 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
     }
 
     const sortedLocal = sortTasksChronologically(localTasks);
-    await AsyncStorage.setItem(taskKey, JSON.stringify(sortedLocal));
-    await AsyncStorage.setItem('tasks', JSON.stringify(sortedLocal));
+    const serializedLocal = JSON.stringify(sortedLocal);
+    await AsyncStorage.setItem(taskKey, serializedLocal);
+    if (taskKey !== 'tasks') {
+        await AsyncStorage.setItem('tasks', serializedLocal);
+    }
     return sortedLocal;
 });
 
@@ -244,6 +250,12 @@ const taskSlice = createSlice({
              const { taskId } = action.payload;
              state.tasks = state.tasks.filter(t => t.id !== taskId);
         },
+        deleteMultipleTasksSync(state, action) {
+             const { taskIds } = action.payload || {};
+             if (!Array.isArray(taskIds) || taskIds.length === 0) return;
+             const idSet = new Set(taskIds.map(String));
+             state.tasks = state.tasks.filter(t => t && !idSet.has(String(t.id)));
+        },
         purgeOrphanedTasksSync(state, action) {
             const boards = action.payload || [];
             if (Array.isArray(boards) && boards.length > 0) {
@@ -318,6 +330,84 @@ const taskSlice = createSlice({
                 if (completionDate !== undefined || time !== undefined) {
                     state.tasks = sortTasksChronologically(state.tasks);
                 }
+            }
+        },
+        updateMultipleTasksSync(state, action) {
+            const { updates, taskIds, changes } = action.payload || {};
+            const nowIso = new Date().toISOString();
+            let needsSort = false;
+
+            const applyChangesToTask = (task, patch) => {
+                if (!task || !patch) return;
+                if (patch.name !== undefined) task.taskname = patch.name;
+                if (patch.priority !== undefined) task.priority = patch.priority;
+                if (patch.completed !== undefined) {
+                    task.completed = patch.completed;
+                    if (task.completed) {
+                        task.isNagMode = false;
+                        task.escalationLevel = 'none';
+                    }
+                }
+                if (patch.completionDate !== undefined) {
+                    task.completionDate = patch.completionDate;
+                    task.dateString = patch.completionDate
+                        ? (typeof patch.completionDate === 'string' ? patch.completionDate.split('T')[0] : dayjs(patch.completionDate).format('YYYY-MM-DD'))
+                        : null;
+                    needsSort = true;
+                }
+                if (patch.time !== undefined) {
+                    task.time = patch.time;
+                    needsSort = true;
+                }
+                if (patch.reminder !== undefined) task.reminder = patch.reminder;
+                if (patch.boardId !== undefined) task.boardId = patch.boardId;
+                if (patch.isAlarm !== undefined) task.isAlarm = patch.isAlarm;
+                if (patch.notificationId !== undefined) task.notificationId = patch.notificationId;
+                if (patch.calendarEventId !== undefined) task.calendarEventId = patch.calendarEventId;
+                if (patch.isNagMode !== undefined) task.isNagMode = patch.isNagMode;
+                if (patch.escalationLevel !== undefined) task.escalationLevel = patch.escalationLevel;
+                if (patch.keepNotificationAllDay !== undefined) task.keepNotificationAllDay = patch.keepNotificationAllDay;
+                if (patch.description) {
+                    task.description = {
+                        text: patch.description.text !== undefined ? patch.description.text : (task.description?.text || ''),
+                        img: patch.description.img !== undefined ? patch.description.img : (task.description?.img || ''),
+                        url: patch.description.url !== undefined ? patch.description.url : (task.description?.url || ''),
+                        attachments: patch.description.attachments !== undefined ? patch.description.attachments : (task.description?.attachments || []),
+                    };
+                }
+                if (patch.subtasks !== undefined) task.subtasks = patch.subtasks;
+                task.lastUpdatedDate = nowIso;
+            };
+
+            if (Array.isArray(taskIds) && taskIds.length > 0 && changes) {
+                const idSet = new Set(taskIds.map(String));
+                for (let i = 0; i < state.tasks.length; i++) {
+                    const t = state.tasks[i];
+                    if (t && idSet.has(String(t.id))) {
+                        applyChangesToTask(t, changes);
+                    }
+                }
+            } else if (Array.isArray(updates) && updates.length > 0) {
+                const updateMap = new Map();
+                for (let i = 0; i < updates.length; i++) {
+                    const u = updates[i];
+                    if (u && u.taskId !== undefined) {
+                        updateMap.set(String(u.taskId), u);
+                    }
+                }
+                for (let i = 0; i < state.tasks.length; i++) {
+                    const t = state.tasks[i];
+                    if (t) {
+                        const patch = updateMap.get(String(t.id));
+                        if (patch) {
+                            applyChangesToTask(t, patch);
+                        }
+                    }
+                }
+            }
+
+            if (needsSort) {
+                state.tasks = sortTasksChronologically(state.tasks);
             }
         },
         updateRecurringSeriesSync(state, action) {
@@ -478,7 +568,7 @@ const taskSlice = createSlice({
     }
 });
 
-export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteTasksByBoardSync, purgeOrphanedTasksSync, updateTaskSync, updateRecurringSeriesSync, deleteRecurringSeriesSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds, batchCalendarSyncComplete } = taskSlice.actions;
+export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSync, deleteMultipleTasksSync, deleteTasksByBoardSync, purgeOrphanedTasksSync, updateTaskSync, updateMultipleTasksSync, updateRecurringSeriesSync, deleteRecurringSeriesSync, clearTasks, loadGuestTasks, setPendingCleanupTaskIds, clearPendingCleanupTaskIds, batchCalendarSyncComplete } = taskSlice.actions;
 
 let saveStorageTimeout = null;
 let lastTasksToSave = null;
@@ -496,13 +586,16 @@ export const persistTasksToStorage = (tasks, getState) => {
                 if (getState) {
                     key = getTaskStorageKey(getState());
                 }
-                await AsyncStorage.setItem(key, JSON.stringify(lastTasksToSave));
-                await AsyncStorage.setItem('tasks', JSON.stringify(lastTasksToSave));
+                const serialized = JSON.stringify(lastTasksToSave);
+                await AsyncStorage.setItem(key, serialized);
+                if (key !== 'tasks') {
+                    await AsyncStorage.setItem('tasks', serialized);
+                }
             }
         } catch (e) {
             console.error('Error saving tasks to AsyncStorage:', e);
         }
-    }, 200);
+    }, 350);
 };
 
 export const flushPendingTaskSaves = async (getState) => {
@@ -514,8 +607,11 @@ export const flushPendingTaskSaves = async (getState) => {
         const tasks = getState ? getState().taskReducer.tasks : lastTasksToSave;
         if (tasks) {
             const key = getState ? getTaskStorageKey(getState()) : 'tasks';
-            await AsyncStorage.setItem(key, JSON.stringify(tasks));
-            await AsyncStorage.setItem('tasks', JSON.stringify(tasks));
+            const serialized = JSON.stringify(tasks);
+            await AsyncStorage.setItem(key, serialized);
+            if (key !== 'tasks') {
+                await AsyncStorage.setItem('tasks', serialized);
+            }
         }
     } catch (e) {
         console.error('Error flushing tasks to storage:', e);
@@ -547,31 +643,6 @@ export const addTask = (payload) => async (dispatch, getState) => {
         if (isPremium && themeState?.defaultReminderEnabled && (!payload.task.reminder || payload.task.reminder === 'None')) {
             payload.task.reminder = themeState.defaultReminderTime || '15 min before';
         }
-        const hasReminder = payload.task.reminder && payload.task.reminder !== 'None';
-        const isKeepAllDay = !!payload.task.keepNotificationAllDay;
-        if ((hasReminder || isKeepAllDay) && payload.task.completionDate && !payload.task.completed) {
-            try {
-                const notifIds = await scheduleTaskReminder(
-                    payload.task.taskname,
-                    payload.task.reminder,
-                    payload.task.completionDate,
-                    payload.task.time,
-                    payload.task.id,
-                    !!payload.task.isAlarm,
-                    themeState,
-                    {
-                        isNagMode: payload.task.isNagMode,
-                        escalationLevel: payload.task.escalationLevel,
-                        keepNotificationAllDay: payload.task.keepNotificationAllDay
-                    }
-                );
-                if (notifIds && notifIds.length > 0) {
-                    payload.task.notificationId = notifIds;
-                }
-            } catch (e) {
-                console.warn('Failed to schedule reminder on addTask:', e);
-            }
-        }
     }
 
     // 1. Optimistic UI update: instantaneous 0ms response
@@ -580,7 +651,38 @@ export const addTask = (payload) => async (dispatch, getState) => {
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
 
-    // 2. Non-blocking bi-directional write to native calendar (PRO)
+    // 2. Non-blocking OS reminder scheduling
+    if (payload?.task) {
+        const hasReminder = payload.task.reminder && payload.task.reminder !== 'None';
+        const isKeepAllDay = !!payload.task.keepNotificationAllDay;
+        if ((hasReminder || isKeepAllDay) && payload.task.completionDate && !payload.task.completed) {
+            scheduleTaskReminder(
+                payload.task.taskname,
+                payload.task.reminder,
+                payload.task.completionDate,
+                payload.task.time,
+                payload.task.id,
+                !!payload.task.isAlarm,
+                themeState,
+                {
+                    isNagMode: payload.task.isNagMode,
+                    escalationLevel: payload.task.escalationLevel,
+                    keepNotificationAllDay: payload.task.keepNotificationAllDay
+                }
+            )
+                .then(notifIds => {
+                    if (notifIds && notifIds.length > 0) {
+                        dispatch(updateTaskSync({ taskId: payload.task.id, notificationId: notifIds }));
+                        persistTasksToStorage(getState().taskReducer.tasks, getState);
+                    }
+                })
+                .catch(e => {
+                    console.warn('Failed to schedule reminder on addTask:', e);
+                });
+        }
+    }
+
+    // 3. Non-blocking bi-directional write to native calendar (PRO)
     if (isPremium && themeState?.calendarSyncEnabled && payload?.task?.completionDate) {
         syncTaskToCalendarAsync(payload.task, themeState)
             .then(calEventId => {
@@ -606,59 +708,78 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     const isPremium = state.entitlementReducer?.isPremium;
     if (Array.isArray(payload?.tasks)) {
         for (const task of payload.tasks) {
-            if (task) {
-                if (isPremium && themeState?.defaultReminderEnabled && (!task.reminder || task.reminder === 'None')) {
-                    task.reminder = themeState.defaultReminderTime || '15 min before';
-                }
-                const hasReminder = task.reminder && task.reminder !== 'None';
-                const isKeepAllDay = !!task.keepNotificationAllDay;
-                if ((hasReminder || isKeepAllDay) && task.completionDate && !task.completed) {
-                    try {
-                        const notifIds = await scheduleTaskReminder(
-                            task.taskname,
-                            task.reminder,
-                            task.completionDate,
-                            task.time,
-                            task.id,
-                            !!task.isAlarm,
-                            themeState,
-                            {
-                                isNagMode: task.isNagMode,
-                                escalationLevel: task.escalationLevel,
-                                keepNotificationAllDay: task.keepNotificationAllDay
-                            }
-                        );
-                        if (notifIds && notifIds.length > 0) {
-                            task.notificationId = notifIds;
-                        }
-                    } catch (e) {}
-                }
+            if (task && isPremium && themeState?.defaultReminderEnabled && (!task.reminder || task.reminder === 'None')) {
+                task.reminder = themeState.defaultReminderTime || '15 min before';
             }
         }
     }
 
-    // 1. Optimistic UI update
+    // 1. Optimistic UI update (immediate 0ms response)
     dispatch(addMultipleTasksSync(payload));
     const tasks = getState().taskReducer.tasks;
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
 
-    // 2. Non-blocking background push to native calendar (PRO)
+    // 2. Non-blocking background scheduling of OS notifications (rolling 60-day window cap)
+    if (Array.isArray(payload?.tasks) && payload.tasks.length > 0) {
+        setTimeout(async () => {
+            const horizon = dayjs().add(60, 'day').endOf('day');
+            const notifUpdates = [];
+            let scheduledCount = 0;
+
+            for (const task of payload.tasks) {
+                if (!task || task.completed || !task.completionDate) continue;
+                if (scheduledCount >= 50) break; // Guard against OS alarm quota exhaustion
+                const hasReminder = task.reminder && task.reminder !== 'None';
+                const isKeepAllDay = !!task.keepNotificationAllDay;
+                if (!hasReminder && !isKeepAllDay) continue;
+                if (dayjs(task.completionDate).isAfter(horizon)) continue;
+
+                try {
+                    const notifIds = await scheduleTaskReminder(
+                        task.taskname,
+                        task.reminder,
+                        task.completionDate,
+                        task.time,
+                        task.id,
+                        !!task.isAlarm,
+                        themeState,
+                        {
+                            isNagMode: task.isNagMode,
+                            escalationLevel: task.escalationLevel,
+                            keepNotificationAllDay: task.keepNotificationAllDay
+                        }
+                    );
+                    if (notifIds && notifIds.length > 0) {
+                        notifUpdates.push({ taskId: task.id, notificationId: notifIds });
+                        scheduledCount++;
+                    }
+                } catch (e) {}
+            }
+
+            if (notifUpdates.length > 0) {
+                dispatch(updateMultipleTasksSync({ updates: notifUpdates }));
+                persistTasksToStorage(getState().taskReducer.tasks, getState);
+            }
+        }, 0);
+    }
+
+    // 3. Non-blocking background push to native calendar (PRO)
     if (isPremium && themeState?.calendarSyncEnabled && Array.isArray(payload?.tasks)) {
         setTimeout(async () => {
-            let anySynced = false;
+            const calUpdates = [];
             for (const task of payload.tasks) {
                 if (task && task.completionDate) {
                     try {
                         const calEventId = await syncTaskToCalendarAsync(task, themeState);
                         if (calEventId) {
-                            dispatch(updateTaskSync({ taskId: task.id, calendarEventId: calEventId }));
-                            anySynced = true;
+                            calUpdates.push({ taskId: task.id, calendarEventId: calEventId });
                         }
                     } catch (calErr) {}
                 }
             }
-            if (anySynced) {
+            if (calUpdates.length > 0) {
+                dispatch(updateMultipleTasksSync({ updates: calUpdates }));
                 persistTasksToStorage(getState().taskReducer.tasks, getState);
             }
         }, 0);
@@ -713,6 +834,53 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
     const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
     if (state.userReducer?.isAuthenticated && dbSyncEnabled && taskId) {
         dispatch(deleteTaskAsync(taskId));
+    }
+};
+
+export const deleteMultipleTasks = (payload) => async (dispatch, getState) => {
+    const taskIds = Array.isArray(payload) ? payload : payload?.taskIds;
+    if (!Array.isArray(taskIds) || taskIds.length === 0) return;
+
+    const state = getState();
+    const idSet = new Set(taskIds.map(String));
+    const existingTasks = (state.taskReducer.tasks || []).filter(t => t && idSet.has(String(t.id)));
+
+    for (const t of existingTasks) {
+        if (t.calendarEventId) {
+            addTombstoneAsync(t.calendarEventId);
+        }
+    }
+
+    // 1. Single batched optimistic UI update
+    dispatch(deleteMultipleTasksSync({ taskIds }));
+
+    // 2. Persist local storage once
+    const remainingTasks = getState().taskReducer.tasks;
+    persistTasksToStorage(remainingTasks, getState);
+    syncRecurringAutomations(getState);
+
+    // 3. Background async cancellation of OS notifications & calendar events (with Undo grace check)
+    setTimeout(async () => {
+        try {
+            const currentTasks = getState().taskReducer.tasks || [];
+            const currentIds = new Set(currentTasks.map(t => t && String(t.id)));
+            for (const existing of existingTasks) {
+                if (!currentIds.has(String(existing.id))) {
+                    await cancelNotification(existing.notificationId, existing.id);
+                    if (existing.calendarEventId) {
+                        await removeTaskFromCalendarAsync(existing.calendarEventId);
+                    }
+                }
+            }
+        } catch (e) {}
+    }, 5000);
+
+    // 4. Background DB sync for authenticated users
+    const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
+    if (state.userReducer?.isAuthenticated && dbSyncEnabled) {
+        for (const id of taskIds) {
+            dispatch(deleteTaskAsync(id));
+        }
     }
 };
 
@@ -811,6 +979,73 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
     if (state.userReducer?.isAuthenticated && dbSyncEnabled && payload?.taskId) {
         dispatch(updateTaskAsync({ taskId: payload.taskId, payload }));
+    }
+};
+
+export const updateMultipleTasks = (payload) => async (dispatch, getState) => {
+    const { updates, taskIds, changes } = payload || {};
+    const state = getState();
+    const targetIds = Array.isArray(taskIds) && taskIds.length > 0
+        ? taskIds.map(String)
+        : (Array.isArray(updates) ? updates.map(u => String(u.taskId)) : []);
+    if (targetIds.length === 0) return;
+
+    const idSet = new Set(targetIds);
+
+    // 1. Single batched optimistic UI update
+    dispatch(updateMultipleTasksSync(payload));
+
+    const allTasks = getState().taskReducer.tasks || [];
+    persistTasksToStorage(allTasks, getState);
+    syncRecurringAutomations(getState);
+
+    // 2. Non-blocking background notification & calendar sync for updated tasks
+    const updatedTasks = allTasks.filter(t => t && idSet.has(String(t.id)));
+    const isPremium = state.entitlementReducer?.isPremium;
+    const themeState = state.themeReducer;
+
+    setTimeout(async () => {
+        const calUpdates = [];
+        for (const ut of updatedTasks) {
+            try {
+                if (ut.completed) {
+                    await cancelNotification(ut.notificationId, ut.id);
+                }
+                if (isPremium && themeState?.calendarSyncEnabled) {
+                    if (ut.completed) {
+                        await syncTaskToCalendarAsync(ut, themeState);
+                    } else if (ut.completionDate) {
+                        const newCalId = await syncTaskToCalendarAsync(ut, themeState);
+                        if (newCalId && newCalId !== ut.calendarEventId) {
+                            calUpdates.push({ taskId: ut.id, calendarEventId: newCalId });
+                        }
+                    } else if (!ut.completionDate && ut.calendarEventId) {
+                        await removeTaskFromCalendarAsync(ut.calendarEventId);
+                        calUpdates.push({ taskId: ut.id, calendarEventId: null });
+                    }
+                }
+            } catch (e) {}
+        }
+        if (calUpdates.length > 0) {
+            dispatch(updateMultipleTasksSync({ updates: calUpdates }));
+            persistTasksToStorage(getState().taskReducer.tasks, getState);
+        }
+    }, 0);
+
+    // 3. Background DB sync for authenticated users
+    const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
+    if (state.userReducer?.isAuthenticated && dbSyncEnabled) {
+        if (Array.isArray(taskIds) && changes) {
+            for (const id of taskIds) {
+                dispatch(updateTaskAsync({ taskId: id, payload: { taskId: id, ...changes } }));
+            }
+        } else if (Array.isArray(updates)) {
+            for (const u of updates) {
+                if (u && u.taskId) {
+                    dispatch(updateTaskAsync({ taskId: u.taskId, payload: u }));
+                }
+            }
+        }
     }
 };
 
@@ -1205,22 +1440,20 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
 
     let newTasks = processedTasks;
 
-    if (tasksToDelete.length > 0) {
+    if (tasksToDelete.length > 0 && !globalSettings.confirmBeforeDeletion) {
         for (const id of tasksToDelete) {
             const t = tasks.find(item => item && String(item.id) === String(id));
             if (t) {
                 await cancelNotification(t.notificationId, t.id);
             }
         }
-        if (!globalSettings.confirmBeforeDeletion) {
-            newTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
-            hasChanges = true;
-        }
+        newTasks = newTasks.filter(t => !tasksToDelete.includes(t.id));
+        hasChanges = true;
     }
 
     if (hasChanges) {
         dispatch(hydrateTaskState(newTasks));
-        persistTasksToStorage(newTasks);
+        persistTasksToStorage(newTasks, getState);
     }
 
     if (tasksToDelete.length > 0 && globalSettings.confirmBeforeDeletion) {
@@ -1243,7 +1476,7 @@ export const executePendingCleanup = () => async (dispatch, getState) => {
         }
         const finalTasks = currentTasks.filter(t => !tasksToDelete.includes(t.id));
         dispatch(hydrateTaskState(finalTasks));
-        persistTasksToStorage(finalTasks);
+        persistTasksToStorage(finalTasks, getState);
         syncRecurringAutomations(getState);
     }
     dispatch(clearPendingCleanupTaskIds());

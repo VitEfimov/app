@@ -110,8 +110,15 @@ const IconCheckCircle = ({ color }) => (
 );
 
 const EMPTY_BOARDS = [];
+const SYSTEM_USES_24H = (() => {
+  try {
+    return Localization.getCalendars?.()?.[0]?.uses24hourClock ?? false;
+  } catch {
+    return false;
+  }
+})();
 
-const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
+const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   const { showToast } = useToast();
@@ -295,7 +302,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
 
   const handleTextPress = useCallback(() => {
     if (isSelectionMode) {
-      if (onToggleSelect) onToggleSelect();
+      if (onToggleSelect && task) onToggleSelect(task.id, sectionId);
       return;
     }
     if (disableInlineEdit) {
@@ -305,7 +312,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
     setEditName(taskTitleText);
     setCursorSelection({ start: taskTitleText.length, end: taskTitleText.length });
     setIsEditing(true);
-  }, [isSelectionMode, onToggleSelect, disableInlineEdit, onPress, taskTitleText, task]);
+  }, [isSelectionMode, onToggleSelect, sectionId, disableInlineEdit, onPress, taskTitleText, task]);
 
   if (!task) return null;
 
@@ -315,7 +322,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       const [h, m] = timeStr.split(':');
       if (!h || !m || isNaN(h) || isNaN(m)) return timeStr;
       
-      const is24Hour = Localization.getCalendars()[0]?.uses24hourClock ?? false;
+      const is24Hour = SYSTEM_USES_24H;
       let hour = parseInt(h, 10);
       let ampm = '';
       
@@ -359,9 +366,9 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const hasSubtasks = totalSubtasksCount > 0;
 
   const taskBoardId = task.boardId || 'main';
-  const taskBoard = boards.find(b => b.id === taskBoardId);
-  const boardName = taskBoard ? (taskBoard.name === 'Main' ? t('Main') : taskBoard.name) : (taskBoardId === 'main' ? t('Main') : 'Board');
-  const boardColor = getBoardColor(taskBoardId, boards);
+  const taskBoard = !hideBoardBadge ? boards.find(b => b.id === taskBoardId) : null;
+  const boardName = !hideBoardBadge ? (taskBoard ? (taskBoard.name === 'Main' ? t('Main') : taskBoard.name) : (taskBoardId === 'main' ? t('Main') : 'Board')) : '';
+  const boardColor = !hideBoardBadge ? getBoardColor(taskBoardId, boards) : null;
 
   const handleLongPress = useCallback(() => {
     if (onLongPress) {
@@ -369,17 +376,17 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       return;
     }
     if (isSelectionMode || isPremium) {
-      if (onToggleSelect) onToggleSelect();
+      if (onToggleSelect) onToggleSelect(task.id, sectionId);
     } else {
       showToast(t('Hold to select tasks is a Pro feature'));
     }
-  }, [onLongPress, task, isSelectionMode, isPremium, onToggleSelect, showToast, t]);
+  }, [onLongPress, task, isSelectionMode, isPremium, onToggleSelect, sectionId, showToast, t]);
 
   const taskRowContent = (
     <TouchableOpacity
       testID={testIDPrefix ? `${testIDPrefix}task_row_${task.taskname || task.name}` : `task_row_${task.taskname || task.name}`}
       accessible={true}
-      accessibilityRole="button"
+      accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
       accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
       accessibilityState={{ checked: task.completed }}
       style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: 'transparent' }, hideUnderline && { borderBottomWidth: 0 }]}
@@ -388,7 +395,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       onLongPress={handleLongPress}
       onPress={() => {
         if (isSelectionMode) {
-          if (onToggleSelect) onToggleSelect();
+          if (onToggleSelect) onToggleSelect(task.id, sectionId);
           return;
         }
         if (isEditing) {
@@ -412,7 +419,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
         style={styles.checkbox}
         onPress={() => {
           if (isSelectionMode) {
-            if (onToggleSelect) onToggleSelect();
+            if (onToggleSelect) onToggleSelect(task.id, sectionId);
           } else {
             handleToggleComplete();
           }
@@ -532,7 +539,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
           style={styles.metadata}
           onPress={() => {
             if (isSelectionMode) {
-              if (onToggleSelect) onToggleSelect();
+              if (onToggleSelect) onToggleSelect(task.id, sectionId);
               return;
             }
             if (onPress) onPress(task);

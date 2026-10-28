@@ -189,6 +189,13 @@ export const useTaskRepeat = () => {
                 completed: false
             }));
 
+            const isInlineBase64Img = typeof descImg === 'string' && descImg.startsWith('data:image') && descImg.length > 4096;
+            const safeAttachments = Array.isArray(descAttachments)
+                ? descAttachments
+                    .filter(att => !(tasksToGenerate.length > 0 && typeof att?.uri === 'string' && att.uri.startsWith('data:image') && att.uri.length > 4096))
+                    .map(att => ({ ...att }))
+                : [];
+
             tasksToGenerate.push({
                 id: newTaskId,
                 boardId: originalTask.boardId || 'main',
@@ -203,9 +210,9 @@ export const useTaskRepeat = () => {
                 keepNotificationAllDay: formData.keepNotificationAllDay !== undefined ? formData.keepNotificationAllDay : (originalTask.keepNotificationAllDay || false),
                 description: {
                     text: descText,
-                    img: descImg,
+                    img: (tasksToGenerate.length > 0 && isInlineBase64Img) ? '' : descImg,
                     url: descUrl,
-                    attachments: JSON.parse(JSON.stringify(descAttachments))
+                    attachments: safeAttachments
                 },
                 subtasks: clonedSubtasks,
                 recurringSeriesId: seriesId,

@@ -105,24 +105,19 @@ const themeSlice = createSlice({
     setThemeColor: (state, action) => {
       const { key, value } = action.payload;
       state.colors[key] = value;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setFontSize: (state, action) => {
       state.fontSize = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setSourceColor: (state, action) => {
       state.sourceColor = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setThemeMode: (state, action) => {
       state.themeMode = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setColumnWidth: (state, action) => {
       const { key, value } = action.payload;
       state.columnWidths[key] = value;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     toggleSettingsOpen: (state, action) => {
       if (action.payload !== undefined) {
@@ -133,19 +128,15 @@ const themeSlice = createSlice({
     },
     setAppPin: (state, action) => {
       state.appPin = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setAlarmSound: (state, action) => {
       state.alarmSound = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setNotificationSound: (state, action) => {
       state.notificationSound = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setVibrationEnabled: (state, action) => {
       state.vibrationEnabled = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     resetTheme: (state) => {
       state.colors = {
@@ -195,49 +186,38 @@ const themeSlice = createSlice({
     },
     setDefaultTaskLimit: (state, action) => {
       state.defaultTaskLimit = Math.max(1, Number(action.payload) || 1);
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setDateFormat: (state, action) => {
       state.dateFormat = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setTaskNameWrap: (state, action) => {
       state.taskNameWrap = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setTimeFormat: (state, action) => {
       state.timeFormat = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setUserPicture: (state, action) => {
       state.userPicture = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setHeaderBackgroundFit: (state, action) => {
       state.headerBackgroundFit = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setCalendarPanePosition: (state, action) => {
       state.calendarPanePosition = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setProgressMode: (state, action) => {
       state.progressMode = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setDefaultSnoozeTime: (state, action) => {
       state.defaultSnoozeTime = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setAutoRescheduleTime: (state, action) => {
       state.autoRescheduleTime = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setAutoManageSettings: (state, action) => {
       Object.keys(action.payload).forEach(key => {
         state[key] = action.payload[key];
       });
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setBoardAutoManageSettings: (state, action) => {
       const { boardId, settings } = action.payload;
@@ -245,61 +225,90 @@ const themeSlice = createSlice({
         state.boardAutomations = {};
       }
       state.boardAutomations[boardId] = settings;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     removeBoardAutoManageSettings: (state, action) => {
       const { boardId } = action.payload;
       if (state.boardAutomations && state.boardAutomations[boardId]) {
         delete state.boardAutomations[boardId];
-        AsyncStorage.setItem('customTheme', JSON.stringify(state));
       }
     },
     setBoardsCollapsed: (state, action) => {
       state.isBoardsCollapsed = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setRandomColorDaily: (state, action) => {
       state.randomColorDaily = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setLastRandomColorDate: (state, action) => {
       state.lastRandomColorDate = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setShowRecurringTasksOnBoard: (state, action) => {
       state.showRecurringTasksOnBoard = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setAndroidAutoEnabled: (state, action) => {
       state.androidAutoEnabled = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setDefaultReminderEnabled: (state, action) => {
       state.defaultReminderEnabled = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setDefaultReminderTime: (state, action) => {
       state.defaultReminderTime = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setDbSyncEnabled: (state, action) => {
       state.dbSyncEnabled = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setCalendarSyncEnabled: (state, action) => {
       state.calendarSyncEnabled = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setCalendarAlarmsEnabled: (state, action) => {
       state.calendarAlarmsEnabled = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     },
     setSelectedCalendarId: (state, action) => {
       state.selectedCalendarId = action.payload;
-      AsyncStorage.setItem('customTheme', JSON.stringify(state));
     }
   }
 });
+
+let saveThemeTimeout = null;
+let lastThemeToSave = null;
+
+const sanitizeThemeForStorage = (themeState) => {
+  if (!themeState) return null;
+  const { isSettingsOpen, isGoogleDrawerOpen, jumpToTodayTrigger, ...persisted } = themeState;
+  return persisted;
+};
+
+export const persistThemeToStorage = (themeState) => {
+  lastThemeToSave = themeState;
+  if (saveThemeTimeout) {
+    clearTimeout(saveThemeTimeout);
+  }
+  saveThemeTimeout = setTimeout(async () => {
+    try {
+      const clean = sanitizeThemeForStorage(lastThemeToSave);
+      if (clean) {
+        await AsyncStorage.setItem('customTheme', JSON.stringify(clean));
+      }
+    } catch (e) {
+      console.error('Error saving theme to AsyncStorage:', e);
+    }
+  }, 300);
+};
+
+export const flushPendingThemeSaves = async (getState) => {
+  if (saveThemeTimeout) {
+    clearTimeout(saveThemeTimeout);
+    saveThemeTimeout = null;
+  }
+  try {
+    const raw = getState ? getState().themeReducer : lastThemeToSave;
+    const clean = sanitizeThemeForStorage(raw);
+    if (clean) {
+      await AsyncStorage.setItem('customTheme', JSON.stringify(clean));
+    }
+  } catch (e) {
+    console.error('Error flushing theme to storage:', e);
+  }
+};
 
 export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,

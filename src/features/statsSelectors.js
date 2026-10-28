@@ -147,35 +147,57 @@ const getStatsForRange = (dailyStats, start, end) => {
   return rangeStats;
 };
 
-// Weekly Analytics Selector
-export const selectWeeklyAnalytics = (date) => createSelector(
-  [selectNormalizedDailyStats],
-  (dailyStats) => {
-    const start = dayjs(date).startOf('week');
-    const end = dayjs(date).endOf('week');
-    return getStatsForRange(dailyStats, start, end);
-  }
-);
+const weeklySelectorCache = new Map();
+const monthlySelectorCache = new Map();
+const yearlySelectorCache = new Map();
 
-// Monthly Analytics Selector
-export const selectMonthlyAnalytics = (date) => createSelector(
-  [selectNormalizedDailyStats],
-  (dailyStats) => {
-    const start = dayjs(date).startOf('month');
-    const end = dayjs(date).endOf('month');
-    return getStatsForRange(dailyStats, start, end);
+// Weekly Analytics Selector (cached by week start date string)
+export const selectWeeklyAnalytics = (date) => {
+  const key = dayjs(date).startOf('week').format('YYYY-MM-DD');
+  if (!weeklySelectorCache.has(key)) {
+    weeklySelectorCache.set(
+      key,
+      createSelector([selectNormalizedDailyStats], (dailyStats) => {
+        const start = dayjs(date).startOf('week');
+        const end = dayjs(date).endOf('week');
+        return getStatsForRange(dailyStats, start, end);
+      })
+    );
   }
-);
+  return weeklySelectorCache.get(key);
+};
 
-// Yearly Analytics Selector
-export const selectYearlyAnalytics = (date) => createSelector(
-  [selectNormalizedDailyStats],
-  (dailyStats) => {
-    const start = dayjs(date).startOf('year');
-    const end = dayjs(date).endOf('year');
-    return getStatsForRange(dailyStats, start, end);
+// Monthly Analytics Selector (cached by month start date string)
+export const selectMonthlyAnalytics = (date) => {
+  const key = dayjs(date).startOf('month').format('YYYY-MM');
+  if (!monthlySelectorCache.has(key)) {
+    monthlySelectorCache.set(
+      key,
+      createSelector([selectNormalizedDailyStats], (dailyStats) => {
+        const start = dayjs(date).startOf('month');
+        const end = dayjs(date).endOf('month');
+        return getStatsForRange(dailyStats, start, end);
+      })
+    );
   }
-);
+  return monthlySelectorCache.get(key);
+};
+
+// Yearly Analytics Selector (cached by year string)
+export const selectYearlyAnalytics = (date) => {
+  const key = dayjs(date).startOf('year').format('YYYY');
+  if (!yearlySelectorCache.has(key)) {
+    yearlySelectorCache.set(
+      key,
+      createSelector([selectNormalizedDailyStats], (dailyStats) => {
+        const start = dayjs(date).startOf('year');
+        const end = dayjs(date).endOf('year');
+        return getStatsForRange(dailyStats, start, end);
+      })
+    );
+  }
+  return yearlySelectorCache.get(key);
+};
 
 // Heat Map Selector (last 12 weeks)
 export const selectHeatMapData = createSelector(

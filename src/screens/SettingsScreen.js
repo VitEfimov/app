@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
@@ -135,7 +135,6 @@ export default function SettingsScreen({ navigation }) {
   const { t, i18n } = useTranslation();
 
   const theme = useSelector(state => state.themeReducer);
-  const tasks = useSelector(state => state.taskReducer.tasks);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
@@ -207,6 +206,15 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const currentSoundRef = useRef(null);
+  useEffect(() => {
+    return () => {
+      if (currentSoundRef.current) {
+        currentSoundRef.current.stopAsync().catch(() => {});
+        currentSoundRef.current.unloadAsync().catch(() => {});
+        currentSoundRef.current = null;
+      }
+    };
+  }, []);
   const primaryAccent = colors.primary || '#5D45DB';
   const iconBg = isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.12)';
 

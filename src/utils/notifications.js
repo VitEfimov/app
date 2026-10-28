@@ -70,7 +70,7 @@ export function getCalendarChannelId(
   return `calendar_task_${soundName}_${vib}_v1`;
 }
 
-// let configuredChannels = new Set(); // Temporarily removed for debugging
+const configuredChannels = new Set();
 
 function serializeError(error) {
   if (!error) {
@@ -141,6 +141,14 @@ export async function configureAndroidNotificationChannels(
     notificationSound,
     vibrationEnabled
   );
+
+  if (
+    configuredChannels.has(defaultChannelId) &&
+    configuredChannels.has(alarmChannelId) &&
+    configuredChannels.has(calendarChannelId)
+  ) {
+    return;
+  }
 
   DevLogger.info(
     'Configuring Android notification channels',
@@ -316,8 +324,9 @@ export async function configureAndroidNotificationChannels(
       return;
     }
 
-    // configuredChannels.add(defaultChannelId);
-    // configuredChannels.add(alarmChannelId);
+    configuredChannels.add(defaultChannelId);
+    configuredChannels.add(alarmChannelId);
+    configuredChannels.add(calendarChannelId);
 
     DevLogger.success(
       'Android notification channels verified',

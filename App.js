@@ -118,10 +118,10 @@ function InitApp() {
   const [pendingNotificationPayload, setPendingNotificationPayload] = useState(null);
   const shareIntentResult = Platform.OS !== 'web' ? useShareIntent() : null;
   const { hasShareIntent, shareIntent, resetShareIntent } = shareIntentResult || {};
-  const themeReducer = useSelector(state => state.themeReducer);
+  const appPin = useSelector(state => state.themeReducer?.appPin);
 
   useEffect(() => {
-    const isLocked = !!(themeReducer.appPin && !isUnlocked);
+    const isLocked = !!(appPin && !isUnlocked);
     if (!isLocked && pendingNotificationPayload) {
       let attempts = 0;
       const interval = setInterval(() => {
@@ -145,7 +145,7 @@ function InitApp() {
       }, 100);
       return () => clearInterval(interval);
     }
-  }, [isUnlocked, themeReducer.appPin, pendingNotificationPayload]);
+  }, [isUnlocked, appPin, pendingNotificationPayload]);
 
   useEffect(() => {
     const removeDiagnostics = attachNotificationDiagnostics();
@@ -342,7 +342,7 @@ function InitApp() {
         const parsedTasks = parseSharedTasks(text, {
           defaultImg: imgUri,
           defaultAttachments: attachments,
-          themeReducer
+          themeReducer: store.getState().themeReducer
         });
 
         if (parsedTasks && parsedTasks.length > 0) {
@@ -400,7 +400,11 @@ function InitApp() {
         await dispatch(processAutoManageTasks());
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
         const { flushPendingTaskSaves } = require('./src/features/taskSlice');
-        await flushPendingTaskSaves();
+        const { flushPendingThemeSaves } = require('./src/features/themeSlice');
+        await Promise.all([
+          flushPendingTaskSaves(store.getState),
+          flushPendingThemeSaves(store.getState),
+        ]);
       }
     };
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -514,7 +518,7 @@ function InitApp() {
     return () => subscription.remove();
   }, [dispatch, isUnlocked]);
 
-  const isLocked = !!(themeReducer.appPin && !isUnlocked);
+  const isLocked = !!(appPin && !isUnlocked);
 
   return (
     <View style={{ flex: 1 }}>
@@ -527,7 +531,7 @@ function InitApp() {
 
       {isLocked && (
         <View style={StyleSheet.absoluteFillObject}>
-          <PinLockScreen correctPin={themeReducer.appPin} onUnlock={() => setIsUnlocked(true)} />
+          <PinLockScreen correctPin={appPin} onUnlock={() => setIsUnlocked(true)} />
         </View>
       )}
 

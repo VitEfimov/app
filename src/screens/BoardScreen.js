@@ -21,7 +21,7 @@ import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, 
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
-import { updateTask, deleteTask, addTask, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
+import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTask, addMultipleTasks, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
@@ -261,17 +261,15 @@ export default function BoardScreen({ route, navigation }) {
     }
   }, [boardIdsKey, dispatch]);
 
-  const toggleSection = (sectionId) => {
+  const toggleSection = useCallback((sectionId) => {
     if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    if (collapsedSections.includes(sectionId)) {
-      setCollapsedSections(collapsedSections.filter(id => id !== sectionId));
-    } else {
-      setCollapsedSections([...collapsedSections, sectionId]);
-    }
-  };
+    setCollapsedSections(prev =>
+      prev.includes(sectionId) ? prev.filter(id => id !== sectionId) : [...prev, sectionId]
+    );
+  }, []);
 
   const toggleTaskSelection = useCallback((taskId) => {
     if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -293,9 +291,7 @@ export default function BoardScreen({ route, navigation }) {
     const selectedIds = [...selectionMode.selectedTaskIds];
     if (selectedIds.length === 0) return;
 
-    selectedIds.forEach(id => {
-      dispatch(updateTask({ taskId: id, boardId: targetBoardId }));
-    });
+    dispatch(updateMultipleTasks({ taskIds: selectedIds, changes: { boardId: targetBoardId } }));
     
     const targetBoard = boards.find(b => b.id === targetBoardId);
     const boardName = targetBoard ? (targetBoard.name === 'Main' ? t('Main') : targetBoard.name) : t('Board');
@@ -323,9 +319,7 @@ export default function BoardScreen({ route, navigation }) {
           UIManager.setLayoutAnimationEnabledExperimental(true);
         }
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        selectionMode.selectedTaskIds.forEach(id => {
-          dispatch(updateTask({ taskId: id, completed: true }));
-        });
+        dispatch(updateMultipleTasks({ taskIds: selectionMode.selectedTaskIds, changes: { completed: true } }));
         setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
       }
@@ -346,7 +340,7 @@ export default function BoardScreen({ route, navigation }) {
           UIManager.setLayoutAnimationEnabledExperimental(true);
         }
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        selectionMode.selectedTaskIds.forEach(id => dispatch(deleteTask({ taskId: id })));
+        dispatch(deleteMultipleTasks({ taskIds: selectionMode.selectedTaskIds }));
         setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
 
@@ -354,9 +348,7 @@ export default function BoardScreen({ route, navigation }) {
           `${count} ${t('tasks deleted')}`,
           t('Undo'),
           () => {
-            selectedTasksObjects.forEach(task => {
-              dispatch(addTask({ task }));
-            });
+            dispatch(addMultipleTasks({ tasks: selectedTasksObjects }));
           }
         );
       }
@@ -504,7 +496,7 @@ export default function BoardScreen({ route, navigation }) {
     return hiddenIds;
   }, [boardTasks, showRecurringTasksOnBoard, activeBoard]);
 
-  const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks, todoTasks, upcomingBirthdayTasks, needToBuyTasks } = useMemo(() => {
+  const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks, completedCount, todoTasks, upcomingBirthdayTasks, needToBuyTasks } = useMemo(() => {
     const thresholds = getDateThresholds();
 
     const buckets = {
@@ -580,10 +572,6 @@ export default function BoardScreen({ route, navigation }) {
     };
   }, [boardTasks, sortConfig, hiddenRecurringTaskIds, collapsedSections]);
 
-  const { completedCount } = useMemo(() => {
-    return { completedCount: boardTasks.filter(t => t && t.completed).length };
-  }, [boardTasks]);
-
   const sections = useMemo(() => {
     const isCompletedCollapsed = collapsedSections.includes('completed');
     const actualCompletedCount = completedTasks.length > 0 ? completedTasks.length : completedCount;
@@ -626,16 +614,34 @@ export default function BoardScreen({ route, navigation }) {
 
   const boardCounts = useMemo(() => {
     const counts = {};
+    const keyMap = new Map();
+    const fallbackMainId = mainBoardId || boards[0]?.id || 'main';
     boards.forEach(b => {
-      const bId = b.id;
-      counts[bId] = tasks.filter(t => !t.completed && isTaskOnBoard(t, bId, mainBoardId, boards)).length;
+      if (!b) return;
+      counts[b.id] = 0;
+      if (b.id) keyMap.set(String(b.id), b.id);
+      if (b._id) keyMap.set(String(b._id), b.id);
+      if (b.name) keyMap.set(String(b.name).toLowerCase(), b.id);
     });
+    keyMap.set('main', fallbackMainId);
+    keyMap.set('tasks', fallbackMainId);
+
+    for (let i = 0; i < tasks.length; i++) {
+      const t = tasks[i];
+      if (!t || t.completed) continue;
+      const rawBId = t.boardId || t.board_id;
+      if (!rawBId) {
+        if (counts[fallbackMainId] !== undefined) counts[fallbackMainId]++;
+      } else {
+        const strId = String(rawBId);
+        const resolvedId = keyMap.get(strId) || keyMap.get(strId.toLowerCase());
+        if (resolvedId && counts[resolvedId] !== undefined) {
+          counts[resolvedId]++;
+        }
+      }
+    }
     return counts;
   }, [tasks, boards, mainBoardId]);
-
-  const stickyHeaderIndices = useMemo(() => {
-    return flattenedData.map((item, index) => item.type === 'header' ? index : -1).filter(i => i !== -1);
-  }, [flattenedData]);
 
   const getSectionTasks = useCallback((section) => {
     if (!section) return [];
@@ -664,18 +670,16 @@ export default function BoardScreen({ route, navigation }) {
           UIManager.setLayoutAnimationEnabledExperimental(true);
         }
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        tasksToComplete.forEach(task => {
-          dispatch(updateTask({ taskId: task.id, completed: true }));
-        });
+        dispatch(updateMultipleTasks({ taskIds: tasksToComplete.map(t => t.id), changes: { completed: true } }));
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
         
         showToast(
           `${tasksToComplete.length} ${t('tasks completed')}`,
           t('Undo'),
           () => {
-            tasksToComplete.forEach(task => {
-              dispatch(updateTask({ taskId: task.id, completed: task.completed }));
-            });
+            dispatch(updateMultipleTasks({
+              updates: tasksToComplete.map(task => ({ taskId: task.id, completed: task.completed }))
+            }));
           }
         );
       }
@@ -707,19 +711,21 @@ export default function BoardScreen({ route, navigation }) {
             default: newDate = today.add(1, 'week').toISOString(); break;
         }
         const newDateStr = dayjs(newDate).format('YYYY-MM-DD');
-        let movedCount = 0;
+        const idsToMove = [];
         targetTasks.forEach(task => {
           const prevDateStr = task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : '';
           if (prevDateStr !== newDateStr) {
-            dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
-            movedCount++;
+            idsToMove.push(task.id);
           }
         });
+        if (idsToMove.length > 0) {
+          dispatch(updateMultipleTasks({ taskIds: idsToMove, changes: { completionDate: newDate, completed: false } }));
+        }
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        if (movedCount === 0) {
+        if (idsToMove.length === 0) {
           showToast(t('Date unchanged. You can change the date on the edit task page.'));
         } else {
-          showToast(`${movedCount} ${t('tasks moved forward')}`);
+          showToast(`${idsToMove.length} ${t('tasks moved forward')}`);
         }
       }
     });
@@ -751,19 +757,21 @@ export default function BoardScreen({ route, navigation }) {
             default: newDate = today.subtract(1, 'day').toISOString(); break;
         }
         const newDateStr = dayjs(newDate).format('YYYY-MM-DD');
-        let movedCount = 0;
+        const idsToMove = [];
         targetTasks.forEach(task => {
           const prevDateStr = task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : '';
           if (prevDateStr !== newDateStr) {
-            dispatch(updateTask({ taskId: task.id, completionDate: newDate, completed: false }));
-            movedCount++;
+            idsToMove.push(task.id);
           }
         });
+        if (idsToMove.length > 0) {
+          dispatch(updateMultipleTasks({ taskIds: idsToMove, changes: { completionDate: newDate, completed: false } }));
+        }
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        if (movedCount === 0) {
+        if (idsToMove.length === 0) {
           showToast(t('Date unchanged. You can change the date on the edit task page.'));
         } else {
-          showToast(`${movedCount} ${t('tasks moved backward')}`);
+          showToast(`${idsToMove.length} ${t('tasks moved backward')}`);
         }
       }
     });
@@ -779,27 +787,23 @@ export default function BoardScreen({ route, navigation }) {
       confirmText: 'Delete',
       isDestructive: true,
       onConfirm: () => {
-        tasksToDelete.forEach(task => {
-          dispatch(deleteTask({ taskId: task.id }));
-        });
+        dispatch(deleteMultipleTasks({ taskIds: tasksToDelete.map(t => t.id) }));
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
         
         showToast(
           `${tasksToDelete.length} ${t('tasks deleted')}`,
           t('Undo'),
           () => {
-            tasksToDelete.forEach(task => {
-              dispatch(addTask({ task }));
-            });
+            dispatch(addMultipleTasks({ tasks: tasksToDelete }));
           }
         );
       }
     });
   };
 
-  const handleMenuPress = (section) => {
+  const handleMenuPress = useCallback((section) => {
     setSectionOptionsConfig({ isVisible: true, section });
-  };
+  }, []);
 
   const handleAddBoard = () => {
     const boardLimit = isPremium ? 20 : 10;
@@ -911,15 +915,11 @@ export default function BoardScreen({ route, navigation }) {
 
   const selectedTaskIdsSet = useMemo(() => new Set(selectionMode.selectedTaskIds), [selectionMode.selectedTaskIds]);
 
-  const boardTasksHash = useMemo(() => {
-    return boardTasks.map(t => `${t.id}_${t.boardId || 'main'}_${t.completed ? 1 : 0}_${t.completionDate || ''}`).join('|');
-  }, [boardTasks]);
-
   const flashListExtraData = useMemo(() => ({
     activeBoardId,
     activeAddSectionId,
     tasksCount: tasks.length,
-    boardTasksHash,
+    boardTasksRef: boardTasks,
     collapsedKey: collapsedSections.join(','),
     sortKey: JSON.stringify(sortConfig),
     selectionActive: selectionMode.isActive,
@@ -929,7 +929,7 @@ export default function BoardScreen({ route, navigation }) {
     themeIsDark: isDark,
     themeBg: colors.bgMain,
     themeText: colors.textPrimary,
-  }), [activeBoardId, activeAddSectionId, tasks.length, boardTasksHash, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary]);
+  }), [activeBoardId, activeAddSectionId, tasks.length, boardTasks, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary]);
 
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
@@ -1059,11 +1059,12 @@ export default function BoardScreen({ route, navigation }) {
             return (
               <TaskRow 
                 task={task} 
+                sectionId={section.id}
                 hideDate={isListBoard}
                 hideBoardBadge={true}
                 isSelectionMode={selectionMode.isActive}
                 isSelected={selectedTaskIdsSet.has(task.id)}
-                onToggleSelect={() => handleToggleSelectTask(task.id, section.id)}
+                onToggleSelect={handleToggleSelectTask}
                 onPressSnooze={handleSnoozePress}
                 onPressMore={isListBoard ? undefined : handleQuickMenuPress}
                 onPress={handleTaskPress}
