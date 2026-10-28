@@ -472,11 +472,14 @@ const styles = StyleSheet.create({
   modalContainer: {
     margin: 0,
     justifyContent: 'flex-end',
+    height: '100%',
   },
   modalContent: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '92%',
+    height: '100%',
+    maxHeight: '100%',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingTop: Platform.OS === 'ios' ? 44 : 16,
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
   },
   dragHandleContainer: {
@@ -508,6 +511,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   scrollBody: {
+    flex: 1,
     paddingHorizontal: 20,
   },
   scrollBodyContent: {

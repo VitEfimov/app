@@ -26,6 +26,13 @@ const IconPlus = ({ color, size = 20 }) => (
   </Svg>
 );
 
+const IconCheckSquare = ({ color, size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <Path d="M9 12l2 2 4-4" />
+  </Svg>
+);
+
 const IconChevronRight = ({ color, size = 18 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M9 18l6-6-6-6" />
@@ -141,6 +148,26 @@ export default function CalendarDayOptionsModal({
             </View>
             <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>
               {t('Add task') || 'Add task'}
+            </Text>
+            <IconChevronRight color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Select tasks */}
+          <TouchableOpacity
+            style={styles.optionRow}
+            activeOpacity={0.7}
+            onPress={() => {
+              onClose();
+              if (onSelectTasks) onSelectTasks();
+            }}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+              <IconCheckSquare color={primaryAccent} />
+            </View>
+            <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>
+              {t('Select tasks') || 'Select tasks'}
             </Text>
             <IconChevronRight color={colors.textSecondary} />
           </TouchableOpacity>

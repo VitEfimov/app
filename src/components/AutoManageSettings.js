@@ -186,7 +186,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
         <View style={styles.dragHandleContainer}>
@@ -215,7 +215,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
           onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
           onContentSizeChange={(_, h) => setScrollContentHeight(h)}
           scrollEventThrottle={16}
-          style={styles.scrollArea}
+          style={[styles.scrollArea, { flex: 1 }]}
         >
           {boardId && (
             <View style={[styles.settingsGroup, { backgroundColor: colors.surfaceContainer, padding: 12, marginBottom: 15, borderRadius: 10, borderWidth: 1, borderColor: colors.primary }]}>
@@ -412,10 +412,11 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
 
 const styles = StyleSheet.create({
   modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-    paddingTop: 10,
+    height: '100%',
+    maxHeight: '100%',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingTop: Platform.OS === 'ios' ? 44 : 16,
   },
   dragHandleContainer: {
     paddingBottom: 10,

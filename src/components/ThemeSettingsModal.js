@@ -200,7 +200,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
       propagateSwipe={true}
       onBackdropPress={onClose}
       onBackButtonPress={onClose}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#18171E' : '#FAF9F6') }]}>
         {/* Drag handle for mobile */}
@@ -225,7 +225,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
           {/* Screen Title & Subtitle */}
           <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>{t('Appearance') || 'Appearance'}</Text>
           <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>{t('Find your focus, in your style.') || 'Find your focus, in your style.'}</Text>
@@ -332,9 +332,11 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
 
 const styles = StyleSheet.create({
   modalContent: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '92%',
+    height: '100%',
+    maxHeight: '100%',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingTop: Platform.OS === 'ios' ? 44 : 16,
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
   },
   dragHandleContainer: {

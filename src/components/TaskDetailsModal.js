@@ -1245,7 +1245,7 @@ useEffect(() => {
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
           <View style={styles.dragHandleContainer}>
@@ -1928,11 +1928,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    height: '92%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    height: '100%',
+    maxHeight: '100%',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     overflow: 'hidden',
-    paddingTop: 10,
+    paddingTop: Platform.OS === 'ios' ? 44 : 16,
   },
   dragHandleContainer: {
     paddingBottom: 5,

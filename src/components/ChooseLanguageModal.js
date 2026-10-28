@@ -48,7 +48,7 @@ export default function ChooseLanguageModal({ isVisible, onClose }) {
       propagateSwipe={true}
       onBackdropPress={onClose}
       onBackButtonPress={onClose}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF') }]}>
         <View style={styles.dragHandleContainer}>
@@ -137,9 +137,11 @@ export default function ChooseLanguageModal({ isVisible, onClose }) {
 
 const styles = StyleSheet.create({
   modalContent: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '85%',
+    height: '100%',
+    maxHeight: '100%',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingTop: Platform.OS === 'ios' ? 44 : 16,
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
   },
   dragHandleContainer: {
@@ -176,7 +178,7 @@ const styles = StyleSheet.create({
   },
   languagesList: {
     paddingHorizontal: 20,
-    maxHeight: 360,
+    flex: 1,
   },
   languageCard: {
     flexDirection: 'row',

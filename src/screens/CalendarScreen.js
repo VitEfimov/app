@@ -26,6 +26,7 @@ import { useToast } from '../styles/ToastContext';
 import TaskRow from '../components/TaskRow';
 import InlineAddTask from '../components/InlineAddTask';
 import TaskDetailsModal from '../components/TaskDetailsModal';
+import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
 import ConfirmModal from '../components/ConfirmModal';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import CreateBoardModal from '../components/CreateBoardModal';
@@ -171,23 +172,39 @@ export default function CalendarScreen({ navigation }) {
   });
   const [selectionMode, setSelectionMode] = useState({ isActive: false, selectedTaskIds: [] });
   const [sortConfig, setSortConfig] = useState('time'); // 'time' or 'priority'
+  const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
 
-  const handleTaskPress = (task) => {
+  const handleTaskPress = useCallback((task) => {
     setSelectedTask(task);
     setDetailsVisible(true);
-  };
+  }, []);
 
-  const toggleTaskSelection = (taskId) => {
+  const handleQuickMenuPress = useCallback((task) => {
+    setSelectedTask(task);
+    setQuickMenuVisible(true);
+  }, []);
+
+  const handleLongPressTask = useCallback((task) => {
+    const taskId = task.id || task._id;
+    setSelectionMode({
+      isActive: true,
+      selectedTaskIds: [taskId],
+    });
+  }, []);
+
+  const toggleTaskSelection = useCallback((taskId) => {
     setSelectionMode(prev => {
       const isSelected = prev.selectedTaskIds.includes(taskId);
+      const newSelected = isSelected
+        ? prev.selectedTaskIds.filter(id => id !== taskId)
+        : [...prev.selectedTaskIds, taskId];
       return {
         ...prev,
-        selectedTaskIds: isSelected
-          ? prev.selectedTaskIds.filter(id => id !== taskId)
-          : [...prev.selectedTaskIds, taskId]
+        selectedTaskIds: newSelected,
+        isActive: newSelected.length > 0 ? true : false,
       };
     });
-  };
+  }, []);
 
   const handleSelectAll = () => {
     const taskIds = selectedTasks.map(t => t.id || t._id);
@@ -723,11 +740,14 @@ export default function CalendarScreen({ navigation }) {
                         hideUnderline={true}
                         hideDate={true}
                         hideBoardBadge={false}
+                        disableInlineEdit={true}
+                        testIDPrefix="calendar_"
                         isSelectionMode={selectionMode.isActive}
                         isSelected={selectionMode.selectedTaskIds.includes(task.id || task._id)}
                         onToggleSelect={() => toggleTaskSelection(task.id || task._id)}
+                        onLongPress={() => handleLongPressTask(task)}
                         onPressSnooze={() => { setSelectedTask(task); setDetailsVisible(true); }}
-                        onPressMore={() => handleTaskPress(task)}
+                        onPressMore={() => handleQuickMenuPress(task)}
                         onPress={() => handleTaskPress(task)}
                       />
                     </View>
@@ -788,6 +808,21 @@ export default function CalendarScreen({ navigation }) {
         onClose={() => setDetailsVisible(false)}
       />
 
+      {/* Task Quick Menu Modal */}
+      <TaskQuickMenuModal
+        isVisible={isQuickMenuVisible}
+        onClose={() => setQuickMenuVisible(false)}
+        task={selectedTask}
+        onEdit={(task) => {
+          setSelectedTask(task);
+          setDetailsVisible(true);
+        }}
+        onSnooze={(task) => {
+          setSelectedTask(task);
+          setDetailsVisible(true);
+        }}
+      />
+
       {/* Day Options Modal */}
       <CalendarDayOptionsModal
         isVisible={isDayOptionsVisible}
@@ -796,6 +831,9 @@ export default function CalendarScreen({ navigation }) {
         onSortTime={() => setSortConfig('time')}
         onSortPriority={() => setSortConfig('priority')}
         onAddTask={() => setIsInlineAddActive(true)}
+        onSelectTasks={() => {
+          setSelectionMode({ isActive: true, selectedTaskIds: [] });
+        }}
       />
 
       {/* Confirm Modal */}

@@ -60,6 +60,16 @@ export function getChannelId(
   return `task_${base}_${soundName}_${vib}_v17`;
 }
 
+export function getCalendarChannelId(
+  sound,
+  vibrationEnabled
+) {
+  const soundName = getSoundBasename(sound, false);
+  const vib = vibrationEnabled ? 'vib1' : 'vib0';
+
+  return `calendar_task_${soundName}_${vib}_v1`;
+}
+
 // let configuredChannels = new Set(); // Temporarily removed for debugging
 
 function serializeError(error) {
@@ -127,6 +137,11 @@ export async function configureAndroidNotificationChannels(
     vibrationEnabled
   );
 
+  const calendarChannelId = getCalendarChannelId(
+    notificationSound,
+    vibrationEnabled
+  );
+
   DevLogger.info(
     'Configuring Android notification channels',
     {
@@ -135,10 +150,34 @@ export async function configureAndroidNotificationChannels(
       vibrationEnabled,
       defaultChannelId,
       alarmChannelId,
+      calendarChannelId,
     }
   );
 
   try {
+    await Notifications.setNotificationChannelAsync(
+      calendarChannelId,
+      {
+        name: 'Calendar notifications',
+        description:
+          'Reminders and notifications for calendar events and scheduled tasks',
+
+        importance:
+          Notifications.AndroidImportance.HIGH,
+
+        sound: getSoundBasename(notificationSound, false),
+
+        enableVibrate: vibrationEnabled,
+
+        vibrationPattern: vibrationEnabled
+          ? VIBRATION_PRESETS.reminder
+          : null,
+
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
+      }
+    );
+
     await Notifications.setNotificationChannelAsync(
       defaultChannelId,
       {
@@ -348,9 +387,15 @@ export async function deleteObsoleteNotificationChannels(
     vibrationEnabled
   );
 
+  const activeCalendarId = getCalendarChannelId(
+    notificationSound,
+    vibrationEnabled
+  );
+
   const keepIds = new Set([
     activeDefaultId,
     activeAlarmId,
+    activeCalendarId,
     'debug_system_sound_v16',
   ]);
 
@@ -362,6 +407,7 @@ export async function deleteObsoleteNotificationChannels(
       const isManagedByYourApp =
         channel.id.startsWith('task_default_') ||
         channel.id.startsWith('task_alarm_') ||
+        channel.id.startsWith('calendar_task_') ||
         channel.id.startsWith('debug_system_sound_') ||
         channel.id.startsWith('task_default_system_sound_') ||
         channel.id.startsWith('default_sound_');
@@ -748,7 +794,10 @@ export async function scheduleExactTaskReminder(
   const alarmSound = themeState.alarmSound || 'default';
   const vibrationEnabled = themeState.vibrationEnabled !== false;
 
-  const channelId = getChannelId(isAlarm, isAlarm ? alarmSound : notificationSound, vibrationEnabled);
+  const isCalendar = !!(advancedOptions?.isCalendar || advancedOptions?.channelType === 'calendar' || advancedOptions?.syncedFromCalendar);
+  const channelId = isCalendar
+    ? getCalendarChannelId(notificationSound, vibrationEnabled)
+    : getChannelId(isAlarm, isAlarm ? alarmSound : notificationSound, vibrationEnabled);
 
   const sound = isAlarm
     ? alarmSound
@@ -895,6 +944,34 @@ export async function scheduleLocalNotification(
 
     return null;
   }
+}
+
+export async function scheduleCalendarNotification(
+  title,
+  body,
+  date,
+  data = {},
+  themeState = {}
+) {
+  if (Platform.OS === 'web') return null;
+  const notificationSound = themeState?.notificationSound || 'default';
+  const vibrationEnabled = themeState?.vibrationEnabled !== false;
+  const channelId = getCalendarChannelId(notificationSound, vibrationEnabled);
+
+  if (Platform.OS === 'android') {
+    await configureAndroidNotificationChannels(notificationSound, themeState?.alarmSound || 'default', vibrationEnabled);
+  }
+
+  return await Notifications.scheduleNotificationAsync({
+    content: {
+      title,
+      body,
+      sound: notificationSound,
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+      data,
+    },
+    trigger: Platform.OS === 'android' ? { date: date instanceof Date ? date : new Date(date), channelId } : { date: date instanceof Date ? date : new Date(date) },
+  });
 }
 
 export async function cancelNotification(notificationIds, taskId = null) {

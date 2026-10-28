@@ -111,7 +111,7 @@ const IconCheckCircle = ({ color }) => (
 
 const EMPTY_BOARDS = [];
 
-const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
+const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
   const { showToast } = useToast();
@@ -363,9 +363,21 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
   const boardName = taskBoard ? (taskBoard.name === 'Main' ? t('Main') : taskBoard.name) : (taskBoardId === 'main' ? t('Main') : 'Board');
   const boardColor = getBoardColor(taskBoardId, boards);
 
+  const handleLongPress = useCallback(() => {
+    if (onLongPress) {
+      onLongPress(task);
+      return;
+    }
+    if (isSelectionMode || isPremium) {
+      if (onToggleSelect) onToggleSelect();
+    } else {
+      showToast(t('Hold to select tasks is a Pro feature'));
+    }
+  }, [onLongPress, task, isSelectionMode, isPremium, onToggleSelect, showToast, t]);
+
   const taskRowContent = (
     <TouchableOpacity
-      testID={`task_row_${testIDPrefix}${task.taskname || task.name}`}
+      testID={testIDPrefix ? `${testIDPrefix}task_row_${task.taskname || task.name}` : `task_row_${task.taskname || task.name}`}
       accessible={true}
       accessibilityRole="button"
       accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
@@ -373,13 +385,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
       style={[styles.container, { borderBottomColor: colors.borderColor, backgroundColor: 'transparent' }, hideUnderline && { borderBottomWidth: 0 }]}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onLongPress={() => {
-        if (isSelectionMode || isPremium) {
-          if (onToggleSelect) onToggleSelect();
-        } else {
-          showToast(t('Hold to select tasks is a Pro feature'));
-        }
-      }}
+      onLongPress={handleLongPress}
       onPress={() => {
         if (isSelectionMode) {
           if (onToggleSelect) onToggleSelect();
@@ -452,7 +458,7 @@ const TaskRow = React.memo(function TaskRow({ task, hideDate = false, hideBoardB
               />
             </View>
           ) : (
-            <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+            <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} onLongPress={handleLongPress} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
               <Text
                 testID="task_name_text"
                 numberOfLines={taskNameWrap === 'nowrap' ? 1 : 2}
