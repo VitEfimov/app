@@ -292,11 +292,6 @@ export default function BoardScreen({ route, navigation }) {
   const handleBatchMoveBoard = (targetBoardId) => {
     const selectedIds = [...selectionMode.selectedTaskIds];
     if (selectedIds.length === 0) return;
-    
-    if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
     selectedIds.forEach(id => {
       dispatch(updateTask({ taskId: id, boardId: targetBoardId }));
@@ -916,10 +911,15 @@ export default function BoardScreen({ route, navigation }) {
 
   const selectedTaskIdsSet = useMemo(() => new Set(selectionMode.selectedTaskIds), [selectionMode.selectedTaskIds]);
 
+  const boardTasksHash = useMemo(() => {
+    return boardTasks.map(t => `${t.id}_${t.boardId || 'main'}_${t.completed ? 1 : 0}_${t.completionDate || ''}`).join('|');
+  }, [boardTasks]);
+
   const flashListExtraData = useMemo(() => ({
     activeBoardId,
     activeAddSectionId,
     tasksCount: tasks.length,
+    boardTasksHash,
     collapsedKey: collapsedSections.join(','),
     sortKey: JSON.stringify(sortConfig),
     selectionActive: selectionMode.isActive,
@@ -929,7 +929,7 @@ export default function BoardScreen({ route, navigation }) {
     themeIsDark: isDark,
     themeBg: colors.bgMain,
     themeText: colors.textPrimary,
-  }), [activeBoardId, activeAddSectionId, tasks.length, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary]);
+  }), [activeBoardId, activeAddSectionId, tasks.length, boardTasksHash, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary]);
 
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
@@ -1047,12 +1047,8 @@ export default function BoardScreen({ route, navigation }) {
         key={activeBoardId}
         data={flattenedData}
         extraData={flashListExtraData}
-        keyExtractor={(item) => item.type === 'task' ? `task_${item.task?.id || ''}_${item.section?.id || ''}` : `${item.type}_${item.section?.id || ''}`}
+        keyExtractor={(item) => item.type === 'task' ? `task_${item.task?.id || ''}_${item.section?.id || ''}` : `${item.type}_${item.section?.id || ''}_${item.section?.count ?? 0}`}
         getItemType={(item) => item.type}
-        overrideItemLayout={(layout, item) => {
-          if (!layout) return;
-          layout.size = item?.type === 'header' ? 48 : item?.type === 'footer' ? 52 : 65;
-        }}
         renderItem={({ item }) => {
           if (item.type === 'header') return renderSectionHeader({ section: item.section });
           if (item.type === 'footer') return renderSectionFooter({ section: item.section });
@@ -1081,7 +1077,6 @@ export default function BoardScreen({ route, navigation }) {
         keyboardShouldPersistTaps="handled"
         estimatedItemSize={65}
         drawDistance={1200}
-        removeClippedSubviews={Platform.OS === 'android'}
       />
 
       <TaskDetailsModal 

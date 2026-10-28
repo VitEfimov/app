@@ -146,6 +146,14 @@ export default function CreateBoardModal({
 
   const primaryAccent = colors?.primary || '#5D45DB';
 
+  const handleBack = () => {
+    if (isEvents) {
+      setSelectedType('standard');
+    } else {
+      onClose();
+    }
+  };
+
   return (
     <Modal
       isVisible={isVisible}
@@ -153,7 +161,7 @@ export default function CreateBoardModal({
       swipeDirection={['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
-      onBackButtonPress={onClose}
+      onBackButtonPress={handleBack}
       style={styles.modalContainer}
     >
       <View style={[styles.modalContent, { backgroundColor: colors?.bgCard || '#FAF9F6' }]}>
@@ -164,8 +172,11 @@ export default function CreateBoardModal({
         {/* Header navigation row */}
         <View style={styles.topNavRow}>
           <TouchableOpacity 
-            onPress={onClose} 
+            onPress={handleBack} 
             activeOpacity={0.7}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={isEvents ? "Back to category types" : "Close"}
             style={[styles.backCircle, { borderColor: colors?.borderColor || '#E5E5EA', backgroundColor: colors?.bgCard || '#FFF' }]}
           >
             <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors?.textPrimary || '#000'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

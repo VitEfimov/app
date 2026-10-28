@@ -650,7 +650,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     width: '95%',
     alignSelf: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingRight: 10,
     paddingLeft: 20,
     position: 'relative',

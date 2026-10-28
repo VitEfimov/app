@@ -252,5 +252,43 @@ test.describe('Board Missed Tasks Move Backward & Year Picker 18 Years', () => {
     await expect(selectionBar).not.toBeVisible();
     await expect(sectionCheckbox).not.toBeVisible();
   });
+
+  test('should navigate back to category types when arrow back is clicked in Events category creation', async () => {
+    const addBoardBtn = page.getByTestId('add_board_btn');
+    await addBoardBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await addBoardBtn.click();
+
+    // Select Events template
+    const eventsCard = page.getByTestId('create_board_type_birthdays');
+    await eventsCard.waitFor({ state: 'visible', timeout: 5000 });
+    await eventsCard.click();
+
+    // Verify Default auto-repeat is visible (Events mode)
+    await expect(page.getByText('Default auto-repeat').first()).toBeVisible();
+
+    // Click top-left arrow back button
+    const backBtn = page.getByRole('button', { name: 'Back to category types' }).first();
+    await backBtn.click();
+
+    // Verify we are back to category types (Standard date category is visible again)
+    const standardCard = page.getByTestId('create_board_type_standard');
+    await expect(standardCard).toBeVisible();
+
+    // Now clicking back/cancel should close modal
+    const closeBtn = page.getByRole('button', { name: 'Close' }).first();
+    await closeBtn.click();
+  });
+
+  test('should verify section headers remain rendered after moving tasks to another board', async () => {
+    const todayHeader = page.getByTestId('section_title_today');
+    await todayHeader.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(todayHeader).toBeVisible();
+
+    const tomorrowHeader = page.getByTestId('section_title_tomorrow');
+    await expect(tomorrowHeader).toBeVisible();
+
+    const thisWeekHeader = page.getByTestId('section_title_on-this-week');
+    await expect(thisWeekHeader).toBeVisible();
+  });
 });
 

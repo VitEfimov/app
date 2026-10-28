@@ -68,9 +68,6 @@ export default function BottomMenu(props) {
     }
   };
 
-  const activePillBg = colors.primaryLight 
-    ? (colors.primaryLight.startsWith('#') ? `${colors.primaryLight}25` : colors.primaryLight) 
-    : (isDark ? 'rgba(98, 70, 234, 0.25)' : 'rgba(98, 70, 234, 0.12)');
 
   return (
     <View style={[
@@ -95,10 +92,7 @@ export default function BottomMenu(props) {
             accessibilityRole="tab"
             accessibilityState={{ selected: isFocused }}
           >
-            <View style={[
-              styles.iconWrapper, 
-              isFocused && [styles.activePill, { backgroundColor: activePillBg }]
-            ]}>
+            <View style={styles.iconWrapper}>
               <TabIcon color={color} size={22} />
             </View>
             <Text style={[
