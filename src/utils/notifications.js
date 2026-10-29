@@ -658,7 +658,8 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
         taskId,
         isAlarm,
         isAlarm ? 'task_reminder' : 'task_regular',
-        themeState
+        themeState,
+        advancedOptions
       );
       if (timeId) ids.push(timeId);
     }
@@ -687,7 +688,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
 
     if (offset) {
       let reminderDate = targetDate.subtract(offset.amount, offset.unit);
-      const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm, 'task_reminder', themeState);
+      const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm, 'task_reminder', themeState, advancedOptions);
       if (remId) ids.push(remId);
     }
   }
@@ -703,7 +704,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     for (const escOffset of escOffsets) {
       let remDate = targetDate.subtract(escOffset.amount, escOffset.unit);
       if (remDate.isAfter(dayjs())) {
-        const remId = await scheduleExactTaskReminder(`[URGENT] ${taskName}`, remDate.toDate(), taskId, true, 'task_alarm', themeState);
+        const remId = await scheduleExactTaskReminder(`[URGENT] ${taskName}`, remDate.toDate(), taskId, true, 'task_alarm', themeState, advancedOptions);
         if (remId) ids.push(remId);
       }
     }
@@ -713,7 +714,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     for (let i = 1; i <= 12; i++) {
       let nagDate = targetDate.add(i * 10, 'minute');
       if (nagDate.isAfter(dayjs())) {
-        const nagId = await scheduleExactTaskReminder(`[OVERDUE] ${taskName}`, nagDate.toDate(), taskId, true, 'task_alarm', themeState);
+        const nagId = await scheduleExactTaskReminder(`[OVERDUE] ${taskName}`, nagDate.toDate(), taskId, true, 'task_alarm', themeState, advancedOptions);
         if (nagId) ids.push(nagId);
       }
     }
@@ -781,7 +782,8 @@ export async function scheduleExactTaskReminder(
   taskId = null,
   isAlarm = false,
   category = 'task_reminder',
-  themeState = {}
+  themeState = {},
+  advancedOptions = {}
 ) {
   if (Platform.OS === 'web') return null;
   const targetDate = dayjs(targetDateObj);

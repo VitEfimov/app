@@ -52,7 +52,13 @@ const IconBell = ({ color }) => (
   </Svg>
 );
 
-export default function DevLogsScreen() {
+const IconArrowLeft = ({ color = '#000', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M19 12H5M12 19l-7-7 7-7" />
+  </Svg>
+);
+
+export default function DevLogsScreen({ navigation }) {
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const tasks = useSelector((state) => state.taskReducer.tasks || []);
@@ -359,6 +365,22 @@ export default function DevLogsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
+      {/* Top Header with Back button */}
+      <View style={[styles.screenHeader, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
+        <TouchableOpacity
+          onPress={() => navigation?.goBack?.()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back to Settings"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <IconArrowLeft color={colors.textPrimary} size={20} />
+          <Text style={[styles.backBtnText, { color: colors.textPrimary }]}>Back</Text>
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Debugger & System Logs</Text>
+        <View style={{ width: 60 }} />
+      </View>
+
       {/* Top Section Nav Tabs */}
       <View style={[styles.topTabsBar, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10, gap: 6 }}>
@@ -590,6 +612,34 @@ export default function DevLogsScreen() {
         {activeTab === 'notifications' && (
           <ScrollView contentContainerStyle={styles.scrollSection}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notification Diagnostics</Text>
+
+            {/* Permission Status Banner */}
+            <View style={[styles.permissionBanner, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                  Notification Permission: {permissionStatus || 'Checking...'}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                  Must be 'granted' for notifications and alarms to work.
+                </Text>
+              </View>
+              {permissionStatus !== 'granted' && (
+                <TouchableOpacity
+                  style={[styles.btnSmall, { backgroundColor: colors.primary, marginLeft: 10, maxWidth: 90 }]}
+                  onPress={async () => {
+                    try {
+                      const res = await Notifications.requestPermissionsAsync();
+                      setPermissionStatus(res.status);
+                      DevLogger.info('Notification permission request result', res);
+                    } catch (e) {
+                      DevLogger.error('Permission request failed', e.message);
+                    }
+                  }}
+                >
+                  <Text style={styles.btnSmallText}>Grant</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* Test Action Buttons */}
             <View style={{ gap: 10, marginBottom: 20 }}>
@@ -834,6 +884,39 @@ export default function DevLogsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  screenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 44 : 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  backBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  permissionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 16,
   },
   topTabsBar: {
     paddingVertical: 10,

@@ -263,8 +263,11 @@ function InitApp() {
         // Signal that state is hydrated — mounts AppNavigator, BoardScreen & CalendarScreen behind the loading screen
         setIsHydrated(true);
 
-        // Run background tasks registration
+        // Run background tasks registration & push notification setup
         await registerBackgroundFetchAsync();
+        registerForPushNotificationsAsync(storageMap.customTheme ? JSON.parse(storageMap.customTheme) : {}).catch(err => {
+          console.warn('registerForPushNotificationsAsync init warning:', err);
+        });
 
         // Perform checkAuth if not in guest mode
         if (isGuestVal !== 'true') {

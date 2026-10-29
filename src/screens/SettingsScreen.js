@@ -681,6 +681,25 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
           <TouchableOpacity
+            testID="settings_debugger_btn"
+            activeOpacity={0.75}
+            onPress={() => navigation.navigate('DevLogs')}
+            style={styles.cardItemRow}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Debugger & System Logs') || 'Debugger & System Logs'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {t('Diagnose notifications, alarms, scheduler & logs') || 'Diagnose notifications, alarms, scheduler & logs'}
+              </Text>
+            </View>
+            <IconChevronRight color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          <TouchableOpacity
             activeOpacity={0.75}
             onPress={handleDeleteData}
             style={styles.cardItemRow}

@@ -405,12 +405,8 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       onLongPress(task);
       return;
     }
-    if (isSelectionMode || isPremium) {
-      if (onToggleSelect) onToggleSelect(task.id, sectionId);
-    } else {
-      showToast(t('Hold to select tasks is a Pro feature'));
-    }
-  }, [onLongPress, task, isSelectionMode, isPremium, onToggleSelect, sectionId, showToast, t]);
+    if (onToggleSelect) onToggleSelect(task.id, sectionId);
+  }, [onLongPress, task, onToggleSelect, sectionId]);
 
   const taskRowContent = (
     <TouchableOpacity
@@ -523,19 +519,23 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
 
         {/* Indicators under task name: Reminder/time, Category badge, Recurring, Notes, Subtasks */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 10, paddingHorizontal: 4, flexWrap: 'wrap' }}>
-          {/* Reminder / Time: ONLY if reminder or time is actually applied! */}
-          {task.reminder && task.reminder !== 'None' ? (
+          {/* Due Time / Reminder: Shows due time with Alarm icon if reminder set, or Clock icon if no reminder */}
+          {task.time && task.time.trim() !== '' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {task.reminder && task.reminder !== 'None' ? (
+                <IconAlarm color={colors.textSecondary} />
+              ) : (
+                <IconClock color={colors.textSecondary} size={13} />
+              )}
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                {formatDisplayTime(task.time)}
+              </Text>
+            </View>
+          ) : (task.reminder && task.reminder !== 'None') ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <IconAlarm color={colors.textSecondary} />
               <Text style={[styles.metaText, { color: colors.textSecondary }]}>
                 {task.reminder}
-              </Text>
-            </View>
-          ) : (task.time && task.time.trim() !== '') ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <IconClock color={colors.textSecondary} size={13} />
-              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                {formatDisplayTime(task.time)}
               </Text>
             </View>
           ) : null}
