@@ -22,20 +22,20 @@ class AlarmActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Wake screen
+        // Wake screen and show over any active app (e.g. YouTube, Chrome, games)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            )
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            keyguardManager?.requestDismissKeyguard(this, null)
         }
+        @Suppress("DEPRECATION")
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+        )
 
         val layoutId = resources.getIdentifier("activity_alarm", "layout", packageName)
         setContentView(layoutId)
@@ -54,6 +54,7 @@ class AlarmActivity : Activity() {
         titleView?.text = taskName
         
         titleView?.setOnClickListener {
+            AlarmAudioManager.abandonAlarmFocus(this)
             NotificationManagerCompat.from(this).cancel(requestCode)
             
             if (taskId.isNotEmpty()) {
@@ -73,11 +74,13 @@ class AlarmActivity : Activity() {
         findViewById<TextView>(nameId)?.text = currentDateTime
 
         findViewById<Button>(dismissBtnId)?.setOnClickListener {
+            AlarmAudioManager.abandonAlarmFocus(this)
             NotificationManagerCompat.from(this).cancel(requestCode)
             finish()
         }
 
         findViewById<Button>(snoozeBtnId)?.setOnClickListener {
+            AlarmAudioManager.abandonAlarmFocus(this)
             NotificationManagerCompat.from(this).cancel(requestCode)
             
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -118,5 +121,10 @@ class AlarmActivity : Activity() {
             
             finish()
         }
+    }
+
+    override fun onDestroy() {
+        AlarmAudioManager.abandonAlarmFocus(this)
+        super.onDestroy()
     }
 }

@@ -19,6 +19,15 @@ export async function scheduleExactAlarm(
   }
 }
 
+export async function isCarConnected(): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.isCarConnected !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.isCarConnected();
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function cancelAlarm(taskId: string): Promise<boolean> {
   if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.cancelAlarm !== 'function') return false;
   try {

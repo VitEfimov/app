@@ -147,6 +147,14 @@ const IconInfo = ({ color = '#6246EA', size = 20 }) => (
   </Svg>
 );
 
+const IconCar = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M5 17H3v-4l2-5h14l2 5v4h-2" />
+    <Circle cx="7.5" cy="17.5" r="2.5" />
+    <Circle cx="16.5" cy="17.5" r="2.5" />
+  </Svg>
+);
+
 const IconChevronRight = ({ color = '#888', size = 18 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M9 18l6-6-6-6" />
@@ -748,7 +756,7 @@ export default function SettingsScreen({ navigation }) {
                 { 
                   value: 'fullscreen', 
                   label: t('Full screen') || 'Full screen', 
-                  desc: t('Full alarm screen with big Snooze & Stop buttons') || 'Full alarm screen with big Snooze & Stop buttons' 
+                  desc: t('Always opens full alarm screen over any app, whether screen is locked or in use') || 'Always opens full alarm screen over any app, whether screen is locked or in use' 
                 },
                 { 
                   value: 'popup', 
@@ -843,6 +851,28 @@ export default function SettingsScreen({ navigation }) {
               ))}
             </View>
           )}
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Android Auto mute sounds toggle */}
+          <View style={styles.cardItemRow}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+              <IconCar color={primaryAccent} />
+            </View>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Mute on Android Auto') || 'Mute on Android Auto'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {t('Silence alarm and notification sounds while connected to car') || 'Silence alarm and notification sounds while connected to car'}
+              </Text>
+            </View>
+            <Switch
+              value={theme.androidAutoEnabled !== false}
+              onValueChange={(val) => dispatch(setAndroidAutoEnabled(val))}
+              trackColor={{ true: primaryAccent, false: colors.borderColor }}
+            />
+          </View>
         </View>
 
         {/* Tip Banner Card (matching Image 3 lavender card) */}

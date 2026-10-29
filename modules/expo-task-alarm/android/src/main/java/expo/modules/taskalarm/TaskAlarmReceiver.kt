@@ -16,13 +16,16 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val taskId = intent.getStringExtra("taskId") ?: ""
         val presentationStyle = intent.getStringExtra("presentationStyle") ?: "fullscreen"
 
+        val isCar = CarUtils.isConnectedToCar(context)
+
         // Wake intent
         val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("taskId", taskId)
             putExtra("taskName", taskName)
             putExtra("channelId", channelId)
             putExtra("requestCode", requestCode)
+            putExtra("isCar", isCar)
         }
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
@@ -71,9 +74,20 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
         }
 
+        if (isCar) {
+            // Mute completely when connected to Android Auto / car
+            notificationBuilder.setSound(null)
+            notificationBuilder.setVibrate(null)
+        } else {
+            // Request audio focus to pause/stop background media (e.g. YouTube, Spotify)
+            AlarmAudioManager.requestAlarmFocus(context)
+            notificationBuilder.setDefaults(NotificationCompat.DEFAULT_LIGHTS)
+        }
+
         val notification = notificationBuilder.build()
-            
-        notification.flags = notification.flags or android.app.Notification.FLAG_INSISTENT
+        if (!isCar) {
+            notification.flags = notification.flags or android.app.Notification.FLAG_INSISTENT
+        }
 
         try {
             NotificationManagerCompat.from(context).notify(requestCode, notification)
@@ -83,10 +97,14 @@ class TaskAlarmReceiver : BroadcastReceiver() {
 
         if (presentationStyle == "fullscreen") {
             try {
-                alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 context.startActivity(alarmIntent)
             } catch (e: Exception) {
-                // If background activity start is restricted by Android OS, fullScreenIntent takes care of it
+                try {
+                    fullScreenPendingIntent.send()
+                } catch (e2: Exception) {
+                    e2.printStackTrace()
+                }
             }
         }
     }

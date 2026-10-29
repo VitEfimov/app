@@ -13,6 +13,9 @@ class AlarmActionReceiver : BroadcastReceiver() {
         val action = intent.action
         val notificationId = intent.getIntExtra("requestCode", 0)
 
+        // Abandon audio focus so background media (like YouTube/music) can resume
+        AlarmAudioManager.abandonAlarmFocus(context)
+
         // Dismiss the notification (this stops the sound because FLAG_INSISTENT is tied to the notification)
         NotificationManagerCompat.from(context).cancel(notificationId)
 

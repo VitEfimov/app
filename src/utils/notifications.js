@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, ToastAndroid } from 'react-native';
-import { scheduleExactAlarm, cancelAlarm, schedulePomodoroAlarm, cancelPomodoroAlarm } from '../../modules/expo-task-alarm';
+import { scheduleExactAlarm, cancelAlarm, schedulePomodoroAlarm, cancelPomodoroAlarm, isCarConnected } from '../../modules/expo-task-alarm';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import { DevLogger } from './logger';
@@ -181,6 +181,11 @@ export async function configureAndroidNotificationChannels(
           ? VIBRATION_PRESETS.reminder
           : null,
 
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.NOTIFICATION,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        },
+
         lockscreenVisibility:
           Notifications.AndroidNotificationVisibility.PUBLIC,
       }
@@ -203,6 +208,30 @@ export async function configureAndroidNotificationChannels(
         vibrationPattern: vibrationEnabled
           ? VIBRATION_PRESETS.reminder
           : null,
+
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.NOTIFICATION,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        },
+
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
+      }
+    );
+
+    await Notifications.setNotificationChannelAsync(
+      'task_car_silent_channel_v1',
+      {
+        name: 'Car / Driving notifications',
+        description:
+          'Silent notifications when connected to Android Auto or Car mode',
+
+        importance:
+          Notifications.AndroidImportance.HIGH,
+
+        sound: null,
+
+        enableVibrate: false,
 
         lockscreenVisibility:
           Notifications.AndroidNotificationVisibility.PUBLIC,
@@ -798,6 +827,13 @@ export async function scheduleExactTaskReminder(
     // Ensure channels exist before scheduling
     await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
 
+    const isCar = (Platform.OS === 'android' && themeState.androidAutoEnabled !== false)
+      ? await isCarConnected()
+      : false;
+
+    const activeChannelId = isCar ? 'task_car_silent_channel_v1' : channelId;
+    const activeSound = isCar ? null : sound;
+
     if (Platform.OS === 'android' && isAlarm) {
       const success = await scheduleExactAlarm(
         taskId,
@@ -807,7 +843,7 @@ export async function scheduleExactTaskReminder(
         alarmPresentationStyle
       );
       if (success) {
-        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, channelId, taskName, alarmPresentationStyle });
+        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, channelId, taskName, alarmPresentationStyle, isCar });
         return `native_alarm_${taskId}`;
       }
     }
@@ -822,7 +858,7 @@ export async function scheduleExactTaskReminder(
           ? `${taskName} is due now`
           : taskName,
 
-        ...(Platform.OS !== 'android' && { sound }),
+        ...(Platform.OS !== 'android' && { sound: activeSound }),
 
         priority:
           Notifications.AndroidNotificationPriority.MAX,
@@ -846,7 +882,7 @@ export async function scheduleExactTaskReminder(
         Platform.OS === 'android'
           ? {
               date: targetDate.toDate(),
-              channelId,
+              channelId: activeChannelId,
             }
           : {
               date: targetDate.toDate(),

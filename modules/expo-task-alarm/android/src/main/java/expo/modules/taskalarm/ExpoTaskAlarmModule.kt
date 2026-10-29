@@ -23,6 +23,11 @@ class ExpoTaskAlarmModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ExpoTaskAlarm")
 
+    AsyncFunction("isCarConnected") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      return@AsyncFunction CarUtils.isConnectedToCar(context)
+    }
+
     AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, channelId: String, presentationStyle: String? ->
       val context = appContext.reactContext ?: return@AsyncFunction false
       
