@@ -104,7 +104,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
       dispatch(setAutoManageSettings(updated));
       updateRecurringAutomations(updated, tasks);
     }
-    dispatch(processAutoManageTasks());
+    dispatch(processAutoManageTasks(true));
   };
 
   const handleSave = () => {
@@ -114,7 +114,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
       dispatch(setAutoManageSettings(localSettings));
       updateRecurringAutomations(localSettings, tasks);
     }
-    dispatch(processAutoManageTasks());
+    dispatch(processAutoManageTasks(true));
     onClose();
   };
 

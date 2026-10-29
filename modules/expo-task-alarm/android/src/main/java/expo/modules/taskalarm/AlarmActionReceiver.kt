@@ -20,6 +20,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
             val taskId = intent.getStringExtra("taskId") ?: ""
             val taskName = intent.getStringExtra("taskName") ?: "Unknown Task"
             val channelId = intent.getStringExtra("channelId") ?: "task_alarm_channel"
+            val presentationStyle = intent.getStringExtra("presentationStyle") ?: "fullscreen"
             
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val snoozeIntent = Intent(context, TaskAlarmReceiver::class.java).apply {
@@ -27,6 +28,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
                 putExtra("taskName", taskName)
                 putExtra("channelId", channelId)
                 putExtra("requestCode", notificationId)
+                putExtra("presentationStyle", presentationStyle)
             }
             
             val pendingIntent = PendingIntent.getBroadcast(

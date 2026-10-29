@@ -492,23 +492,16 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
     [
       {
         identifier: 'complete_task',
-        buttonTitle: 'Complete Task',
+        buttonTitle: 'Complete',
         options: {
-          opensAppToForeground: true,
+          opensAppToForeground: false,
         },
       },
       {
         identifier: 'snooze',
         buttonTitle: 'Snooze',
         options: {
-          opensAppToForeground: true,
-        },
-      },
-      {
-        identifier: 'reschedule',
-        buttonTitle: 'Reschedule',
-        options: {
-          opensAppToForeground: true,
+          opensAppToForeground: false,
         },
       },
     ]
@@ -519,23 +512,16 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
     [
       {
         identifier: 'complete_task',
-        buttonTitle: 'Complete Task',
+        buttonTitle: 'Complete',
         options: {
-          opensAppToForeground: true,
+          opensAppToForeground: false,
         },
       },
       {
         identifier: 'snooze',
         buttonTitle: 'Snooze',
         options: {
-          opensAppToForeground: true,
-        },
-      },
-      {
-        identifier: 'reschedule',
-        buttonTitle: 'Reschedule',
-        options: {
-          opensAppToForeground: true,
+          opensAppToForeground: false,
         },
       },
     ]
@@ -546,16 +532,9 @@ export async function registerForPushNotificationsAsync(themeState = {}) {
     [
       {
         identifier: 'complete_task',
-        buttonTitle: 'Complete Task',
+        buttonTitle: 'Complete',
         options: {
           opensAppToForeground: false,
-        },
-      },
-      {
-        identifier: 'reschedule',
-        buttonTitle: 'Edit Task',
-        options: {
-          opensAppToForeground: true,
         },
       },
     ]
@@ -804,6 +783,7 @@ export async function scheduleExactTaskReminder(
   const notificationSound = themeState.notificationSound || 'default';
   const alarmSound = themeState.alarmSound || 'default';
   const vibrationEnabled = themeState.vibrationEnabled !== false;
+  const alarmPresentationStyle = themeState.alarmPresentationStyle || 'fullscreen';
 
   const isCalendar = !!(advancedOptions?.isCalendar || advancedOptions?.channelType === 'calendar' || advancedOptions?.syncedFromCalendar);
   const channelId = isCalendar
@@ -823,10 +803,11 @@ export async function scheduleExactTaskReminder(
         taskId,
         taskName,
         targetDate.valueOf(),
-        channelId
+        channelId,
+        alarmPresentationStyle
       );
       if (success) {
-        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, channelId, taskName });
+        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, channelId, taskName, alarmPresentationStyle });
         return `native_alarm_${taskId}`;
       }
     }

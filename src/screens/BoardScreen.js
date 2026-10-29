@@ -140,6 +140,9 @@ const SectionHeader = React.memo(function SectionHeader({
   );
 });
 
+const DEFAULT_COLLAPSED_SECTIONS = ['missed', 'on-this-week', 'on-next-week', 'later', 'completed'];
+let currentSessionCollapsedSections = [...DEFAULT_COLLAPSED_SECTIONS];
+
 export default function BoardScreen({ route, navigation }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeAddSectionId, setActiveAddSectionId] = useState(null);
@@ -223,14 +226,18 @@ export default function BoardScreen({ route, navigation }) {
 
   const [collapsedSections, setCollapsedSections] = useState(() => {
     if (route?.params?.sectionId) {
-      return allSectionIds.filter(id => id !== route.params.sectionId);
+      const target = allSectionIds.filter(id => id !== route.params.sectionId);
+      currentSessionCollapsedSections = target;
+      return target;
     }
-    return ['completed'];
+    return currentSessionCollapsedSections;
   });
 
   useEffect(() => {
     if (route?.params?.sectionId) {
-      setCollapsedSections(allSectionIds.filter(id => id !== route.params.sectionId));
+      const target = allSectionIds.filter(id => id !== route.params.sectionId);
+      currentSessionCollapsedSections = target;
+      setCollapsedSections(target);
     }
   }, [route?.params?.sectionId]);
 
@@ -266,9 +273,11 @@ export default function BoardScreen({ route, navigation }) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setCollapsedSections(prev =>
-      prev.includes(sectionId) ? prev.filter(id => id !== sectionId) : [...prev, sectionId]
-    );
+    setCollapsedSections(prev => {
+      const next = prev.includes(sectionId) ? prev.filter(id => id !== sectionId) : [...prev, sectionId];
+      currentSessionCollapsedSections = next;
+      return next;
+    });
   }, []);
 
   const toggleTaskSelection = useCallback((taskId) => {
@@ -874,13 +883,20 @@ export default function BoardScreen({ route, navigation }) {
     });
   }, [getSectionTasks]);
 
-  const renderSectionHeader = ({ section }) => {
+  const selectedTaskIdsSet = useMemo(() => new Set(selectionMode.selectedTaskIds), [selectionMode.selectedTaskIds]);
+
+  const renderSectionHeader = useCallback(({ section }) => {
     const isCollapsed = collapsedSections.includes(section.id);
-    const sectionTasks = getSectionTasks(section);
-    const sectionTaskIds = sectionTasks.map(t => t.id);
-    const selectedCountInSection = sectionTaskIds.filter(id => selectedTaskIdsSet.has(id)).length;
-    const isAllSectionSelected = sectionTasks.length > 0 && selectedCountInSection === sectionTasks.length;
-    const isPartiallySelected = selectedCountInSection > 0 && !isAllSectionSelected;
+    let isAllSectionSelected = false;
+    let isPartiallySelected = false;
+
+    if (selectionMode.isActive) {
+      const sectionTasks = getSectionTasks(section);
+      const sectionTaskIds = sectionTasks.map(t => t.id);
+      const selectedCountInSection = sectionTaskIds.filter(id => selectedTaskIdsSet.has(id)).length;
+      isAllSectionSelected = sectionTasks.length > 0 && selectedCountInSection === sectionTasks.length;
+      isPartiallySelected = selectedCountInSection > 0 && !isAllSectionSelected;
+    }
 
     return (
       <SectionHeader
@@ -894,9 +910,9 @@ export default function BoardScreen({ route, navigation }) {
         onToggleSelectSection={handleToggleSelectSection}
       />
     );
-  };
+  }, [collapsedSections, selectionMode.isActive, getSectionTasks, selectedTaskIdsSet, toggleSection, handleMenuPress, handleToggleSelectSection]);
 
-  const renderSectionFooter = ({ section }) => {
+  const renderSectionFooter = useCallback(({ section }) => {
     return (
       <InlineAddTask 
         sectionId={section.id} 
@@ -911,9 +927,32 @@ export default function BoardScreen({ route, navigation }) {
         }}
       />
     );
-  };
+  }, [activeAddSectionId]);
 
-  const selectedTaskIdsSet = useMemo(() => new Set(selectionMode.selectedTaskIds), [selectionMode.selectedTaskIds]);
+  const renderItem = useCallback(({ item }) => {
+    if (item.type === 'header') return renderSectionHeader({ section: item.section });
+    if (item.type === 'footer') return renderSectionFooter({ section: item.section });
+    if (item.type === 'task') {
+      const task = item.task;
+      const section = item.section;
+      const isListBoard = activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping';
+      return (
+        <TaskRow 
+          task={task} 
+          sectionId={section.id}
+          hideDate={isListBoard}
+          hideBoardBadge={true}
+          isSelectionMode={selectionMode.isActive}
+          isSelected={selectedTaskIdsSet.has(task.id)}
+          onToggleSelect={handleToggleSelectTask}
+          onPressSnooze={handleSnoozePress}
+          onPressMore={isListBoard ? undefined : handleQuickMenuPress}
+          onPress={handleTaskPress}
+        />
+      );
+    }
+    return null;
+  }, [renderSectionHeader, renderSectionFooter, activeBoard?.type, selectionMode.isActive, selectedTaskIdsSet, handleToggleSelectTask, handleSnoozePress, handleQuickMenuPress, handleTaskPress]);
 
   const flashListExtraData = useMemo(() => ({
     activeBoardId,
@@ -1049,37 +1088,15 @@ export default function BoardScreen({ route, navigation }) {
         extraData={flashListExtraData}
         keyExtractor={(item) => item.type === 'task' ? `task_${item.task?.id || ''}_${item.section?.id || ''}` : `${item.type}_${item.section?.id || ''}_${item.section?.count ?? 0}`}
         getItemType={(item) => item.type}
-        renderItem={({ item }) => {
-          if (item.type === 'header') return renderSectionHeader({ section: item.section });
-          if (item.type === 'footer') return renderSectionFooter({ section: item.section });
-          if (item.type === 'task') {
-            const task = item.task;
-            const section = item.section;
-            const isListBoard = activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping';
-            return (
-              <TaskRow 
-                task={task} 
-                sectionId={section.id}
-                hideDate={isListBoard}
-                hideBoardBadge={true}
-                isSelectionMode={selectionMode.isActive}
-                isSelected={selectedTaskIdsSet.has(task.id)}
-                onToggleSelect={handleToggleSelectTask}
-                onPressSnooze={handleSnoozePress}
-                onPressMore={isListBoard ? undefined : handleQuickMenuPress}
-                onPress={handleTaskPress}
-              />
-            );
-          }
-          return null;
-        }}
+        renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={undefined}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={closeOpenSwipeableRow}
         estimatedItemSize={65}
-        drawDistance={1200}
+        drawDistance={Platform.OS === 'web' ? 400 : 350}
+        removeClippedSubviews={Platform.OS !== 'web'}
       />
 
       <TaskDetailsModal 

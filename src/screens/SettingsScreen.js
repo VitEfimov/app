@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync } from '../utils/calendarSync';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
@@ -131,6 +131,14 @@ const IconAlarm = ({ color = '#6246EA', size = 20 }) => (
   </Svg>
 );
 
+const IconDisplay = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+    <Line x1="8" y1="21" x2="16" y2="21" />
+    <Line x1="12" y1="17" x2="12" y2="21" />
+  </Svg>
+);
+
 const IconInfo = ({ color = '#6246EA', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <Circle cx="12" cy="12" r="10" />
@@ -158,6 +166,7 @@ export default function SettingsScreen({ navigation }) {
   const [isNotificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [isSoundPickerOpen, setSoundPickerOpen] = useState(false);
   const [isAlarmSoundPickerOpen, setAlarmSoundPickerOpen] = useState(false);
+  const [isAlarmStylePickerOpen, setAlarmStylePickerOpen] = useState(false);
   const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
   const [premiumFeatureName, setPremiumFeatureName] = useState('');
@@ -327,6 +336,16 @@ export default function SettingsScreen({ navigation }) {
   const currentAlarmSoundName = theme.alarmSound === 'default' 
     ? (t('Device Default') || 'Device Default') 
     : (ALL_SOUND_OPTIONS.find(o => o.value === theme.alarmSound)?.label || (theme.alarmSound || 'bass_alarm.mp3').replace(/\.(wav|mp3)$/i, ''));
+
+  const currentAlarmStyle = theme.alarmPresentationStyle || 'fullscreen';
+  const getAlarmStyleLabel = (style) => {
+    switch (style) {
+      case 'popup': return t('Popup banner') || 'Popup banner';
+      case 'adaptive': return t('Adaptive (System)') || 'Adaptive (System)';
+      case 'fullscreen':
+      default: return t('Full screen') || 'Full screen';
+    }
+  };
 
   const playSoundPreview = async (soundFilename) => {
     try {
@@ -689,6 +708,87 @@ export default function SettingsScreen({ navigation }) {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          )}
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Alarm presentation style */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => {
+              setAlarmStylePickerOpen(!isAlarmStylePickerOpen);
+              if (!isAlarmStylePickerOpen) {
+                setSoundPickerOpen(false);
+                setAlarmSoundPickerOpen(false);
+                setSnoozePickerOpen(false);
+              }
+            }}
+            style={styles.cardItemRow}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+              <IconDisplay color={primaryAccent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Alarm display style') || 'Alarm display style'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
+                {getAlarmStyleLabel(currentAlarmStyle)}
+              </Text>
+              <IconChevronRight color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Expanded alarm display style options */}
+          {isAlarmStylePickerOpen && (
+            <View style={styles.expandedSubOptions}>
+              {[
+                { 
+                  value: 'fullscreen', 
+                  label: t('Full screen') || 'Full screen', 
+                  desc: t('Full alarm screen with big Snooze & Stop buttons') || 'Full alarm screen with big Snooze & Stop buttons' 
+                },
+                { 
+                  value: 'popup', 
+                  label: t('Popup banner') || 'Popup banner', 
+                  desc: t('Heads-up notification banner at the top of the screen') || 'Heads-up notification banner at the top of the screen' 
+                },
+                { 
+                  value: 'adaptive', 
+                  label: t('Adaptive (System)') || 'Adaptive (System)', 
+                  desc: t('Full screen when locked, popup banner when phone is in use') || 'Full screen when locked, popup banner when phone is in use' 
+                },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={`style_${opt.value}`}
+                  style={[styles.soundItemRow, { paddingVertical: 10, alignItems: 'flex-start' }]}
+                  onPress={() => {
+                    dispatch(setAlarmPresentationStyle(opt.value));
+                    setAlarmStylePickerOpen(false);
+                  }}
+                >
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={[
+                      styles.soundItemText, 
+                      { 
+                        color: currentAlarmStyle === opt.value ? primaryAccent : colors.textPrimary,
+                        fontWeight: currentAlarmStyle === opt.value ? '700' : '500'
+                      }
+                    ]}>
+                      {opt.label}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                      {opt.desc}
+                    </Text>
+                  </View>
+                  {currentAlarmStyle === opt.value && (
+                    <Text style={{ color: primaryAccent, fontWeight: 'bold', alignSelf: 'center' }}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
 
           <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />

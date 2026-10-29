@@ -23,7 +23,7 @@ class ExpoTaskAlarmModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ExpoTaskAlarm")
 
-    AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, channelId: String ->
+    AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, channelId: String, presentationStyle: String? ->
       val context = appContext.reactContext ?: return@AsyncFunction false
       
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -48,6 +48,7 @@ class ExpoTaskAlarmModule : Module() {
           putExtra("taskName", taskName)
           putExtra("channelId", channelId)
           putExtra("requestCode", requestCode)
+          putExtra("presentationStyle", presentationStyle ?: "fullscreen")
       }
 
       val pendingIntent = PendingIntent.getBroadcast(

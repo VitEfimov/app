@@ -61,6 +61,7 @@ const initialState = {
   summaryReminderTime: loaded?.summaryReminderTime || '09:00',
   
   // Notification Settings
+  alarmPresentationStyle: loaded?.alarmPresentationStyle || 'fullscreen', // 'fullscreen', 'popup', 'adaptive'
   alarmSound: loaded?.alarmSound || 'bass_alarm.mp3',
   notificationSound: loaded?.notificationSound || 'notification.wav',
   vibrationEnabled: loaded?.vibrationEnabled !== undefined ? loaded.vibrationEnabled : true,
@@ -131,6 +132,9 @@ const themeSlice = createSlice({
     },
     setAlarmSound: (state, action) => {
       state.alarmSound = action.payload;
+    },
+    setAlarmPresentationStyle: (state, action) => {
+      state.alarmPresentationStyle = action.payload;
     },
     setNotificationSound: (state, action) => {
       state.notificationSound = action.payload;
@@ -313,7 +317,7 @@ export const flushPendingThemeSaves = async (getState) => {
 export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
-  setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setNotificationSound, setVibrationEnabled,
+  setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
   setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId,

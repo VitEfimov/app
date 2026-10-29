@@ -1234,11 +1234,22 @@ export const deleteRecurringSeries = (payload) => async (dispatch, getState) => 
     }
 };
 
-export const processAutoManageTasks = () => async (dispatch, getState) => {
+let lastAutoManageRun = 0;
+
+export const processAutoManageTasks = (force = false) => async (dispatch, getState) => {
     const state = getState();
     const isPremium = state.entitlementReducer?.isPremium;
     if (!isPremium) return;
+
+    const now = Date.now();
+    if (!force && now - lastAutoManageRun < 60000) {
+        return;
+    }
+    lastAutoManageRun = now;
+
     const tasks = state.taskReducer.tasks;
+    if (!tasks || tasks.length === 0) return;
+
     const themeState = state.themeReducer;
     const boardAutomations = themeState.boardAutomations || {};
     
@@ -1253,6 +1264,21 @@ export const processAutoManageTasks = () => async (dispatch, getState) => {
         autoRescheduleTime: (themeState.autoRescheduleTime && themeState.autoRescheduleTime !== '00:00') ? themeState.autoRescheduleTime : '23:59',
         rescheduleTransferredReminders: themeState.rescheduleTransferredReminders !== undefined ? themeState.rescheduleTransferredReminders : true
     };
+
+    const hasAnyGlobalAutomation = 
+        (globalSettings.autoTransferMode && globalSettings.autoTransferMode !== 'none') ||
+        globalSettings.increasePriorityWhenOverdue ||
+        globalSettings.removePriorityWhenCompleted ||
+        globalSettings.autoDeleteOverdueDays > 0 ||
+        globalSettings.autoDeleteCompletedDays > 0;
+
+    const hasBoardAutomationOverrides = Object.values(boardAutomations).some(
+        b => b && b.overrideGlobal === true
+    );
+
+    if (!hasAnyGlobalAutomation && !hasBoardAutomationOverrides) {
+        return;
+    }
     
     const actualToday = dayjs().startOf('day');
 

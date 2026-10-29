@@ -635,6 +635,14 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
             Animated.timing(kebabOpacity, { toValue: 0, duration: 80, useNativeDriver: true }).start();
           }
         }}
+        onSwipeableOpen={() => {
+          if (activeOpenSwipeable && activeOpenSwipeable !== swipeableRef.current) {
+            try {
+              activeOpenSwipeable.close();
+            } catch (e) {}
+          }
+          activeOpenSwipeable = swipeableRef.current;
+        }}
         onSwipeableWillClose={() => {
           Animated.timing(kebabOpacity, { toValue: 1, duration: 80, useNativeDriver: true }).start();
         }}
@@ -682,6 +690,7 @@ const styles = StyleSheet.create({
     paddingRight: 15,
     paddingLeft: 20,
     position: 'relative',
+    overflow: 'hidden',
   },
   priorityIndicator: {
     position: 'absolute',
@@ -763,6 +772,7 @@ const styles = StyleSheet.create({
     marginLeft: '2.5%',
     paddingLeft: 20,
     borderBottomWidth: 1,
+    overflow: 'hidden',
   },
   leftActionIconWrapper: {
     width: 24,
@@ -780,6 +790,7 @@ const styles = StyleSheet.create({
     marginRight: '2.5%',
     paddingRight: 10,
     borderBottomWidth: 1,
+    overflow: 'hidden',
   },
   rightActionBtn: {
     width: 48,

@@ -484,7 +484,25 @@ function InitApp() {
           }
         } else if (actionIdentifier === 'complete_task') {
           dispatch(updateTask({ taskId, completed: true }));
+          try {
+            const { cancelAlarm } = require('./modules/expo-task-alarm');
+            cancelAlarm(taskId);
+          } catch (e) {}
+          if (response.notification?.request?.identifier) {
+            try {
+              await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+            } catch (e) {}
+          }
         } else if (actionIdentifier === 'snooze') {
+          try {
+            const { cancelAlarm } = require('./modules/expo-task-alarm');
+            cancelAlarm(taskId);
+          } catch (e) {}
+          if (response.notification?.request?.identifier) {
+            try {
+              await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+            } catch (e) {}
+          }
           const themeState = store.getState().themeReducer || {};
           const snoozeMins = themeState.defaultSnoozeTime || 30;
 

@@ -7,11 +7,12 @@ export async function scheduleExactAlarm(
   taskId: string,
   taskName: string,
   triggerTimeMillis: number,
-  soundName: string
+  soundName: string,
+  presentationStyle?: string
 ): Promise<boolean> {
   if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.scheduleExactAlarm !== 'function') return false;
   try {
-    return await ExpoTaskAlarm.scheduleExactAlarm(taskId, taskName, triggerTimeMillis, soundName);
+    return await ExpoTaskAlarm.scheduleExactAlarm(taskId, taskName, triggerTimeMillis, soundName, presentationStyle || 'fullscreen');
   } catch (e) {
     console.warn('scheduleExactAlarm failed:', e);
     return false;

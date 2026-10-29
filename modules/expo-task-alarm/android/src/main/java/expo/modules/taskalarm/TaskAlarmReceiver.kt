@@ -14,6 +14,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val requestCode = intent.getIntExtra("requestCode", 0)
 
         val taskId = intent.getStringExtra("taskId") ?: ""
+        val presentationStyle = intent.getStringExtra("presentationStyle") ?: "fullscreen"
 
         // Wake intent
         val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
@@ -49,23 +50,28 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             putExtra("taskId", taskId)
             putExtra("taskName", taskName)
             putExtra("channelId", channelId)
+            putExtra("presentationStyle", presentationStyle)
         }
         val snoozePendingIntent = PendingIntent.getBroadcast(context, requestCode + 2000, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-        val notification = NotificationCompat.Builder(context, channelId)
+        val notificationBuilder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(iconResId)
             .setContentTitle("Task Alarm")
             .setContentText(taskName)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setContentIntent(fullScreenPendingIntent)
             .setOngoing(true)
             .setAutoCancel(false)
             .addAction(0, "Snooze", snoozePendingIntent)
             .addAction(0, "Stop", stopPendingIntent)
-            .build()
+
+        if (presentationStyle != "popup") {
+            notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
+        }
+
+        val notification = notificationBuilder.build()
             
         notification.flags = notification.flags or android.app.Notification.FLAG_INSISTENT
 
@@ -73,6 +79,15 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             NotificationManagerCompat.from(context).notify(requestCode, notification)
         } catch (e: SecurityException) {
             e.printStackTrace()
+        }
+
+        if (presentationStyle == "fullscreen") {
+            try {
+                alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(alarmIntent)
+            } catch (e: Exception) {
+                // If background activity start is restricted by Android OS, fullScreenIntent takes care of it
+            }
         }
     }
 }
