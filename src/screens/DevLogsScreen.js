@@ -28,6 +28,7 @@ import {
 import { updateTask, processAutoManageTasks } from '../features/taskSlice';
 import * as Notifications from 'expo-notifications';
 import dayjs from 'dayjs';
+import { navigationRef } from '../navigation/AppNavigator';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming } from '../utils/filters';
 import Svg, { Path } from 'react-native-svg';
 
@@ -363,12 +364,22 @@ export default function DevLogsScreen({ navigation }) {
     return logs.filter((l) => l.type === logFilter);
   }, [logs, logFilter]);
 
+  const handleBack = () => {
+    if (navigation?.canGoBack?.()) {
+      navigation.goBack();
+    } else if (navigation?.navigate) {
+      navigation.navigate('MainTabs', { screen: 'Settings' });
+    } else if (navigationRef?.isReady?.()) {
+      navigationRef.navigate('MainTabs', { screen: 'Settings' });
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       {/* Top Header with Back button */}
       <View style={[styles.screenHeader, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
         <TouchableOpacity
-          onPress={() => navigation?.goBack?.()}
+          onPress={handleBack}
           style={styles.backBtn}
           accessibilityRole="button"
           accessibilityLabel="Go back to Settings"

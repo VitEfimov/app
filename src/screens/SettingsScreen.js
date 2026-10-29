@@ -122,6 +122,15 @@ const IconSpeaker = ({ color = '#6246EA', size = 20 }) => (
   </Svg>
 );
 
+const IconAlarm = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="13" r="8" />
+    <Path d="M12 9v4l2 2" />
+    <Path d="M5 3L2 6" />
+    <Path d="M19 3l3 3" />
+  </Svg>
+);
+
 const IconInfo = ({ color = '#6246EA', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <Circle cx="12" cy="12" r="10" />
@@ -148,6 +157,7 @@ export default function SettingsScreen({ navigation }) {
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isNotificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [isSoundPickerOpen, setSoundPickerOpen] = useState(false);
+  const [isAlarmSoundPickerOpen, setAlarmSoundPickerOpen] = useState(false);
   const [isAutoManageModalVisible, setAutoManageModalVisible] = useState(false);
   const [isPremiumModalVisible, setPremiumModalVisible] = useState(false);
   const [premiumFeatureName, setPremiumFeatureName] = useState('');
@@ -271,22 +281,52 @@ export default function SettingsScreen({ navigation }) {
     contrast: t('Contrast') || 'Contrast',
   }[mode || 'light'] || 'Light';
 
-  const currentSoundName = theme.notificationSound === 'default' 
-    ? (t('Default') || 'Default') 
-    : (theme.notificationSound || 'notification.wav').replace('.wav', '').replace('.mp3', '');
-
-  const soundOptions = [
-    { label: t('Device Default'), value: 'default' },
-    { label: t('Bonjo'), value: 'bonjo.mp3' },
-    { label: t('Pisk'), value: 'pisk.mp3' },
-    { label: t('Tucktuck'), value: 'tucktuck.mp3' },
-    { label: t('Alarm 02'), value: 'alarm_02.mp3' },
-    { label: t('Bass Alarm'), value: 'bass_alarm.mp3' },
-    { label: t('Bell'), value: 'bell.mp3' },
-    { label: t('Chime'), value: 'chime.wav' },
-    { label: t('Koto'), value: 'koto.mp3' },
-    { label: t('Notification'), value: 'notification.wav' },
+  const ALL_SOUND_OPTIONS = [
+    { label: t('Device Default') || 'Device Default', value: 'default' },
+    { label: 'Alarm 02', value: 'alarm_02.mp3' },
+    { label: 'Bass Alarm', value: 'bass_alarm.mp3' },
+    { label: 'Bell', value: 'bell.mp3' },
+    { label: 'Bell 01', value: 'bell01.mp3' },
+    { label: 'Bonjo', value: 'bonjo.mp3' },
+    { label: 'Cellos Pizzicato', value: 'cellos_pizz.mp3' },
+    { label: 'Cellos Pizz DGG', value: 'cellos_pizzdgg.mp3' },
+    { label: 'Cellos Pizz EDF', value: 'cellos_pizzedf.mp3' },
+    { label: 'Cellos Tremolo', value: 'cellos_tremolo.mp3' },
+    { label: 'Chime', value: 'chime.wav' },
+    { label: 'Fireworks', value: 'fireworks.mp3' },
+    { label: 'Keys', value: 'keys.mp3' },
+    { label: 'Keys 2', value: 'keys2.mp3' },
+    { label: 'Koto', value: 'koto.mp3' },
+    { label: 'Koto Notification', value: 'koto_notification.mp3' },
+    { label: 'Koto Shamisen', value: 'koto_shamisen.mp3' },
+    { label: 'Light Ping', value: 'light_ping.mp3' },
+    { label: 'Light Scrub', value: 'light_scrub.mp3' },
+    { label: 'Low Piano', value: 'low_piano.mp3' },
+    { label: 'Marimba', value: 'marinba.mp3' },
+    { label: 'Marimba EEFGE', value: 'marinbaeefge.mp3' },
+    { label: 'Notification', value: 'notification.wav' },
+    { label: 'Overdue Nudge', value: 'overdue_nudge.wav' },
+    { label: 'Pisk', value: 'pisk.mp3' },
+    { label: 'Shamisen', value: 'shamisen.mp3' },
+    { label: 'Tucktuck', value: 'tucktuck.mp3' },
+    { label: 'Viola Solo Pizzicato EGABEB', value: 'viola_solo_pizzicatoegabeb.mp3' },
+    { label: 'Viola Solo Pizzicato EGAG', value: 'viola_solo_pizzicatoegag.mp3' },
+    { label: 'Violin Pizzicato BEFE', value: 'violin_pizzicatobefe.mp3' },
+    { label: 'Viola Pizzicato EGF', value: 'violla_pizzicatoegf.mp3' },
+    { label: 'V Pizzicato', value: 'vpizzicato.mp3' },
+    { label: 'Xelod', value: 'xelod.mp3' },
+    { label: 'Xelod FS', value: 'xelodfs.mp3' },
+    { label: 'Xelof', value: 'xelof.mp3' },
+    { label: 'Xylo', value: 'xylo.mp3' },
   ];
+
+  const currentNotificationSoundName = theme.notificationSound === 'default' 
+    ? (t('Device Default') || 'Device Default') 
+    : (ALL_SOUND_OPTIONS.find(o => o.value === theme.notificationSound)?.label || (theme.notificationSound || 'notification.wav').replace(/\.(wav|mp3)$/i, ''));
+
+  const currentAlarmSoundName = theme.alarmSound === 'default' 
+    ? (t('Device Default') || 'Device Default') 
+    : (ALL_SOUND_OPTIONS.find(o => o.value === theme.alarmSound)?.label || (theme.alarmSound || 'bass_alarm.mp3').replace(/\.(wav|mp3)$/i, ''));
 
   const playSoundPreview = async (soundFilename) => {
     try {
@@ -544,7 +584,10 @@ export default function SettingsScreen({ navigation }) {
           {/* Notification sound */}
           <TouchableOpacity
             activeOpacity={0.75}
-            onPress={() => setSoundPickerOpen(!isSoundPickerOpen)}
+            onPress={() => {
+              setSoundPickerOpen(!isSoundPickerOpen);
+              if (!isSoundPickerOpen) setAlarmSoundPickerOpen(false);
+            }}
             style={styles.cardItemRow}
           >
             <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
@@ -557,18 +600,18 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
-                {currentSoundName}
+                {currentNotificationSoundName}
               </Text>
               <IconChevronRight color={colors.textSecondary} />
             </View>
           </TouchableOpacity>
 
-          {/* Expanded sound options */}
+          {/* Expanded notification sound options */}
           {isSoundPickerOpen && (
-            <View style={styles.expandedSubOptions}>
-              {soundOptions.map(snd => (
+            <ScrollView nestedScrollEnabled={true} style={[styles.expandedSubOptions, { maxHeight: 280 }]} showsVerticalScrollIndicator={true}>
+              {ALL_SOUND_OPTIONS.map(snd => (
                 <TouchableOpacity
-                  key={snd.value}
+                  key={`notif_${snd.value}`}
                   style={styles.soundItemRow}
                   onPress={() => {
                     dispatch(setNotificationSound(snd.value));
@@ -578,18 +621,74 @@ export default function SettingsScreen({ navigation }) {
                   <Text style={[
                     styles.soundItemText, 
                     { 
-                      color: theme.notificationSound === snd.value ? primaryAccent : colors.textPrimary,
-                      fontWeight: theme.notificationSound === snd.value ? '700' : '500'
+                      color: (theme.notificationSound || 'notification.wav') === snd.value ? primaryAccent : colors.textPrimary,
+                      fontWeight: (theme.notificationSound || 'notification.wav') === snd.value ? '700' : '500'
                     }
                   ]}>
                     {snd.label}
                   </Text>
-                  {theme.notificationSound === snd.value && (
+                  {(theme.notificationSound || 'notification.wav') === snd.value && (
                     <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
                   )}
                 </TouchableOpacity>
               ))}
+            </ScrollView>
+          )}
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Alarm sound */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => {
+              setAlarmSoundPickerOpen(!isAlarmSoundPickerOpen);
+              if (!isAlarmSoundPickerOpen) setSoundPickerOpen(false);
+            }}
+            style={styles.cardItemRow}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+              <IconAlarm color={primaryAccent} />
             </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Alarm sound') || 'Alarm sound'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
+                {currentAlarmSoundName}
+              </Text>
+              <IconChevronRight color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Expanded alarm sound options */}
+          {isAlarmSoundPickerOpen && (
+            <ScrollView nestedScrollEnabled={true} style={[styles.expandedSubOptions, { maxHeight: 280 }]} showsVerticalScrollIndicator={true}>
+              {ALL_SOUND_OPTIONS.map(snd => (
+                <TouchableOpacity
+                  key={`alarm_${snd.value}`}
+                  style={styles.soundItemRow}
+                  onPress={() => {
+                    dispatch(setAlarmSound(snd.value));
+                    playSoundPreview(snd.value);
+                  }}
+                >
+                  <Text style={[
+                    styles.soundItemText, 
+                    { 
+                      color: (theme.alarmSound || 'bass_alarm.mp3') === snd.value ? primaryAccent : colors.textPrimary,
+                      fontWeight: (theme.alarmSound || 'bass_alarm.mp3') === snd.value ? '700' : '500'
+                    }
+                  ]}>
+                    {snd.label}
+                  </Text>
+                  {(theme.alarmSound || 'bass_alarm.mp3') === snd.value && (
+                    <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           )}
 
           <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />

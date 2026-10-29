@@ -1395,6 +1395,7 @@ useEffect(() => {
                   <Text style={[styles.optionsSummaryText, { color: colors.textSecondary }]} numberOfLines={1}>
                     {[
                       reminder !== 'None' ? (t(reminder) || reminder) : null,
+                      isAlarm ? `⏰ ${t('Alarm') || 'Alarm'}` : null,
                       selectedBoardName,
                       repeatConfig?.preset && repeatConfig.preset !== 'None' ? (t(repeatConfig.preset) || repeatConfig.preset) : null
                     ].filter(Boolean).join(' · ')}
