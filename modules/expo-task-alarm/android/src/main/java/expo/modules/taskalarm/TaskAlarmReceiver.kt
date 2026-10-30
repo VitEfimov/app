@@ -1,9 +1,11 @@
 package expo.modules.taskalarm
 
+import android.app.KeyguardManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
@@ -22,7 +24,6 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val isLocked = keyguardManager?.isKeyguardLocked ?: false
 
         val isFullScreenMode = (presentationStyle == "fullscreen") || (presentationStyle == "adaptive" && (!isInteractive || isLocked))
-        val isPopupMode = (presentationStyle == "popup") || (presentationStyle == "adaptive" && isInteractive && !isLocked)
 
         val activeChannelId = if (isFullScreenMode) "${channelId}_fs" else channelId
         val isCar = CarUtils.isConnectedToCar(context)
