@@ -89,6 +89,7 @@ class AlarmActivity : Activity() {
                 putExtra("taskName", taskName)
                 putExtra("channelId", channelId)
                 putExtra("requestCode", requestCode)
+                putExtra("presentationStyle", intent.getStringExtra("presentationStyle") ?: "fullscreen")
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 this,

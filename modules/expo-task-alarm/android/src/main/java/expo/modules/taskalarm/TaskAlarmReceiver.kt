@@ -16,6 +16,15 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val taskId = intent.getStringExtra("taskId") ?: ""
         val presentationStyle = intent.getStringExtra("presentationStyle") ?: "fullscreen"
 
+        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val isInteractive = powerManager?.isInteractive ?: false
+        val isLocked = keyguardManager?.isKeyguardLocked ?: false
+
+        val isFullScreenMode = (presentationStyle == "fullscreen") || (presentationStyle == "adaptive" && (!isInteractive || isLocked))
+        val isPopupMode = (presentationStyle == "popup") || (presentationStyle == "adaptive" && isInteractive && !isLocked)
+
+        val activeChannelId = if (isFullScreenMode) "${channelId}_fs" else channelId
         val isCar = CarUtils.isConnectedToCar(context)
 
         // Wake intent
@@ -26,6 +35,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             putExtra("channelId", channelId)
             putExtra("requestCode", requestCode)
             putExtra("isCar", isCar)
+            putExtra("presentationStyle", presentationStyle)
         }
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
@@ -57,11 +67,10 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         }
         val snoozePendingIntent = PendingIntent.getBroadcast(context, requestCode + 2000, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-        val notificationBuilder = NotificationCompat.Builder(context, channelId)
+        val notificationBuilder = NotificationCompat.Builder(context, activeChannelId)
             .setSmallIcon(iconResId)
             .setContentTitle("Task Alarm")
             .setContentText(taskName)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(fullScreenPendingIntent)
@@ -70,8 +79,16 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             .addAction(0, "Snooze", snoozePendingIntent)
             .addAction(0, "Stop", stopPendingIntent)
 
-        if (presentationStyle != "popup") {
-            notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
+        if (isFullScreenMode) {
+            // In Full-Screen mode, priority is DEFAULT so Android does not show a heads-up popup banner over the full-screen activity
+            notificationBuilder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            if (!isInteractive || isLocked) {
+                // If screen is locked or off, fullScreenIntent will wake the device to full-screen activity (no heads-up banner on lockscreen)
+                notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
+            }
+        } else {
+            // In Popup mode, priority is MAX so Android drops down the heads-up notification banner with action buttons
+            notificationBuilder.setPriority(NotificationCompat.PRIORITY_MAX)
         }
 
         if (isCar) {
@@ -95,7 +112,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             e.printStackTrace()
         }
 
-        if (presentationStyle == "fullscreen") {
+        if (isFullScreenMode) {
             try {
                 alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 context.startActivity(alarmIntent)

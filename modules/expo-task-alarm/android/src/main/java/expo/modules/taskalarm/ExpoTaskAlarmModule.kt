@@ -137,17 +137,34 @@ class ExpoTaskAlarmModule : Module() {
     AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, channelId: String, presentationStyle: String? ->
       val context = appContext.reactContext ?: return@AsyncFunction false
       
+      val targetChannelId = if (!channelId.isNullOrEmpty()) channelId else "task_alarm_channel"
+      val style = presentationStyle ?: "fullscreen"
+
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          val channelId = "task_alarm_channel"
-          val channelName = "Full Screen Alarms"
-          val importance = NotificationManager.IMPORTANCE_HIGH
-          val channel = NotificationChannel(channelId, channelName, importance).apply {
-              description = "Channel for full screen alarms"
-              setSound(null, null) 
-              enableVibration(false)
-          }
           val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-          notificationManager.createNotificationChannel(channel)
+          
+          // 1. Ensure high priority channel exists for popup mode
+          if (notificationManager.getNotificationChannel(targetChannelId) == null) {
+              val channel = NotificationChannel(targetChannelId, "Task Alarms", NotificationManager.IMPORTANCE_HIGH).apply {
+                  description = "Channel for task alarms"
+              }
+              notificationManager.createNotificationChannel(channel)
+          }
+
+          // 2. Default importance channel for full-screen mode to prevent popup banner over the full screen activity
+          val fsChannelId = "${targetChannelId}_fs"
+          if (notificationManager.getNotificationChannel(fsChannelId) == null) {
+              val existing = notificationManager.getNotificationChannel(targetChannelId)
+              val fsChannel = NotificationChannel(fsChannelId, "Task Full Screen Alarms", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                  description = "Channel for full screen alarms without heads-up popup banner"
+                  if (existing != null) {
+                      setSound(existing.sound, existing.audioAttributes)
+                      enableVibration(existing.shouldVibrate())
+                      vibrationPattern = existing.vibrationPattern
+                  }
+              }
+              notificationManager.createNotificationChannel(fsChannel)
+          }
       }
 
       val requestCode = taskId.hashCode()
@@ -157,9 +174,9 @@ class ExpoTaskAlarmModule : Module() {
       val receiverIntent = Intent(context, TaskAlarmReceiver::class.java).apply {
           putExtra("taskId", taskId)
           putExtra("taskName", taskName)
-          putExtra("channelId", channelId)
+          putExtra("channelId", targetChannelId)
           putExtra("requestCode", requestCode)
-          putExtra("presentationStyle", presentationStyle ?: "fullscreen")
+          putExtra("presentationStyle", style)
       }
 
       val pendingIntent = PendingIntent.getBroadcast(
