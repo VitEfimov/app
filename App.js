@@ -402,6 +402,9 @@ function InitApp() {
         // 2. Auto-manage overdue/completed tasks
         await dispatch(processAutoManageTasks());
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        if (nextAppState === 'background' && store.getState().themeReducer?.appPin) {
+          setIsUnlocked(false);
+        }
         const { flushPendingTaskSaves } = require('./src/features/taskSlice');
         const { flushPendingThemeSaves } = require('./src/features/themeSlice');
         await Promise.all([

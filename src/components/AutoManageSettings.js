@@ -90,7 +90,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
         setLocalSettings(themeState || defaultSettings);
       }
     }
-  }, [isVisible, boardId, themeState]);
+  }, [isVisible, boardId]);
 
   const handleUpdate = (updates) => {
     let updated = { ...localSettings, ...updates };
@@ -98,18 +98,15 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
       updated.overrideGlobal = true;
     }
     setLocalSettings(updated);
-    if (boardId) {
-      dispatch(setBoardAutoManageSettings({ boardId, settings: updated }));
-    } else {
-      dispatch(setAutoManageSettings(updated));
-      updateRecurringAutomations(updated, tasks);
-    }
-    dispatch(processAutoManageTasks(true));
   };
 
   const handleSave = () => {
     if (boardId) {
-      dispatch(setBoardAutoManageSettings({ boardId, settings: localSettings }));
+      if (localSettings.overrideGlobal === false) {
+        dispatch(removeBoardAutoManageSettings({ boardId }));
+      } else {
+        dispatch(setBoardAutoManageSettings({ boardId, settings: localSettings }));
+      }
     } else {
       dispatch(setAutoManageSettings(localSettings));
       updateRecurringAutomations(localSettings, tasks);
@@ -120,7 +117,6 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
 
   const handleReset = () => {
     if (boardId) {
-      dispatch(removeBoardAutoManageSettings({ boardId }));
       setLocalSettings({ ...defaultSettings, overrideGlobal: false });
     } else {
       setLocalSettings(defaultSettings);

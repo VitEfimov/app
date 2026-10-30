@@ -57,14 +57,24 @@ class AlarmActivity : Activity() {
             AlarmAudioManager.abandonAlarmFocus(this)
             NotificationManagerCompat.from(this).cancel(requestCode)
             
-            if (taskId.isNotEmpty()) {
-                val launchIntent = Intent(Intent.ACTION_VIEW, Uri.parse("taskmanager://board?editTaskId=$taskId"))
-                launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                startActivity(launchIntent)
-            } else {
-                val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-                launchIntent?.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                startActivity(launchIntent)
+            try {
+                if (taskId.isNotEmpty()) {
+                    val safeTaskId = Uri.encode(taskId)
+                    val launchIntent = Intent(Intent.ACTION_VIEW, Uri.parse("taskmanager://board?editTaskId=$safeTaskId")).apply {
+                        setPackage(packageName)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                    startActivity(launchIntent)
+                } else {
+                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                    if (launchIntent != null) {
+                        startActivity(launchIntent)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
             finish()
         }

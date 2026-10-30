@@ -49,7 +49,7 @@ function MainStack() {
 }
 
 const linking = {
-  prefixes: ['taskmanager://'],
+  prefixes: ['taskflow://', 'taskmanager://', 'taskcalendar://', 'com.vitvalef.app://'],
   config: {
     screens: {
       MainTabs: {
@@ -59,7 +59,6 @@ const linking = {
           Settings: 'settings',
         },
       },
-      DevLogs: 'devlogs',
       Login: 'login',
     },
   },

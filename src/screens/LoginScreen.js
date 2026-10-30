@@ -5,12 +5,14 @@ import { loginUser, registerUser, continueAsGuest } from '../features/userSlice'
 import { useTheme } from '../styles/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
+import { isValidEmail } from '../utils/securitySanitizer';
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [validationError, setValidationError] = useState('');
 
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.userReducer);
@@ -34,11 +36,20 @@ export default function LoginScreen() {
   }, []);
 
   const handleSubmit = () => {
-    if (!email.trim() || !password.trim()) return;
+    setValidationError('');
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
+      setValidationError(t('Please fill in all fields.') || 'Please fill in all fields.');
+      return;
+    }
+    if (!isValidEmail(cleanEmail)) {
+      setValidationError(t('Please enter a valid email address.') || 'Please enter a valid email address.');
+      return;
+    }
     if (isLogin) {
-      dispatch(loginUser({ email: email.trim(), password, rememberMe }));
+      dispatch(loginUser({ email: cleanEmail, password, rememberMe }));
     } else {
-      dispatch(registerUser({ email: email.trim(), password }));
+      dispatch(registerUser({ email: cleanEmail, password }));
     }
   };
 
@@ -147,7 +158,11 @@ export default function LoginScreen() {
       <View style={styles.formContainer}>
         <Text style={styles.title}>{isLogin ? t('Login to TaskManager') || 'Login to TaskManager' : t('Register Account') || 'Register Account'}</Text>
         
-        {error ? <Text style={styles.errorText}>{typeof error === 'string' ? error : JSON.stringify(error)}</Text> : null}
+        {validationError || error ? (
+          <Text style={styles.errorText}>
+            {validationError || (typeof error === 'string' ? error : JSON.stringify(error))}
+          </Text>
+        ) : null}
 
         <TextInput
           testID="login_email_input"
@@ -155,7 +170,7 @@ export default function LoginScreen() {
           placeholder={t('Email') || 'Email'}
           placeholderTextColor={colors.textSecondary}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => { setEmail(text); setValidationError(''); }}
           keyboardType="email-address"
           autoCapitalize="none"
         />
@@ -166,7 +181,7 @@ export default function LoginScreen() {
           placeholder={t('Password') || 'Password'}
           placeholderTextColor={colors.textSecondary}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(text) => { setPassword(text); setValidationError(''); }}
           secureTextEntry
         />
 

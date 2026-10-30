@@ -7,6 +7,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
 import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, addTombstoneAsync } from '../utils/calendarSync';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
+import { sanitizeId, sanitizeForStorage } from '../utils/securitySanitizer';
 import axios from 'axios';
 
 dayjs.extend(isSameOrBefore);
@@ -148,7 +149,8 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
 
 export const addTaskAsync = createAsyncThunk('task/addTaskAsync', async (task, thunkAPI) => {
     try {
-        const response = await axios.post('/api/tasks', task, { withCredentials: true });
+        const safeTask = sanitizeForStorage(task);
+        const response = await axios.post('/api/tasks', safeTask, { withCredentials: true });
         return response.data;
     } catch (err) {
         return task;
@@ -157,7 +159,8 @@ export const addTaskAsync = createAsyncThunk('task/addTaskAsync', async (task, t
 
 export const addMultipleTasksAsync = createAsyncThunk('task/addMultipleTasksAsync', async (tasks, thunkAPI) => {
     try {
-        const response = await axios.post('/api/tasks/bulk', { tasks }, { withCredentials: true });
+        const safeTasks = Array.isArray(tasks) ? tasks.map(t => sanitizeForStorage(t)) : tasks;
+        const response = await axios.post('/api/tasks/bulk', { tasks: safeTasks }, { withCredentials: true });
         return response.data;
     } catch (err) {
         return tasks;
@@ -167,8 +170,10 @@ export const addMultipleTasksAsync = createAsyncThunk('task/addMultipleTasksAsyn
 export const updateTaskAsync = createAsyncThunk('task/updateTaskAsync', async (updateData, thunkAPI) => {
     try {
         const { taskId, payload } = updateData;
-        await axios.put(`/api/tasks/${taskId}`, payload, { withCredentials: true });
-        return { taskId, payload };
+        const safeId = sanitizeId(taskId);
+        const safePayload = sanitizeForStorage(payload);
+        await axios.put(`/api/tasks/${safeId}`, safePayload, { withCredentials: true });
+        return { taskId: safeId, payload: safePayload };
     } catch (err) {
         return updateData;
     }
@@ -176,7 +181,8 @@ export const updateTaskAsync = createAsyncThunk('task/updateTaskAsync', async (u
 
 export const deleteTaskAsync = createAsyncThunk('task/deleteTaskAsync', async (taskId, thunkAPI) => {
     try {
-        await axios.delete(`/api/tasks/${taskId}`, { withCredentials: true });
+        const safeId = sanitizeId(taskId);
+        await axios.delete(`/api/tasks/${safeId}`, { withCredentials: true });
     } catch (err) {
         // Fallback
     }
