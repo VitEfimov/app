@@ -31,6 +31,13 @@ import dayjs from 'dayjs';
 import { navigationRef } from '../navigation/AppNavigator';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming } from '../utils/filters';
 import Svg, { Path } from 'react-native-svg';
+import {
+  getAlarmSystemDiagnostics,
+  openExactAlarmSettings,
+  openBatteryOptimizationSettings,
+  openOverlaySettings,
+  isCarConnected,
+} from '../../modules/expo-task-alarm';
 
 const IconRefresh = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -75,6 +82,9 @@ export default function DevLogsScreen({ navigation }) {
   const [scheduledNotifications, setScheduledNotifications] = useState([]);
   const [channelsList, setChannelsList] = useState([]);
   const [permissionStatus, setPermissionStatus] = useState(null);
+  const [systemDiag, setSystemDiag] = useState(null);
+  const [desyncReport, setDesyncReport] = useState(null);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = DevLogger.subscribe((newLogs) => {
@@ -84,8 +94,95 @@ export default function DevLogsScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    checkPermissions();
-  }, []);
+    runSystemDiagnostics();
+  }, [tasks]);
+
+  const runSystemDiagnostics = async () => {
+    setIsDiagnosing(true);
+    try {
+      const diag = await getAlarmSystemDiagnostics();
+      setSystemDiag(diag);
+
+      const perm = await Notifications.getPermissionsAsync();
+      setPermissionStatus(perm.status);
+
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      setScheduledNotifications(scheduled);
+
+      if (Platform.OS === 'android') {
+        try {
+          const channels = await Notifications.getNotificationChannelsAsync();
+          setChannelsList(channels);
+        } catch (e) {}
+      }
+
+      // Check desync between tasks with reminders and OS scheduled notifications
+      const activeTasksWithReminders = tasks.filter(
+        (t) => !t.completed && ((t.reminder && t.reminder !== 'None') || t.isAlarm)
+      );
+      const scheduledIds = new Set(scheduled.map((s) => String(s.identifier)));
+
+      const missingFromOS = [];
+      activeTasksWithReminders.forEach((t) => {
+        const notifIds = Array.isArray(t.notificationId)
+          ? t.notificationId
+          : t.notificationId
+          ? [t.notificationId]
+          : [];
+        const hasNative = notifIds.some((id) => String(id).startsWith('native_alarm_'));
+        const hasExpo = notifIds.some((id) => scheduledIds.has(String(id)));
+        if (!hasNative && !hasExpo) {
+          missingFromOS.push(t);
+        }
+      });
+
+      setDesyncReport({
+        total: activeTasksWithReminders.length,
+        osScheduled: scheduled.length,
+        missing: missingFromOS,
+      });
+
+      DevLogger.success('Checker diagnostics updated', {
+        canExact: diag?.canScheduleExactAlarms,
+        fullScreen: diag?.canUseFullScreenIntent,
+        batteryOpt: diag?.isIgnoringBatteryOptimizations,
+        missing: missingFromOS.length,
+      });
+    } catch (err) {
+      DevLogger.error('Failed to run alarm diagnostics', err.message);
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
+
+  const handleFixAllDesynced = async () => {
+    if (!desyncReport || !desyncReport.missing || desyncReport.missing.length === 0) return;
+    DevLogger.info(`Re-syncing ${desyncReport.missing.length} missing tasks...`);
+    for (const t of desyncReport.missing) {
+      try {
+        const newNotifIds = await scheduleTaskReminder(
+          t.taskname,
+          t.reminder || 'None',
+          t.completionDate,
+          t.time,
+          t.id,
+          t.isAlarm || false,
+          themeState,
+          { isNagMode: t.isNagMode, escalationLevel: t.escalationLevel }
+        );
+        dispatch(
+          updateTask({
+            taskId: t.id,
+            notificationId: newNotifIds || [],
+          })
+        );
+      } catch (e) {
+        DevLogger.error(`Failed to reschedule ${t.taskname}`, e.message);
+      }
+    }
+    DevLogger.success('Re-sync completed. Refreshing diagnostics...');
+    await runSystemDiagnostics();
+  };
 
   const checkPermissions = async () => {
     try {
@@ -247,15 +344,41 @@ export default function DevLogsScreen({ navigation }) {
   };
 
   const handleTestFullAlarm = async () => {
-    DevLogger.info('Triggering 3-second Full-Screen Alarm Test');
+    DevLogger.info('Triggering 3-second Full-Screen Alarm Test (with audio pause & over other apps)');
     const fireTime = dayjs().add(3, 'second');
     await scheduleExactTaskReminder(
       'Full Screen Alarm Test',
       fireTime.toDate(),
-      'test_alarm_123',
+      'test_alarm_fullscreen_123',
       true,
       'task_alarm',
-      themeState
+      { ...themeState, alarmPresentationStyle: 'fullscreen' }
+    );
+  };
+
+  const handleTestPopupAlarm = async () => {
+    DevLogger.info('Triggering 3-second Popup Banner Alarm Test (heads-up with action buttons)');
+    const fireTime = dayjs().add(3, 'second');
+    await scheduleExactTaskReminder(
+      'Popup Banner Alarm Test',
+      fireTime.toDate(),
+      'test_alarm_popup_123',
+      true,
+      'task_reminder',
+      { ...themeState, alarmPresentationStyle: 'popup' }
+    );
+  };
+
+  const handleTestCarSilentMode = async () => {
+    DevLogger.info('Triggering 3-second Android Auto / Car Silent Mode Test');
+    const fireTime = dayjs().add(3, 'second');
+    await scheduleExactTaskReminder(
+      'Car Silent Notification Test',
+      fireTime.toDate(),
+      'test_car_silent_123',
+      false,
+      'task_reminder',
+      { ...themeState, androidAutoEnabled: true }
     );
   };
 
@@ -622,50 +745,243 @@ export default function DevLogsScreen({ navigation }) {
         {/* ================= TAB 2: NOTIFICATIONS & ALARMS ================= */}
         {activeTab === 'notifications' && (
           <ScrollView contentContainerStyle={styles.scrollSection}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notification Diagnostics</Text>
-
-            {/* Permission Status Banner */}
-            <View style={[styles.permissionBanner, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
-                  Notification Permission: {permissionStatus || 'Checking...'}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
+                Alarms & Notifications Health Checker
+              </Text>
+              <TouchableOpacity
+                style={[styles.btnSmall, { backgroundColor: colors.primary, maxWidth: 120, paddingVertical: 6 }]}
+                onPress={runSystemDiagnostics}
+                disabled={isDiagnosing}
+              >
+                <Text style={styles.btnSmallText}>
+                  {isDiagnosing ? 'Checking...' : 'Run Diagnostic'}
                 </Text>
-                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-                  Must be 'granted' for notifications and alarms to work.
+              </TouchableOpacity>
+            </View>
+
+            {/* System Health Capabilities Matrix Card */}
+            <View style={[styles.cardDump, { backgroundColor: colors.bgCard, borderColor: colors.borderColor, marginBottom: 16 }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 }}>
+                System Permissions & Subsystem Health
+              </Text>
+
+              {/* Exact Alarms Capability */}
+              <View style={styles.infoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Exact Alarms (Android 12+)</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Required for on-time alarm triggering</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={[styles.tag, { backgroundColor: systemDiag?.canScheduleExactAlarms !== false ? 'rgba(82, 196, 26, 0.15)' : 'rgba(255, 77, 79, 0.15)' }]}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: systemDiag?.canScheduleExactAlarms !== false ? '#52c41a' : '#ff4d4f' }}>
+                      {systemDiag?.canScheduleExactAlarms !== false ? 'Allowed' : 'Restricted'}
+                    </Text>
+                  </View>
+                  {systemDiag?.canScheduleExactAlarms === false && (
+                    <TouchableOpacity
+                      style={[styles.btnSmall, { backgroundColor: '#ff4d4f', paddingVertical: 4, paddingHorizontal: 6 }]}
+                      onPress={openExactAlarmSettings}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Enable</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Full Screen Intent Capability */}
+              <View style={styles.infoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Full-Screen Intent (Android 14+)</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Required for full-screen alarm screen</Text>
+                </View>
+                <View style={[styles.tag, { backgroundColor: systemDiag?.canUseFullScreenIntent !== false ? 'rgba(82, 196, 26, 0.15)' : 'rgba(255, 77, 79, 0.15)' }]}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: systemDiag?.canUseFullScreenIntent !== false ? '#52c41a' : '#ff4d4f' }}>
+                    {systemDiag?.canUseFullScreenIntent !== false ? 'Allowed' : 'Blocked'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Display Over Other Apps */}
+              <View style={styles.infoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Display Over Other Apps</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Shows alarm over YouTube, games & active apps</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={[styles.tag, { backgroundColor: systemDiag?.canDrawOverlays ? 'rgba(82, 196, 26, 0.15)' : 'rgba(250, 173, 20, 0.15)' }]}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: systemDiag?.canDrawOverlays ? '#52c41a' : '#faad14' }}>
+                      {systemDiag?.canDrawOverlays ? 'Granted' : 'Not Granted'}
+                    </Text>
+                  </View>
+                  {!systemDiag?.canDrawOverlays && (
+                    <TouchableOpacity
+                      style={[styles.btnSmall, { backgroundColor: colors.primary, paddingVertical: 4, paddingHorizontal: 6 }]}
+                      onPress={openOverlaySettings}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Grant</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Battery Optimization / Doze */}
+              <View style={styles.infoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Battery Optimization</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Prevents OS from killing or delaying alarms</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={[styles.tag, { backgroundColor: systemDiag?.isIgnoringBatteryOptimizations ? 'rgba(82, 196, 26, 0.15)' : 'rgba(250, 173, 20, 0.15)' }]}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: systemDiag?.isIgnoringBatteryOptimizations ? '#52c41a' : '#faad14' }}>
+                      {systemDiag?.isIgnoringBatteryOptimizations ? 'Unrestricted' : 'Optimized'}
+                    </Text>
+                  </View>
+                  {!systemDiag?.isIgnoringBatteryOptimizations && (
+                    <TouchableOpacity
+                      style={[styles.btnSmall, { backgroundColor: '#faad14', paddingVertical: 4, paddingHorizontal: 6 }]}
+                      onPress={openBatteryOptimizationSettings}
+                    >
+                      <Text style={{ color: '#000', fontSize: 10, fontWeight: 'bold' }}>Fix</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Notifications Permission */}
+              <View style={styles.infoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Notification Permission</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Standard notification posting permission</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={[styles.tag, { backgroundColor: permissionStatus === 'granted' ? 'rgba(82, 196, 26, 0.15)' : 'rgba(255, 77, 79, 0.15)' }]}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: permissionStatus === 'granted' ? '#52c41a' : '#ff4d4f' }}>
+                      {permissionStatus || 'Checking...'}
+                    </Text>
+                  </View>
+                  {permissionStatus !== 'granted' && (
+                    <TouchableOpacity
+                      style={[styles.btnSmall, { backgroundColor: colors.primary, paddingVertical: 4, paddingHorizontal: 6 }]}
+                      onPress={async () => {
+                        const res = await Notifications.requestPermissionsAsync();
+                        setPermissionStatus(res.status);
+                        await runSystemDiagnostics();
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Grant</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Android Auto / Car Connection */}
+              <View style={styles.infoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Android Auto / Car Connection</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Auto-silences sounds while driving</Text>
+                </View>
+                <View style={[styles.tag, { backgroundColor: systemDiag?.isCarConnected ? 'rgba(24, 144, 255, 0.15)' : 'rgba(128, 128, 128, 0.15)' }]}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: systemDiag?.isCarConnected ? '#1890ff' : colors.textSecondary }}>
+                    {systemDiag?.isCarConnected ? 'Connected (Muted)' : 'Disconnected (Normal)'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Active Alarm Presentation Style */}
+              <View style={styles.infoRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Alarm Display Mode</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Current presentation configuration</Text>
+                </View>
+                <View style={[styles.tag, { backgroundColor: 'rgba(98, 70, 234, 0.15)' }]}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary }}>
+                    {themeState.alarmPresentationStyle || 'fullscreen'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Audio Management */}
+              <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Audio Focus & Ducking</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Alarms pause YouTube/media; notifications duck volume</Text>
+                </View>
+                <View style={[styles.tag, { backgroundColor: 'rgba(82, 196, 26, 0.15)' }]}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#52c41a' }}>Active</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Task Reminders vs OS Scheduler Synchronization Card */}
+            <View style={[styles.cardDump, { backgroundColor: colors.bgCard, borderColor: colors.borderColor, marginBottom: 16 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                  Scheduler Synchronization Checker
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                  {desyncReport?.osScheduled ?? 0} OS Alarms Active
                 </Text>
               </View>
-              {permissionStatus !== 'granted' && (
-                <TouchableOpacity
-                  style={[styles.btnSmall, { backgroundColor: colors.primary, marginLeft: 10, maxWidth: 90 }]}
-                  onPress={async () => {
-                    try {
-                      const res = await Notifications.requestPermissionsAsync();
-                      setPermissionStatus(res.status);
-                      DevLogger.info('Notification permission request result', res);
-                    } catch (e) {
-                      DevLogger.error('Permission request failed', e.message);
-                    }
-                  }}
-                >
-                  <Text style={styles.btnSmallText}>Grant</Text>
-                </TouchableOpacity>
+
+              {desyncReport?.missing && desyncReport.missing.length > 0 ? (
+                <View style={{ marginTop: 6 }}>
+                  <View style={{ backgroundColor: 'rgba(255, 77, 79, 0.1)', padding: 10, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#ff4d4f' }}>
+                    <Text style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: 12 }}>
+                      ⚠️ {desyncReport.missing.length} tasks have reminders configured but are MISSING from the OS scheduler!
+                    </Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
+                      Tasks: {desyncReport.missing.map(m => `"${m.taskname}"`).join(', ')}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.btnLarge, { backgroundColor: '#ff4d4f' }]}
+                    onPress={handleFixAllDesynced}
+                  >
+                    <Text style={styles.btnLargeText}>⚡ Fix & Re-sync All ({desyncReport.missing.length} tasks)</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={{ backgroundColor: 'rgba(82, 196, 26, 0.1)', padding: 10, borderRadius: 8, marginTop: 6 }}>
+                  <Text style={{ color: '#52c41a', fontWeight: 'bold', fontSize: 12 }}>
+                    ✅ All {desyncReport?.total ?? 0} tasks with reminders are fully registered with the Android OS scheduler.
+                  </Text>
+                </View>
               )}
             </View>
 
-            {/* Test Action Buttons */}
-            <View style={{ gap: 10, marginBottom: 20 }}>
-              <TouchableOpacity
-                style={[styles.btnLarge, { backgroundColor: colors.primary }]}
-                onPress={handleTestStandardNotif}
-              >
-                <Text style={styles.btnLargeText}>Test Standard Notification (in 3s)</Text>
-              </TouchableOpacity>
+            {/* Live Interactive Test Suite */}
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginBottom: 10 }]}>
+              Live Alarm & Audio Diagnostics (In 3s)
+            </Text>
 
+            <View style={{ gap: 10, marginBottom: 20 }}>
               <TouchableOpacity
                 style={[styles.btnLarge, { backgroundColor: '#ff4d4f' }]}
                 onPress={handleTestFullAlarm}
               >
-                <Text style={styles.btnLargeText}>Test Full-Screen Alarm (in 3s)</Text>
+                <Text style={styles.btnLargeText}>Test Full-Screen Alarm (Pauses Media & Shows on Top)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.btnLarge, { backgroundColor: '#722ed1' }]}
+                onPress={handleTestPopupAlarm}
+              >
+                <Text style={styles.btnLargeText}>Test Popup Banner Alarm (Heads-Up with Actions)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.btnLarge, { backgroundColor: colors.primary }]}
+                onPress={handleTestStandardNotif}
+              >
+                <Text style={styles.btnLargeText}>Test Standard Notification (Audio Ducking)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.btnLarge, { backgroundColor: '#1890ff' }]}
+                onPress={handleTestCarSilentMode}
+              >
+                <Text style={styles.btnLargeText}>Test Android Auto / Car Silent Mode (Muted)</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -673,22 +989,15 @@ export default function DevLogsScreen({ navigation }) {
                 onPress={handleTestNagSimulation}
               >
                 <Text style={[styles.btnLargeText, { color: '#000' }]}>
-                  Test Nag Mode Simulation (3 Notifs)
+                  Test Nag Mode Simulation (3 Repeating Alarms)
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.btnLarge, { backgroundColor: '#722ed1' }]}
+                style={[styles.btnLarge, { backgroundColor: '#13c2c2' }]}
                 onPress={handleTestEscalationSimulation}
               >
                 <Text style={styles.btnLargeText}>Test Escalating Reminders Simulation</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.btnLarge, { backgroundColor: '#13c2c2' }]}
-                onPress={handleTestAutomationMorning}
-              >
-                <Text style={styles.btnLargeText}>Test Morning Summary Notification</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -703,7 +1012,7 @@ export default function DevLogsScreen({ navigation }) {
             </View>
 
             {/* System Scheduler Inspection */}
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>System Scheduler State</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>OS Scheduler Details</Text>
 
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
               <TouchableOpacity style={[styles.btnSmall, { backgroundColor: colors.primary }]} onPress={handleInspectScheduledNotifs}>

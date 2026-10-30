@@ -28,6 +28,43 @@ export async function isCarConnected(): Promise<boolean> {
   }
 }
 
+export async function getAlarmSystemDiagnostics(): Promise<Record<string, any>> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getAlarmSystemDiagnostics !== 'function') return {};
+  try {
+    return await ExpoTaskAlarm.getAlarmSystemDiagnostics();
+  } catch (e) {
+    console.warn('getAlarmSystemDiagnostics failed:', e);
+    return {};
+  }
+}
+
+export async function openExactAlarmSettings(): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.openExactAlarmSettings !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.openExactAlarmSettings();
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function openBatteryOptimizationSettings(): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.openBatteryOptimizationSettings !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.openBatteryOptimizationSettings();
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function openOverlaySettings(): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.openOverlaySettings !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.openOverlaySettings();
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function cancelAlarm(taskId: string): Promise<boolean> {
   if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.cancelAlarm !== 'function') return false;
   try {

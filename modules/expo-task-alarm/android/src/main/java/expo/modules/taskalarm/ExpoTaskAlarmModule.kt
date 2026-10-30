@@ -9,13 +9,16 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.MediaStore
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
 import java.util.ArrayList
+import java.util.HashMap
 
 class ExpoTaskAlarmModule : Module() {
   private var photoPromise: Promise? = null
@@ -26,6 +29,109 @@ class ExpoTaskAlarmModule : Module() {
     AsyncFunction("isCarConnected") {
       val context = appContext.reactContext ?: return@AsyncFunction false
       return@AsyncFunction CarUtils.isConnectedToCar(context)
+    }
+
+    AsyncFunction("getAlarmSystemDiagnostics") {
+      val context = appContext.reactContext ?: return@AsyncFunction emptyMap<String, Any>()
+      val result = HashMap<String, Any>()
+
+      val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+      val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+      val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+
+      // 1. Exact Alarms Permission (Android 12+)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        result["canScheduleExactAlarms"] = alarmManager?.canScheduleExactAlarms() ?: false
+      } else {
+        result["canScheduleExactAlarms"] = true
+      }
+
+      // 2. Notifications Enabled
+      result["areNotificationsEnabled"] = notificationManager?.areNotificationsEnabled() ?: false
+
+      // 3. Full Screen Intent Permission (Android 14+)
+      if (Build.VERSION.SDK_INT >= 34) {
+        try {
+          val method = notificationManager?.javaClass?.getMethod("canUseFullScreenIntent")
+          result["canUseFullScreenIntent"] = method?.invoke(notificationManager) as? Boolean ?: true
+        } catch (e: Exception) {
+          result["canUseFullScreenIntent"] = true
+        }
+      } else {
+        result["canUseFullScreenIntent"] = true
+      }
+
+      // 4. Battery Optimization / Doze mode
+      val packageName = context.packageName
+      result["isIgnoringBatteryOptimizations"] = powerManager?.isIgnoringBatteryOptimizations(packageName) ?: false
+
+      // 5. Overlay / Draw over other apps (canDrawOverlays)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        result["canDrawOverlays"] = Settings.canDrawOverlays(context)
+      } else {
+        result["canDrawOverlays"] = true
+      }
+
+      // 6. Car / Android Auto connected
+      result["isCarConnected"] = CarUtils.isConnectedToCar(context)
+
+      // 7. System metadata
+      result["androidSdkVersion"] = Build.VERSION.SDK_INT
+      result["deviceModel"] = Build.MODEL
+      result["deviceManufacturer"] = Build.MANUFACTURER
+
+      return@AsyncFunction result
+    }
+
+    AsyncFunction("openExactAlarmSettings") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        try {
+          val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+            data = Uri.parse("package:${context.packageName}")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+          }
+          context.startActivity(intent)
+          return@AsyncFunction true
+        } catch (e: Exception) {
+          try {
+            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+              flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+            return@AsyncFunction true
+          } catch (e2: Exception) {}
+        }
+      }
+      return@AsyncFunction false
+    }
+
+    AsyncFunction("openBatteryOptimizationSettings") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      try {
+        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+          flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+        return@AsyncFunction true
+      } catch (e: Exception) {
+        return@AsyncFunction false
+      }
+    }
+
+    AsyncFunction("openOverlaySettings") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        try {
+          val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+            data = Uri.parse("package:${context.packageName}")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+          }
+          context.startActivity(intent)
+          return@AsyncFunction true
+        } catch (e: Exception) {}
+      }
+      return@AsyncFunction false
     }
 
     AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, channelId: String, presentationStyle: String? ->
