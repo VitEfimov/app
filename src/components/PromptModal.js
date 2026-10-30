@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal } from 'react-native';
 import { useTheme } from '../styles/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
-export default function PromptModal({ isVisible, title, message, defaultValue = '', onCancel, onSubmit, submitText = 'Submit', maxLength, keyboardType }) {
+export default function PromptModal({ isVisible, title, message, defaultValue = '', onCancel, onSubmit, submitText, cancelText, maxLength, keyboardType }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [value, setValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -33,10 +35,10 @@ export default function PromptModal({ isVisible, title, message, defaultValue = 
 
           <View style={styles.actions}>
             <TouchableOpacity style={styles.btn} onPress={onCancel}>
-              <Text style={[styles.btnText, { color: colors.textSecondary }]}>Cancel</Text>
+              <Text style={[styles.btnText, { color: colors.textSecondary }]}>{cancelText || t('Cancel') || 'Cancel'}</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="prompt_submit_btn" style={styles.btn} onPress={() => onSubmit(value)}>
-              <Text style={[styles.btnText, { color: colors.primary, fontWeight: 'bold' }]}>{submitText}</Text>
+              <Text style={[styles.btnText, { color: colors.primary, fontWeight: 'bold' }]}>{submitText || t('OK') || 'OK'}</Text>
             </TouchableOpacity>
           </View>
         </View>

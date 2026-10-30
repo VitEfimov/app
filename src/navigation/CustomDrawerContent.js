@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../features/userSlice';
 import { clearTasks } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 
 // Simple SVG Icons since we can't easily rely on vector-icons without pre-configuring them sometimes
@@ -59,6 +60,7 @@ const IconLogout = ({ color }) => (
 export default function CustomDrawerContent(props) {
   const dispatch = useDispatch();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   
   const isAuthenticated = useSelector(state => state.userReducer.isAuthenticated);
   const tasks = useSelector(state => state.taskReducer.tasks || []);
@@ -112,9 +114,9 @@ export default function CustomDrawerContent(props) {
         <View 
           style={[styles.statsContainer, { backgroundColor: colors.surfaceContainer }]}
           accessible={true}
-          accessibilityLabel={`Today's progress: ${completedToday} out of ${totalToday} tasks completed, ${totalToday - completedToday} tasks remaining`}
+          accessibilityLabel={`${t("Today's progress") || "Today's progress"}: ${completedToday} / ${totalToday}`}
         >
-          <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>Today's progress</Text>
+          <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>{t("Today's progress") || "Today's progress"}</Text>
           <View style={styles.statsCounts}>
             <Text style={[styles.statsDone, { color: colors.primary }]}>{completedToday}</Text>
             <Text style={[styles.statsTotal, { color: colors.textSecondary }]}> / {totalToday}</Text>
@@ -122,16 +124,16 @@ export default function CustomDrawerContent(props) {
           <View style={[styles.statsBarBg, { backgroundColor: colors.surfaceContainerHigh }]}>
             <View style={[styles.statsBarFill, { backgroundColor: colors.primary, width: `${progressPercent}%` }]} />
           </View>
-          <Text style={[styles.statsRemaining, { color: colors.textTertiary }]}>{totalToday - completedToday} tasks remaining</Text>
+          <Text style={[styles.statsRemaining, { color: colors.textTertiary }]}>{totalToday - completedToday} {t('tasks remaining') || 'tasks remaining'}</Text>
         </View>
 
         {/* Navigation Items */}
         <View style={styles.navContainer}>
-          <NavItem label="Dashboard" routeName="Dashboard" Icon={IconDashboard} />
-          <NavItem label="Tasks" routeName="Board" Icon={IconBoard} />
-          <NavItem label="Calendar" routeName="Calendar" Icon={IconCalendar} />
-          <NavItem label="Pomodoro" routeName="Pomodoro" Icon={IconPomodoro} />
-          <NavItem label="Settings" routeName="Settings" Icon={IconSettings} />
+          <NavItem label={t('Dashboard') || 'Dashboard'} routeName="Dashboard" Icon={IconDashboard} />
+          <NavItem label={t('Tasks') || 'Tasks'} routeName="Board" Icon={IconBoard} />
+          <NavItem label={t('Calendar') || 'Calendar'} routeName="Calendar" Icon={IconCalendar} />
+          <NavItem label={t('Pomodoro') || 'Pomodoro'} routeName="Pomodoro" Icon={IconPomodoro} />
+          <NavItem label={t('Settings') || 'Settings'} routeName="Settings" Icon={IconSettings} />
         </View>
 
       </DrawerContentScrollView>
@@ -139,13 +141,13 @@ export default function CustomDrawerContent(props) {
       {/* Footer / Logout */}
       <View style={[styles.footer, { borderTopColor: colors.borderColor }]}>
         <TouchableOpacity 
-          accessible={true} accessibilityRole="button" accessibilityLabel="Log Out"
+          accessible={true} accessibilityRole="button" accessibilityLabel={t('Log Out') || 'Log Out'}
           style={[styles.navItem, { opacity: isAuthenticated ? 1 : 0.5 }]} 
           onPress={handleLogout}
           disabled={!isAuthenticated}
         >
           <IconLogout color={colors.textSecondary} />
-          <Text style={[styles.navItemText, { color: colors.textSecondary }]}>Log Out</Text>
+          <Text style={[styles.navItemText, { color: colors.textSecondary }]}>{t('Log Out') || 'Log Out'}</Text>
         </TouchableOpacity>
       </View>
     </View>

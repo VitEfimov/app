@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import i18n from '../i18n';
 
 export default class ScreenErrorBoundary extends React.Component {
   constructor(props) {
@@ -31,7 +32,7 @@ export default class ScreenErrorBoundary extends React.Component {
       return (
         <View style={styles.errorContainer}>
           <View style={styles.card}>
-            <Text style={styles.title}>Something went wrong</Text>
+            <Text style={styles.title}>{i18n.t('Something went wrong') || 'Something went wrong'}</Text>
             <Text style={styles.screenName}>
               Error in {this.props.screenName || 'this screen'}
             </Text>
@@ -43,7 +44,7 @@ export default class ScreenErrorBoundary extends React.Component {
               style={styles.retryButton}
               onPress={this.handleReset}
             >
-              <Text style={styles.retryButtonText}>Reload Screen</Text>
+              <Text style={styles.retryButtonText}>{i18n.t('Reload Screen') || 'Reload Screen'}</Text>
             </TouchableOpacity>
           </View>
         </View>

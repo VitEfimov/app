@@ -1352,6 +1352,7 @@ import {
 
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
+import { useTranslation } from 'react-i18next';
 
 import Svg, {
   Circle,
@@ -2398,6 +2399,7 @@ export default function CustomTimePicker({
   colors = {},
   isDark = false,
 }) {
+  const { t } = useTranslation();
   const scheme =
     useMemo(
       () =>
@@ -3024,7 +3026,7 @@ export default function CustomTimePicker({
                       },
                     ]}
                   >
-                    Hour
+                    {t('Hour') || 'Hour'}
                   </Text>
                 </View>
 
@@ -3080,7 +3082,7 @@ export default function CustomTimePicker({
                       },
                     ]}
                   >
-                    Minute
+                    {t('Minute') || 'Minute'}
                   </Text>
                 </View>
               </View>
@@ -3165,7 +3167,7 @@ export default function CustomTimePicker({
                       },
                     ]}
                   >
-                    Cancel
+                    {t('Cancel') || 'Cancel'}
                   </Text>
                 </TouchableOpacity>
 
@@ -3187,7 +3189,7 @@ export default function CustomTimePicker({
                       },
                     ]}
                   >
-                    OK
+                    {t('OK') || 'OK'}
                   </Text>
                 </TouchableOpacity>
               </View>
