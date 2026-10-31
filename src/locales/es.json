@@ -680,5 +680,8 @@
   "week": "semana",
   "year": "año",
   "You have reached the maximum number of boards": "Has alcanzado el número máximo de tableros",
-  "Your day, your rhythm": "Tu día, tu ritmo"
+  "Your day, your rhythm": "Tu día, tu ritmo",
+  "Focused on": "Enfocado en",
+  "Cancel focus": "Cancelar enfoque",
+  "Show all": "Mostrar todo"
 }

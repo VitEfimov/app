@@ -23,6 +23,8 @@ export default function GoogleDrawer({
   onSelectView,
   boards = [],
   selectedCategoryIds = [],
+  filterBoardId = null,
+  onSelectCategory,
   onToggleCategory,
   onSelectAllCategories,
   onOpenCreateCategory,
@@ -175,25 +177,57 @@ export default function GoogleDrawer({
           <Text style={[styles.sectionHeading, { color: colors.textSecondary }]}>
             {t('My Calendars') || 'MY CALENDARS'}
           </Text>
-          <TouchableOpacity 
-            onPress={() => onOpenCreateCategory && onOpenCreateCategory('category')}
-            style={styles.addCategoryBtn}
-          >
-            <Text style={{ fontSize: 18, color: colors.primary, fontWeight: 'bold' }}>+</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {filterBoardId && (
+              <TouchableOpacity
+                onPress={() => {
+                  onSelectCategory && onSelectCategory(null);
+                  if (!isDesktop) onClose();
+                }}
+                style={[styles.showAllBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(93, 69, 219, 0.1)' }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('Show all') || 'Show all'}
+              >
+                <Text style={[styles.showAllBtnText, { color: colors.primary }]}>
+                  {t('Show all') || 'Show all'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity 
+              onPress={() => onOpenCreateCategory && onOpenCreateCategory('category')}
+              style={styles.addCategoryBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Add category"
+            >
+              <Text style={{ fontSize: 18, color: colors.primary, fontWeight: 'bold' }}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {boards.map(board => {
           const boardId = board.id || board._id || 'main';
-          const isSelected = selectedCategoryIds.length === 0 || selectedCategoryIds.includes(boardId);
+          const isFocused = filterBoardId === boardId;
+          const isSelected = filterBoardId ? isFocused : (selectedCategoryIds.length === 0 || selectedCategoryIds.includes(boardId));
           const boardColor = getBoardColor(board, boards);
           const count = taskCountByBoard[boardId] || 0;
 
           return (
             <TouchableOpacity
               key={boardId}
-              style={styles.categoryRow}
-              onPress={() => onToggleCategory(boardId)}
+              style={[
+                styles.categoryRow,
+                isFocused && { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : `${boardColor}18` }
+              ]}
+              onPress={() => {
+                if (onSelectCategory) {
+                  // If clicking the currently focused category, reset to show all; otherwise focus this one
+                  const nextFilter = isFocused ? null : boardId;
+                  onSelectCategory(nextFilter);
+                } else if (onToggleCategory) {
+                  onToggleCategory(boardId);
+                }
+                if (!isDesktop) onClose();
+              }}
             >
               <View style={[
                 styles.categoryCheckbox,
@@ -205,13 +239,22 @@ export default function GoogleDrawer({
                 {isSelected && <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>✓</Text>}
               </View>
 
-              <Text style={[styles.categoryName, { color: colors.textPrimary }]} numberOfLines={1}>
+              <Text 
+                style={[
+                  styles.categoryName, 
+                  { 
+                    color: isFocused ? colors.textPrimary : (filterBoardId ? colors.textSecondary : colors.textPrimary),
+                    fontWeight: isFocused ? '700' : '400' 
+                  }
+                ]} 
+                numberOfLines={1}
+              >
                 {board.name === 'Main' ? (t('Main') || 'Main') : board.name}
               </Text>
 
               {count > 0 && (
-                <View style={[styles.categoryCountBadge, { backgroundColor: colors.surfaceContainerHigh }]}>
-                  <Text style={[styles.categoryCountText, { color: colors.textSecondary }]}>
+                <View style={[styles.categoryCountBadge, { backgroundColor: isFocused ? `${boardColor}30` : colors.surfaceContainerHigh }]}>
+                  <Text style={[styles.categoryCountText, { color: isFocused ? boardColor : colors.textSecondary }]}>
                     {count}
                   </Text>
                 </View>
@@ -410,6 +453,16 @@ const styles = StyleSheet.create({
   addCategoryBtn: {
     paddingHorizontal: 8,
     paddingVertical: 2,
+  },
+  showAllBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginRight: 4,
+  },
+  showAllBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   categoryRow: {
     flexDirection: 'row',

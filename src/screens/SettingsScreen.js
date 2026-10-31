@@ -467,20 +467,15 @@ export default function SettingsScreen({ navigation }) {
             <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
               <IconPalette color={primaryAccent} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
               <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
                 {t('Appearance') || 'Appearance'}
               </Text>
-              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                {t('Theme, colors & contrast') || 'Theme, colors & contrast'}
+              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
+                {currentThemeLabel} · {t('Theme, colors & contrast') || 'Theme, colors & contrast'}
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
-                {currentThemeLabel}
-              </Text>
-              <IconChevronRight color={colors.textSecondary} />
-            </View>
+            <IconChevronRight color={colors.textSecondary} />
           </TouchableOpacity>
 
           <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
@@ -494,17 +489,15 @@ export default function SettingsScreen({ navigation }) {
             <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
               <IconTranslate color={primaryAccent} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
               <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
                 {t('Language') || 'Language'}
               </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
+              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
                 {currentLanguageLabel}
               </Text>
-              <IconChevronRight color={colors.textSecondary} />
             </View>
+            <IconChevronRight color={colors.textSecondary} />
           </TouchableOpacity>
 
           <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
@@ -620,17 +613,15 @@ export default function SettingsScreen({ navigation }) {
             <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
               <IconSpeaker color={primaryAccent} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
               <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
                 {t('Notification sound') || 'Notification sound'}
               </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
+              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
                 {currentNotificationSoundName}
               </Text>
-              <IconChevronRight color={colors.textSecondary} />
             </View>
+            <IconChevronRight color={colors.textSecondary} />
           </TouchableOpacity>
 
           {/* Expanded notification sound options */}
@@ -676,17 +667,15 @@ export default function SettingsScreen({ navigation }) {
             <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
               <IconAlarm color={primaryAccent} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
               <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
                 {t('Alarm sound') || 'Alarm sound'}
               </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
+              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
                 {currentAlarmSoundName}
               </Text>
-              <IconChevronRight color={colors.textSecondary} />
             </View>
+            <IconChevronRight color={colors.textSecondary} />
           </TouchableOpacity>
 
           {/* Expanded alarm sound options */}
@@ -736,17 +725,15 @@ export default function SettingsScreen({ navigation }) {
             <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
               <IconDisplay color={primaryAccent} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
               <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
                 {t('Alarm display style') || 'Alarm display style'}
               </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
+              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
                 {getAlarmStyleLabel(currentAlarmStyle)}
               </Text>
-              <IconChevronRight color={colors.textSecondary} />
             </View>
+            <IconChevronRight color={colors.textSecondary} />
           </TouchableOpacity>
 
           {/* Expanded alarm display style options */}
@@ -810,17 +797,15 @@ export default function SettingsScreen({ navigation }) {
             <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
               <IconClock color={primaryAccent} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
               <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
                 {t('Default Snooze') || 'Default snooze'}
               </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.itemValueText, { color: colors.textSecondary, marginRight: 6 }]}>
+              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
                 {formatSnoozeTime(defaultSnoozeTime)}
               </Text>
-              <IconChevronRight color={colors.textSecondary} />
             </View>
+            <IconChevronRight color={colors.textSecondary} />
           </TouchableOpacity>
 
           {/* Expanded snooze options */}
@@ -1053,6 +1038,11 @@ const styles = StyleSheet.create({
   },
   itemSubtitle: {
     fontSize: 12,
+  },
+  itemSubtitleValue: {
+    fontSize: 13,
+    fontWeight: '400',
+    marginTop: 2,
   },
   itemValueText: {
     fontSize: 13,

@@ -680,5 +680,8 @@
   "week": "неделя",
   "year": "год",
   "You have reached the maximum number of boards": "Вы достигли максимального количества досок",
-  "Your day, your rhythm": "Ваш день, ваш ритм"
+  "Your day, your rhythm": "Ваш день, ваш ритм",
+  "Focused on": "Фокус на",
+  "Cancel focus": "Сбросить фокус",
+  "Show all": "Показать все"
 }

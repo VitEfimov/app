@@ -680,5 +680,8 @@
   "week": "주",
   "year": "년",
   "You have reached the maximum number of boards": "보드 최대 개수에 도달했습니다",
-  "Your day, your rhythm": "나의 하루, 나의 리듬"
+  "Your day, your rhythm": "나의 하루, 나의 리듬",
+  "Focused on": "포커스 대상",
+  "Cancel focus": "포커스 취소",
+  "Show all": "모두 보기"
 }

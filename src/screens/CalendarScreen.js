@@ -76,7 +76,7 @@ const IconSubtasksLines = ({ color = '#888', size = 14 }) => (
   </Svg>
 );
 
-export default function CalendarScreen({ navigation }) {
+export default function CalendarScreen({ navigation, route }) {
   const { colors, isDark, mode } = useTheme();
   const { t, i18n } = useTranslation();
   const { showToast } = useToast ? useToast() : { showToast: () => {} };
@@ -97,6 +97,22 @@ export default function CalendarScreen({ navigation }) {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isInlineAddActive, setIsInlineAddActive] = useState(false);
   const [isYearPickerVisible, setIsYearPickerVisible] = useState(false);
+
+  // Set focus if passed via navigation params
+  useEffect(() => {
+    if (route?.params?.focusBoardId) {
+      setFilterBoardId(route.params.focusBoardId);
+    }
+  }, [route?.params?.focusBoardId]);
+
+  // Automatically reset focus when navigating away (user changes screen)
+  useEffect(() => {
+    if (!navigation?.addListener) return;
+    const unsubscribe = navigation.addListener('blur', () => {
+      setFilterBoardId(null);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const handleSelectYear = (year) => {
     const currentMonthMoment = dayjs(calendarMonth);
@@ -378,7 +394,11 @@ export default function CalendarScreen({ navigation }) {
       }
     });
 
-    tasks.forEach(task => {
+    const tasksToMark = filterBoardId
+      ? tasks.filter(t => t && String(t.boardId || 'main') === String(filterBoardId))
+      : tasks;
+
+    tasksToMark.forEach(task => {
       if (!task) return;
       let dateStr = task.dateString;
       if (!dateStr && task.completionDate) {
@@ -423,7 +443,7 @@ export default function CalendarScreen({ navigation }) {
     }
 
     return finalMarks;
-  }, [tasks, boards, selectedDate]);
+  }, [tasks, boards, selectedDate, filterBoardId]);
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
@@ -665,17 +685,66 @@ export default function CalendarScreen({ navigation }) {
           />
         </View>
 
+        {/* Active Focus Banner when a calendar is focused */}
+        {activeBoard && (
+          <View style={[
+            styles.focusBanner, 
+            { 
+              backgroundColor: isDark ? 'rgba(93, 69, 219, 0.15)' : 'rgba(93, 69, 219, 0.08)',
+              borderColor: getBoardColor(activeBoard, boards)
+            }
+          ]}>
+            <View style={styles.focusBannerContent}>
+              <View style={[styles.focusDot, { backgroundColor: getBoardColor(activeBoard, boards) }]} />
+              <Text style={[styles.focusText, { color: colors.textPrimary }]} numberOfLines={1}>
+                {t('Focused on') || 'Focused on'}: <Text style={{ fontWeight: '700' }}>{activeBoard.name === 'Main' ? (t('Main') || 'Main') : activeBoard.name}</Text>
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.cancelFocusBtn, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+              onPress={() => setFilterBoardId(null)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t('Cancel focus') || 'Cancel focus'}
+            >
+              <Text style={[styles.cancelFocusBtnText, { color: primaryAccent }]}>
+                ✕ {t('Cancel focus') || 'Cancel focus'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Filter pill & Back to today row */}
         <View style={styles.calendarSubRow}>
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => dispatch(setGoogleDrawerOpen(true))}
-            style={[styles.categoryPill, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+            style={[
+              styles.categoryPill, 
+              { 
+                backgroundColor: colors.bgCard, 
+                borderColor: activeBoard ? getBoardColor(activeBoard, boards) : colors.borderColor 
+              }
+            ]}
           >
             <IconCategoryGrid color={activeBoard ? getBoardColor(activeBoard, boards) : primaryAccent} />
             <Text style={[styles.categoryPillText, { color: colors.textPrimary }]}>
-              {activeBoard ? activeBoard.name : (t('All Categories') || 'All categories')}
+              {activeBoard ? (activeBoard.name === 'Main' ? (t('Main') || 'Main') : activeBoard.name) : (t('All Categories') || 'All categories')}
             </Text>
+            {activeBoard && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e?.stopPropagation && e.stopPropagation();
+                  setFilterBoardId(null);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ marginLeft: 6, paddingHorizontal: 2 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear calendar focus"
+              >
+                <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '700' }}>✕</Text>
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -869,6 +938,10 @@ export default function CalendarScreen({ navigation }) {
         colors={colors}
         isDark={isDark}
         isDesktop={false}
+        filterBoardId={filterBoardId}
+        onSelectCategory={(boardId) => {
+          setFilterBoardId(boardId);
+        }}
         onOpenCreateCategory={handleOpenCreateCategory}
         onPressSettings={() => {
           dispatch(setGoogleDrawerOpen(false));
@@ -1005,6 +1078,41 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
+  },
+  focusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  focusBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  focusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  focusText: {
+    fontSize: 13,
+  },
+  cancelFocusBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  cancelFocusBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   calendarSubRow: {
     flexDirection: 'row',

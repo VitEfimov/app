@@ -680,5 +680,8 @@
   "week": "週",
   "year": "年",
   "You have reached the maximum number of boards": "ボード数の上限に達しました",
-  "Your day, your rhythm": "あなたの一日、あなたのリズム"
+  "Your day, your rhythm": "あなたの一日、あなたのリズム",
+  "Focused on": "フォーカス中",
+  "Cancel focus": "フォーカス解除",
+  "Show all": "すべて表示"
 }

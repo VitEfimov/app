@@ -1510,6 +1510,10 @@ export default function BoardScreen({ route, navigation }) {
         colors={colors}
         isDark={isDark}
         isDesktop={false}
+        onSelectCategory={(boardId) => {
+          dispatch(setGoogleDrawerOpen(false));
+          navigation.navigate('Calendar', { focusBoardId: boardId });
+        }}
         onOpenCreateCategory={() => handleAddBoard()}
         onPressSettings={() => {
           dispatch(setGoogleDrawerOpen(false));
