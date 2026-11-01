@@ -21,11 +21,12 @@ function loadTranspiledModule(filePath, customMocks = {}) {
     if (reqPath.startsWith('.')) {
       const resolved = path.resolve(path.dirname(filePath), reqPath);
       for (const ext of ['', '.js', '.jsx', '.json']) {
-        if (fs.existsSync(resolved + ext) && !fs.statSync(resolved + ext).isDirectory()) {
-          if (ext === '.json') {
-            return JSON.parse(fs.readFileSync(resolved + ext, 'utf8'));
+        const fullPath = resolved + ext;
+        if (fs.existsSync(fullPath) && !fs.statSync(fullPath).isDirectory()) {
+          if (ext === '.json' || fullPath.endsWith('.json')) {
+            return JSON.parse(fs.readFileSync(fullPath, 'utf8'));
           }
-          return loadTranspiledModule(resolved + ext, customMocks);
+          return loadTranspiledModule(fullPath, customMocks);
         }
       }
     }
@@ -1232,5 +1233,204 @@ describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
         );
       }
     }
+  });
+});
+
+// ==============================================================================
+// TEST SUITE 11: Apple HIG & Material Design Haptic Engine
+// ==============================================================================
+describe('Apple HIG & Material Design Haptic Engine', () => {
+  let HapticHelper;
+  let vibrationCalls;
+
+  beforeEach(() => {
+    vibrationCalls = [];
+    const mockRN = {
+      Platform: { OS: 'android' },
+      Vibration: {
+        vibrate: (pattern) => {
+          vibrationCalls.push(pattern);
+        }
+      }
+    };
+
+    const mod = loadTranspiledModule(path.resolve('src/utils/hapticHelper.js'), {
+      'react-native': mockRN
+    });
+    HapticHelper = mod.HapticHelper;
+    if (HapticHelper._resetForTesting) HapticHelper._resetForTesting();
+  });
+
+  afterEach(() => {
+    if (HapticHelper._resetForTesting) HapticHelper._resetForTesting();
+  });
+
+  test('trigger vibrates with accurate HIG/Material patterns for all interaction types', () => {
+    // 1. selection
+    HapticHelper.selection();
+    assert.strictEqual(vibrationCalls.length, 1);
+    assert.strictEqual(vibrationCalls[0], 8);
+
+    // 2. light
+    HapticHelper.light();
+    assert.strictEqual(vibrationCalls.length, 2);
+    assert.strictEqual(vibrationCalls[1], 12);
+
+    // 3. medium
+    HapticHelper.medium();
+    assert.strictEqual(vibrationCalls.length, 3);
+    assert.strictEqual(vibrationCalls[2], 22);
+
+    // 4. heavy
+    HapticHelper.heavy();
+    assert.strictEqual(vibrationCalls.length, 4);
+    assert.strictEqual(vibrationCalls[3], 38);
+
+    // 5. success (celebratory rhythm for task completion)
+    HapticHelper.success();
+    assert.strictEqual(vibrationCalls.length, 5);
+    assert.deepStrictEqual(vibrationCalls[4], [0, 25, 60, 35]);
+
+    // 6. warning
+    HapticHelper.warning();
+    assert.strictEqual(vibrationCalls.length, 6);
+    assert.deepStrictEqual(vibrationCalls[5], [0, 35, 50, 35]);
+
+    // 7. error (triple buzz on failed PIN / lockout)
+    HapticHelper.error();
+    assert.strictEqual(vibrationCalls.length, 7);
+    assert.deepStrictEqual(vibrationCalls[6], [0, 45, 60, 45, 60, 45]);
+  });
+
+  test('setVibrationEnabled(false) completely suppresses all haptic vibrations', () => {
+    HapticHelper.setVibrationEnabled(false);
+    assert.strictEqual(HapticHelper.isVibrationEnabled(), false);
+
+    const res = HapticHelper.success();
+    assert.strictEqual(res, false);
+    assert.strictEqual(vibrationCalls.length, 0);
+
+    HapticHelper.light();
+    HapticHelper.error();
+    assert.strictEqual(vibrationCalls.length, 0);
+
+    // Re-enabling restores vibration immediately
+    HapticHelper.setVibrationEnabled(true);
+    assert.strictEqual(HapticHelper.isVibrationEnabled(), true);
+    HapticHelper.selection();
+    assert.strictEqual(vibrationCalls.length, 1);
+  });
+
+  test('per-call vibrationEnabled: false overrides global setting', () => {
+    HapticHelper.setVibrationEnabled(true);
+    const res = HapticHelper.success({ vibrationEnabled: false });
+    assert.strictEqual(res, false);
+    assert.strictEqual(vibrationCalls.length, 0);
+  });
+
+  test('expo-haptics integration invokes native impact and notification methods', () => {
+    let expoCalled = [];
+    const mockExpo = {
+      ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+      NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+      selectionAsync: async () => { expoCalled.push('selection'); },
+      impactAsync: async (style) => { expoCalled.push(`impact:${style}`); },
+      notificationAsync: async (type) => { expoCalled.push(`notification:${type}`); }
+    };
+
+    const mod = loadTranspiledModule(path.resolve('src/utils/hapticHelper.js'), {
+      'react-native': { Platform: { OS: 'ios' }, Vibration: { vibrate: () => {} } },
+      'expo-haptics': mockExpo
+    });
+    const customHaptic = mod.HapticHelper;
+
+    customHaptic.selection();
+    assert.ok(expoCalled.includes('selection'));
+
+    customHaptic.success();
+    assert.ok(expoCalled.includes('notification:success'));
+
+    customHaptic.error();
+    assert.ok(expoCalled.includes('notification:error'));
+
+    customHaptic.heavy();
+    assert.ok(expoCalled.includes('impact:heavy'));
+  });
+
+  test('Web environment invokes navigator.vibrate when available', () => {
+    let webVibrated = null;
+    const originalVibrate = navigator.vibrate;
+    navigator.vibrate = (pattern) => { webVibrated = pattern; };
+
+    try {
+      const mod = loadTranspiledModule(path.resolve('src/utils/hapticHelper.js'), {
+        'react-native': { Platform: { OS: 'web' }, Vibration: { vibrate: () => {} } }
+      });
+
+      mod.HapticHelper.success();
+      assert.deepStrictEqual(webVibrated, [0, 25, 60, 35]);
+    } finally {
+      if (originalVibrate) {
+        navigator.vibrate = originalVibrate;
+      } else {
+        delete navigator.vibrate;
+      }
+    }
+  });
+});
+
+// ==============================================================================
+// TEST SUITE 12: Bidirectional (RTL) Layout & CI Quality Gate
+// ==============================================================================
+describe('Bidirectional (RTL) Layout & CI Quality Gate', () => {
+  let isRtlLanguage;
+  let syncRtlLayout;
+  let rtlAllowed = null;
+
+  beforeEach(() => {
+    rtlAllowed = null;
+    const mockI18nManager = {
+      allowRTL: (allow) => { rtlAllowed = allow; },
+      isRTL: false
+    };
+
+    const mod = loadTranspiledModule(path.resolve('src/i18n.js'), {
+      'react-native': { I18nManager: mockI18nManager },
+      'expo-localization': { getLocales: () => [{ languageCode: 'en' }] },
+      'react-native-calendars': { LocaleConfig: { locales: {}, defaultLocale: 'en' } }
+    });
+    isRtlLanguage = mod.isRtlLanguage;
+    syncRtlLayout = mod.syncRtlLayout;
+  });
+
+  test('isRtlLanguage correctly identifies RTL language families', () => {
+    assert.strictEqual(isRtlLanguage('ar'), true);
+    assert.strictEqual(isRtlLanguage('ar-SA'), true);
+    assert.strictEqual(isRtlLanguage('he'), true);
+    assert.strictEqual(isRtlLanguage('fa'), true);
+    assert.strictEqual(isRtlLanguage('ur'), true);
+
+    assert.strictEqual(isRtlLanguage('en'), false);
+    assert.strictEqual(isRtlLanguage('ru'), false);
+    assert.strictEqual(isRtlLanguage('es'), false);
+    assert.strictEqual(isRtlLanguage('zh'), false);
+    assert.strictEqual(isRtlLanguage(null), false);
+    assert.strictEqual(isRtlLanguage(undefined), false);
+  });
+
+  test('syncRtlLayout dynamically communicates RTL state to native I18nManager', () => {
+    syncRtlLayout('ar');
+    assert.strictEqual(rtlAllowed, true);
+
+    syncRtlLayout('en');
+    assert.strictEqual(rtlAllowed, false);
+  });
+
+  test('CI workflow file exists and includes npm test step', () => {
+    const ciPath = path.resolve('.github/workflows/ci.yml');
+    assert.ok(fs.existsSync(ciPath), 'ci.yml must exist');
+    const ciContent = fs.readFileSync(ciPath, 'utf8');
+    assert.ok(ciContent.includes('npm test'), 'ci.yml must execute npm test');
+    assert.ok(ciContent.includes('TaskCalendar CI Quality Gate'), 'ci.yml must define quality gate');
   });
 });

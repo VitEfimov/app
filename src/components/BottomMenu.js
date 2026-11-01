@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../styles/ThemeContext';
+import { HapticHelper } from '../utils/hapticHelper';
 
 const IconTasks = ({ color, size = 22 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -59,6 +60,7 @@ export default function BottomMenu(props) {
   ];
 
   const handlePress = (tabName) => {
+    HapticHelper.selection();
     if (navigation) {
       if (currentRouteName !== tabName) {
         navigation.navigate(tabName);

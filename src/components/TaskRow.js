@@ -12,6 +12,7 @@ import * as Localization from 'expo-localization';
 import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { A11yHelper } from '../utils/a11yHelper';
+import { HapticHelper } from '../utils/hapticHelper';
 
 const inlineEditingListeners = new Set();
 
@@ -199,6 +200,12 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
     }));
     
     A11yHelper.announce(newCompletedState ? (t('Task Completed') || 'Task Completed') : (t('Task Uncompleted') || 'Task Uncompleted'));
+
+    if (newCompletedState) {
+      HapticHelper.success();
+    } else {
+      HapticHelper.light();
+    }
 
     showToast(
       newCompletedState ? t('Task Completed') : t('Task Uncompleted'),

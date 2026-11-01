@@ -13,8 +13,27 @@ import 'dayjs/locale/it';
 import 'dayjs/locale/ko';
 import localeData from 'dayjs/plugin/localeData';
 import { LocaleConfig } from 'react-native-calendars';
+import { I18nManager } from 'react-native';
 
 dayjs.extend(localeData);
+
+export const RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'];
+
+export function isRtlLanguage(langCode) {
+  if (!langCode || typeof langCode !== 'string') return false;
+  return RTL_LANGUAGES.includes(langCode.toLowerCase().split(/[-_]/)[0]);
+}
+
+export function syncRtlLayout(langCode) {
+  try {
+    const isRtl = isRtlLanguage(langCode);
+    if (I18nManager && typeof I18nManager.allowRTL === 'function') {
+      I18nManager.allowRTL(isRtl);
+    }
+  } catch (e) {
+    console.warn('[i18n] syncRtlLayout error:', e);
+  }
+}
 
 import en from './locales/en.json';
 import ru from './locales/ru.json';
@@ -83,11 +102,13 @@ const currentLang = i18n.language || getDeviceLanguage();
 const currentDayjsLang = currentLang === 'zh' ? 'zh-cn' : currentLang;
 dayjs.locale(currentDayjsLang);
 setupCalendarLocale(currentDayjsLang);
+syncRtlLayout(currentDayjsLang);
 
 i18n.on('languageChanged', (lng) => {
   const newLang = lng === 'zh' ? 'zh-cn' : lng;
   dayjs.locale(newLang);
   setupCalendarLocale(newLang);
+  syncRtlLayout(newLang);
 });
 
 export default i18n;

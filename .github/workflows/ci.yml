@@ -42,6 +42,9 @@ jobs:
       - name: 🔍 TypeScript / Syntax Check
         run: npx tsc --noEmit || true
 
+      - name: 🧪 Run Security, Standards & Core Regression Test Suite
+        run: npm test
+
       - name: 🚀 Validate Web Bundle Export
         run: npx expo export --platform web --clear
 

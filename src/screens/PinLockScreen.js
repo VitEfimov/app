@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
 import { BiometricHelper } from '../utils/biometricHelper';
 import { CryptoStorage } from '../utils/cryptoStorage';
+import { HapticHelper } from '../utils/hapticHelper';
 
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -173,12 +174,14 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
     }
 
     if (lockoutSeconds > 0) {
+      HapticHelper.error();
       setAlertConfig({
         isVisible: true,
         title: t('Temporary Lockout'),
         message: t('Too many failed attempts. Keypad locked for {{count}} seconds.', { count: lockoutSeconds })
       });
     } else {
+      HapticHelper.error();
       const remainingBeforeLock = 5 - (nextAttempts % 5);
       setAlertConfig({
         isVisible: true,
@@ -189,6 +192,7 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
   };
 
   const handleSuccessfulUnlock = async () => {
+    HapticHelper.success();
     try {
       await Promise.all([
         AsyncStorage.removeItem(STORAGE_KEY_FAILED_ATTEMPTS),
@@ -224,6 +228,7 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
 
   const handlePress = (num) => {
     if (lockoutRemaining > 0) return;
+    HapticHelper.light();
     if (pin.length < 4) {
       setPin(prev => prev + num);
     }
@@ -231,6 +236,7 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
 
   const handleBackspace = () => {
     if (lockoutRemaining > 0) return;
+    HapticHelper.selection();
     if (pin.length > 0) {
       setPin(prev => prev.slice(0, -1));
     }

@@ -34,6 +34,7 @@ import { SecurityLockHelper } from './src/utils/securityLockHelper';
 import { CryptoStorage } from './src/utils/cryptoStorage';
 import { setScreenSecurityAsync } from './modules/expo-task-alarm';
 import { A11yHelper } from './src/utils/a11yHelper';
+import { HapticHelper } from './src/utils/hapticHelper';
 
 // WCAG 1.4.4: Configure global font scaling upper bound to prevent UI clipping
 A11yHelper.configureGlobalFontScaling(1.5);
@@ -127,7 +128,13 @@ function InitApp() {
   const shareIntentResult = Platform.OS !== 'web' ? useShareIntent() : null;
   const { hasShareIntent, shareIntent, resetShareIntent } = shareIntentResult || {};
   const appPin = useSelector(state => state.themeReducer?.appPin);
+  const vibrationEnabled = useSelector(state => state.themeReducer?.vibrationEnabled);
   const lastBackgroundTimestampRef = useRef(null);
+
+  // Sync global haptic engine with user's vibration preference
+  useEffect(() => {
+    HapticHelper.setVibrationEnabled(vibrationEnabled !== false);
+  }, [vibrationEnabled]);
 
   // OWASP MASVS-RESILIENCE-1: Enable native window FLAG_SECURE whenever App PIN is configured
   useEffect(() => {
