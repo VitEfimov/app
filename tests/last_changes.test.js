@@ -1359,8 +1359,18 @@ describe('Apple HIG & Material Design Haptic Engine', () => {
 
   test('Web environment invokes navigator.vibrate when available', () => {
     let webVibrated = null;
-    const originalVibrate = navigator.vibrate;
-    navigator.vibrate = (pattern) => { webVibrated = pattern; };
+    const originalNav = typeof globalThis.navigator !== 'undefined' ? globalThis.navigator : undefined;
+    const originalVibrate = originalNav ? originalNav.vibrate : undefined;
+
+    if (typeof globalThis.navigator === 'undefined') {
+      Object.defineProperty(globalThis, 'navigator', {
+        value: { vibrate: (pattern) => { webVibrated = pattern; } },
+        configurable: true,
+        writable: true
+      });
+    } else {
+      globalThis.navigator.vibrate = (pattern) => { webVibrated = pattern; };
+    }
 
     try {
       const mod = loadTranspiledModule(path.resolve('src/utils/hapticHelper.js'), {
@@ -1370,10 +1380,14 @@ describe('Apple HIG & Material Design Haptic Engine', () => {
       mod.HapticHelper.success();
       assert.deepStrictEqual(webVibrated, [0, 25, 60, 35]);
     } finally {
-      if (originalVibrate) {
-        navigator.vibrate = originalVibrate;
+      if (!originalNav) {
+        try {
+          delete globalThis.navigator;
+        } catch (e) {}
+      } else if (originalVibrate) {
+        globalThis.navigator.vibrate = originalVibrate;
       } else {
-        delete navigator.vibrate;
+        delete globalThis.navigator.vibrate;
       }
     }
   });
@@ -1432,5 +1446,157 @@ describe('Bidirectional (RTL) Layout & CI Quality Gate', () => {
     const ciContent = fs.readFileSync(ciPath, 'utf8');
     assert.ok(ciContent.includes('npm test'), 'ci.yml must execute npm test');
     assert.ok(ciContent.includes('TaskCalendar CI Quality Gate'), 'ci.yml must define quality gate');
+  });
+});
+
+// ==============================================================================
+// TEST SUITE 13: Tier 2 Large Screens, Foldables & Chaos Stress Harness
+// ==============================================================================
+describe('Tier 2 Large Screens, Foldables & Chaos Stress Harness', () => {
+  let ResponsiveHelper;
+  let WINDOW_SIZE_CLASSES;
+  let BREAKPOINTS;
+  let ChaosTestHelper;
+  let CHAOS_PREFIX;
+
+  beforeEach(() => {
+    const respMod = loadTranspiledModule(path.resolve('src/utils/responsiveHelper.js'));
+    ResponsiveHelper = respMod.ResponsiveHelper;
+    WINDOW_SIZE_CLASSES = respMod.WINDOW_SIZE_CLASSES;
+    BREAKPOINTS = respMod.BREAKPOINTS;
+
+    const chaosMod = loadTranspiledModule(path.resolve('src/utils/chaosTestHelper.js'), {
+      dayjs: require('dayjs')
+    });
+    ChaosTestHelper = chaosMod.ChaosTestHelper;
+    CHAOS_PREFIX = chaosMod.CHAOS_PREFIX;
+  });
+
+  test('getWindowSizeClass identifies compact, medium and expanded viewports', () => {
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(360), WINDOW_SIZE_CLASSES.COMPACT);
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(599), WINDOW_SIZE_CLASSES.COMPACT);
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(600), WINDOW_SIZE_CLASSES.MEDIUM);
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(720), WINDOW_SIZE_CLASSES.MEDIUM);
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(839), WINDOW_SIZE_CLASSES.MEDIUM);
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(840), WINDOW_SIZE_CLASSES.EXPANDED);
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(1280), WINDOW_SIZE_CLASSES.EXPANDED);
+    // Safe fallback on invalid/missing width
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(0), WINDOW_SIZE_CLASSES.COMPACT);
+    assert.strictEqual(ResponsiveHelper.getWindowSizeClass(null), WINDOW_SIZE_CLASSES.COMPACT);
+  });
+
+  test('isDualPane activates at >= 720dp for unfolded foldables and tablets', () => {
+    assert.strictEqual(ResponsiveHelper.isDualPane(360), false);
+    assert.strictEqual(ResponsiveHelper.isDualPane(412), false);
+    assert.strictEqual(ResponsiveHelper.isDualPane(719), false);
+    assert.strictEqual(ResponsiveHelper.isDualPane(720), true);
+    assert.strictEqual(ResponsiveHelper.isDualPane(800), true);
+    assert.strictEqual(ResponsiveHelper.isDualPane(1024), true);
+  });
+
+  test('getDualPaneLayout calculates Master-Detail pane dimensions correctly', () => {
+    const compactLayout = ResponsiveHelper.getDualPaneLayout(400);
+    assert.strictEqual(compactLayout.isDualPane, false);
+    assert.strictEqual(compactLayout.leftPaneWidth, 400);
+
+    const foldableLayout = ResponsiveHelper.getDualPaneLayout(750);
+    assert.strictEqual(foldableLayout.isDualPane, true);
+    // 750 * 0.42 = 315, capped by min 340
+    assert.strictEqual(foldableLayout.leftPaneWidth, 340);
+
+    const tabletLayout = ResponsiveHelper.getDualPaneLayout(1000);
+    assert.strictEqual(tabletLayout.isDualPane, true);
+    // 1000 * 0.42 = 420
+    assert.strictEqual(tabletLayout.leftPaneWidth, 420);
+
+    const wideTabletLayout = ResponsiveHelper.getDualPaneLayout(1400);
+    assert.strictEqual(wideTabletLayout.isDualPane, true);
+    // 1400 * 0.42 = 588, capped by max 440
+    assert.strictEqual(wideTabletLayout.leftPaneWidth, 440);
+  });
+
+  test('getCenteredContainerStyle centers cards on wide viewports and preserves full width on phones', () => {
+    const phoneStyle = ResponsiveHelper.getCenteredContainerStyle(390, 760);
+    assert.deepStrictEqual(phoneStyle, { width: '100%' });
+
+    const wideStyle = ResponsiveHelper.getCenteredContainerStyle(1024, 760);
+    assert.strictEqual(wideStyle.width, '100%');
+    assert.strictEqual(wideStyle.maxWidth, 760);
+    assert.strictEqual(wideStyle.alignSelf, 'center');
+  });
+
+  test('app.json orientation is set to default for foldable and tablet freedom', () => {
+    const appJsonPath = path.resolve('app.json');
+    assert.ok(fs.existsSync(appJsonPath));
+    const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
+    assert.strictEqual(
+      appJson.expo.orientation,
+      'default',
+      'app.json orientation must be "default" to comply with Android 12L+ Large Screen quality standards'
+    );
+  });
+
+  test('generateStressTasks creates requested task volume with benchmark attributes', () => {
+    const tasks = ChaosTestHelper.generateStressTasks(25, 'custom_board');
+    assert.strictEqual(tasks.length, 25);
+    tasks.forEach((t) => {
+      assert.ok(t.id.startsWith(CHAOS_PREFIX));
+      assert.ok(t.taskname.includes('[Performance Benchmark]'));
+      assert.strictEqual(t.boardId, 'custom_board');
+      assert.ok(Array.isArray(t.subtasks));
+      assert.strictEqual(t.subtasks.length, 2);
+      assert.ok(typeof t.dueDate === 'string' && t.dueDate.length === 10);
+    });
+  });
+
+  test('isChaosTask distinguishes synthetic stress tasks from user tasks', () => {
+    const stressTask = {
+      id: `${CHAOS_PREFIX}12345_1`,
+      taskname: 'Stress Task #1 [Performance Benchmark]'
+    };
+    assert.strictEqual(ChaosTestHelper.isChaosTask(stressTask), true);
+
+    const normalTask = {
+      id: 'task_abc_789',
+      taskname: 'Buy milk at grocery store'
+    };
+    assert.strictEqual(ChaosTestHelper.isChaosTask(normalTask), false);
+
+    assert.strictEqual(ChaosTestHelper.isChaosTask(null), false);
+    assert.strictEqual(ChaosTestHelper.isChaosTask(undefined), false);
+    assert.strictEqual(ChaosTestHelper.isChaosTask({}), false);
+  });
+
+  test('getPayloadMetrics calculates item count, byte size, and human-readable KB', () => {
+    const stressTasks = ChaosTestHelper.generateStressTasks(50);
+    const metrics = ChaosTestHelper.getPayloadMetrics(stressTasks);
+    assert.strictEqual(metrics.count, 50);
+    assert.ok(typeof metrics.sizeBytes === 'number' && metrics.sizeBytes > 0);
+    assert.ok(typeof metrics.sizeKb === 'number' && metrics.sizeKb > 0);
+    assert.ok(metrics.formattedSize.includes('KB'));
+    assert.ok(metrics.formattedSize.includes('50 items'));
+  });
+
+  test('testStorageCorruptionResilience detects tampered envelopes and quarantines safely', async () => {
+    let rawStored = {};
+    const mockRawStorage = {
+      setItem: async (k, v) => { rawStored[k] = v; },
+      getItem: async (k) => rawStored[k] || null,
+      removeItem: async (k) => { delete rawStored[k]; }
+    };
+
+    const cryptoMod = loadTranspiledModule(path.resolve('src/utils/cryptoStorage.js'), {
+      '@react-native-async-storage/async-storage': mockRawStorage
+    });
+
+    const result = await ChaosTestHelper.testStorageCorruptionResilience(
+      cryptoMod.CryptoStorage,
+      mockRawStorage
+    );
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.isTamperCaught, true);
+    assert.ok(result.message.includes('Integrity Verified'));
+    assert.strictEqual(rawStored['@chaos_tamper_canary'], undefined);
   });
 });

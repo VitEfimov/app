@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
@@ -32,6 +32,7 @@ import * as FileSystem from 'expo-file-system';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
 import { A11yHelper } from '../utils/a11yHelper';
+import { ResponsiveHelper } from '../utils/responsiveHelper';
 
 let RNShare;
 if (Platform.OS !== 'web') {
@@ -145,6 +146,7 @@ const DEFAULT_COLLAPSED_SECTIONS = ['missed', 'on-this-week', 'on-next-week', 'l
 let currentSessionCollapsedSections = [...DEFAULT_COLLAPSED_SECTIONS];
 
 export default function BoardScreen({ route, navigation }) {
+  const { width: windowWidth } = useWindowDimensions();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeAddSectionId, setActiveAddSectionId] = useState(null);
   
@@ -1034,7 +1036,7 @@ export default function BoardScreen({ route, navigation }) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
       >
         <View 
-          style={[styles.container, { backgroundColor: colors.bgMain }]}
+          style={[styles.container, { backgroundColor: colors.bgMain }, ResponsiveHelper.getCenteredContainerStyle(windowWidth, 880)]}
           {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
         >
       

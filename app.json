@@ -5,7 +5,7 @@
     "slug": "taskcalendar",
     "version": "1.0.0",
     "scheme": "taskcalendar",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "jsEngine": "hermes",

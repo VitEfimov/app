@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
@@ -25,6 +25,7 @@ import { logoutUser, logout } from '../features/userSlice';
 import { BiometricHelper } from '../utils/biometricHelper';
 import { CryptoStorage } from '../utils/cryptoStorage';
 import { A11yHelper } from '../utils/a11yHelper';
+import { ResponsiveHelper } from '../utils/responsiveHelper';
 
 const SOUND_ASSETS = {
   'pisk.mp3': require('../../assets/audio/pisk.mp3'),
@@ -198,6 +199,7 @@ const IconTrash = ({ color = '#E53935', size = 20 }) => (
 );
 
 export default function SettingsScreen({ navigation }) {
+  const { width: windowWidth } = useWindowDimensions();
   const dispatch = useDispatch();
   const { colors, isDark, mode } = useTheme();
   const { t, i18n } = useTranslation();
@@ -567,7 +569,7 @@ export default function SettingsScreen({ navigation }) {
     <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, ResponsiveHelper.getCenteredContainerStyle(windowWidth, 760)]}
         {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
       >
         {/* Top Header */}

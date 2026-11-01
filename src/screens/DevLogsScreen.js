@@ -26,7 +26,10 @@ import {
   rescheduleAllActiveTasks,
   getChannelId,
 } from '../utils/notifications';
-import { updateTask, processAutoManageTasks } from '../features/taskSlice';
+import { updateTask, processAutoManageTasks, addMultipleTasks, deleteMultipleTasks } from '../features/taskSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CryptoStorage } from '../utils/cryptoStorage';
+import { ChaosTestHelper } from '../utils/chaosTestHelper';
 import * as Notifications from 'expo-notifications';
 import dayjs from 'dayjs';
 import { navigationRef } from '../navigation/AppNavigator';
@@ -490,6 +493,58 @@ export default function DevLogsScreen({ navigation }) {
     DevLogger.info('Manual trigger: Running Auto-Manage engine (processAutoManageTasks)');
     await dispatch(processAutoManageTasks());
     DevLogger.success('Auto-Manage engine execution finished');
+  };
+
+  // --- Chaos & Stress Testing Handlers ---
+  const handleInjectStressTasks = async () => {
+    try {
+      const activeBoard = boards[0]?.id || 'main';
+      const startTime = Date.now();
+      const stressTasks = ChaosTestHelper.generateStressTasks(200, activeBoard);
+      await dispatch(addMultipleTasks(stressTasks));
+      const durationMs = Date.now() - startTime;
+      const metrics = ChaosTestHelper.getPayloadMetrics([...tasks, ...stressTasks]);
+      DevLogger.info(`[ChaosTest] Injected 200 stress tasks in ${durationMs}ms. New payload: ${metrics.formattedSize}`);
+      Alert.alert(
+        'Stress Benchmark Injected',
+        `Successfully generated and dispatched 200 tasks in ${durationMs}ms.\nTotal payload: ${metrics.formattedSize}.\nUse Board and Calendar screens to inspect FlashList rendering and scrolling responsiveness.`
+      );
+    } catch (e) {
+      DevLogger.error('[ChaosTest] Failed to inject stress tasks', e.message);
+      Alert.alert('Injection Error', e.message);
+    }
+  };
+
+  const handleRunStorageTamperTest = async () => {
+    try {
+      const result = await ChaosTestHelper.testStorageCorruptionResilience(CryptoStorage, AsyncStorage);
+      if (result.isTamperCaught) {
+        DevLogger.success(`[ChaosTest] Tamper canary passed: ${result.message}`);
+        Alert.alert('Storage Resilience PASS', result.message);
+      } else {
+        DevLogger.error(`[ChaosTest] Tamper canary failed: ${result.message || result.error}`);
+        Alert.alert('Storage Resilience FAIL', result.error || result.message);
+      }
+    } catch (e) {
+      DevLogger.error('[ChaosTest] Storage tamper test threw unexpected error', e.message);
+      Alert.alert('Test Error', e.message);
+    }
+  };
+
+  const handlePurgeChaosTasks = async () => {
+    try {
+      const chaosTaskIds = tasks.filter(ChaosTestHelper.isChaosTask).map((t) => t.id || t._id);
+      if (chaosTaskIds.length === 0) {
+        Alert.alert('No Chaos Tasks', 'There are no active chaos test tasks in the state.');
+        return;
+      }
+      await dispatch(deleteMultipleTasks(chaosTaskIds));
+      DevLogger.info(`[ChaosTest] Purged ${chaosTaskIds.length} synthetic chaos tasks from state`);
+      Alert.alert('Cleaned Up', `Successfully purged ${chaosTaskIds.length} synthetic chaos tasks.`);
+    } catch (e) {
+      DevLogger.error('[ChaosTest] Failed to purge chaos tasks', e.message);
+      Alert.alert('Purge Error', e.message);
+    }
   };
 
   const filteredLogs = useMemo(() => {
@@ -1305,6 +1360,72 @@ export default function DevLogsScreen({ navigation }) {
                 })}
               </View>
             )}
+
+            {/* Chaos & Stress Testing Harness */}
+            <View style={[
+              styles.sectionCard,
+              {
+                backgroundColor: colors.bgCard,
+                borderColor: colors.borderColor || '#E5E5EA',
+                borderWidth: 1,
+                marginTop: 14,
+              }
+            ]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
+                  ⚡ Chaos & Stress Testing Harness
+                </Text>
+                <View style={[styles.statusBadge, { backgroundColor: 'rgba(98, 70, 234, 0.15)' }]}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                    FAULT INJECTION
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12, lineHeight: 18 }}>
+                Simulate production edge cases: high-density task loads, FlashList memory pressure, and corrupted/tampered storage envelopes to test cryptographic self-quarantine and zero-crash resilience.
+              </Text>
+
+              {/* Memory / Payload Stats */}
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', padding: 10, borderRadius: 8, marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 4 }}>
+                  Current Task Payload: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{ChaosTestHelper.getPayloadMetrics(tasks).formattedSize}</Text>
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                  Active Chaos Tasks in State: <Text style={{ fontWeight: '700', color: tasks.filter(ChaosTestHelper.isChaosTask).length > 0 ? '#ffaa00' : '#52c41a' }}>
+                    {tasks.filter(ChaosTestHelper.isChaosTask).length} items
+                  </Text>
+                </Text>
+              </View>
+
+              <View style={{ gap: 8 }}>
+                {/* 1. Mass Injection */}
+                <TouchableOpacity
+                  style={[styles.btnLarge, { backgroundColor: colors.primary }]}
+                  onPress={handleInjectStressTasks}
+                >
+                  <Text style={styles.btnLargeText}>Inject 200 Stress Tasks (Memory Benchmark)</Text>
+                </TouchableOpacity>
+
+                {/* 2. Storage Tamper Canary Test */}
+                <TouchableOpacity
+                  style={[styles.btnLarge, { backgroundColor: '#1890ff' }]}
+                  onPress={handleRunStorageTamperTest}
+                >
+                  <Text style={styles.btnLargeText}>Run Storage Tamper & Integrity Test</Text>
+                </TouchableOpacity>
+
+                {/* 3. Purge Chaos Data */}
+                {tasks.some(ChaosTestHelper.isChaosTask) && (
+                  <TouchableOpacity
+                    style={[styles.btnLarge, { backgroundColor: '#ff4d4f' }]}
+                    onPress={handlePurgeChaosTasks}
+                  >
+                    <Text style={styles.btnLargeText}>Purge All Chaos Test Data ({tasks.filter(ChaosTestHelper.isChaosTask).length})</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           </ScrollView>
         )}
 

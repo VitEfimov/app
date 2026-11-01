@@ -38,6 +38,7 @@ import { addBoardAsync } from '../features/userSlice';
 import { getBoardColor } from '../utils/boardColors';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
 import { A11yHelper } from '../utils/a11yHelper';
+import { ResponsiveHelper } from '../utils/responsiveHelper';
 
 const IconSearch = ({ color = '#000', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -539,323 +540,359 @@ export default function CalendarScreen({ navigation, route }) {
     isQuickMenuVisible || 
     isGoogleDrawerOpen;
 
+  const { width: windowWidth } = useWindowDimensions();
+  const { isDualPane, leftPaneWidth } = ResponsiveHelper.getDualPaneLayout(windowWidth);
+
+  const renderMasterCalendarPane = () => (
+    <>
+      {/* Screen Header */}
+      <View style={styles.topHeaderRow}>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>
+            {t('Calendar') || 'Calendar'}
+          </Text>
+          <Text style={[styles.screenSubtitle, { color: colors.textSecondary }]}>
+            {t('Make room for what matters.') || 'Make room for what matters.'}
+          </Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={handleToggleTheme}
+            style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle theme"
+          >
+            {renderThemeIcon()}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setIsSearchActive(!isSearchActive)}
+            style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+            accessibilityRole="button"
+            accessibilityLabel="Search tasks"
+          >
+            <IconSearch color={colors.textPrimary} size={18} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Search bar when toggled */}
+      {isSearchActive && (
+        <View style={[styles.searchBarWrapper, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+          <IconSearch color={colors.textSecondary} size={16} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.textPrimary }]}
+            placeholder={t('Search day tasks...') || 'Search day tasks...'}
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus={true}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* Calendar Card (enclosed in clean white card matching Image 5) */}
+      <View style={[styles.calendarCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+        <Calendar
+          testID="task_calendar"
+          key={`cal-${calendarMonth}-${colors.bgCard}-${isDark}-${i18n.language}`}
+          current={calendarMonth}
+          onDayPress={(day) => {
+            setSelectedDate(day.dateString);
+            setCalendarMonth(day.dateString);
+            setSelectionMode({ isActive: false, selectedTaskIds: [] });
+          }}
+          onMonthChange={(month) => {
+            setCalendarMonth(month.dateString);
+          }}
+          markingType={'multi-dot'}
+          markedDates={markedDates}
+          dayComponent={renderCustomDay}
+          renderHeader={(date) => {
+            let dateObj = dayjs(date ? (date.dateString || date.toString()) : calendarMonth);
+            if (!dateObj.isValid()) {
+              dateObj = dayjs(calendarMonth);
+            }
+            const monthYearStr = dateObj.format('MMMM YYYY');
+            return (
+              <TouchableOpacity
+                testID="calendar_month_year_header"
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`Select year, current month ${monthYearStr}`}
+                activeOpacity={0.7}
+                style={styles.monthYearHeaderBtn}
+                onPress={() => setIsYearPickerVisible(true)}
+              >
+                <Text style={[styles.monthYearHeaderText, { color: colors.textPrimary }]}>
+                  {monthYearStr}
+                </Text>
+                <Text style={[styles.monthYearChevron, { color: primaryAccent }]}>▾</Text>
+              </TouchableOpacity>
+            );
+          }}
+          enableSwipeMonths={true}
+          hideExtraDays={true}
+          theme={{
+            backgroundColor: colors.bgCard,
+            calendarBackground: colors.bgCard,
+            textSectionTitleColor: colors.textSecondary,
+            selectedDayBackgroundColor: primaryAccent,
+            selectedDayTextColor: '#FFFFFF',
+            todayTextColor: primaryAccent,
+            dayTextColor: colors.textPrimary,
+            textDisabledColor: colors.textSecondary ? `${colors.textSecondary}60` : '#AAA',
+            dotColor: primaryAccent,
+            selectedDotColor: '#FFFFFF',
+            arrowColor: primaryAccent,
+            monthTextColor: colors.textPrimary,
+            indicatorColor: primaryAccent,
+            textDayFontWeight: '600',
+            textMonthFontWeight: '700',
+            textDayFontSize: 15,
+            textMonthFontSize: 17,
+            textDayHeaderFontSize: 12,
+            weekVerticalMargin: 0,
+            'stylesheet.calendar.main': {
+              week: {
+                marginVertical: 1,
+                flexDirection: 'row',
+                justifyContent: 'space-around',
+              },
+            },
+            'stylesheet.calendar.header': {
+              header: {
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                paddingLeft: 4,
+                paddingRight: 4,
+                marginTop: 0,
+                marginBottom: 6,
+                alignItems: 'center',
+                height: 38,
+              },
+              week: {
+                marginTop: 2,
+                marginBottom: 6,
+                flexDirection: 'row',
+                justifyContent: 'space-around',
+              },
+            },
+          }}
+          style={styles.calendar}
+        />
+      </View>
+
+      {/* Active Focus Banner when a calendar is focused */}
+      {activeBoard && (
+        <View style={[
+          styles.focusBanner, 
+          { 
+            backgroundColor: isDark ? 'rgba(93, 69, 219, 0.15)' : 'rgba(93, 69, 219, 0.08)',
+            borderColor: getBoardColor(activeBoard, boards)
+          }
+        ]}>
+          <View style={styles.focusBannerContent}>
+            <View style={[styles.focusDot, { backgroundColor: getBoardColor(activeBoard, boards) }]} />
+            <Text style={[styles.focusText, { color: colors.textPrimary }]} numberOfLines={1}>
+              {t('Focused on') || 'Focused on'}: <Text style={{ fontWeight: '700' }}>{activeBoard.name === 'Main' ? (t('Main') || 'Main') : activeBoard.name}</Text>
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.cancelFocusBtn, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
+            onPress={() => setFilterBoardId(null)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('Cancel focus') || 'Cancel focus'}
+          >
+            <Text style={[styles.cancelFocusBtnText, { color: primaryAccent }]}>
+              ✕ {t('Cancel focus') || 'Cancel focus'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Filter pill & Back to today row */}
+      <View style={styles.calendarSubRow}>
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => dispatch(setGoogleDrawerOpen(true))}
+          style={[
+            styles.categoryPill, 
+            { 
+              backgroundColor: colors.bgCard, 
+              borderColor: activeBoard ? getBoardColor(activeBoard, boards) : colors.borderColor 
+            }
+          ]}
+        >
+          <IconCategoryGrid color={activeBoard ? getBoardColor(activeBoard, boards) : primaryAccent} />
+          <Text style={[styles.categoryPillText, { color: colors.textPrimary }]}>
+            {activeBoard ? (activeBoard.name === 'Main' ? (t('Main') || 'Main') : activeBoard.name) : (t('All Categories') || 'All categories')}
+          </Text>
+          {activeBoard && (
+            <TouchableOpacity
+              onPress={(e) => {
+                e?.stopPropagation && e.stopPropagation();
+                setFilterBoardId(null);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ marginLeft: 6, paddingHorizontal: 2 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear calendar focus"
+            >
+              <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '700' }}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            setSelectedDate(todayStr);
+            setCalendarMonth(todayStr);
+          }}
+        >
+          <Text style={[styles.backToTodayText, { color: primaryAccent }]}>
+            {t('Back to today') || 'Back to today'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
+  const renderDetailTaskPane = () => (
+    <View style={[styles.dayTaskListCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+      {/* Header row: Tasks for Oct 26, 2026 ... */}
+      <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
+        <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
+          {t('Tasks for')} {dayjs(selectedDate).format('MMM D, YYYY')}
+        </Text>
+        <TouchableOpacity
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Day options"
+          style={styles.ellipsisBtn}
+          onPress={() => setIsDayOptionsVisible(true)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={[styles.ellipsisText, { color: colors.textSecondary }]}>⋯</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Grouped by Category */}
+      {groupedTasks.length > 0 ? (
+        groupedTasks.map((group, groupIndex) => (
+          <View key={group.id} style={styles.categorySectionGroup}>
+            {/* Category Header: 🟠 DCFGH */}
+            <View style={[styles.categorySectionHeader, { borderBottomColor: colors.borderColor }]}>
+              <View style={[styles.categoryHeaderDot, { backgroundColor: group.color }]} />
+              <Text style={[styles.categoryHeaderText, { color: colors.textSecondary }]}>
+                {group.title.toUpperCase()}
+              </Text>
+            </View>
+
+            {/* Tasks in Category */}
+            {group.data.map((task, taskIndex) => {
+              const isLastTaskOverall =
+                groupIndex === groupedTasks.length - 1 &&
+                taskIndex === group.data.length - 1;
+              return (
+                <View
+                  key={task.id || task._id}
+                  style={[
+                    styles.taskRowWrapper,
+                    { borderBottomColor: colors.borderColor },
+                    isLastTaskOverall && { borderBottomWidth: 0 }
+                  ]}
+                >
+                  <TaskRow
+                    task={task}
+                    hideUnderline={true}
+                    hideDate={true}
+                    hideBoardBadge={false}
+                    disableInlineEdit={true}
+                    testIDPrefix="calendar_"
+                    isSelectionMode={selectionMode.isActive}
+                    isSelected={selectedTaskIdsSet.has(task.id || task._id)}
+                    onToggleSelect={toggleTaskSelection}
+                    onLongPress={handleLongPressTask}
+                    onPressSnooze={handleTaskPress}
+                    onPressMore={handleQuickMenuPress}
+                    onPress={handleTaskPress}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        ))
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {t('No tasks scheduled for this day.') || 'No tasks scheduled for this day.'}
+          </Text>
+        </View>
+      )}
+
+      {/* Bottom + Add task */}
+      <View style={[styles.inlineAddWrapper, { borderTopColor: colors.borderColor }]}>
+        <InlineAddTask
+          sectionId={selectedDate}
+          hideUnderline={true}
+          onAddDetails={(task) => {
+            setSelectedTask(task);
+            setDetailsVisible(true);
+          }}
+        />
+      </View>
+    </View>
+  );
+
   return (
     <ScreenErrorBoundary screenName="CalendarScreen">
       <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
-        <ScrollView 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.mainScrollContent}
-          keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={closeOpenSwipeableRow}
-          {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
-        >
-        {/* Screen Header */}
-        <View style={styles.topHeaderRow}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>
-              {t('Calendar') || 'Calendar'}
-            </Text>
-            <Text style={[styles.screenSubtitle, { color: colors.textSecondary }]}>
-              {t('Make room for what matters.') || 'Make room for what matters.'}
-            </Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={handleToggleTheme}
-              style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
-              accessibilityRole="button"
-              accessibilityLabel="Toggle theme"
+        {isDualPane ? (
+          <View style={{ flex: 1, flexDirection: 'row' }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ width: leftPaneWidth, borderRightWidth: 1, borderRightColor: colors.borderColor }}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28 }}
+              keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={closeOpenSwipeableRow}
+              {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
             >
-              {renderThemeIcon()}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => setIsSearchActive(!isSearchActive)}
-              style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
-              accessibilityRole="button"
-              accessibilityLabel="Search tasks"
+              {renderMasterCalendarPane()}
+            </ScrollView>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 28 }}
+              keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={closeOpenSwipeableRow}
+              {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
             >
-              <IconSearch color={colors.textPrimary} size={18} />
-            </TouchableOpacity>
+              {renderDetailTaskPane()}
+            </ScrollView>
           </View>
-        </View>
-
-        {/* Search bar when toggled */}
-        {isSearchActive && (
-          <View style={[styles.searchBarWrapper, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-            <IconSearch color={colors.textSecondary} size={16} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.textPrimary }]}
-              placeholder={t('Search day tasks...') || 'Search day tasks...'}
-              placeholderTextColor={colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoFocus={true}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* Calendar Card (enclosed in clean white card matching Image 5) */}
-        <View style={[styles.calendarCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-          <Calendar
-            testID="task_calendar"
-            key={`cal-${calendarMonth}-${colors.bgCard}-${isDark}-${i18n.language}`}
-            current={calendarMonth}
-            onDayPress={(day) => {
-              setSelectedDate(day.dateString);
-              setCalendarMonth(day.dateString);
-              setSelectionMode({ isActive: false, selectedTaskIds: [] });
-            }}
-            onMonthChange={(month) => {
-              setCalendarMonth(month.dateString);
-            }}
-            markingType={'multi-dot'}
-            markedDates={markedDates}
-            dayComponent={renderCustomDay}
-            renderHeader={(date) => {
-              let dateObj = dayjs(date ? (date.dateString || date.toString()) : calendarMonth);
-              if (!dateObj.isValid()) {
-                dateObj = dayjs(calendarMonth);
-              }
-              const monthYearStr = dateObj.format('MMMM YYYY');
-              return (
-                <TouchableOpacity
-                  testID="calendar_month_year_header"
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select year, current month ${monthYearStr}`}
-                  activeOpacity={0.7}
-                  style={styles.monthYearHeaderBtn}
-                  onPress={() => setIsYearPickerVisible(true)}
-                >
-                  <Text style={[styles.monthYearHeaderText, { color: colors.textPrimary }]}>
-                    {monthYearStr}
-                  </Text>
-                  <Text style={[styles.monthYearChevron, { color: primaryAccent }]}>▾</Text>
-                </TouchableOpacity>
-              );
-            }}
-            enableSwipeMonths={true}
-            hideExtraDays={true}
-            theme={{
-              backgroundColor: colors.bgCard,
-              calendarBackground: colors.bgCard,
-              textSectionTitleColor: colors.textSecondary,
-              selectedDayBackgroundColor: primaryAccent,
-              selectedDayTextColor: '#FFFFFF',
-              todayTextColor: primaryAccent,
-              dayTextColor: colors.textPrimary,
-              textDisabledColor: colors.textSecondary ? `${colors.textSecondary}60` : '#AAA',
-              dotColor: primaryAccent,
-              selectedDotColor: '#FFFFFF',
-              arrowColor: primaryAccent,
-              monthTextColor: colors.textPrimary,
-              indicatorColor: primaryAccent,
-              textDayFontWeight: '600',
-              textMonthFontWeight: '700',
-              textDayFontSize: 15,
-              textMonthFontSize: 17,
-              textDayHeaderFontSize: 12,
-              weekVerticalMargin: 0,
-              'stylesheet.calendar.main': {
-                week: {
-                  marginVertical: 1,
-                  flexDirection: 'row',
-                  justifyContent: 'space-around',
-                },
-              },
-              'stylesheet.calendar.header': {
-                header: {
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  paddingLeft: 4,
-                  paddingRight: 4,
-                  marginTop: 0,
-                  marginBottom: 6,
-                  alignItems: 'center',
-                  height: 38,
-                },
-                week: {
-                  marginTop: 2,
-                  marginBottom: 6,
-                  flexDirection: 'row',
-                  justifyContent: 'space-around',
-                },
-              },
-            }}
-            style={styles.calendar}
-          />
-        </View>
-
-        {/* Active Focus Banner when a calendar is focused */}
-        {activeBoard && (
-          <View style={[
-            styles.focusBanner, 
-            { 
-              backgroundColor: isDark ? 'rgba(93, 69, 219, 0.15)' : 'rgba(93, 69, 219, 0.08)',
-              borderColor: getBoardColor(activeBoard, boards)
-            }
-          ]}>
-            <View style={styles.focusBannerContent}>
-              <View style={[styles.focusDot, { backgroundColor: getBoardColor(activeBoard, boards) }]} />
-              <Text style={[styles.focusText, { color: colors.textPrimary }]} numberOfLines={1}>
-                {t('Focused on') || 'Focused on'}: <Text style={{ fontWeight: '700' }}>{activeBoard.name === 'Main' ? (t('Main') || 'Main') : activeBoard.name}</Text>
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.cancelFocusBtn, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
-              onPress={() => setFilterBoardId(null)}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={t('Cancel focus') || 'Cancel focus'}
-            >
-              <Text style={[styles.cancelFocusBtnText, { color: primaryAccent }]}>
-                ✕ {t('Cancel focus') || 'Cancel focus'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Filter pill & Back to today row */}
-        <View style={styles.calendarSubRow}>
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => dispatch(setGoogleDrawerOpen(true))}
-            style={[
-              styles.categoryPill, 
-              { 
-                backgroundColor: colors.bgCard, 
-                borderColor: activeBoard ? getBoardColor(activeBoard, boards) : colors.borderColor 
-              }
-            ]}
+        ) : (
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[styles.mainScrollContent, ResponsiveHelper.getCenteredContainerStyle(windowWidth, 760)]}
+            keyboardShouldPersistTaps="handled"
+            onScrollBeginDrag={closeOpenSwipeableRow}
+            {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
           >
-            <IconCategoryGrid color={activeBoard ? getBoardColor(activeBoard, boards) : primaryAccent} />
-            <Text style={[styles.categoryPillText, { color: colors.textPrimary }]}>
-              {activeBoard ? (activeBoard.name === 'Main' ? (t('Main') || 'Main') : activeBoard.name) : (t('All Categories') || 'All categories')}
-            </Text>
-            {activeBoard && (
-              <TouchableOpacity
-                onPress={(e) => {
-                  e?.stopPropagation && e.stopPropagation();
-                  setFilterBoardId(null);
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{ marginLeft: 6, paddingHorizontal: 2 }}
-                accessibilityRole="button"
-                accessibilityLabel="Clear calendar focus"
-              >
-                <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '700' }}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => {
-              setSelectedDate(todayStr);
-              setCalendarMonth(todayStr);
-            }}
-          >
-            <Text style={[styles.backToTodayText, { color: primaryAccent }]}>
-              {t('Back to today') || 'Back to today'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tasks List Card matching user picture */}
-        <View style={[styles.dayTaskListCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-          {/* Header row: Tasks for Oct 26, 2026 ... */}
-          <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
-            <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
-              {t('Tasks for')} {dayjs(selectedDate).format('MMM D, YYYY')}
-            </Text>
-            <TouchableOpacity
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel="Day options"
-              style={styles.ellipsisBtn}
-              onPress={() => setIsDayOptionsVisible(true)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={[styles.ellipsisText, { color: colors.textSecondary }]}>⋯</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Grouped by Category */}
-          {groupedTasks.length > 0 ? (
-            groupedTasks.map((group, groupIndex) => (
-              <View key={group.id} style={styles.categorySectionGroup}>
-                {/* Category Header: 🟠 DCFGH */}
-                <View style={[styles.categorySectionHeader, { borderBottomColor: colors.borderColor }]}>
-                  <View style={[styles.categoryHeaderDot, { backgroundColor: group.color }]} />
-                  <Text style={[styles.categoryHeaderText, { color: colors.textSecondary }]}>
-                    {group.title.toUpperCase()}
-                  </Text>
-                </View>
-
-                {/* Tasks in Category */}
-                {group.data.map((task, taskIndex) => {
-                  const isLastTaskOverall =
-                    groupIndex === groupedTasks.length - 1 &&
-                    taskIndex === group.data.length - 1;
-                  return (
-                    <View
-                      key={task.id || task._id}
-                      style={[
-                        styles.taskRowWrapper,
-                        { borderBottomColor: colors.borderColor },
-                        isLastTaskOverall && { borderBottomWidth: 0 }
-                      ]}
-                    >
-                      <TaskRow
-                        task={task}
-                        hideUnderline={true}
-                        hideDate={true}
-                        hideBoardBadge={false}
-                        disableInlineEdit={true}
-                        testIDPrefix="calendar_"
-                        isSelectionMode={selectionMode.isActive}
-                        isSelected={selectedTaskIdsSet.has(task.id || task._id)}
-                        onToggleSelect={toggleTaskSelection}
-                        onLongPress={handleLongPressTask}
-                        onPressSnooze={handleTaskPress}
-                        onPressMore={handleQuickMenuPress}
-                        onPress={handleTaskPress}
-                      />
-                    </View>
-                  );
-                })}
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {t('No tasks scheduled for this day.') || 'No tasks scheduled for this day.'}
-              </Text>
-            </View>
-          )}
-
-          {/* Bottom + Add task */}
-          <View style={[styles.inlineAddWrapper, { borderTopColor: colors.borderColor }]}>
-            <InlineAddTask
-              sectionId={selectedDate}
-              hideUnderline={true}
-              onAddDetails={(task) => {
-                setSelectedTask(task);
-                setDetailsVisible(true);
-              }}
-            />
-          </View>
-        </View>
-      </ScrollView>
+            {renderMasterCalendarPane()}
+            {renderDetailTaskPane()}
+          </ScrollView>
+        )}
 
       {/* Multi-Selection Action Bar */}
       {selectionMode.isActive && (
