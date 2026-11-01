@@ -24,6 +24,7 @@ import { Audio } from 'expo-av';
 import { logoutUser, logout } from '../features/userSlice';
 import { BiometricHelper } from '../utils/biometricHelper';
 import { CryptoStorage } from '../utils/cryptoStorage';
+import { A11yHelper } from '../utils/a11yHelper';
 
 const SOUND_ASSETS = {
   'pisk.mp3': require('../../assets/audio/pisk.mp3'),
@@ -554,11 +555,20 @@ export default function SettingsScreen({ navigation }) {
 
   const handleDeleteData = handleEraseAllData;
 
+  const isAnyModalOpen = isThemeModalVisible ||
+    isLanguageModalVisible ||
+    isAutoManageModalVisible ||
+    isPremiumModalVisible ||
+    pinPromptVisible ||
+    confirmConfig.isVisible ||
+    isPrivacyModalVisible;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
       <ScrollView 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
       >
         {/* Top Header */}
         <View style={styles.topHeaderRow}>

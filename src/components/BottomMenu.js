@@ -95,11 +95,14 @@ export default function BottomMenu(props) {
             <View style={styles.iconWrapper}>
               <TabIcon color={color} size={22} />
             </View>
-            <Text style={[
-              styles.tabLabel, 
-              { color },
-              isFocused && styles.activeTabLabel
-            ]}>
+            <Text 
+              maxFontSizeMultiplier={1.35}
+              style={[
+                styles.tabLabel, 
+                { color },
+                isFocused && styles.activeTabLabel
+              ]}
+            >
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -112,7 +115,7 @@ export default function BottomMenu(props) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    height: Platform.OS === 'ios' ? 82 : 66,
+    minHeight: Platform.OS === 'ios' ? 82 : 66,
     paddingBottom: Platform.OS === 'ios' ? 22 : 6,
     paddingTop: 6,
     borderTopWidth: 1,

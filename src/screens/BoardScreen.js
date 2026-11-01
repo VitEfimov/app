@@ -1013,6 +1013,19 @@ export default function BoardScreen({ route, navigation }) {
     themeText: colors.textPrimary,
   }), [activeBoardId, activeAddSectionId, tasks.length, boardTasks, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary]);
 
+  const isAnyModalOpen = isDetailsVisible || 
+    isQuickMenuVisible || 
+    isSnoozeVisible || 
+    isPremiumModalVisible || 
+    isCreateBoardVisible || 
+    promptConfig.isVisible || 
+    confirmConfig.isVisible || 
+    sectionOptionsConfig.isVisible || 
+    boardOptionsConfig.isVisible || 
+    boardAutomationModal.isVisible || 
+    isMoveBoardVisible || 
+    isGoogleDrawerOpen;
+
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
       <KeyboardAvoidingView 
@@ -1020,7 +1033,10 @@ export default function BoardScreen({ route, navigation }) {
         behavior="padding"
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
       >
-        <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
+        <View 
+          style={[styles.container, { backgroundColor: colors.bgMain }]}
+          {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
+        >
       
         {/* Screen Header matching new design */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 }}>

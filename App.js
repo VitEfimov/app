@@ -33,6 +33,10 @@ import PinLockScreen from './src/screens/PinLockScreen';
 import { SecurityLockHelper } from './src/utils/securityLockHelper';
 import { CryptoStorage } from './src/utils/cryptoStorage';
 import { setScreenSecurityAsync } from './modules/expo-task-alarm';
+import { A11yHelper } from './src/utils/a11yHelper';
+
+// WCAG 1.4.4: Configure global font scaling upper bound to prevent UI clipping
+A11yHelper.configureGlobalFontScaling(1.5);
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -574,10 +578,13 @@ function InitApp() {
   return (
     <View style={{ flex: 1 }}>
       {isHydrated && (
-        <>
+        <View 
+          style={{ flex: 1 }}
+          {...A11yHelper.getModalFocusTrapProps(isLocked)}
+        >
           <AppNavigator />
           <AutomaticCleanupModal />
-        </>
+        </View>
       )}
 
       {isLocked && (

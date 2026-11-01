@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Log
 import android.view.WindowManager
 import androidx.core.content.FileProvider
 import expo.modules.kotlin.Promise
@@ -187,18 +188,66 @@ class ExpoTaskAlarmModule : Module() {
           PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
       )
 
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-          alarmManager.setExactAndAllowWhileIdle(
-              AlarmManager.RTC_WAKEUP,
-              triggerTimeMillis,
-              pendingIntent
-          )
-      } else {
-          alarmManager.setExact(
-              AlarmManager.RTC_WAKEUP,
-              triggerTimeMillis,
-              pendingIntent
-          )
+      try {
+          val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+              alarmManager.canScheduleExactAlarms()
+          } else {
+              true
+          }
+
+          if (canExact) {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                  alarmManager.setExactAndAllowWhileIdle(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              } else {
+                  alarmManager.setExact(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              }
+          } else {
+              // Google Play & Android 14+ Battery Policy Fallback
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                  alarmManager.setAndAllowWhileIdle(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              } else {
+                  alarmManager.set(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              }
+          }
+      } catch (e: SecurityException) {
+          Log.w("ExpoTaskAlarm", "Exact alarm denied by system policy, falling back to inexact alarm: ${e.message}")
+          try {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                  alarmManager.setAndAllowWhileIdle(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              } else {
+                  alarmManager.set(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              }
+          } catch (fallbackError: Exception) {
+              Log.e("ExpoTaskAlarm", "Fallback alarm scheduling failed", fallbackError)
+              return@AsyncFunction false
+          }
+      } catch (e: Exception) {
+          Log.e("ExpoTaskAlarm", "Failed to schedule alarm", e)
+          return@AsyncFunction false
       }
 
       return@AsyncFunction true
@@ -225,18 +274,65 @@ class ExpoTaskAlarmModule : Module() {
           PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
       )
 
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-          alarmManager.setExactAndAllowWhileIdle(
-              AlarmManager.RTC_WAKEUP,
-              triggerTimeMillis,
-              pendingIntent
-          )
-      } else {
-          alarmManager.setExact(
-              AlarmManager.RTC_WAKEUP,
-              triggerTimeMillis,
-              pendingIntent
-          )
+      try {
+          val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+              alarmManager.canScheduleExactAlarms()
+          } else {
+              true
+          }
+
+          if (canExact) {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                  alarmManager.setExactAndAllowWhileIdle(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              } else {
+                  alarmManager.setExact(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              }
+          } else {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                  alarmManager.setAndAllowWhileIdle(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              } else {
+                  alarmManager.set(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              }
+          }
+      } catch (e: SecurityException) {
+          Log.w("ExpoTaskAlarm", "Exact alarm denied, falling back for pomodoro: ${e.message}")
+          try {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                  alarmManager.setAndAllowWhileIdle(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              } else {
+                  alarmManager.set(
+                      AlarmManager.RTC_WAKEUP,
+                      triggerTimeMillis,
+                      pendingIntent
+                  )
+              }
+          } catch (fallbackError: Exception) {
+              Log.e("ExpoTaskAlarm", "Pomodoro fallback alarm failed", fallbackError)
+              return@AsyncFunction false
+          }
+      } catch (e: Exception) {
+          Log.e("ExpoTaskAlarm", "Failed to schedule pomodoro alarm", e)
+          return@AsyncFunction false
       }
       return@AsyncFunction true
     }

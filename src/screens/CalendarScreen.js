@@ -37,6 +37,7 @@ import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
 import { getBoardColor } from '../utils/boardColors';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
+import { A11yHelper } from '../utils/a11yHelper';
 
 const IconSearch = ({ color = '#000', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -530,6 +531,14 @@ export default function CalendarScreen({ navigation, route }) {
 
   const primaryAccent = colors.primary || '#5D45DB';
 
+  const isAnyModalOpen = isDetailsVisible || 
+    isYearPickerVisible || 
+    isDayOptionsVisible || 
+    isCreateCategoryVisible || 
+    confirmConfig.isVisible || 
+    isQuickMenuVisible || 
+    isGoogleDrawerOpen;
+
   return (
     <ScreenErrorBoundary screenName="CalendarScreen">
       <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
@@ -538,6 +547,7 @@ export default function CalendarScreen({ navigation, route }) {
           contentContainerStyle={styles.mainScrollContent}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={closeOpenSwipeableRow}
+          {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
         >
         {/* Screen Header */}
         <View style={styles.topHeaderRow}>

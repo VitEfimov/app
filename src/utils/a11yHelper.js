@@ -1,9 +1,79 @@
-import { AccessibilityInfo, Platform } from 'react-native';
+import { AccessibilityInfo, Platform, Text, TextInput } from 'react-native';
 
 /**
  * Section 508 and WCAG 2.1 AA Accessibility Helper
  */
 export const A11yHelper = {
+  /**
+   * Maximum recommended font scale multiplier for standard controls to prevent
+   * vertical clipping while fully complying with WCAG 1.4.4.
+   */
+  MAX_FONT_SIZE_MULTIPLIER: 1.5,
+
+  /**
+   * Returns accessible text props with maxFontSizeMultiplier.
+   * @param {number} [maxMultiplier=1.5]
+   */
+  getAccessibleTextProps: (maxMultiplier = 1.5) => ({
+    maxFontSizeMultiplier: maxMultiplier,
+    allowFontScaling: true,
+  }),
+
+  /**
+   * Generates cross-platform focus-trap properties for views behind an active modal.
+   * Complies with WCAG 2.1.2 (No Keyboard/Accessibility Trap) and WCAG 2.4.3 (Focus Order).
+   *
+   * @param {boolean} isModalActive Whether any modal or overlay is currently active
+   * @returns {object} Accessibility properties for the background container
+   */
+  getModalFocusTrapProps: (isModalActive) => {
+    const active = !!isModalActive;
+    return {
+      accessibilityElementsHidden: active,
+      importantForAccessibility: active ? 'no-hide-descendants' : 'auto',
+      pointerEvents: active ? 'none' : 'auto',
+    };
+  },
+
+  /**
+   * Convert fixed height styles into accessible minHeight styles to prevent
+   * text clipping when Dynamic Type font scaling is increased.
+   * @param {object} [style={}]
+   */
+  makeFlexibleHeight: (style = {}) => {
+    if (!style || typeof style !== 'object') return style;
+    const { height, ...rest } = style;
+    if (typeof height === 'number') {
+      return {
+        ...rest,
+        minHeight: Math.max(height, 44),
+      };
+    }
+    return {
+      ...rest,
+      minHeight: 44,
+    };
+  },
+
+  /**
+   * Safely configure global dynamic type scaling limits across the app.
+   * Sets defaultProps on Text and TextInput when available in the environment.
+   */
+  configureGlobalFontScaling: (maxMultiplier = 1.5) => {
+    try {
+      if (Text) {
+        Text.defaultProps = Text.defaultProps || {};
+        Text.defaultProps.maxFontSizeMultiplier = maxMultiplier;
+      }
+      if (TextInput) {
+        TextInput.defaultProps = TextInput.defaultProps || {};
+        TextInput.defaultProps.maxFontSizeMultiplier = maxMultiplier;
+      }
+    } catch (e) {
+      console.warn('[A11yHelper] configureGlobalFontScaling failed:', e);
+    }
+  },
+
   /**
    * Announce message to assistive technologies (TalkBack / VoiceOver).
    * @param {string} message Text to announce

@@ -638,7 +638,9 @@ describe('Section 508 & WCAG 2.1 AA Accessibility Standards', () => {
         announceForAccessibility: (msg) => {
           lastAnnouncedMessage = msg;
         }
-      }
+      },
+      Text: {},
+      TextInput: {}
     };
     const mod = loadTranspiledModule(path.resolve('src/utils/a11yHelper.js'), {
       'react-native': mockRN
@@ -738,6 +740,48 @@ describe('Section 508 & WCAG 2.1 AA Accessibility Standards', () => {
     assert.ok(label.includes('Срок: 2026-11-01'));
     assert.ok(label.includes('Повторяющаяся задача'));
     assert.ok(label.includes('2 из 2 подзадач выполнено'));
+  });
+
+  test('getModalFocusTrapProps shields background views when modal is active (WCAG 2.1.2)', () => {
+    const trapped = A11yHelper.getModalFocusTrapProps(true);
+    assert.strictEqual(trapped.accessibilityElementsHidden, true);
+    assert.strictEqual(trapped.importantForAccessibility, 'no-hide-descendants');
+    assert.strictEqual(trapped.pointerEvents, 'none');
+
+    const untrapped = A11yHelper.getModalFocusTrapProps(false);
+    assert.strictEqual(untrapped.accessibilityElementsHidden, false);
+    assert.strictEqual(untrapped.importantForAccessibility, 'auto');
+    assert.strictEqual(untrapped.pointerEvents, 'auto');
+  });
+
+  test('MAX_FONT_SIZE_MULTIPLIER and getAccessibleTextProps provide WCAG 1.4.4 font scaling limits', () => {
+    assert.strictEqual(A11yHelper.MAX_FONT_SIZE_MULTIPLIER, 1.5);
+    const defaultProps = A11yHelper.getAccessibleTextProps();
+    assert.strictEqual(defaultProps.maxFontSizeMultiplier, 1.5);
+    assert.strictEqual(defaultProps.allowFontScaling, true);
+
+    const customProps = A11yHelper.getAccessibleTextProps(1.35);
+    assert.strictEqual(customProps.maxFontSizeMultiplier, 1.35);
+  });
+
+  test('makeFlexibleHeight converts fixed heights into accessible minHeights', () => {
+    const fixedSmall = { height: 32, padding: 8 };
+    const flexibleSmall = A11yHelper.makeFlexibleHeight(fixedSmall);
+    assert.strictEqual(flexibleSmall.height, undefined);
+    assert.strictEqual(flexibleSmall.minHeight, 44);
+    assert.strictEqual(flexibleSmall.padding, 8);
+
+    const fixedLarge = { height: 56, margin: 4 };
+    const flexibleLarge = A11yHelper.makeFlexibleHeight(fixedLarge);
+    assert.strictEqual(flexibleLarge.minHeight, 56);
+  });
+
+  test('configureGlobalFontScaling sets maxFontSizeMultiplier across Text and TextInput', () => {
+    A11yHelper.configureGlobalFontScaling(1.5);
+    const mockRN = loadTranspiledModule(path.resolve('src/utils/a11yHelper.js'), {
+      'react-native': { Text: {}, TextInput: {}, AccessibilityInfo: {}, Platform: { OS: 'ios' } }
+    });
+    mockRN.A11yHelper.configureGlobalFontScaling(1.5);
   });
 });
 
@@ -859,6 +903,26 @@ describe('OWASP MASVS Security Standards (Data-at-Rest & Screen Privacy)', () =>
     assert.strictEqual(setRes, true);
     const isSec = await alarmModule.isScreenSecurityEnabled();
     assert.strictEqual(isSec, true);
+  });
+
+  test('scheduleExactAlarm handles exact alarm execution and errors gracefully', async () => {
+    let scheduledWith = null;
+    const alarmModule = loadTranspiledModule(path.resolve('modules/expo-task-alarm/index.ts'), {
+      'expo-modules-core': {
+        requireNativeModule: () => ({
+          scheduleExactAlarm: async (id, name, time, sound, style) => {
+            scheduledWith = { id, name, time, sound, style };
+            return true;
+          }
+        })
+      },
+      'react-native': { Platform: { OS: 'android' } }
+    });
+
+    const success = await alarmModule.scheduleExactAlarm('t-123', 'Important task', Date.now() + 60000, 'bell.mp3', 'fullscreen');
+    assert.strictEqual(success, true);
+    assert.strictEqual(scheduledWith.id, 't-123');
+    assert.strictEqual(scheduledWith.sound, 'bell.mp3');
   });
 });
 
