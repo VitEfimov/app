@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions, LayoutAnimation, UIManager } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync } from '../utils/calendarSync';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
@@ -167,6 +167,40 @@ const IconChevronRight = ({ color = '#888', size = 18 }) => (
   </Svg>
 );
 
+const IconChevronDown = ({ color = '#888', size = 18, isExpanded = true }) => (
+  <Svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ transform: [{ rotate: isExpanded ? '0deg' : '-90deg' }] }}
+  >
+    <Path d="M6 9l6 6 6-6" />
+  </Svg>
+);
+
+if (Platform.OS === 'android' && UIManager?.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const IconFingerprint = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none">
+    <Path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+    <Path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+    <Path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+    <Path d="M2 12a10 10 0 0 1 18-6" />
+    <Path d="M2 16h.01" />
+    <Path d="M21.8 16c.2-2 .131-5.354 0-6" />
+    <Path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+    <Path d="M8.65 22c.21-.66.45-1.32.57-2" />
+    <Path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
+  </Svg>
+);
+
 const IconShield = ({ color = '#6246EA', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -215,7 +249,29 @@ export default function SettingsScreen({ navigation }) {
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@settings_privacy_expanded').then(val => {
+      if (val !== null) {
+        try {
+          setIsPrivacyExpanded(JSON.parse(val));
+        } catch (e) {}
+      }
+    }).catch(() => {});
+  }, []);
+
+  const togglePrivacySection = () => {
+    if (Platform.OS !== 'web' && LayoutAnimation?.configureNext) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
+    setIsPrivacyExpanded(prev => {
+      const nextVal = !prev;
+      AsyncStorage.setItem('@settings_privacy_expanded', JSON.stringify(nextVal)).catch(() => {});
+      return nextVal;
+    });
+  };
   const [isNotificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [isSoundPickerOpen, setSoundPickerOpen] = useState(false);
   const [isAlarmSoundPickerOpen, setAlarmSoundPickerOpen] = useState(false);
@@ -227,6 +283,13 @@ export default function SettingsScreen({ navigation }) {
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
   const [isSnoozePickerOpen, setSnoozePickerOpen] = useState(false);
+  const [isBiometricHardwareAvailable, setIsBiometricHardwareAvailable] = useState(false);
+
+  useEffect(() => {
+    BiometricHelper.isAvailable().then(avail => {
+      setIsBiometricHardwareAvailable(!!avail);
+    }).catch(() => {});
+  }, []);
 
   const handleOpenPinPrompt = async () => {
     const isAvail = await BiometricHelper.isAvailable();
@@ -555,8 +618,6 @@ export default function SettingsScreen({ navigation }) {
     });
   };
 
-  const handleDeleteData = handleEraseAllData;
-
   const isAnyModalOpen = isThemeModalVisible ||
     isLanguageModalVisible ||
     isAutoManageModalVisible ||
@@ -706,7 +767,7 @@ export default function SettingsScreen({ navigation }) {
               </Text>
               <Text style={[styles.itemSubtitle, { color: theme.appPin ? primaryAccent : colors.textSecondary }]}>
                 {theme.appPin
-                  ? `PIN: •••• · ${t('Tap to change') || 'Tap to change'}`
+                  ? `PIN: •••• · ${t('Tap to change') || 'Tap to change'} · ${t('Reset with fingerprint if forgotten') || 'Reset with fingerprint if forgotten'}`
                   : (t('Protect app with a 4-digit PIN') || 'Protect app with a 4-digit PIN')}
               </Text>
             </TouchableOpacity>
@@ -718,6 +779,35 @@ export default function SettingsScreen({ navigation }) {
               accessibilityState={{ checked: !!theme.appPin }}
               accessibilityLabel={t('App PIN Lock') || 'App PIN Lock'}
               accessibilityHint={t('Enables or disables App PIN lock') || 'Enables or disables App PIN lock'}
+            />
+          </View>
+
+          {/* Biometric Unlock (Fingerprint / Face ID) */}
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          <View style={styles.cardItemRow}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+              <IconFingerprint color={primaryAccent} />
+            </View>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Biometric Unlock') || 'Biometric Unlock'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {isBiometricHardwareAvailable
+                  ? (t('Unlock with fingerprint or Face ID') || 'Unlock with fingerprint or Face ID')
+                  : (t('Not available on this device') || 'Not available on this device')}
+              </Text>
+            </View>
+            <Switch
+              disabled={!isBiometricHardwareAvailable}
+              value={isBiometricHardwareAvailable && (theme.biometricUnlockEnabled !== false)}
+              onValueChange={(val) => dispatch(setBiometricUnlockEnabled(val))}
+              trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: isBiometricHardwareAvailable && (theme.biometricUnlockEnabled !== false) }}
+              accessibilityLabel={t('Biometric Unlock') || 'Biometric Unlock'}
+              accessibilityHint={t('Enables or disables unlocking with device biometrics') || 'Enables or disables unlocking with device biometrics'}
             />
           </View>
         </View>
@@ -1110,116 +1200,136 @@ export default function SettingsScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Privacy & Data (GDPR & CCPA Compliance) */}
-        <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: 24 }]}>
-          {t('Privacy & Data (GDPR)') || 'Privacy & Data (GDPR)'}
-        </Text>
+        {/* Privacy & Data (GDPR & CCPA Compliance) - Collapsible & Adjustable */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={togglePrivacySection}
+          style={styles.collapsibleSectionHeader}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isPrivacyExpanded }}
+          accessibilityLabel={`${t('Privacy & Data (GDPR)') || 'Privacy & Data (GDPR)'}. ${isPrivacyExpanded ? (t('Tap to collapse') || 'Tap to collapse') : (t('Tap to expand') || 'Tap to expand')}`}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[styles.sectionHeadingText, { color: colors.textSecondary }]}>
+              {t('Privacy & Data (GDPR)') || 'Privacy & Data (GDPR)'}
+            </Text>
+            <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(93, 69, 219, 0.20)' : 'rgba(93, 69, 219, 0.10)' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                {isPrivacyExpanded ? '4 options' : (t('Tap to expand') || 'Tap to expand')}
+              </Text>
+            </View>
+          </View>
+          <IconChevronDown color={colors.textSecondary} size={18} isExpanded={isPrivacyExpanded} />
+        </TouchableOpacity>
 
-        <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-          {/* Privacy Policy */}
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => setPrivacyModalVisible(true)}
-            style={styles.cardItemRow}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('Privacy & Security Policy') || 'Privacy & Security Policy'}. ${t('Local storage, AES-256 encryption, zero ad trackers') || 'Local storage, AES-256 encryption, zero ad trackers'}`}
-            accessibilityHint={t('Opens privacy policy and data protection disclosures') || 'Opens privacy policy and data protection disclosures'}
-          >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
-              <IconShield color={primaryAccent} />
-            </View>
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                {t('Privacy & Security Policy') || 'Privacy & Security Policy'}
-              </Text>
-              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                {t('Local storage, AES-256 encryption, zero ad trackers') || 'Local storage, AES-256 encryption, zero ad trackers'}
-              </Text>
-            </View>
-            <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
+        {isPrivacyExpanded && (
+          <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+            {/* Privacy Policy */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setPrivacyModalVisible(true)}
+              style={styles.cardItemRow}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('Privacy & Security Policy') || 'Privacy & Security Policy'}. ${t('Local storage, AES-256 encryption, zero ad trackers') || 'Local storage, AES-256 encryption, zero ad trackers'}`}
+              accessibilityHint={t('Opens privacy policy and data protection disclosures') || 'Opens privacy policy and data protection disclosures'}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+                <IconShield color={primaryAccent} />
+              </View>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t('Privacy & Security Policy') || 'Privacy & Security Policy'}
+                </Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                  {t('Local storage, AES-256 encryption, zero ad trackers') || 'Local storage, AES-256 encryption, zero ad trackers'}
+                </Text>
+              </View>
+              <IconChevronRight color={colors.textSecondary} />
+            </TouchableOpacity>
 
-          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+            <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
-          {/* Export JSON (GDPR Art. 20 Data Portability) */}
-          <TouchableOpacity
-            activeOpacity={0.75}
-            disabled={isExporting}
-            onPress={handleExportJson}
-            style={styles.cardItemRow}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('Export All Data (JSON)') || 'Export All Data (JSON)'}. ${t('GDPR Art. 20 Data Portability · Full JSON backup') || 'GDPR Art. 20 Data Portability · Full JSON backup'}`}
-            accessibilityHint={t('Exports complete data backup as a JSON file') || 'Exports complete data backup as a JSON file'}
-          >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
-              <IconDownload color={primaryAccent} />
-            </View>
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                {t('Export All Data (JSON)') || 'Export All Data (JSON)'}
-              </Text>
-              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                {t('GDPR Art. 20 Data Portability · Full JSON backup') || 'GDPR Art. 20 Data Portability · Full JSON backup'}
-              </Text>
-            </View>
-            <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
+            {/* Export JSON (GDPR Art. 20 Data Portability) */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              disabled={isExporting}
+              onPress={handleExportJson}
+              style={styles.cardItemRow}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('Export All Data (JSON)') || 'Export All Data (JSON)'}. ${t('GDPR Art. 20 Data Portability · Full JSON backup') || 'GDPR Art. 20 Data Portability · Full JSON backup'}`}
+              accessibilityHint={t('Exports complete data backup as a JSON file') || 'Exports complete data backup as a JSON file'}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+                <IconDownload color={primaryAccent} />
+              </View>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t('Export All Data (JSON)') || 'Export All Data (JSON)'}
+                </Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                  {t('GDPR Art. 20 Data Portability · Full JSON backup') || 'GDPR Art. 20 Data Portability · Full JSON backup'}
+                </Text>
+              </View>
+              <IconChevronRight color={colors.textSecondary} />
+            </TouchableOpacity>
 
-          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+            <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
-          {/* Export CSV (Spreadsheet) */}
-          <TouchableOpacity
-            activeOpacity={0.75}
-            disabled={isExporting}
-            onPress={handleExportCsv}
-            style={styles.cardItemRow}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('Export Tasks (CSV)') || 'Export Tasks (CSV)'}. ${t('Formatted for spreadsheets · Excel, Sheets, Numbers') || 'Formatted for spreadsheets · Excel, Sheets, Numbers'}`}
-            accessibilityHint={t('Exports tasks as a CSV spreadsheet') || 'Exports tasks as a CSV spreadsheet'}
-          >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
-              <IconSpreadsheet color={primaryAccent} />
-            </View>
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                {t('Export Tasks (CSV)') || 'Export Tasks (CSV)'}
-              </Text>
-              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                {t('Formatted for spreadsheets · Excel, Sheets, Numbers') || 'Formatted for spreadsheets · Excel, Sheets, Numbers'}
-              </Text>
-            </View>
-            <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
+            {/* Export CSV (Spreadsheet) */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              disabled={isExporting}
+              onPress={handleExportCsv}
+              style={styles.cardItemRow}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('Export Tasks (CSV)') || 'Export Tasks (CSV)'}. ${t('Formatted for spreadsheets · Excel, Sheets, Numbers') || 'Formatted for spreadsheets · Excel, Sheets, Numbers'}`}
+              accessibilityHint={t('Exports tasks as a CSV spreadsheet') || 'Exports tasks as a CSV spreadsheet'}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+                <IconSpreadsheet color={primaryAccent} />
+              </View>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t('Export Tasks (CSV)') || 'Export Tasks (CSV)'}
+                </Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                  {t('Formatted for spreadsheets · Excel, Sheets, Numbers') || 'Formatted for spreadsheets · Excel, Sheets, Numbers'}
+                </Text>
+              </View>
+              <IconChevronRight color={colors.textSecondary} />
+            </TouchableOpacity>
 
-          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+            <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
-          {/* Erase All Data & Reset (GDPR Art. 17 Right to Erasure) */}
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={handleEraseAllData}
-            style={styles.cardItemRow}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('Erase All Data & Reset') || 'Erase All Data & Reset'}. ${t('GDPR Art. 17 Right to Erasure · Permanent wipe') || 'GDPR Art. 17 Right to Erasure · Permanent wipe'}`}
-            accessibilityHint={t('Permanently deletes all tasks, lists, settings and resets the app') || 'Permanently deletes all tasks, lists, settings and resets the app'}
-          >
-            <View style={[styles.iconWrapper, { backgroundColor: isDark ? 'rgba(229, 57, 53, 0.15)' : '#FFEBEE' }]} accessible={false} importantForAccessibility="no">
-              <IconTrash color="#E53935" />
-            </View>
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={[styles.itemTitle, { color: '#E53935' }]}>
-                {t('Erase All Data & Reset') || 'Erase All Data & Reset'}
-              </Text>
-              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                {t('GDPR Art. 17 Right to Erasure · Permanent wipe') || 'GDPR Art. 17 Right to Erasure · Permanent wipe'}
-              </Text>
-            </View>
-            <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
+            {/* Erase All Data & Reset (GDPR Art. 17 Right to Erasure) */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={handleEraseAllData}
+              style={styles.cardItemRow}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('Erase All Data & Reset') || 'Erase All Data & Reset'}. ${t('GDPR Art. 17 Right to Erasure · Permanent wipe') || 'GDPR Art. 17 Right to Erasure · Permanent wipe'}`}
+              accessibilityHint={t('Permanently deletes all tasks, lists, settings and resets the app') || 'Permanently deletes all tasks, lists, settings and resets the app'}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: isDark ? 'rgba(229, 57, 53, 0.15)' : '#FFEBEE' }]} accessible={false} importantForAccessibility="no">
+                <IconTrash color="#E53935" />
+              </View>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={[styles.itemTitle, { color: '#E53935' }]}>
+                  {t('Erase All Data & Reset') || 'Erase All Data & Reset'}
+                </Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                  {t('GDPR Art. 17 Right to Erasure · Permanent wipe') || 'GDPR Art. 17 Right to Erasure · Permanent wipe'}
+                </Text>
+              </View>
+              <IconChevronRight color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* More Options / Advanced Card */}
         <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: 24 }]}>
@@ -1257,18 +1367,6 @@ export default function SettingsScreen({ navigation }) {
               </Text>
             </View>
             <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
-
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={handleDeleteData}
-            style={styles.cardItemRow}
-          >
-            <Text style={{ color: '#E53935', fontSize: 15, fontWeight: '600' }}>
-              {t('Delete All Data') || 'Delete All Data'}
-            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -1358,6 +1456,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
     marginLeft: 4,
+  },
+  collapsibleSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    marginBottom: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  sectionHeadingText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  badgePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   groupedCard: {
     borderRadius: 22,

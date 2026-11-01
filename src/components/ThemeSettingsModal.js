@@ -292,7 +292,7 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
               {/* Accent Color Header */}
               <View style={[styles.accentHeaderRow, isCompact && { marginBottom: 10 }]}>
                 <Text style={[styles.accentLabel, { color: colors.textPrimary }]}>{t('Accent color') || 'Accent color'}</Text>
-                <Text style={[styles.accentValue, { color: colors.primary || '#6750A4' }]}>{currentColorObj.name}</Text>
+                <Text style={[styles.accentValue, { color: colors.primary || '#6750A4' }]}>{t(currentColorObj.name) || currentColorObj.name}</Text>
               </View>
 
               {/* Accent Color Circles */}
@@ -304,6 +304,10 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
                       key={item.color}
                       activeOpacity={0.75}
                       onPress={() => setTempColor(item.color)}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel={t(item.name) || item.name}
+                      accessibilityState={{ selected: isSelected }}
                       style={[
                         styles.colorDot,
                         isCompact && { width: 36, height: 36, borderRadius: 18 },

@@ -11,6 +11,19 @@ export const BOARD_COLORS = [
   '#FFC107', // Amber
 ];
 
+export const BOARD_COLOR_NAMES = {
+  '#4CAF50': 'Green',
+  '#2196F3': 'Blue',
+  '#FF9800': 'Orange',
+  '#9C27B0': 'Purple',
+  '#E91E63': 'Pink',
+  '#00BCD4': 'Cyan',
+  '#FF5722': 'Deep Orange',
+  '#3F51B5': 'Indigo',
+  '#8BC34A': 'Light Green',
+  '#FFC107': 'Amber',
+};
+
 export const getBoardColor = (boardOrId, boardsArray = []) => {
   if (typeof boardOrId === 'object' && boardOrId?.color) {
     return boardOrId.color;

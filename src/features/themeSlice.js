@@ -70,6 +70,7 @@ const initialState = {
   
   // Security
   appPin: loaded?.appPin || null,
+  biometricUnlockEnabled: loaded?.biometricUnlockEnabled !== undefined ? loaded.biometricUnlockEnabled : true,
 
   // Default Reminder Settings for New Tasks
   defaultReminderEnabled: loaded?.defaultReminderEnabled || false,
@@ -130,6 +131,9 @@ const themeSlice = createSlice({
     },
     setAppPin: (state, action) => {
       state.appPin = action.payload;
+    },
+    setBiometricUnlockEnabled: (state, action) => {
+      state.biometricUnlockEnabled = action.payload;
     },
     setAlarmSound: (state, action) => {
       state.alarmSound = action.payload;
@@ -318,7 +322,7 @@ export const flushPendingThemeSaves = async (getState) => {
 export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
-  setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled,
+  setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setBiometricUnlockEnabled, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
   setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId,

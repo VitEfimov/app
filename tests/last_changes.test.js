@@ -435,7 +435,15 @@ describe('Localization & PIN String Integrity', () => {
     'Authenticate with fingerprint to enable App PIN',
     'Authenticate to remove App PIN',
     'Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.',
-    'Biometric authentication is required to turn off App PIN.'
+    'Biometric authentication is required to turn off App PIN.',
+    'Not available on this device',
+    'Enter your 4-digit PIN',
+    'Purple',
+    'Violet',
+    'Green',
+    'Blue',
+    'Orange',
+    'Slate'
   ];
 
   test('all 10 language files exist, are valid JSON, and have matching key counts', () => {
@@ -621,6 +629,26 @@ describe('Tier 1 Biometric Protection for PIN Operations', () => {
     await handleForgotPin();
     assert.strictEqual(appPin, null); // PIN successfully reset
     assert.strictEqual(isUnlocked, true); // App unlocked
+  });
+
+  test('user can choose biometric or PIN unlock via biometricUnlockEnabled setting', () => {
+    const themeMod = loadTranspiledModule(path.resolve('src/features/themeSlice.js'), {
+      '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} }
+    });
+    const reducer = themeMod.default;
+    const { setBiometricUnlockEnabled } = themeMod;
+
+    // Initial state has biometricUnlockEnabled default true
+    const initialState = reducer(undefined, { type: '@@INIT' });
+    assert.strictEqual(initialState.biometricUnlockEnabled, true);
+
+    // User chooses PIN code only (turns off biometric unlock)
+    const pinOnlyState = reducer(initialState, setBiometricUnlockEnabled(false));
+    assert.strictEqual(pinOnlyState.biometricUnlockEnabled, false);
+
+    // User switches back to biometric unlock
+    const biometricState = reducer(pinOnlyState, setBiometricUnlockEnabled(true));
+    assert.strictEqual(biometricState.biometricUnlockEnabled, true);
   });
 });
 
@@ -1182,11 +1210,16 @@ describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
     }
 
     const enKeys = Object.keys(loadedLocales['en']);
-    assert.strictEqual(enKeys.length, 728, 'English locale must contain exactly 728 keys');
+    assert.strictEqual(enKeys.length, 778, 'English locale must contain exactly 778 keys');
+    assert.strictEqual(loadedLocales['ru']['Not available on this device'], 'Недоступно на этом устройстве');
+    assert.strictEqual(loadedLocales['ko']['Purple'], '보라');
+    assert.strictEqual(loadedLocales['ru']['Purple'], 'Пурпурный');
 
     // Required GDPR keys to check
     const requiredGdprKeys = [
       'Privacy & Data (GDPR)',
+      'Tap to expand',
+      'Tap to collapse',
       'Privacy & Security Policy',
       'Local storage, AES-256 encryption, zero ad trackers',
       'Export All Data (JSON)',

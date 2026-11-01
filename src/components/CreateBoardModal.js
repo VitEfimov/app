@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platfo
 import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
-import { BOARD_COLORS } from '../utils/boardColors';
+import { BOARD_COLORS, BOARD_COLOR_NAMES } from '../utils/boardColors';
 import CustomRepeatModal from './CustomRepeatModal';
 
 const IconCalendar = ({ color = '#6246EA' }) => (
@@ -316,6 +316,10 @@ export default function CreateBoardModal({
                     key={c}
                     activeOpacity={0.75}
                     onPress={() => setSelectedColor(c)}
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={t(BOARD_COLOR_NAMES[c] || 'Color')}
+                    accessibilityState={{ selected: isSelected }}
                     style={[
                       styles.colorCircle,
                       isCompact && { width: 32, height: 32, borderRadius: 16 },

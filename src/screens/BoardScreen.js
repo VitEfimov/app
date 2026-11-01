@@ -27,7 +27,7 @@ import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode } from '../featur
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
-import { getBoardColor, BOARD_COLORS } from '../utils/boardColors';
+import { getBoardColor, BOARD_COLORS, BOARD_COLOR_NAMES } from '../utils/boardColors';
 import * as FileSystem from 'expo-file-system';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
@@ -1340,7 +1340,8 @@ export default function BoardScreen({ route, navigation }) {
                     key={c}
                     accessible={true}
                     accessibilityRole="button"
-                    accessibilityLabel={`Color ${c}`}
+                    accessibilityLabel={t(BOARD_COLOR_NAMES[c] || 'Color')}
+                    accessibilityState={{ selected: isSelected }}
                     onPress={() => {
                       if (boardOptionsConfig.board) {
                         const boardId = boardOptionsConfig.board.id;

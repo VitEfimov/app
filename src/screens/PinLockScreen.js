@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setAppPin } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -53,6 +53,7 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const dispatch = useDispatch();
+  const biometricUnlockEnabled = useSelector(state => state.themeReducer?.biometricUnlockEnabled !== false);
   const [pin, setPin] = useState('');
   const [alertConfig, setAlertConfig] = useState({ isVisible: false, title: '', message: '' });
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -83,8 +84,8 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
         if (lockoutUntil > now) {
           const remainingSec = Math.ceil((lockoutUntil - now) / 1000);
           setLockoutRemaining(remainingSec);
-        } else if (bioAvail) {
-          // Auto-prompt biometric unlock on initial display if device supports it
+        } else if (bioAvail && biometricUnlockEnabled) {
+          // Auto-prompt biometric unlock on initial display if device supports it and user enabled it
           attemptBiometricUnlock();
         }
       } catch (e) {
@@ -247,6 +248,11 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
       <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>{t('Enter PIN')}</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+        {isBiometricAvailable && biometricUnlockEnabled
+          ? (t('Enter PIN or use fingerprint to unlock') || 'Enter PIN or use fingerprint to unlock')
+          : (t('Enter your 4-digit PIN') || 'Enter your 4-digit PIN')}
+      </Text>
       
       {lockoutRemaining > 0 ? (
         <View 
@@ -290,7 +296,7 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
       >
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'biometric', '0', 'delete'].map((key, index) => {
           if (key === 'biometric') {
-            if (!isBiometricAvailable) {
+            if (!isBiometricAvailable || !biometricUnlockEnabled) {
               return <View key={index} style={styles.key} pointerEvents="none" accessible={false} importantForAccessibility="no" />;
             }
             return (
@@ -352,11 +358,13 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
         onPress={handleForgotPinPress}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel={t('Forgot PIN?') || 'Forgot PIN?'}
+        accessibilityLabel={isBiometricAvailable ? (t('Forgot PIN? Reset with fingerprint') || 'Forgot PIN? Reset with fingerprint') : (t('Forgot PIN?') || 'Forgot PIN?')}
         accessibilityHint={t('Resets your App PIN via biometric verification') || 'Resets your App PIN via biometric verification'}
       >
         <Text style={[styles.forgotPinText, { color: colors.primary }]}>
-          {t('Forgot PIN?') || 'Forgot PIN?'}
+          {isBiometricAvailable 
+            ? (t('Forgot PIN? Reset with fingerprint') || 'Forgot PIN? Reset with fingerprint') 
+            : (t('Forgot PIN?') || 'Forgot PIN?')}
         </Text>
       </TouchableOpacity>
 
@@ -402,7 +410,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 40,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 13,
+    marginBottom: 32,
+    textAlign: 'center',
   },
   lockoutBanner: {
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
