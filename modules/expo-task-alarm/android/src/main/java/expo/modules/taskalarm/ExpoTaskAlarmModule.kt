@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.MediaStore
 import android.provider.Settings
+import android.view.WindowManager
 import androidx.core.content.FileProvider
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
@@ -373,6 +374,28 @@ class ExpoTaskAlarmModule : Module() {
           e.printStackTrace()
           return@AsyncFunction false
       }
+    }
+
+    AsyncFunction("setScreenSecurityAsync") { enabled: Boolean ->
+      val activity = appContext.currentActivity ?: return@AsyncFunction false
+      activity.runOnUiThread {
+        try {
+          if (enabled) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+          } else {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+          }
+        } catch (e: Exception) {
+          e.printStackTrace()
+        }
+      }
+      return@AsyncFunction true
+    }
+
+    AsyncFunction("isScreenSecurityEnabled") {
+      val activity = appContext.currentActivity ?: return@AsyncFunction false
+      val flags = activity.window.attributes.flags
+      return@AsyncFunction (flags and WindowManager.LayoutParams.FLAG_SECURE) != 0
     }
 
     OnActivityResult { _, payload ->

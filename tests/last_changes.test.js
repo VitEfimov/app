@@ -9,7 +9,7 @@ const dayjs = require('dayjs');
 function loadTranspiledModule(filePath, customMocks = {}) {
   const code = fs.readFileSync(filePath, 'utf8');
   const transformed = transform(code, {
-    transforms: ['imports', 'jsx'],
+    transforms: ['imports', 'jsx', 'typescript'],
     jsxRuntime: 'classic'
   }).code;
 
@@ -738,5 +738,126 @@ describe('Section 508 & WCAG 2.1 AA Accessibility Standards', () => {
     assert.ok(label.includes('Срок: 2026-11-01'));
     assert.ok(label.includes('Повторяющаяся задача'));
     assert.ok(label.includes('2 из 2 подзадач выполнено'));
+  });
+});
+
+// ==============================================================================
+// TEST SUITE 9: OWASP MASVS Security Standards (Data-at-Rest & Screen Privacy)
+// ==============================================================================
+describe('OWASP MASVS Security Standards (Data-at-Rest & Screen Privacy)', () => {
+  let CryptoStorage;
+  let mockStorage;
+
+  beforeEach(() => {
+    mockStorage = {};
+    const mockAsyncStorage = {
+      setItem: async (k, v) => { mockStorage[k] = String(v); },
+      getItem: async (k) => mockStorage[k] !== undefined ? mockStorage[k] : null,
+      multiGet: async (keys) => keys.map(k => [k, mockStorage[k] !== undefined ? mockStorage[k] : null]),
+      removeItem: async (k) => { delete mockStorage[k]; },
+      clear: async () => { mockStorage = {}; }
+    };
+    const mod = loadTranspiledModule(path.resolve('src/utils/cryptoStorage.js'), {
+      '@react-native-async-storage/async-storage': mockAsyncStorage
+    });
+    CryptoStorage = mod.CryptoStorage;
+    if (CryptoStorage._resetKeyForTesting) CryptoStorage._resetKeyForTesting();
+  });
+
+  test('SHA-256 and HMAC-SHA256 match cryptographic standard test vectors', () => {
+    const { sha256Bytes, hmacSha256, strToUtf8, bytesToHex } = CryptoStorage;
+    // NIST test vector for empty string
+    const emptySha = bytesToHex(sha256Bytes(strToUtf8('')));
+    assert.strictEqual(emptySha, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+
+    // NIST test vector for "The quick brown fox jumps over the lazy dog"
+    const foxSha = bytesToHex(sha256Bytes(strToUtf8('The quick brown fox jumps over the lazy dog')));
+    assert.strictEqual(foxSha, 'd7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592');
+
+    // RFC 2104 HMAC-SHA256 test vector
+    const key = strToUtf8('key');
+    const msg = strToUtf8('The quick brown fox jumps over the lazy dog');
+    const hmacHex = bytesToHex(hmacSha256(key, msg));
+    assert.strictEqual(hmacHex, 'f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8');
+  });
+
+  test('hashPin generates salted multi-iteration hash, protecting PIN from plaintext storage', () => {
+    const hash1 = CryptoStorage.hashPin('1234');
+    const hash2 = CryptoStorage.hashPin('1234');
+    assert.ok(CryptoStorage.isPinHashed(hash1));
+    assert.ok(CryptoStorage.isPinHashed(hash2));
+    // Due to random salt, two hashes of the same PIN must not be identical
+    assert.notStrictEqual(hash1, hash2);
+    assert.ok(!hash1.includes('1234'));
+  });
+
+  test('verifyPin correctly verifies matching PIN and rejects incorrect PIN', () => {
+    const hashed = CryptoStorage.hashPin('4321');
+    assert.strictEqual(CryptoStorage.verifyPin('4321', hashed), true);
+    assert.strictEqual(CryptoStorage.verifyPin('1234', hashed), false);
+    assert.strictEqual(CryptoStorage.verifyPin('4322', hashed), false);
+    assert.strictEqual(CryptoStorage.verifyPin('', hashed), false);
+  });
+
+  test('verifyPin supports backward-compatible constant-time verification for legacy plaintext PINs', () => {
+    assert.strictEqual(CryptoStorage.verifyPin('9999', '9999'), true);
+    assert.strictEqual(CryptoStorage.verifyPin('1111', '9999'), false);
+  });
+
+  test('CryptoStorage encrypts tasks at rest with AES-256 CTR and HMAC authentication', async () => {
+    const sensitiveTasks = [
+      { id: 'task_001', taskname: 'Secret client meeting', notes: 'Password123' }
+    ];
+    await CryptoStorage.setItem('tasks', JSON.stringify(sensitiveTasks));
+
+    const rawInStorage = mockStorage['tasks'];
+    assert.ok(rawInStorage);
+    // Raw storage must be an encrypted envelope, not plaintext
+    assert.ok(rawInStorage.includes('__enc__'));
+    assert.ok(!rawInStorage.includes('Secret client meeting'));
+    assert.ok(!rawInStorage.includes('Password123'));
+
+    // Reading back decrypts correctly
+    const decrypted = await CryptoStorage.getItem('tasks');
+    assert.deepStrictEqual(JSON.parse(decrypted), sensitiveTasks);
+  });
+
+  test('CryptoStorage transparently reads existing unencrypted data without corruption', async () => {
+    const legacyPlaintext = JSON.stringify([{ id: 'legacy_1', taskname: 'Existing unencrypted task' }]);
+    mockStorage['legacy_tasks'] = legacyPlaintext;
+
+    const readBack = await CryptoStorage.getItem('legacy_tasks');
+    assert.strictEqual(readBack, legacyPlaintext);
+  });
+
+  test('CryptoStorage detects data tampering and fails integrity verification', async () => {
+    await CryptoStorage.setItem('tamper_test', 'Sensitive configuration');
+    const envelope = JSON.parse(mockStorage['tamper_test']);
+
+    // Tamper with the ciphertext by flipping bytes
+    const tamperedCt = envelope.ct.replace(/^[0-9a-f]{2}/, 'ff');
+    envelope.ct = tamperedCt;
+    mockStorage['tamper_test'] = JSON.stringify(envelope);
+
+    const decrypted = await CryptoStorage.getItem('tamper_test');
+    // Tampered data must return null to prevent executing corrupted/manipulated payloads
+    assert.strictEqual(decrypted, null);
+  });
+
+  test('setScreenSecurityAsync and isScreenSecurityEnabled operate safely on native module interface', async () => {
+    const alarmModule = loadTranspiledModule(path.resolve('modules/expo-task-alarm/index.ts'), {
+      'expo-modules-core': {
+        requireNativeModule: () => ({
+          setScreenSecurityAsync: async (enable) => enable,
+          isScreenSecurityEnabled: async () => true
+        })
+      },
+      'react-native': { Platform: { OS: 'android' } }
+    });
+
+    const setRes = await alarmModule.setScreenSecurityAsync(true);
+    assert.strictEqual(setRes, true);
+    const isSec = await alarmModule.isScreenSecurityEnabled();
+    assert.strictEqual(isSec, true);
   });
 });

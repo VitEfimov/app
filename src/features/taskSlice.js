@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CryptoStorage } from '../utils/cryptoStorage';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { Platform, Alert } from 'react-native';
 import dayjs from 'dayjs';
@@ -78,7 +79,7 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
 
     let localTasks = [];
     try {
-        const tasksJson = (await AsyncStorage.getItem(taskKey)) || (await AsyncStorage.getItem('tasks'));
+        const tasksJson = (await CryptoStorage.getItem(taskKey)) || (await CryptoStorage.getItem('tasks'));
         if (tasksJson) localTasks = JSON.parse(tasksJson);
     } catch (e) {}
 
@@ -127,9 +128,9 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
 
                 const mergedTasks = sortTasksChronologically(purgeOrphanedTasks(mergeTasks(unsyncedTasks, remoteTasks), boards));
                 const serializedMerged = JSON.stringify(mergedTasks);
-                await AsyncStorage.setItem(taskKey, serializedMerged);
+                await CryptoStorage.setItem(taskKey, serializedMerged);
                 if (taskKey !== 'tasks') {
-                    await AsyncStorage.setItem('tasks', serializedMerged);
+                    await CryptoStorage.setItem('tasks', serializedMerged);
                 }
                 return mergedTasks;
             }
@@ -140,9 +141,9 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
 
     const sortedLocal = sortTasksChronologically(localTasks);
     const serializedLocal = JSON.stringify(sortedLocal);
-    await AsyncStorage.setItem(taskKey, serializedLocal);
+    await CryptoStorage.setItem(taskKey, serializedLocal);
     if (taskKey !== 'tasks') {
-        await AsyncStorage.setItem('tasks', serializedLocal);
+        await CryptoStorage.setItem('tasks', serializedLocal);
     }
     return sortedLocal;
 });
@@ -593,9 +594,9 @@ export const persistTasksToStorage = (tasks, getState) => {
                     key = getTaskStorageKey(getState());
                 }
                 const serialized = JSON.stringify(lastTasksToSave);
-                await AsyncStorage.setItem(key, serialized);
+                await CryptoStorage.setItem(key, serialized);
                 if (key !== 'tasks') {
-                    await AsyncStorage.setItem('tasks', serialized);
+                    await CryptoStorage.setItem('tasks', serialized);
                 }
             }
         } catch (e) {
@@ -614,9 +615,9 @@ export const flushPendingTaskSaves = async (getState) => {
         if (tasks) {
             const key = getState ? getTaskStorageKey(getState()) : 'tasks';
             const serialized = JSON.stringify(tasks);
-            await AsyncStorage.setItem(key, serialized);
+            await CryptoStorage.setItem(key, serialized);
             if (key !== 'tasks') {
-                await AsyncStorage.setItem('tasks', serialized);
+                await CryptoStorage.setItem('tasks', serialized);
             }
         }
     } catch (e) {

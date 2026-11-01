@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import { logoutUser, logout } from '../features/userSlice';
 import { BiometricHelper } from '../utils/biometricHelper';
+import { CryptoStorage } from '../utils/cryptoStorage';
 
 const SOUND_ASSETS = {
   'pisk.mp3': require('../../assets/audio/pisk.mp3'),
@@ -239,7 +240,7 @@ export default function SettingsScreen({ navigation }) {
   const handleSetPin = (pin) => {
     const cleaned = String(pin || '').replace(/[^0-9]/g, '');
     if (cleaned.length === 4) {
-      dispatch(setAppPin(cleaned));
+      dispatch(setAppPin(CryptoStorage.hashPin(cleaned)));
       setPinPromptVisible(false);
     } else {
       setConfirmConfig({
@@ -589,7 +590,7 @@ export default function SettingsScreen({ navigation }) {
               style={{ flex: 1, marginRight: 10 }}
               accessible={true}
               accessibilityRole="button"
-              accessibilityLabel={theme.appPin ? `${t('App PIN Lock') || 'App PIN Lock'}. PIN: ${theme.appPin}` : (t('App PIN Lock') || 'App PIN Lock')}
+              accessibilityLabel={theme.appPin ? `${t('App PIN Lock') || 'App PIN Lock'}. ${t('PIN Active') || 'PIN Active'}` : (t('App PIN Lock') || 'App PIN Lock')}
               accessibilityHint={t('Configure or change App PIN') || 'Configure or change App PIN'}
             >
               <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
@@ -597,7 +598,7 @@ export default function SettingsScreen({ navigation }) {
               </Text>
               <Text style={[styles.itemSubtitle, { color: theme.appPin ? primaryAccent : colors.textSecondary }]}>
                 {theme.appPin
-                  ? `PIN: ${theme.appPin} · ${t('Tap to change') || 'Tap to change'}`
+                  ? `PIN: •••• · ${t('Tap to change') || 'Tap to change'}`
                   : (t('Protect app with a 4-digit PIN') || 'Protect app with a 4-digit PIN')}
               </Text>
             </TouchableOpacity>
@@ -1073,7 +1074,7 @@ export default function SettingsScreen({ navigation }) {
         isVisible={pinPromptVisible}
         title={t('Set PIN') || 'Set PIN'}
         message={t('Enter a 4-digit PIN') || 'Enter a 4-digit PIN'}
-        defaultValue={theme.appPin || ''}
+        defaultValue=""
         onCancel={() => setPinPromptVisible(false)}
         onSubmit={handleSetPin}
         submitText={t('Save') || 'Save'}

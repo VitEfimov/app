@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CryptoStorage } from '../utils/cryptoStorage';
 import { createSlice } from '@reduxjs/toolkit';
 
 const loadThemeState = () => {
@@ -290,7 +291,7 @@ export const persistThemeToStorage = (themeState) => {
     try {
       const clean = sanitizeThemeForStorage(lastThemeToSave);
       if (clean) {
-        await AsyncStorage.setItem('customTheme', JSON.stringify(clean));
+        await CryptoStorage.setItem('customTheme', JSON.stringify(clean));
       }
     } catch (e) {
       console.error('Error saving theme to AsyncStorage:', e);
@@ -307,7 +308,7 @@ export const flushPendingThemeSaves = async (getState) => {
     const raw = getState ? getState().themeReducer : lastThemeToSave;
     const clean = sanitizeThemeForStorage(raw);
     if (clean) {
-      await AsyncStorage.setItem('customTheme', JSON.stringify(clean));
+      await CryptoStorage.setItem('customTheme', JSON.stringify(clean));
     }
   } catch (e) {
     console.error('Error flushing theme to storage:', e);

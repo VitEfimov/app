@@ -31,6 +31,8 @@ import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
 import PinLockScreen from './src/screens/PinLockScreen';
 import { SecurityLockHelper } from './src/utils/securityLockHelper';
+import { CryptoStorage } from './src/utils/cryptoStorage';
+import { setScreenSecurityAsync } from './modules/expo-task-alarm';
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -116,11 +118,21 @@ function InitApp() {
   const [loadingDismissed, setLoadingDismissed] = useState(false);
   const loadingFadeAnim = useRef(new Animated.Value(1)).current;
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isAppBackgrounded, setIsAppBackgrounded] = useState(false);
   const [pendingNotificationPayload, setPendingNotificationPayload] = useState(null);
   const shareIntentResult = Platform.OS !== 'web' ? useShareIntent() : null;
   const { hasShareIntent, shareIntent, resetShareIntent } = shareIntentResult || {};
   const appPin = useSelector(state => state.themeReducer?.appPin);
   const lastBackgroundTimestampRef = useRef(null);
+
+  // OWASP MASVS-RESILIENCE-1: Enable native window FLAG_SECURE whenever App PIN is configured
+  useEffect(() => {
+    if (appPin) {
+      setScreenSecurityAsync(true);
+    } else {
+      setScreenSecurityAsync(false);
+    }
+  }, [appPin]);
 
   useEffect(() => {
     const isLocked = !!(appPin && !isUnlocked);
@@ -172,7 +184,7 @@ function InitApp() {
           'tasks',
           'tasks_guest'
         ];
-        const entries = await AsyncStorage.multiGet(keys);
+        const entries = await CryptoStorage.multiGet(keys);
         const storageMap = Object.fromEntries(entries);
 
         const theme = storageMap.customTheme;
@@ -188,7 +200,7 @@ function InitApp() {
               ];
               themeData.sourceColor = PREDEFINED_COLORS[Math.floor(Math.random() * PREDEFINED_COLORS.length)];
               themeData.lastRandomColorDate = today;
-              await AsyncStorage.setItem('customTheme', JSON.stringify(themeData));
+              await CryptoStorage.setItem('customTheme', JSON.stringify(themeData));
             }
           }
           
@@ -246,7 +258,7 @@ function InitApp() {
         // Immediately load cached tasks from local storage so Board and Calendar pre-render instantly
         let cachedTasksJson = null;
         if (authenticatedEmail) {
-          cachedTasksJson = await AsyncStorage.getItem(`tasks_${authenticatedEmail.toLowerCase().trim()}`);
+          cachedTasksJson = await CryptoStorage.getItem(`tasks_${authenticatedEmail.toLowerCase().trim()}`);
         }
         if (!cachedTasksJson) {
           cachedTasksJson = isGuestVal === 'true' ? storageMap.tasks_guest : (storageMap.tasks || storageMap.tasks_guest);
@@ -398,6 +410,7 @@ function InitApp() {
   useEffect(() => {
     const handleAppStateChange = async (nextAppState) => {
       if (nextAppState === 'active') {
+        setIsAppBackgrounded(false);
         const { processAutoManageTasks, performForegroundCalendarSync } = require('./src/features/taskSlice');
         // 1. Silent Foreground Differential Calendar Sync (0-button real-time sync)
         dispatch(performForegroundCalendarSync()).catch(() => {});
@@ -413,6 +426,7 @@ function InitApp() {
           lastBackgroundTimestampRef.current = null;
         }
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        setIsAppBackgrounded(true);
         if (nextAppState === 'background' && store.getState().themeReducer?.appPin) {
           if (!SecurityLockHelper.isAttachmentPickerActive() && !SecurityLockHelper.isAuthenticatingBiometric()) {
             lastBackgroundTimestampRef.current = Date.now();
@@ -569,6 +583,25 @@ function InitApp() {
       {isLocked && (
         <View style={StyleSheet.absoluteFillObject}>
           <PinLockScreen correctPin={appPin} onUnlock={() => setIsUnlocked(true)} />
+        </View>
+      )}
+
+      {/* OWASP MASVS-RESILIENCE-1: Privacy Shield covering app switcher snapshot when minimized */}
+      {isAppBackgrounded && !!appPin && (
+        <View 
+          style={[
+            StyleSheet.absoluteFillObject, 
+            { 
+              zIndex: 999998, 
+              backgroundColor: '#121212', 
+              justifyContent: 'center', 
+              alignItems: 'center' 
+            }
+          ]}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Text style={{ fontSize: 24, fontWeight: '700', color: '#ffffff', letterSpacing: 0.5 }}>TaskCalendar</Text>
         </View>
       )}
 

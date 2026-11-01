@@ -7,6 +7,7 @@ import { useTheme } from '../styles/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
 import { BiometricHelper } from '../utils/biometricHelper';
+import { CryptoStorage } from '../utils/cryptoStorage';
 
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -208,7 +209,11 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
         return;
       }
 
-      if (timingSafeEqual(pin, String(correctPin))) {
+      if (CryptoStorage.verifyPin(pin, correctPin)) {
+        if (correctPin && !CryptoStorage.isPinHashed(correctPin)) {
+          // Transparently upgrade legacy plaintext PIN to salted cryptographic hash
+          dispatch(setAppPin(CryptoStorage.hashPin(pin)));
+        }
         handleSuccessfulUnlock();
       } else {
         recordFailedAttempt();

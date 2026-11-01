@@ -131,3 +131,22 @@ export async function openDocumentAsync(uri: string, mimeType: string | null = n
   }
 }
 
+export async function setScreenSecurityAsync(enabled: boolean): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.setScreenSecurityAsync !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.setScreenSecurityAsync(enabled);
+  } catch (e) {
+    console.warn('setScreenSecurityAsync failed:', e);
+    return false;
+  }
+}
+
+export async function isScreenSecurityEnabled(): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.isScreenSecurityEnabled !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.isScreenSecurityEnabled();
+  } catch (e) {
+    return false;
+  }
+}
+
