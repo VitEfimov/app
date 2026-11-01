@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import { logoutUser, logout } from '../features/userSlice';
+import { BiometricHelper } from '../utils/biometricHelper';
 
 const SOUND_ASSETS = {
   'pisk.mp3': require('../../assets/audio/pisk.mp3'),
@@ -183,10 +184,54 @@ export default function SettingsScreen({ navigation }) {
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
   const [isSnoozePickerOpen, setSnoozePickerOpen] = useState(false);
 
-  const handleTogglePin = (value) => {
+  const handleOpenPinPrompt = async () => {
+    const isAvail = await BiometricHelper.isAvailable();
+    if (isAvail) {
+      const result = await BiometricHelper.authenticate({
+        promptMessage: theme.appPin
+          ? (t('Authenticate to change App PIN') || 'Authenticate to change App PIN')
+          : (t('Authenticate with fingerprint to enable App PIN') || 'Authenticate with fingerprint to enable App PIN'),
+        cancelLabel: t('Cancel') || 'Cancel'
+      });
+
+      if (!result.success) {
+        setConfirmConfig({
+          isVisible: true,
+          title: t('Authentication Failed') || 'Authentication Failed',
+          message: t('Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.') || 'Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.',
+          confirmText: t('OK') || 'OK',
+          hideCancel: true,
+          onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+        });
+        return;
+      }
+    }
+    setPinPromptVisible(true);
+  };
+
+  const handleTogglePin = async (value) => {
     if (value) {
-      setPinPromptVisible(true);
+      await handleOpenPinPrompt();
     } else {
+      const isAvail = await BiometricHelper.isAvailable();
+      if (isAvail) {
+        const result = await BiometricHelper.authenticate({
+          promptMessage: t('Authenticate to remove App PIN') || 'Authenticate to remove App PIN',
+          cancelLabel: t('Cancel') || 'Cancel'
+        });
+
+        if (!result.success) {
+          setConfirmConfig({
+            isVisible: true,
+            title: t('Authentication Failed') || 'Authentication Failed',
+            message: t('Biometric authentication is required to turn off App PIN.') || 'Biometric authentication is required to turn off App PIN.',
+            confirmText: t('OK') || 'OK',
+            hideCancel: true,
+            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+          });
+          return;
+        }
+      }
       dispatch(setAppPin(null));
     }
   };
@@ -463,8 +508,12 @@ export default function SettingsScreen({ navigation }) {
             activeOpacity={0.75}
             onPress={() => setThemeModalVisible(true)}
             style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('Appearance') || 'Appearance'}. ${currentThemeLabel} · ${t('Theme, colors & contrast') || 'Theme, colors & contrast'}`}
+            accessibilityHint={t('Opens theme and color settings') || 'Opens theme and color settings'}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconPalette color={primaryAccent} />
             </View>
             <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
@@ -485,8 +534,12 @@ export default function SettingsScreen({ navigation }) {
             activeOpacity={0.75}
             onPress={() => setLanguageModalVisible(true)}
             style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('Language') || 'Language'}. ${currentLanguageLabel}`}
+            accessibilityHint={t('Opens language selection modal') || 'Opens language selection modal'}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconTranslate color={primaryAccent} />
             </View>
             <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
@@ -504,7 +557,7 @@ export default function SettingsScreen({ navigation }) {
 
           {/* Show Recurring Tasks */}
           <View style={styles.cardItemRow}>
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconRepeat color={primaryAccent} />
             </View>
             <View style={{ flex: 1, marginRight: 10 }}>
@@ -516,6 +569,10 @@ export default function SettingsScreen({ navigation }) {
               value={theme.showRecurringTasksOnBoard || false}
               onValueChange={val => dispatch(setShowRecurringTasksOnBoard(val))}
               trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: !!theme.showRecurringTasksOnBoard }}
+              accessibilityLabel={t('Show recurring tasks') || 'Show recurring tasks'}
+              accessibilityHint={t('Toggles display of recurring tasks in upcoming section') || 'Toggles display of recurring tasks in upcoming section'}
             />
           </View>
 
@@ -523,13 +580,17 @@ export default function SettingsScreen({ navigation }) {
 
           {/* App PIN Lock */}
           <View style={styles.cardItemRow}>
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconLock color={primaryAccent} />
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => setPinPromptVisible(true)}
+              onPress={handleOpenPinPrompt}
               style={{ flex: 1, marginRight: 10 }}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={theme.appPin ? `${t('App PIN Lock') || 'App PIN Lock'}. PIN: ${theme.appPin}` : (t('App PIN Lock') || 'App PIN Lock')}
+              accessibilityHint={t('Configure or change App PIN') || 'Configure or change App PIN'}
             >
               <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
                 {t('App PIN Lock') || 'App PIN Lock'}
@@ -544,6 +605,10 @@ export default function SettingsScreen({ navigation }) {
               value={!!theme.appPin}
               onValueChange={handleTogglePin}
               trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: !!theme.appPin }}
+              accessibilityLabel={t('App PIN Lock') || 'App PIN Lock'}
+              accessibilityHint={t('Enables or disables App PIN lock') || 'Enables or disables App PIN lock'}
             />
           </View>
         </View>
@@ -559,8 +624,13 @@ export default function SettingsScreen({ navigation }) {
             activeOpacity={0.75}
             onPress={() => setNotificationSettingsOpen(!isNotificationSettingsOpen)}
             style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isNotificationSettingsOpen }}
+            accessibilityLabel={t('Notification settings') || 'Notification settings'}
+            accessibilityHint={isNotificationSettingsOpen ? 'Double tap to collapse notification settings' : 'Double tap to expand notification settings'}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconBell color={primaryAccent} />
             </View>
             <View style={{ flex: 1 }}>
@@ -582,6 +652,9 @@ export default function SettingsScreen({ navigation }) {
                   value={theme.vibrationEnabled !== false}
                   onValueChange={val => dispatch(setVibrationEnabled(val))}
                   trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: theme.vibrationEnabled !== false }}
+                  accessibilityLabel={t('Vibration') || 'Vibration'}
                 />
               </View>
               {isPremium && (
@@ -593,6 +666,9 @@ export default function SettingsScreen({ navigation }) {
                     value={theme.defaultReminderEnabled || false}
                     onValueChange={val => dispatch(setDefaultReminderEnabled(val))}
                     trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: !!theme.defaultReminderEnabled }}
+                    accessibilityLabel={t('Default reminder on new tasks') || 'Default reminder on new tasks'}
                   />
                 </View>
               )}
@@ -609,8 +685,13 @@ export default function SettingsScreen({ navigation }) {
               if (!isSoundPickerOpen) setAlarmSoundPickerOpen(false);
             }}
             style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isSoundPickerOpen }}
+            accessibilityLabel={`${t('Notification sound') || 'Notification sound'}. ${currentNotificationSoundName}`}
+            accessibilityHint={isSoundPickerOpen ? 'Double tap to close sound list' : 'Double tap to open sound list'}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconSpeaker color={primaryAccent} />
             </View>
             <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
@@ -627,29 +708,37 @@ export default function SettingsScreen({ navigation }) {
           {/* Expanded notification sound options */}
           {isSoundPickerOpen && (
             <ScrollView nestedScrollEnabled={true} style={[styles.expandedSubOptions, { maxHeight: 280 }]} showsVerticalScrollIndicator={true}>
-              {ALL_SOUND_OPTIONS.map(snd => (
-                <TouchableOpacity
-                  key={`notif_${snd.value}`}
-                  style={styles.soundItemRow}
-                  onPress={() => {
-                    dispatch(setNotificationSound(snd.value));
-                    playSoundPreview(snd.value);
-                  }}
-                >
-                  <Text style={[
-                    styles.soundItemText, 
-                    { 
-                      color: (theme.notificationSound || 'notification.wav') === snd.value ? primaryAccent : colors.textPrimary,
-                      fontWeight: (theme.notificationSound || 'notification.wav') === snd.value ? '700' : '500'
-                    }
-                  ]}>
-                    {snd.label}
-                  </Text>
-                  {(theme.notificationSound || 'notification.wav') === snd.value && (
-                    <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {ALL_SOUND_OPTIONS.map(snd => {
+                const isSelected = (theme.notificationSound || 'notification.wav') === snd.value;
+                return (
+                  <TouchableOpacity
+                    key={`notif_${snd.value}`}
+                    style={styles.soundItemRow}
+                    onPress={() => {
+                      dispatch(setNotificationSound(snd.value));
+                      playSoundPreview(snd.value);
+                    }}
+                    accessible={true}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
+                    accessibilityLabel={`${snd.label}${isSelected ? ', selected' : ''}`}
+                    accessibilityHint="Double tap to select this sound"
+                  >
+                    <Text style={[
+                      styles.soundItemText, 
+                      { 
+                        color: isSelected ? primaryAccent : colors.textPrimary,
+                        fontWeight: isSelected ? '700' : '500'
+                      }
+                    ]}>
+                      {snd.label}
+                    </Text>
+                    {isSelected && (
+                      <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           )}
 
@@ -663,8 +752,13 @@ export default function SettingsScreen({ navigation }) {
               if (!isAlarmSoundPickerOpen) setSoundPickerOpen(false);
             }}
             style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isAlarmSoundPickerOpen }}
+            accessibilityLabel={`${t('Alarm sound') || 'Alarm sound'}. ${currentAlarmSoundName}`}
+            accessibilityHint={isAlarmSoundPickerOpen ? 'Double tap to close alarm sound list' : 'Double tap to open alarm sound list'}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconAlarm color={primaryAccent} />
             </View>
             <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
@@ -681,29 +775,37 @@ export default function SettingsScreen({ navigation }) {
           {/* Expanded alarm sound options */}
           {isAlarmSoundPickerOpen && (
             <ScrollView nestedScrollEnabled={true} style={[styles.expandedSubOptions, { maxHeight: 280 }]} showsVerticalScrollIndicator={true}>
-              {ALL_SOUND_OPTIONS.map(snd => (
-                <TouchableOpacity
-                  key={`alarm_${snd.value}`}
-                  style={styles.soundItemRow}
-                  onPress={() => {
-                    dispatch(setAlarmSound(snd.value));
-                    playSoundPreview(snd.value);
-                  }}
-                >
-                  <Text style={[
-                    styles.soundItemText, 
-                    { 
-                      color: (theme.alarmSound || 'bass_alarm.mp3') === snd.value ? primaryAccent : colors.textPrimary,
-                      fontWeight: (theme.alarmSound || 'bass_alarm.mp3') === snd.value ? '700' : '500'
-                    }
-                  ]}>
-                    {snd.label}
-                  </Text>
-                  {(theme.alarmSound || 'bass_alarm.mp3') === snd.value && (
-                    <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {ALL_SOUND_OPTIONS.map(snd => {
+                const isSelected = (theme.alarmSound || 'bass_alarm.mp3') === snd.value;
+                return (
+                  <TouchableOpacity
+                    key={`alarm_${snd.value}`}
+                    style={styles.soundItemRow}
+                    onPress={() => {
+                      dispatch(setAlarmSound(snd.value));
+                      playSoundPreview(snd.value);
+                    }}
+                    accessible={true}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
+                    accessibilityLabel={`${snd.label}${isSelected ? ', selected' : ''}`}
+                    accessibilityHint="Double tap to select this alarm sound"
+                  >
+                    <Text style={[
+                      styles.soundItemText, 
+                      { 
+                        color: isSelected ? primaryAccent : colors.textPrimary,
+                        fontWeight: isSelected ? '700' : '500'
+                      }
+                    ]}>
+                      {snd.label}
+                    </Text>
+                    {isSelected && (
+                      <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           )}
 
@@ -721,8 +823,12 @@ export default function SettingsScreen({ navigation }) {
               }
             }}
             style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isAlarmStylePickerOpen }}
+            accessibilityLabel={`${t('Alarm display style') || 'Alarm display style'}. ${getAlarmStyleLabel(currentAlarmStyle)}`}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconDisplay color={primaryAccent} />
             </View>
             <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
@@ -755,34 +861,41 @@ export default function SettingsScreen({ navigation }) {
                   label: t('Adaptive (System)') || 'Adaptive (System)', 
                   desc: t('Full screen when locked, popup banner when phone is in use') || 'Full screen when locked, popup banner when phone is in use' 
                 },
-              ].map(opt => (
-                <TouchableOpacity
-                  key={`style_${opt.value}`}
-                  style={[styles.soundItemRow, { paddingVertical: 10, alignItems: 'flex-start' }]}
-                  onPress={() => {
-                    dispatch(setAlarmPresentationStyle(opt.value));
-                    setAlarmStylePickerOpen(false);
-                  }}
-                >
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={[
-                      styles.soundItemText, 
-                      { 
-                        color: currentAlarmStyle === opt.value ? primaryAccent : colors.textPrimary,
-                        fontWeight: currentAlarmStyle === opt.value ? '700' : '500'
-                      }
-                    ]}>
-                      {opt.label}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-                      {opt.desc}
-                    </Text>
-                  </View>
-                  {currentAlarmStyle === opt.value && (
-                    <Text style={{ color: primaryAccent, fontWeight: 'bold', alignSelf: 'center' }}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              ].map(opt => {
+                const isSelected = currentAlarmStyle === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={`style_${opt.value}`}
+                    style={[styles.soundItemRow, { paddingVertical: 10, alignItems: 'flex-start' }]}
+                    onPress={() => {
+                      dispatch(setAlarmPresentationStyle(opt.value));
+                      setAlarmStylePickerOpen(false);
+                    }}
+                    accessible={true}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
+                    accessibilityLabel={`${opt.label}. ${opt.desc}${isSelected ? ', selected' : ''}`}
+                  >
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={[
+                        styles.soundItemText, 
+                        { 
+                          color: isSelected ? primaryAccent : colors.textPrimary,
+                          fontWeight: isSelected ? '700' : '500'
+                        }
+                      ]}>
+                        {opt.label}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Text style={{ color: primaryAccent, fontWeight: 'bold', alignSelf: 'center' }}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
@@ -793,8 +906,12 @@ export default function SettingsScreen({ navigation }) {
             activeOpacity={0.75}
             onPress={() => setSnoozePickerOpen(!isSnoozePickerOpen)}
             style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isSnoozePickerOpen }}
+            accessibilityLabel={`${t('Default Snooze') || 'Default snooze'}. ${formatSnoozeTime(defaultSnoozeTime)}`}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconClock color={primaryAccent} />
             </View>
             <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
@@ -811,29 +928,36 @@ export default function SettingsScreen({ navigation }) {
           {/* Expanded snooze options */}
           {isSnoozePickerOpen && (
             <View style={styles.expandedSubOptions}>
-              {snoozeOptions.map(opt => (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={styles.soundItemRow}
-                  onPress={() => {
-                    dispatch(setDefaultSnoozeTime(opt.value));
-                    setSnoozePickerOpen(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.soundItemText, 
-                    { 
-                      color: defaultSnoozeTime === opt.value ? primaryAccent : colors.textPrimary,
-                      fontWeight: defaultSnoozeTime === opt.value ? '700' : '500'
-                    }
-                  ]}>
-                    {opt.label}
-                  </Text>
-                  {defaultSnoozeTime === opt.value && (
-                    <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {snoozeOptions.map(opt => {
+                const isSelected = defaultSnoozeTime === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={styles.soundItemRow}
+                    onPress={() => {
+                      dispatch(setDefaultSnoozeTime(opt.value));
+                      setSnoozePickerOpen(false);
+                    }}
+                    accessible={true}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
+                    accessibilityLabel={`${opt.label}${isSelected ? ', selected' : ''}`}
+                  >
+                    <Text style={[
+                      styles.soundItemText, 
+                      { 
+                        color: isSelected ? primaryAccent : colors.textPrimary,
+                        fontWeight: isSelected ? '700' : '500'
+                      }
+                    ]}>
+                      {opt.label}
+                    </Text>
+                    {isSelected && (
+                      <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
@@ -841,7 +965,7 @@ export default function SettingsScreen({ navigation }) {
 
           {/* Android Auto mute sounds toggle */}
           <View style={styles.cardItemRow}>
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
               <IconCar color={primaryAccent} />
             </View>
             <View style={{ flex: 1, paddingRight: 8 }}>
@@ -856,6 +980,10 @@ export default function SettingsScreen({ navigation }) {
               value={theme.androidAutoEnabled !== false}
               onValueChange={(val) => dispatch(setAndroidAutoEnabled(val))}
               trackColor={{ true: primaryAccent, false: colors.borderColor }}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: theme.androidAutoEnabled !== false }}
+              accessibilityLabel={t('Mute on Android Auto') || 'Mute on Android Auto'}
+              accessibilityHint={t('Silence alarm and notification sounds while connected to car') || 'Silence alarm and notification sounds while connected to car'}
             />
           </View>
         </View>

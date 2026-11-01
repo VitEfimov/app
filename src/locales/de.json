@@ -683,5 +683,18 @@
   "Your day, your rhythm": "Ihr Tag, Ihr Rhythmus",
   "Focused on": "Fokus auf",
   "Cancel focus": "Fokus aufheben",
-  "Show all": "Alle anzeigen"
+  "Show all": "Alle anzeigen",
+  "Forgot PIN?": "PIN vergessen?",
+  "Reset PIN": "PIN zurücksetzen",
+  "Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?": "Durch das Zurücksetzen der PIN wird die App-PIN-Sperre entfernt und Sie erhalten Zugriff auf Ihre Aufgaben. Möchten Sie die PIN zurücksetzen?",
+  "Unlock with Biometrics": "Mit Biometrie entsperren",
+  "Verify fingerprint to reset App PIN": "Fingerabdruck bestätigen, um App-PIN zurückzusetzen",
+  "Authentication Failed": "Authentifizierung fehlgeschlagen",
+  "Biometric authentication failed. The App PIN cannot be reset without verification.": "Biometrische Authentifizierung fehlgeschlagen. Die App-PIN kann ohne Bestätigung nicht zurückgesetzt werden.",
+  "Authenticate to manage App PIN": "Authentifizieren, um App-PIN zu verwalten",
+  "Authenticate to change App PIN": "Authentifizieren, um App-PIN zu ändern",
+  "Authenticate with fingerprint to enable App PIN": "Mit Fingerabdruck bestätigen, um App-PIN zu aktivieren",
+  "Authenticate to remove App PIN": "Mit Fingerabdruck bestätigen, um App-PIN zu deaktivieren",
+  "Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.": "Eine biometrische Authentifizierung ist erforderlich, um die App-PIN zu konfigurieren oder zu ändern, um unbefugte Sperrungen zu verhindern.",
+  "Biometric authentication is required to turn off App PIN.": "Eine biometrische Authentifizierung ist erforderlich, um die App-PIN zu deaktivieren."
 }

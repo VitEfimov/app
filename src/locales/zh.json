@@ -683,5 +683,18 @@
   "Your day, your rhythm": "把握节奏，随心生活",
   "Focused on": "聚焦于",
   "Cancel focus": "取消聚焦",
-  "Show all": "显示全部"
+  "Show all": "显示全部",
+  "Forgot PIN?": "忘记 PIN 码？",
+  "Reset PIN": "重置 PIN 码",
+  "Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?": "重置 PIN 码将移除应用 PIN 锁并允许您访问任务。是否要重置 PIN 码？",
+  "Unlock with Biometrics": "生物识别解锁",
+  "Verify fingerprint to reset App PIN": "验证指纹以重置应用 PIN 码",
+  "Authentication Failed": "认证失败",
+  "Biometric authentication failed. The App PIN cannot be reset without verification.": "生物识别验证失败。未经身份验证无法重置应用 PIN 码。",
+  "Authenticate to manage App PIN": "验证身份以管理应用 PIN 码",
+  "Authenticate to change App PIN": "验证身份以更改应用 PIN 码",
+  "Authenticate with fingerprint to enable App PIN": "验证指纹以启用应用 PIN 码",
+  "Authenticate to remove App PIN": "验证指纹以关闭应用 PIN 码",
+  "Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.": "配置或更改应用 PIN 码需要生物识别认证，以防止未经授权的设备锁定。",
+  "Biometric authentication is required to turn off App PIN.": "关闭应用 PIN 码需要生物识别认证。"
 }

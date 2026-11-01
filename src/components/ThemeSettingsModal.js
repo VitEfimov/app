@@ -4,6 +4,7 @@ import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSourceColor, resetTheme, setUserPicture, setThemeMode, setRandomColorDaily } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
+import { SecurityLockHelper } from '../utils/securityLockHelper';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
@@ -77,11 +78,17 @@ export default function ThemeSettingsModal({ isVisible, onClose }) {
       return;
     }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
+    SecurityLockHelper.markPickingAttachment(true);
+    let result;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+    } finally {
+      SecurityLockHelper.markPickingAttachment(false);
+    }
 
     if (!result.canceled) {
       const sourceUri = result.assets[0].uri;

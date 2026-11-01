@@ -683,5 +683,18 @@
   "Your day, your rhythm": "나의 하루, 나의 리듬",
   "Focused on": "포커스 대상",
   "Cancel focus": "포커스 취소",
-  "Show all": "모두 보기"
+  "Show all": "모두 보기",
+  "Forgot PIN?": "PIN을 잊으셨나요?",
+  "Reset PIN": "PIN 재설정",
+  "Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?": "PIN을 재설정하면 앱 잠금이 해제되고 작업에 액세스할 수 있습니다. PIN을 재설정하시겠습니까?",
+  "Unlock with Biometrics": "생체 인식으로 잠금 해제",
+  "Verify fingerprint to reset App PIN": "지문을 인증하여 앱 PIN 재설정",
+  "Authentication Failed": "인증 실패",
+  "Biometric authentication failed. The App PIN cannot be reset without verification.": "생체 인증에 실패했습니다. 확인 없이는 앱 PIN을 재설정할 수 없습니다.",
+  "Authenticate to manage App PIN": "앱 PIN을 관리하려면 인증하세요",
+  "Authenticate to change App PIN": "앱 PIN을 변경하려면 인증하세요",
+  "Authenticate with fingerprint to enable App PIN": "지문 인증으로 앱 PIN 활성화",
+  "Authenticate to remove App PIN": "지문 인증으로 앱 PIN 해제",
+  "Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.": "무단 잠금을 방지하기 위해 앱 PIN을 설정하거나 변경하려면 생체 인증이 필요합니다.",
+  "Biometric authentication is required to turn off App PIN.": "앱 PIN을 끄려면 생체 인증이 필요합니다."
 }

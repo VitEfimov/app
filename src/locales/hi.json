@@ -683,5 +683,18 @@
   "Your day, your rhythm": "आपका दिन, आपकी लय",
   "Focused on": "फ़ोकस",
   "Cancel focus": "फ़ोकस रद्द करें",
-  "Show all": "सभी दिखाएं"
+  "Show all": "सभी दिखाएं",
+  "Forgot PIN?": "पिन भूल गए?",
+  "Reset PIN": "पिन रीसेट करें",
+  "Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?": "पिन रीसेट करने से ऐप पिन लॉक हट जाएगा और आपको अपने कार्यों तक पहुंच मिल जाएगी। क्या आप अपना पिन रीसेट करना चाहते हैं?",
+  "Unlock with Biometrics": "बायोमेट्रिक्स से अनलॉक करें",
+  "Verify fingerprint to reset App PIN": "ऐप पिन रीसेट करने के लिए फिंगरप्रिंट सत्यापित करें",
+  "Authentication Failed": "प्रमाणीकरण विफल",
+  "Biometric authentication failed. The App PIN cannot be reset without verification.": "बायोमेट्रिक प्रमाणीकरण विफल रहा। सत्यापन के बिना ऐप पिन रीसेट नहीं किया जा सकता।",
+  "Authenticate to manage App PIN": "ऐप पिन प्रबंधित करने के लिए प्रमाणित करें",
+  "Authenticate to change App PIN": "ऐप पिन बदलने के लिए प्रमाणित करें",
+  "Authenticate with fingerprint to enable App PIN": "ऐप पिन सक्षम करने के लिए फिंगरप्रिंट प्रमाणित करें",
+  "Authenticate to remove App PIN": "ऐप पिन हटाने के लिए फिंगरप्रिंट प्रमाणित करें",
+  "Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.": "अनधिकृत लॉकआउट को रोकने के लिए ऐप पिन को कॉन्फ़िगर या बदलने के लिए बायोमेट्रिक प्रमाणीकरण आवश्यक है।",
+  "Biometric authentication is required to turn off App PIN.": "ऐप पिन बंद करने के लिए बायोमेट्रिक प्रमाणीकरण आवश्यक है।"
 }

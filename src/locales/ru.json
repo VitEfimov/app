@@ -683,5 +683,18 @@
   "Your day, your rhythm": "Ваш день, ваш ритм",
   "Focused on": "Фокус на",
   "Cancel focus": "Сбросить фокус",
-  "Show all": "Показать все"
+  "Show all": "Показать все",
+  "Forgot PIN?": "Забыли PIN-код?",
+  "Reset PIN": "Сбросить PIN-код",
+  "Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?": "Сброс PIN-кода снимет блокировку приложения и откроет доступ к задачам. Вы уверены, что хотите сбросить PIN-код?",
+  "Unlock with Biometrics": "Разблокировать по отпечатку",
+  "Verify fingerprint to reset App PIN": "Подтвердите отпечаток для сброса PIN-кода",
+  "Authentication Failed": "Ошибка аутентификации",
+  "Biometric authentication failed. The App PIN cannot be reset without verification.": "Биометрическая аутентификация не пройдена. Сброс PIN-кода невозможен без подтверждения владельца.",
+  "Authenticate to manage App PIN": "Подтвердите личность для управления PIN-кодом",
+  "Authenticate to change App PIN": "Подтвердите личность для изменения PIN-кода",
+  "Authenticate with fingerprint to enable App PIN": "Подтвердите отпечаток для включения PIN-кода",
+  "Authenticate to remove App PIN": "Подтвердите отпечаток для отключения PIN-кода",
+  "Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.": "Биометрическая аутентификация необходима для настройки или изменения PIN-кода, чтобы предотвратить случайную или намеренную блокировку.",
+  "Biometric authentication is required to turn off App PIN.": "Биометрическая аутентификация необходима для отключения PIN-кода приложения."
 }

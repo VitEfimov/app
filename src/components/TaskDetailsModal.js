@@ -33,6 +33,8 @@ import PremiumModal from './PremiumModal';
 import { toggleTaskOptionsCollapsed, setTaskOptionsCollapsed } from '../features/userSlice';
 import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
+import { SecurityLockHelper } from '../utils/securityLockHelper';
+import { A11yHelper } from '../utils/a11yHelper';
 
 const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style }, ref) => {
   const [text, setText] = useState(initialValue || '');
@@ -47,7 +49,9 @@ const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placehol
 
   return (
     <TextInput
-      accessible={true} accessibilityLabel="Task Notes"
+      accessible={true} 
+      accessibilityRole="text"
+      accessibilityLabel="Task Notes"
       style={[{ outlineStyle: 'none', outlineWidth: 0, borderWidth: 0, backgroundColor: 'transparent' }, style]}
       value={text}
       onChangeText={setText}
@@ -917,6 +921,7 @@ useEffect(() => {
   };
 
   const launchCamera = async () => {
+    SecurityLockHelper.markPickingAttachment(true);
     try {
       console.log('[Camera] start');
       let permission = await ImagePicker.getCameraPermissionsAsync();
@@ -972,10 +977,13 @@ useEffect(() => {
         message: error?.message,
         stack: error?.stack,
       });
+    } finally {
+      SecurityLockHelper.markPickingAttachment(false);
     }
   };
 
   const launchImageLibrary = async () => {
+    SecurityLockHelper.markPickingAttachment(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -989,11 +997,14 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('[Gallery] launch failed:', error);
+    } finally {
+      SecurityLockHelper.markPickingAttachment(false);
     }
   };
 
 
   const pickDocument = async () => {
+    SecurityLockHelper.markPickingAttachment(true);
     try {
       const result =
         await DocumentPicker.getDocumentAsync({
@@ -1067,6 +1078,8 @@ useEffect(() => {
         'Error picking document:',
         error
       );
+    } finally {
+      SecurityLockHelper.markPickingAttachment(false);
     }
   };
 
@@ -1230,6 +1243,10 @@ useEffect(() => {
             <TouchableOpacity 
               onPress={handleClose} 
               activeOpacity={0.7}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('Back') || 'Back'}
+              accessibilityHint={t('Close task details and return') || 'Close task details and return'}
               style={{ width: isVeryCompact ? 32 : 36, height: isVeryCompact ? 32 : 36, borderRadius: 18, borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
             >
               <Svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1238,10 +1255,25 @@ useEffect(() => {
             </TouchableOpacity>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <TouchableOpacity onPress={handleShare} activeOpacity={0.7} style={{ padding: 4 }}>
+              <TouchableOpacity 
+                onPress={handleShare} 
+                activeOpacity={0.7} 
+                style={{ padding: 4 }}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Share task') || 'Share task'}
+                accessibilityHint={t('Share task details with other apps') || 'Share task details with other apps'}
+              >
                 <IconShare color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleClose} activeOpacity={0.7}>
+              <TouchableOpacity 
+                onPress={handleClose} 
+                activeOpacity={0.7}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Cancel') || 'Cancel'}
+                accessibilityHint={t('Discard changes and close') || 'Discard changes and close'}
+              >
                 <Text style={{ fontSize: 14, fontWeight: '500', color: colors.textSecondary }}>{t('Cancel') || 'Cancel'}</Text>
               </TouchableOpacity>
             </View>
@@ -1272,7 +1304,10 @@ useEffect(() => {
           >
             <View>
             {/* Screen Title: Edit task */}
-            <Text style={{ fontSize: isVeryCompact ? 20 : (isCompact ? 22 : 25), fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary, marginBottom: isVeryCompact ? 6 : (isCompact ? 8 : 12) }}>
+            <Text 
+              accessibilityRole="header"
+              style={{ fontSize: isVeryCompact ? 20 : (isCompact ? 22 : 25), fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary, marginBottom: isVeryCompact ? 6 : (isCompact ? 8 : 12) }}
+            >
               {t('Edit task') || 'Edit task'}
             </Text>
             
@@ -1284,7 +1319,10 @@ useEffect(() => {
               
               <TextInput
                 testID="task_details_name_input"
-                accessible={true} accessibilityLabel="Task Name"
+                accessible={true} 
+                accessibilityRole="text"
+                accessibilityLabel={t('Task name') || 'Task name'}
+                accessibilityHint={t('Edit task name') || 'Edit task name'}
                 rows={1}
                 style={[
                   styles.input,
@@ -1323,8 +1361,13 @@ useEffect(() => {
               />
 
               {/* Category indicator below task name */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: getBoardColor(boards.find(b => b.id === selectedBoardId || b._id === selectedBoardId), boards), marginRight: 6 }} />
+              <View 
+                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}
+                accessible={true}
+                accessibilityRole="text"
+                accessibilityLabel={`${t('Category') || 'Category'}: ${selectedBoardName}`}
+              >
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: getBoardColor(boards.find(b => b.id === selectedBoardId || b._id === selectedBoardId), boards), marginRight: 6 }} accessible={false} importantForAccessibility="no" />
                 <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '500' }}>
                   {selectedBoardName}
                 </Text>
@@ -1334,7 +1377,10 @@ useEffect(() => {
             {/* Date and Time picker pills row */}
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }}>
               <TouchableOpacity 
-                accessible={true} accessibilityRole="button" accessibilityLabel={`Due date, ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}`}
+                accessible={true} 
+                accessibilityRole="button" 
+                accessibilityLabel={`${t('Due date') || 'Due date'}: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : (t('Not set') || 'Not set')}`}
+                accessibilityHint={t('Opens calendar to select due date') || 'Opens calendar to select due date'}
                 style={[styles.dateTimePill, { borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, borderRadius: 12, height: isVeryCompact ? 38 : (isCompact ? 42 : 44), paddingHorizontal: 12, flex: 1, justifyContent: 'space-between', outlineStyle: 'none' }]}
                 onPress={() => { setDatePickerType('due'); setShowDatePicker(true); }}
               >
@@ -1348,7 +1394,10 @@ useEffect(() => {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                accessible={true} accessibilityRole="button" accessibilityLabel={`Time, ${formatDisplayTime(selectedTime)}`}
+                accessible={true} 
+                accessibilityRole="button" 
+                accessibilityLabel={`${t('Time') || 'Time'}: ${formatDisplayTime(selectedTime) || (t('No time') || 'No time')}`}
+                accessibilityHint={t('Opens time picker') || 'Opens time picker'}
                 style={[styles.dateTimePill, { borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', backgroundColor: colors.bgCard, borderRadius: 12, height: isVeryCompact ? 38 : (isCompact ? 42 : 44), paddingHorizontal: 12, flex: 1, justifyContent: 'space-between', outlineStyle: 'none' }]}
                 onPress={() => setShowTimePicker(true)}
               >
@@ -1366,10 +1415,15 @@ useEffect(() => {
             <View style={[styles.optionsCard, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingVertical: isVeryCompact ? 8 : (isCompact ? 10 : 12), paddingHorizontal: 12, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }]}>
               <TouchableOpacity
                 accessible={true}
-                accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
-                accessibilityLabel={`${t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}, ${isTaskOptionsCollapsed ? 'collapsed' : 'expanded'}`}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: !isTaskOptionsCollapsed }}
+                accessibilityLabel={`${t('Priority, Reminder, Repeat') || 'Priority, Reminder, Repeat'}, ${isTaskOptionsCollapsed ? (t('collapsed') || 'collapsed') : (t('expanded') || 'expanded')}`}
+                accessibilityHint={isTaskOptionsCollapsed ? (t('Double tap to expand options') || 'Double tap to expand options') : (t('Double tap to collapse options') || 'Double tap to collapse options')}
                 style={[styles.optionsCardHeader, { borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' }]}
-                onPress={() => dispatch(toggleTaskOptionsCollapsed())}
+                onPress={() => {
+                  A11yHelper.announce(isTaskOptionsCollapsed ? (t('Options expanded') || 'Options expanded') : (t('Options collapsed') || 'Options collapsed'));
+                  dispatch(toggleTaskOptionsCollapsed());
+                }}
                 activeOpacity={0.7}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
@@ -1456,6 +1510,10 @@ useEffect(() => {
                   <View style={{ marginBottom: 16 }}>
                     <Text style={[styles.label, { color: colors.textSecondary }]}>{t('Repeat')}</Text>
                     <TouchableOpacity 
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t('Repeat') || 'Repeat'}: ${repeatConfig.preset === 'custom' ? (t('Custom...') || 'Custom...') : repeatConfig.preset === 'None' ? (t('None') || 'None') : (t(repeatConfig.preset) || repeatConfig.preset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}`}
+                      accessibilityHint={t('Opens repeat frequency options') || 'Opens repeat frequency options'}
                       style={[styles.dropdownLikeBtn, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', height: 46, borderRadius: 12 }]}
                       onPress={() => setIsRepeatModalVisible(true)}
                     >
@@ -1475,6 +1533,10 @@ useEffect(() => {
                         <View style={styles.column}>
                           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('From')}</Text>
                           <TouchableOpacity 
+                            accessible={true}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('From') || 'From'}: ${repeatStartDate || selectedDate ? dayjs(repeatStartDate || selectedDate).format('MM/DD/YYYY') : (t('Select') || 'Select')}`}
+                            accessibilityHint={t('Opens calendar to select start date') || 'Opens calendar to select start date'}
                             style={[styles.dateBtn, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', height: 46, borderRadius: 10 }]}
                             onPress={() => { setDatePickerType('repeatStart'); setShowDatePicker(true); }}
                           >
@@ -1487,6 +1549,10 @@ useEffect(() => {
                         <View style={styles.column}>
                           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 6 }]}>{t('To')}</Text>
                           <TouchableOpacity 
+                            accessible={true}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('To') || 'To'}: ${repeatEndDate ? dayjs(repeatEndDate).format('MM/DD/YYYY') : (t('Select') || 'Select')}`}
+                            accessibilityHint={t('Opens calendar to select end date') || 'Opens calendar to select end date'}
                             style={[styles.dateBtn, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', height: 46, borderRadius: 10 }]}
                             onPress={() => { setDatePickerType('repeatEnd'); setShowDatePicker(true); }}
                           >
@@ -1512,6 +1578,11 @@ useEffect(() => {
                       </Text>
                     </View>
                     <Switch 
+                      accessible={true}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: isAlarm }}
+                      accessibilityLabel={t('Play Reminder as Alarm') || 'Play Reminder as Alarm'}
+                      accessibilityHint={t('Use an alarm instead of a notification') || 'Use an alarm instead of a notification'}
                       value={isAlarm} 
                       onValueChange={setIsAlarm} 
                       trackColor={{ true: colors.primary, false: colors.borderColor }} 
@@ -1529,6 +1600,11 @@ useEffect(() => {
                     </View>
                     <Switch
                       testID="keep_notification_all_day_switch"
+                      accessible={true}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: keepNotificationAllDay }}
+                      accessibilityLabel={t('Keep notification all day') || 'Keep notification all day'}
+                      accessibilityHint={t('Cannot be closed until task is modified or completed') || 'Cannot be closed until task is modified or completed'}
                       value={keepNotificationAllDay}
                       onValueChange={setKeepNotificationAllDay}
                       trackColor={{ true: colors.primary, false: colors.borderColor }}
@@ -1576,11 +1652,25 @@ useEffect(() => {
                     {attachments.map(att => (
                       <View key={att.id} style={styles.attachmentItem}>
                         {att.type === 'image' ? (
-                          <TouchableOpacity onPress={() => setSelectedFullscreenImage(att.uri)} activeOpacity={0.8}>
+                          <TouchableOpacity 
+                            onPress={() => setSelectedFullscreenImage(att.uri)} 
+                            activeOpacity={0.8}
+                            accessible={true}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('View image attachment') || 'View image attachment'}`}
+                            accessibilityHint={t('Double tap to view full screen') || 'Double tap to view full screen'}
+                          >
                             <Image source={{ uri: att.uri }} style={styles.attachmentThumb} />
                           </TouchableOpacity>
                         ) : (
-                          <TouchableOpacity onPress={() => openDocument(att.uri, att.mimeType)} activeOpacity={0.8}>
+                          <TouchableOpacity 
+                            onPress={() => openDocument(att.uri, att.mimeType)} 
+                            activeOpacity={0.8}
+                            accessible={true}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('Open document') || 'Open document'}: ${att.name || 'File'}`}
+                            accessibilityHint={t('Double tap to view document') || 'Double tap to view document'}
+                          >
                             <View style={[styles.attachmentThumb, { backgroundColor: colors.bgMain, justifyContent: 'center', alignItems: 'center', borderColor: colors.borderColor, borderWidth: 1 }]}>
                               <IconFile color={colors.primary} />
                               <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1}>{att.name}</Text>
@@ -1590,6 +1680,11 @@ useEffect(() => {
                         <TouchableOpacity 
                           style={styles.attachmentRemoveBtn} 
                           onPress={() => removeAttachment(att.id)}
+                          accessible={true}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${t('Remove attachment') || 'Remove attachment'}: ${att.name || 'Image'}`}
+                          accessibilityHint={t('Deletes this attachment from task') || 'Deletes this attachment from task'}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
                           <IconClose color="#fff" />
                         </TouchableOpacity>
@@ -1600,8 +1695,9 @@ useEffect(() => {
 
                 <TouchableOpacity
                   accessible={true}
-                  accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
-                  accessibilityLabel="Add attachment"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('Add attachment') || 'Add attachment'}
+                  accessibilityHint={t('Opens camera, photo gallery, or file picker') || 'Opens camera, photo gallery, or file picker'}
                   style={{ flexDirection: 'row', alignItems: 'center', marginTop: isVeryCompact ? 4 : 6, gap: 6, borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' }}
                   onPress={handleOpenAttachmentOptions}
                 >
@@ -1634,15 +1730,26 @@ useEffect(() => {
                       style={[styles.subtaskPillRow, { borderWidth: 0, backgroundColor: 'transparent' }]}
                     >
                       <TouchableOpacity 
-                        accessible={true} accessibilityRole="checkbox" accessibilityState={{ checked: subtask.completed }} accessibilityLabel="Toggle subtask completion"
-                        onPress={() => toggleSubtask(subtask.id)} 
+                        accessible={true} 
+                        accessibilityRole="checkbox" 
+                        accessibilityState={{ checked: subtask.completed }} 
+                        accessibilityLabel={subtask.completed ? (t('Mark subtask as incomplete') || 'Mark subtask as incomplete') : (t('Mark subtask as complete') || 'Mark subtask as complete')}
+                        accessibilityHint={subtask.text}
+                        onPress={() => {
+                          const next = !subtask.completed;
+                          A11yHelper.announce(next ? (t('Subtask completed') || 'Subtask completed') : (t('Subtask uncompleted') || 'Subtask uncompleted'));
+                          toggleSubtask(subtask.id);
+                        }} 
                         style={styles.subtaskCheckBtn}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
                         {subtask.completed ? <IconCheckCircle color={colors.primary} size={20} /> : <IconCircle color={colors.textSecondary} size={20} />}
                       </TouchableOpacity>
                       <TextInput
-                        accessible={true} accessibilityLabel="Subtask text"
+                        accessible={true} 
+                        accessibilityRole="text"
+                        accessibilityLabel={t('Subtask text') || 'Subtask text'}
+                        accessibilityHint={t('Type subtask description') || 'Type subtask description'}
                         style={[
                           styles.subtaskTextInput,
                           { color: colors.textPrimary, borderWidth: 0, backgroundColor: 'transparent' },
@@ -1655,7 +1762,10 @@ useEffect(() => {
                         blurOnSubmit={true}
                       />
                       <TouchableOpacity 
-                        accessible={true} accessibilityRole="button" accessibilityLabel="Delete subtask"
+                        accessible={true} 
+                        accessibilityRole="button" 
+                        accessibilityLabel={t('Delete subtask') || 'Delete subtask'}
+                        accessibilityHint={subtask.text}
                         onPress={() => removeSubtask(subtask.id)} 
                         style={styles.subtaskDeleteBtn}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1669,8 +1779,9 @@ useEffect(() => {
 
               <TouchableOpacity
                 accessible={true}
-                accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
-                accessibilityLabel="Add subtask"
+                accessibilityRole="button"
+                accessibilityLabel={t('Add subtask') || 'Add subtask'}
+                accessibilityHint={t('Creates a new checklist item') || 'Creates a new checklist item'}
                 style={{ height: isVeryCompact ? 36 : (isCompact ? 40 : 42), borderRadius: 12, backgroundColor: isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.10)', justifyContent: 'center', alignItems: 'center', borderWidth: 0, outlineStyle: 'none' }}
                 onPress={addSubtask}
               >
@@ -1685,6 +1796,10 @@ useEffect(() => {
             <View style={{ marginTop: isVeryCompact ? 6 : 10, marginBottom: 4 }}>
               <TouchableOpacity 
                 testID="task_details_save_btn_bottom"
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Save changes') || 'Save changes'}
+                accessibilityHint={t('Saves all changes made to this task') || 'Saves all changes made to this task'}
                 onPress={handleSave} 
                 style={[styles.saveBtnFull, { backgroundColor: colors.primary, height: isVeryCompact ? 42 : (isCompact ? 46 : 48), borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 0, outlineStyle: 'none' }]}
                 activeOpacity={0.85}
@@ -1699,7 +1814,10 @@ useEffect(() => {
 
               <TouchableOpacity 
                 testID="task_details_delete_btn_bottom"
-                accessible={true} accessibilityRole={Platform.OS === 'web' ? undefined : 'button'} accessibilityLabel="Delete task"
+                accessible={true} 
+                accessibilityRole="button" 
+                accessibilityLabel={t('Delete task') || 'Delete task'}
+                accessibilityHint={t('Permanently deletes this task') || 'Permanently deletes this task'}
                 onPress={handleDelete} 
                 style={[styles.deleteLink, { marginTop: isVeryCompact ? 4 : 6, marginBottom: 0, paddingVertical: isVeryCompact ? 4 : 6, borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' }]}
                 activeOpacity={0.7}
@@ -1746,6 +1864,9 @@ useEffect(() => {
             activeOpacity={1}
             style={styles.calendarOverlay}
             onPress={() => setAttachmentOptionsVisible(false)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={t('Close overlay') || 'Close overlay'}
           >
             <View
               style={[
@@ -1759,7 +1880,10 @@ useEffect(() => {
                 }
               ]}
             >
-              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 }}>
+              <Text 
+                accessibilityRole="header"
+                style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 }}
+              >
                 {t('Add Attachment') || 'Add Attachment'}
               </Text>
               <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 14 }}>
@@ -1768,6 +1892,10 @@ useEffect(() => {
 
               <TouchableOpacity
                 activeOpacity={0.75}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Take Photo') || 'Take Photo'}
+                accessibilityHint={t('Opens camera to capture an image') || 'Opens camera to capture an image'}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1791,6 +1919,10 @@ useEffect(() => {
 
               <TouchableOpacity
                 activeOpacity={0.75}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Choose Image') || t('Choose from Gallery') || 'Choose Image'}
+                accessibilityHint={t('Opens photo gallery') || 'Opens photo gallery'}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1814,6 +1946,10 @@ useEffect(() => {
 
               <TouchableOpacity
                 activeOpacity={0.75}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Attach File') || t('Attach Document') || 'Attach File'}
+                accessibilityHint={t('Opens document file browser') || 'Opens document file browser'}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1837,6 +1973,9 @@ useEffect(() => {
 
               <TouchableOpacity
                 activeOpacity={0.7}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Cancel') || 'Cancel'}
                 style={{ alignItems: 'center', paddingVertical: 8 }}
                 onPress={() => setAttachmentOptionsVisible(false)}
               >
@@ -1987,7 +2126,13 @@ useEffect(() => {
         <RNModal visible={!!selectedFullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setSelectedFullscreenImage(null)}>
           <View style={styles.fullscreenImageOverlay}>
             <View style={styles.fullscreenImageContainer}>
-              <TouchableOpacity style={styles.fullscreenImageClose} onPress={() => setSelectedFullscreenImage(null)}>
+              <TouchableOpacity 
+                style={styles.fullscreenImageClose} 
+                onPress={() => setSelectedFullscreenImage(null)}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Close full screen view') || 'Close full screen view'}
+              >
                 <IconClose color="#fff" />
               </TouchableOpacity>
               {selectedFullscreenImage && (

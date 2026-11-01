@@ -11,6 +11,16 @@ import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
 import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
+import { A11yHelper } from '../utils/a11yHelper';
+
+const inlineEditingListeners = new Set();
+
+export function cancelAllInlineEditing() {
+  inlineEditingListeners.forEach(fn => {
+    try { fn(); } catch (e) {}
+  });
+  Keyboard.dismiss();
+}
 
 const SwipeIconComplete = ({ color }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -188,6 +198,8 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       completed: newCompletedState
     }));
     
+    A11yHelper.announce(newCompletedState ? (t('Task Completed') || 'Task Completed') : (t('Task Uncompleted') || 'Task Uncompleted'));
+
     showToast(
       newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
       t('Undo'),
@@ -302,6 +314,9 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
           style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]}
           onPress={handleSwipeSnooze}
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('Snooze task') || 'Snooze task'}
+          accessibilityHint={t('Opens menu to postpone or reschedule task') || 'Opens menu to postpone or reschedule task'}
         >
           <Animated.View style={{ transform: [{ scale }] }}>
             <SwipeIconSnooze color={colors.textPrimary} />
@@ -311,6 +326,9 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
           style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainerHigh }]}
           onPress={handleSwipeDelete}
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('Delete task') || 'Delete task'}
+          accessibilityHint={t('Permanently deletes this task') || 'Permanently deletes this task'}
         >
           <Animated.View style={{ transform: [{ scale }] }}>
             <SwipeIconDelete color="#f44336" />
@@ -320,6 +338,9 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
           style={[styles.rightActionKebabBtn, { backgroundColor: colors.surfaceContainer }]}
           onPress={handleSwipeMore}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('Task options') || 'Task options'}
+          accessibilityHint={t('Opens actions menu') || 'Opens actions menu'}
         >
           <Animated.View style={{ transform: [{ scale }] }}>
             <IconDotsVertical color={colors.textSecondary} size={18} />
@@ -338,10 +359,31 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       if (onPress) onPress(task);
       return;
     }
+    cancelAllInlineEditing();
     setEditName(taskTitleText);
     setCursorSelection({ start: taskTitleText.length, end: taskTitleText.length });
     setIsEditing(true);
   }, [isSelectionMode, onToggleSelect, sectionId, disableInlineEdit, onPress, taskTitleText, task]);
+
+  const submitEdit = useCallback(() => {
+    setIsEditing(false);
+    Keyboard.dismiss();
+    if (editName.trim() !== '' && editName !== task?.taskname) {
+      dispatch(updateTask({ taskId: task.id, name: editName }));
+    }
+  }, [editName, task, dispatch]);
+
+  useEffect(() => {
+    const handleCancel = () => {
+      if (isEditing) {
+        submitEdit();
+      }
+    };
+    inlineEditingListeners.add(handleCancel);
+    return () => {
+      inlineEditingListeners.delete(handleCancel);
+    };
+  }, [isEditing, submitEdit]);
 
   if (!task) return null;
 
@@ -366,13 +408,6 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       return `${hour}:${m.padStart(2, '0')}${ampm}`;
     } catch {
       return timeStr;
-    }
-  };
-
-  const submitEdit = () => {
-    setIsEditing(false);
-    if (editName.trim() !== '' && editName !== task.taskname) {
-      dispatch(updateTask({ taskId: task.id, name: editName }));
     }
   };
 
@@ -413,7 +448,8 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       testID={testIDPrefix ? `${testIDPrefix}task_row_${task.taskname || task.name}` : `task_row_${task.taskname || task.name}`}
       accessible={true}
       accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
-      accessibilityLabel={`${t('Task')}: ${task.name}. ${task.completed ? t('Completed.') : t('Uncompleted.')} ${task.completionDate ? `${t('Due')} ${dayjs(task.completionDate).format('MMM D')}.` : ''} ${task.priority && task.priority !== 'none' ? `${t('Priority')} ${task.priority}.` : ''}`}
+      accessibilityLabel={A11yHelper.formatTaskAccessibilityLabel(task, { t })}
+      accessibilityHint={t('Double tap to view or edit task details') || 'Double tap to view or edit task details'}
       accessibilityState={{ checked: task.completed }}
       style={[
         styles.container,
@@ -440,7 +476,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       activeOpacity={0.7}
     >
       {priorityColor ? (
-        <View style={[styles.priorityIndicator, { backgroundColor: priorityColor }]} />
+        <View style={[styles.priorityIndicator, { backgroundColor: priorityColor }]} accessible={false} importantForAccessibility="no" />
       ) : null}
 
       {/* Region 2: Checkbox */}
@@ -449,7 +485,12 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         accessible={true}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: isSelectionMode ? isSelected : task.completed }}
-        accessibilityLabel={isSelectionMode ? "Select task" : "Toggle task completion"}
+        accessibilityLabel={
+          isSelectionMode 
+            ? (isSelected ? (t('Deselect task') || 'Deselect task') : (t('Select task') || 'Select task'))
+            : (task.completed ? (t('Mark task as incomplete') || 'Mark task as incomplete') : (t('Mark task as complete') || 'Mark task as complete'))
+        }
+        accessibilityHint={t('Toggles completion status for {{name}}', { name: task.taskname || task.name }) || `Toggles completion status for ${task.taskname || task.name}`}
         style={styles.checkbox}
         onPress={() => {
           closeOpenSwipeableRow();
@@ -478,6 +519,8 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
                   styles.title,
                   { color: 'transparent', fontSize: titleFontSize, flexShrink: 1 }
                 ]}
+                accessible={false}
+                importantForAccessibility="no"
               >
                 {editName}
               </Text>
@@ -497,10 +540,21 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
                 multiline={true}
                 blurOnSubmit={true}
                 returnKeyType="done"
+                accessibilityRole="text"
+                accessibilityLabel={t('Edit task name') || 'Edit task name'}
+                accessibilityHint={t('Type new task name and submit') || 'Type new task name and submit'}
               />
             </View>
           ) : (
-            <TouchableOpacity activeOpacity={0.7} onPress={handleTextPress} onLongPress={handleLongPress} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+            <TouchableOpacity 
+              activeOpacity={0.7} 
+              onPress={handleTextPress} 
+              onLongPress={handleLongPress} 
+              style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}
+              accessibilityRole="button"
+              accessibilityLabel={task.taskname || task.name}
+              accessibilityHint={t('Double tap to edit task name') || 'Double tap to edit task name'}
+            >
               <Text
                 testID="task_name_text"
                 numberOfLines={taskNameWrap === 'nowrap' ? 1 : 2}

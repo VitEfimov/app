@@ -5,7 +5,7 @@ import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanim
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
-import TaskRow, { closeOpenSwipeableRow } from '../components/TaskRow';
+import TaskRow, { closeOpenSwipeableRow, cancelAllInlineEditing } from '../components/TaskRow';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
 import SnoozeModal from '../components/SnoozeModal';
@@ -31,6 +31,7 @@ import { getBoardColor, BOARD_COLORS } from '../utils/boardColors';
 import * as FileSystem from 'expo-file-system';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
+import { A11yHelper } from '../utils/a11yHelper';
 
 let RNShare;
 if (Platform.OS !== 'web') {
@@ -88,23 +89,23 @@ const SectionHeader = React.memo(function SectionHeader({
   return (
     <View style={[styles.sectionHeader, { backgroundColor: colors.bgMain, borderBottomColor: `${section.color}33` }]}>
       <TouchableOpacity 
-        accessible={true} accessibilityRole="button" accessibilityLabel={`${section.title} section, ${section.count} tasks`} accessibilityState={{ expanded: !isCollapsed }}
-        style={styles.sectionHeaderLeft} onPress={() => onToggleSection(section.id)}
-      >
-        <Text testID={`section_title_${section.id}`} style={[styles.sectionTitle, { color: colors.textPrimary, marginLeft: 0 }]}>{section.title}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity 
-        style={[styles.badge, { backgroundColor: `${section.color}20` }]}
+        accessible={true} 
+        accessibilityRole="header" 
+        accessibilityLabel={`${section.title} section, ${section.count} ${section.count === 1 ? 'task' : 'tasks'}`} 
+        accessibilityState={{ expanded: !isCollapsed }}
+        accessibilityHint={isCollapsed ? 'Double tap to expand section' : 'Double tap to collapse section'}
+        style={[styles.sectionHeaderLeft, { flexDirection: 'row', alignItems: 'center' }]} 
         onPress={() => onToggleSection(section.id)}
       >
-        <Text style={[styles.badgeText, { color: section.color }]}>{section.count}</Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        accessible={true} accessibilityRole="button" accessibilityLabel={`Toggle ${section.title} section`}
-        onPress={() => onToggleSection(section.id)} style={{ padding: 5, marginLeft: 10 }}
-      >
-        <IconChevronDown color={isCollapsed ? section.color : colors.textSecondary} isCollapsed={isCollapsed} />
+        <Text testID={`section_title_${section.id}`} style={[styles.sectionTitle, { color: colors.textPrimary, marginLeft: 0 }]}>
+          {section.title}
+        </Text>
+        <View style={[styles.badge, { backgroundColor: `${section.color}20` }]} accessible={false} importantForAccessibility="no">
+          <Text style={[styles.badgeText, { color: section.color }]}>{section.count}</Text>
+        </View>
+        <View style={{ padding: 5, marginLeft: 10 }} accessible={false} importantForAccessibility="no">
+          <IconChevronDown color={isCollapsed ? section.color : colors.textSecondary} isCollapsed={isCollapsed} />
+        </View>
       </TouchableOpacity>
 
       {isSelectionActive ? (
@@ -269,11 +270,17 @@ export default function BoardScreen({ route, navigation }) {
   }, [boardIdsKey, dispatch]);
 
   const toggleSection = useCallback((sectionId) => {
-    if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
+    try {
+      if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+      }
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    } catch (e) {
+      // Safe fallback on massive layout mutations
     }
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setCollapsedSections(prev => {
+      const willCollapse = !prev.includes(sectionId);
+      A11yHelper.announce(willCollapse ? `${sectionId} section collapsed` : `${sectionId} section expanded`);
       const next = prev.includes(sectionId) ? prev.filter(id => id !== sectionId) : [...prev, sectionId];
       currentSessionCollapsedSections = next;
       return next;
@@ -424,16 +431,25 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleTaskPress = useCallback((task) => {
+    cancelAllInlineEditing();
+    setActiveAddSectionId(null);
+    Keyboard.dismiss();
     setSelectedTask(task);
     setDetailsVisible(true);
   }, []);
 
   const handleSnoozePress = useCallback((task) => {
+    cancelAllInlineEditing();
+    setActiveAddSectionId(null);
+    Keyboard.dismiss();
     setSelectedTask(task);
     setSnoozeVisible(true);
   }, []);
 
   const handleQuickMenuPress = useCallback((task) => {
+    cancelAllInlineEditing();
+    setActiveAddSectionId(null);
+    Keyboard.dismiss();
     setSelectedTask(task);
     setQuickMenuVisible(true);
   }, []);
@@ -471,16 +487,43 @@ export default function BoardScreen({ route, navigation }) {
     return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
   }, [boards, activeBoardId]);
 
+  const isRepeatingTask = useCallback((task) => {
+    if (!task) return false;
+    return !!(
+      task.recurringSeriesId ||
+      task.isRecurring ||
+      (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') ||
+      (task.repeatFrequency && task.repeatFrequency !== 'None') ||
+      (task.repeat && task.repeat !== 'none' && task.repeat !== 'None')
+    );
+  }, []);
+
   // Single-pass O(N) deduplication of recurring tasks (eliminates per-series sorting allocations)
   const hiddenRecurringTaskIds = useMemo(() => {
-    if (showRecurringTasksOnBoard || activeBoard?.type === 'birthdays') return new Set();
+    if (activeBoard?.type === 'birthdays') return new Set();
 
-    const earliestSeriesMap = new Map();
     const hiddenIds = new Set();
     const todayStr = dayjs().format('YYYY-MM-DD');
 
+    // When toggle is OFF: Hide ALL recurring tasks from future/upcoming sections
+    if (!showRecurringTasksOnBoard) {
+      for (const task of boardTasks) {
+        if (!task || task.completed) continue;
+        if (isRepeatingTask(task)) {
+          const dateStr = getTaskDateStr(task);
+          // Keep missed and today tasks visible so actionable items aren't lost
+          if (!dateStr || dateStr > todayStr) {
+            hiddenIds.add(task.id);
+          }
+        }
+      }
+      return hiddenIds;
+    }
+
+    // When toggle is ON: Deduplicate each recurring series so only the earliest upcoming occurrence appears
+    const earliestSeriesMap = new Map();
     for (const task of boardTasks) {
-      if (task.completed || !task.recurringSeriesId) continue;
+      if (!task || task.completed || !task.recurringSeriesId) continue;
       const dateStr = getTaskDateStr(task);
       if (dateStr && dateStr < todayStr) continue; // Missed tasks remain visible in Missed section
 
@@ -503,7 +546,7 @@ export default function BoardScreen({ route, navigation }) {
     }
 
     return hiddenIds;
-  }, [boardTasks, showRecurringTasksOnBoard, activeBoard]);
+  }, [boardTasks, showRecurringTasksOnBoard, activeBoard, isRepeatingTask]);
 
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks, completedCount, todoTasks, upcomingBirthdayTasks, needToBuyTasks } = useMemo(() => {
     const thresholds = getDateThresholds();
@@ -1028,7 +1071,8 @@ export default function BoardScreen({ route, navigation }) {
                   testID={`board_tab_${board.id}`}
                   accessible={true} 
                   accessibilityRole="tab" 
-                  accessibilityLabel={`Board ${board.name === 'Main' ? t('Main') : board.name}`} 
+                  accessibilityLabel={`${board.name === 'Main' ? (t('Main') || 'Main') : board.name} board, ${count} ${count === 1 ? 'task' : 'tasks'}`} 
+                  accessibilityHint={t('Double tap to switch to this board') || 'Double tap to switch to this board'}
                   accessibilityState={{ selected: isSelected }}
                   style={[
                     {
@@ -1086,7 +1130,13 @@ export default function BoardScreen({ route, navigation }) {
         key={activeBoardId}
         data={flattenedData}
         extraData={flashListExtraData}
-        keyExtractor={(item) => item.type === 'task' ? `task_${item.task?.id || ''}_${item.section?.id || ''}` : `${item.type}_${item.section?.id || ''}_${item.section?.count ?? 0}`}
+        keyExtractor={(item, index) => {
+          if (item?.type === 'task') {
+            const taskId = item.task?.id || `idx_${index}`;
+            return `task_${taskId}_${item.section?.id || 'sec'}_${index}`;
+          }
+          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}_${index}`;
+        }}
         getItemType={(item) => item.type}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
@@ -1102,7 +1152,11 @@ export default function BoardScreen({ route, navigation }) {
       <TaskDetailsModal 
         task={selectedTask}
         isVisible={isDetailsVisible}
-        onClose={() => setDetailsVisible(false)}
+        onClose={() => {
+          cancelAllInlineEditing();
+          Keyboard.dismiss();
+          setDetailsVisible(false);
+        }}
       />
 
       <PromptModal

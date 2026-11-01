@@ -683,5 +683,18 @@
   "Your day, your rhythm": "あなたの一日、あなたのリズム",
   "Focused on": "フォーカス中",
   "Cancel focus": "フォーカス解除",
-  "Show all": "すべて表示"
+  "Show all": "すべて表示",
+  "Forgot PIN?": "PINをお忘れですか？",
+  "Reset PIN": "PINをリセット",
+  "Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?": "PINをリセットするとアプリのロックが解除され、タスクにアクセスできるようになります。PINをリセットしますか？",
+  "Unlock with Biometrics": "生体認証でロック解除",
+  "Verify fingerprint to reset App PIN": "指紋を認証してPINをリセット",
+  "Authentication Failed": "認証に失敗しました",
+  "Biometric authentication failed. The App PIN cannot be reset without verification.": "生体認証に失敗しました。本人確認なしでアプリのPINをリセットすることはできません。",
+  "Authenticate to manage App PIN": "アプリPINを管理するために認証してください",
+  "Authenticate to change App PIN": "アプリPINを変更するために認証してください",
+  "Authenticate with fingerprint to enable App PIN": "指紋認証でアプリPINを有効化",
+  "Authenticate to remove App PIN": "指紋認証でアプリPINを解除",
+  "Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.": "不正なロックを防ぐため、アプリPINの設定または変更には生体認証が必要です。",
+  "Biometric authentication is required to turn off App PIN.": "アプリPINを無効にするには生体認証が必要です。"
 }

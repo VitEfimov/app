@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { DevLogger } from '../utils/logger';
+import { CrashLogger } from '../utils/crashLogger';
 import { useTheme } from '../styles/ThemeContext';
 import {
   testAndroidDefaultNotification,
@@ -85,10 +86,19 @@ export default function DevLogsScreen({ navigation }) {
   const [systemDiag, setSystemDiag] = useState(null);
   const [desyncReport, setDesyncReport] = useState(null);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [crashLogs, setCrashLogs] = useState([]);
+  const [expandedCrashId, setExpandedCrashId] = useState(null);
 
   useEffect(() => {
     const unsubscribe = DevLogger.subscribe((newLogs) => {
       setLogs(newLogs);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = CrashLogger.subscribe((newCrashes) => {
+      setCrashLogs(newCrashes);
     });
     return unsubscribe;
   }, []);
@@ -523,6 +533,7 @@ export default function DevLogsScreen({ navigation }) {
             { id: 'notifications', label: 'Notifications' },
             { id: 'reschedule', label: 'Reschedule Engine' },
             { id: 'bottlenecks', label: 'Bottlenecks' },
+            { id: 'crashes', label: `Crashes (${crashLogs.length})` },
             { id: 'logs', label: `Logs (${logs.length})` },
           ].map((tab) => (
             <TouchableOpacity
@@ -1139,7 +1150,165 @@ export default function DevLogsScreen({ navigation }) {
           </ScrollView>
         )}
 
-        {/* ================= TAB 5: LOGS FEED ================= */}
+        {/* ================= TAB 5: CRASHES & ERROR LOGS ================= */}
+        {activeTab === 'crashes' && (
+          <ScrollView contentContainerStyle={styles.scrollSection}>
+            {/* Crash Health Status Card */}
+            <View style={[
+              styles.sectionCard, 
+              { 
+                backgroundColor: colors.bgCard, 
+                borderColor: crashLogs.length > 0 ? '#f44336' : (colors.borderColor || '#E5E5EA'),
+                borderWidth: crashLogs.length > 0 ? 1.5 : 1
+              }
+            ]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={[styles.sectionTitle, { color: crashLogs.length > 0 ? '#f44336' : colors.textPrimary, marginBottom: 0 }]}>
+                  {crashLogs.length > 0 ? `⚠️ ${crashLogs.length} Crash(es) Detected` : '✅ System Healthy (0 Crashes)'}
+                </Text>
+                <View style={[styles.statusBadge, { backgroundColor: crashLogs.length > 0 ? 'rgba(244,67,54,0.15)' : 'rgba(76,175,80,0.15)' }]}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: crashLogs.length > 0 ? '#f44336' : '#4CAF50' }}>
+                    {crashLogs.length > 0 ? 'ERRORS RECORDED' : 'ALL CLEAR'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12, lineHeight: 18 }}>
+                {crashLogs.length > 0 
+                  ? 'Runtime errors or exceptions caught by ScreenErrorBoundary are captured here. Tap any item to inspect the stack trace.'
+                  : 'No runtime errors or unhandled exceptions have been recorded. Error boundaries and render passes are clean.'}
+              </Text>
+
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                  onPress={async () => {
+                    const testEntry = {
+                      screenName: 'ManualCrashTester',
+                      error: new Error('Simulated runtime error triggered to verify crash detection system.'),
+                      errorInfo: { componentStack: '\n    in TaskList\n    in BoardScreen\n    in ScreenErrorBoundary' }
+                    };
+                    await CrashLogger.recordCrash(testEntry);
+                    Alert.alert('Simulated Crash Recorded', 'A test crash was added to the crash log to verify the capture mechanism.');
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>Simulate Test Error</Text>
+                </TouchableOpacity>
+
+                {crashLogs.length > 0 && (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: colors.surfaceContainerHigh || '#E5E5EA' }]}
+                      onPress={() => {
+                        const reportText = JSON.stringify(crashLogs, null, 2);
+                        Clipboard.setString(reportText);
+                        Alert.alert('Copied', 'Complete crash report copied to clipboard.');
+                      }}
+                    >
+                      <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: 'bold' }}>Copy All Crashes</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: 'rgba(244,67,54,0.15)' }]}
+                      onPress={async () => {
+                        await CrashLogger.clearCrashLogs();
+                        Alert.alert('Cleared', 'Crash log history has been wiped.');
+                      }}
+                    >
+                      <Text style={{ color: '#f44336', fontSize: 12, fontWeight: 'bold' }}>Clear Crashes</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </View>
+
+            {/* Crash Entries Feed */}
+            {crashLogs.length > 0 && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginBottom: 8 }]}>
+                  CRASH LOGS HISTORY ({crashLogs.length})
+                </Text>
+                {crashLogs.map((crash) => {
+                  const isExpanded = expandedCrashId === crash.id;
+                  return (
+                    <View
+                      key={crash.id}
+                      style={[
+                        styles.taskDetailCard,
+                        { backgroundColor: colors.bgCard, borderColor: colors.borderColor, marginBottom: 10 }
+                      ]}
+                    >
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setExpandedCrashId(isExpanded ? null : crash.id)}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                      >
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#f44336' }} />
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                              {crash.screenName}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                              {dayjs(crash.timestamp).format('MMM D, h:mm:ss A')}
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 12, color: '#f44336', fontWeight: '600' }} numberOfLines={isExpanded ? undefined : 2}>
+                            {crash.message}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: 'bold' }}>
+                          {isExpanded ? '▲' : '▼'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {isExpanded && (
+                        <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.borderColor }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                              STACK TRACE:
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                const fullReport = `Screen: ${crash.screenName}\nTime: ${crash.timestamp}\nError: ${crash.message}\n\nStack:\n${crash.stack || 'No stack'}\n\nComponent Stack:\n${crash.componentStack || 'None'}`;
+                                Clipboard.setString(fullReport);
+                                Alert.alert('Copied', 'Crash stack trace copied to clipboard.');
+                              }}
+                              style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.surfaceContainerHigh || '#E5E5EA' }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.textPrimary }}>Copy Stack</Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          <ScrollView horizontal style={{ backgroundColor: isDark ? '#1a1a24' : '#2d2d3a', borderRadius: 8, padding: 10, maxHeight: 220 }}>
+                            <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#e0e0e0', lineHeight: 16 }}>
+                              {crash.stack || crash.componentStack || crash.message}
+                            </Text>
+                          </ScrollView>
+
+                          {crash.componentStack && (
+                            <View style={{ marginTop: 8 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 }}>
+                                COMPONENT HIERARCHY:
+                              </Text>
+                              <ScrollView horizontal style={{ backgroundColor: isDark ? '#1a1a24' : '#2d2d3a', borderRadius: 8, padding: 10, maxHeight: 150 }}>
+                                <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 10, color: '#a0c0e0', lineHeight: 14 }}>
+                                  {crash.componentStack}
+                                </Text>
+                              </ScrollView>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        {/* ================= TAB 6: LOGS FEED ================= */}
         {activeTab === 'logs' && (
           <View style={{ flex: 1 }}>
             {/* Filter Log Bar */}

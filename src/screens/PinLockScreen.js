@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDispatch } from 'react-redux';
+import { setAppPin } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
+import { BiometricHelper } from '../utils/biometricHelper';
 
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -30,23 +33,41 @@ const IconBackspace = ({ color }) => (
   </Svg>
 );
 
+const IconFingerprint = ({ color }) => (
+  <Svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none">
+    <Path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+    <Path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+    <Path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+    <Path d="M2 12a10 10 0 0 1 18-6" />
+    <Path d="M2 16h.01" />
+    <Path d="M21.8 16c.2-2 .131-5.354 0-6" />
+    <Path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+    <Path d="M8.65 22c.21-.66.45-1.32.57-2" />
+    <Path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
+  </Svg>
+);
+
 export default function PinLockScreen({ correctPin, onUnlock }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const dispatch = useDispatch();
   const [pin, setPin] = useState('');
   const [alertConfig, setAlertConfig] = useState({ isVisible: false, title: '', message: '' });
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  const [forgotModalVisible, setForgotModalVisible] = useState(false);
+  const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const timerRef = useRef(null);
 
-  // Load persisted lockout state on mount
+  // Load persisted lockout state and check biometrics on mount
   useEffect(() => {
     let isMounted = true;
     const initLockoutState = async () => {
       try {
-        const [storedAttempts, storedLockout] = await Promise.all([
+        const [storedAttempts, storedLockout, bioAvail] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY_FAILED_ATTEMPTS),
-          AsyncStorage.getItem(STORAGE_KEY_LOCKOUT_UNTIL)
+          AsyncStorage.getItem(STORAGE_KEY_LOCKOUT_UNTIL),
+          BiometricHelper.isAvailable()
         ]);
 
         const attempts = storedAttempts ? parseInt(storedAttempts, 10) : 0;
@@ -54,11 +75,15 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
 
         if (!isMounted) return;
         setFailedAttempts(attempts);
+        setIsBiometricAvailable(bioAvail);
 
         const now = Date.now();
         if (lockoutUntil > now) {
           const remainingSec = Math.ceil((lockoutUntil - now) / 1000);
           setLockoutRemaining(remainingSec);
+        } else if (bioAvail) {
+          // Auto-prompt biometric unlock on initial display if device supports it
+          attemptBiometricUnlock();
         }
       } catch (e) {
         // Fallback silently if storage read fails
@@ -70,6 +95,38 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
       isMounted = false;
     };
   }, []);
+
+  const attemptBiometricUnlock = async () => {
+    if (lockoutRemaining > 0) return;
+    const result = await BiometricHelper.authenticate({
+      promptMessage: t('Unlock with Biometrics') || 'Unlock with Biometrics',
+      cancelLabel: t('Cancel') || 'Cancel'
+    });
+    if (result.success) {
+      await handleSuccessfulUnlock();
+    }
+  };
+
+  const handleForgotPinPress = async () => {
+    if (isBiometricAvailable) {
+      const result = await BiometricHelper.authenticate({
+        promptMessage: t('Verify fingerprint to reset App PIN') || 'Verify fingerprint to reset App PIN',
+        cancelLabel: t('Cancel') || 'Cancel'
+      });
+      if (result.success) {
+        dispatch(setAppPin(null));
+        await handleSuccessfulUnlock();
+      } else {
+        setAlertConfig({
+          isVisible: true,
+          title: t('Authentication Failed') || 'Authentication Failed',
+          message: t('Biometric authentication failed. The App PIN cannot be reset without verification.') || 'Biometric authentication failed. The App PIN cannot be reset without verification.'
+        });
+      }
+    } else {
+      setForgotModalVisible(true);
+    }
+  };
 
   // Countdown timer for active lockout
   useEffect(() => {
@@ -178,19 +235,32 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
-      <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Enter PIN')}</Text>
+      <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>{t('Enter PIN')}</Text>
       
       {lockoutRemaining > 0 ? (
-        <View style={styles.lockoutBanner}>
+        <View 
+          style={styles.lockoutBanner}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+          accessibilityLabel={t('Too many failed attempts. Try again in {{count}}s', { count: lockoutRemaining })}
+        >
           <Text style={styles.lockoutText}>
             {t('Too many failed attempts. Try again in {{count}}s', { count: lockoutRemaining })}
           </Text>
         </View>
       ) : (
-        <View style={styles.pinDisplay}>
+        <View 
+          style={styles.pinDisplay}
+          accessible={true}
+          accessibilityRole="text"
+          accessibilityLabel={t('{{count}} of 4 digits entered', { count: pin.length })}
+          accessibilityLiveRegion="polite"
+        >
           {[0, 1, 2, 3].map(i => (
             <View 
               key={i} 
+              accessible={false}
+              importantForAccessibility="no"
               style={[
                 styles.pinDot, 
                 { 
@@ -207,9 +277,26 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
         style={[styles.keypad, isKeypadDisabled && styles.keypadDisabled]}
         pointerEvents={isKeypadDisabled ? 'none' : 'auto'}
       >
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'delete'].map((key, index) => {
-          if (key === '') {
-            return <View key={index} style={styles.key} pointerEvents="none" />;
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'biometric', '0', 'delete'].map((key, index) => {
+          if (key === 'biometric') {
+            if (!isBiometricAvailable) {
+              return <View key={index} style={styles.key} pointerEvents="none" accessible={false} importantForAccessibility="no" />;
+            }
+            return (
+              <TouchableOpacity 
+                key={index} 
+                activeOpacity={0.6}
+                disabled={isKeypadDisabled}
+                style={[styles.key, { backgroundColor: colors.bgCard }]} 
+                onPress={attemptBiometricUnlock}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('Unlock with Biometrics') || 'Unlock with Biometrics'}
+                accessibilityHint={t('Authenticates with device fingerprint or face to unlock') || 'Authenticates with device fingerprint or face to unlock'}
+              >
+                <IconFingerprint color={colors.primary} />
+              </TouchableOpacity>
+            );
           }
 
           if (key === 'delete') {
@@ -221,6 +308,9 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
                 style={styles.key} 
                 onPress={handleBackspace}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('Delete digit') || 'Delete digit'}
+                accessibilityHint={t('Deletes the last entered PIN digit') || 'Deletes the last entered PIN digit'}
               >
                 <IconBackspace color={colors.textSecondary} />
               </TouchableOpacity>
@@ -235,12 +325,29 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
               style={[styles.key, { backgroundColor: colors.bgCard }]} 
               onPress={() => handlePress(key)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={key}
+              accessibilityHint={t('Enters digit {{digit}}', { digit: key }) || `Enters digit ${key}`}
             >
               <Text style={[styles.keyText, { color: colors.textPrimary }]}>{key}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
+
+      {/* Forgot PIN Button */}
+      <TouchableOpacity
+        style={styles.forgotPinBtn}
+        onPress={handleForgotPinPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={t('Forgot PIN?') || 'Forgot PIN?'}
+        accessibilityHint={t('Resets your App PIN via biometric verification') || 'Resets your App PIN via biometric verification'}
+      >
+        <Text style={[styles.forgotPinText, { color: colors.primary }]}>
+          {t('Forgot PIN?') || 'Forgot PIN?'}
+        </Text>
+      </TouchableOpacity>
 
       <ConfirmModal
         isVisible={alertConfig.isVisible}
@@ -250,6 +357,22 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
         hideCancel={true}
         onConfirm={() => setAlertConfig({ isVisible: false, title: '', message: '' })}
         onCancel={() => setAlertConfig({ isVisible: false, title: '', message: '' })}
+      />
+
+      {/* Forgot PIN Confirmation Modal */}
+      <ConfirmModal
+        isVisible={forgotModalVisible}
+        title={t('Forgot PIN?') || 'Forgot PIN?'}
+        message={t('Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?') || 'Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?'}
+        confirmText={t('Reset PIN') || 'Reset PIN'}
+        cancelText={t('Cancel') || 'Cancel'}
+        isDestructive={true}
+        onConfirm={async () => {
+          setForgotModalVisible(false);
+          dispatch(setAppPin(null));
+          await handleSuccessfulUnlock();
+        }}
+        onCancel={() => setForgotModalVisible(false)}
       />
     </View>
   );
@@ -322,5 +445,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     includeFontPadding: false,
     textAlignVertical: 'center',
+  },
+  forgotPinBtn: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  forgotPinText: {
+    fontSize: 14,
+    fontWeight: '600',
   }
 });

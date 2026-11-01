@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import i18n from '../i18n';
+import { CrashLogger } from '../utils/crashLogger';
 
 export default class ScreenErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,6 +16,11 @@ export default class ScreenErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error(`[ScreenErrorBoundary] Caught error in ${this.props.screenName || 'Component'}:`, error, errorInfo);
     this.setState({ errorInfo });
+    CrashLogger.recordCrash({
+      screenName: this.props.screenName || 'ScreenErrorBoundary',
+      error,
+      errorInfo
+    });
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }

@@ -683,5 +683,18 @@
   "Your day, your rhythm": "Votre journée, votre rythme",
   "Focused on": "Focus sur",
   "Cancel focus": "Annuler le focus",
-  "Show all": "Tout afficher"
+  "Show all": "Tout afficher",
+  "Forgot PIN?": "PIN oublié ?",
+  "Reset PIN": "Réinitialiser le PIN",
+  "Reset PIN will remove the App PIN lock and allow you to access your tasks. Do you want to reset your PIN?": "La réinitialisation du code PIN supprimera le verrouillage de l'application et vous donnera accès à vos tâches. Voulez-vous réinitialiser votre code PIN ?",
+  "Unlock with Biometrics": "Déverrouiller avec la biométrie",
+  "Verify fingerprint to reset App PIN": "Vérifier l'empreinte pour réinitialiser le code PIN",
+  "Authentication Failed": "Échec de l'authentification",
+  "Biometric authentication failed. The App PIN cannot be reset without verification.": "Échec de l'authentification biométrique. Le code PIN ne peut être réinitialisé sans vérification.",
+  "Authenticate to manage App PIN": "Authentifiez-vous pour gérer le code PIN",
+  "Authenticate to change App PIN": "Authentifiez-vous pour modifier le code PIN",
+  "Authenticate with fingerprint to enable App PIN": "Authentifiez-vous avec l'empreinte pour activer le PIN",
+  "Authenticate to remove App PIN": "Authentifiez-vous avec l'empreinte pour désactiver le PIN",
+  "Biometric authentication is required to configure or change the App PIN to prevent unauthorized lockouts.": "L'authentification biométrique est requise pour configurer ou modifier le code PIN afin d'éviter tout verrouillage non autorisé.",
+  "Biometric authentication is required to turn off App PIN.": "L'authentification biométrique est requise pour désactiver le code PIN de l'application."
 }

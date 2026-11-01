@@ -30,6 +30,7 @@ import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, ge
 import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
 import PinLockScreen from './src/screens/PinLockScreen';
+import { SecurityLockHelper } from './src/utils/securityLockHelper';
 
 // Polyfill for Hermes / Reanimated warnings
 if (typeof structuredClone === 'undefined') {
@@ -119,6 +120,7 @@ function InitApp() {
   const shareIntentResult = Platform.OS !== 'web' ? useShareIntent() : null;
   const { hasShareIntent, shareIntent, resetShareIntent } = shareIntentResult || {};
   const appPin = useSelector(state => state.themeReducer?.appPin);
+  const lastBackgroundTimestampRef = useRef(null);
 
   useEffect(() => {
     const isLocked = !!(appPin && !isUnlocked);
@@ -401,9 +403,20 @@ function InitApp() {
         dispatch(performForegroundCalendarSync()).catch(() => {});
         // 2. Auto-manage overdue/completed tasks
         await dispatch(processAutoManageTasks());
+
+        // 3. Smart PIN lock on resume: only lock if minimized for more than 30 seconds and not picking an attachment or authenticating biometrically
+        if (lastBackgroundTimestampRef.current && store.getState().themeReducer?.appPin) {
+          const elapsed = Date.now() - lastBackgroundTimestampRef.current;
+          if (elapsed > 30000 && !SecurityLockHelper.isAttachmentPickerActive() && !SecurityLockHelper.isAuthenticatingBiometric()) {
+            setIsUnlocked(false);
+          }
+          lastBackgroundTimestampRef.current = null;
+        }
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
         if (nextAppState === 'background' && store.getState().themeReducer?.appPin) {
-          setIsUnlocked(false);
+          if (!SecurityLockHelper.isAttachmentPickerActive() && !SecurityLockHelper.isAuthenticatingBiometric()) {
+            lastBackgroundTimestampRef.current = Date.now();
+          }
         }
         const { flushPendingTaskSaves } = require('./src/features/taskSlice');
         const { flushPendingThemeSaves } = require('./src/features/themeSlice');
