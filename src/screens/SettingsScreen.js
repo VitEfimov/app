@@ -16,6 +16,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import PremiumModal from '../components/PremiumModal';
 import CustomDropdown from '../components/CustomDropdown';
 import PromptModal from '../components/PromptModal';
+import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
+import { exportDataAsJsonAsync, exportTasksAsCsvAsync, wipeAllUserDataAsync } from '../utils/gdprHelper';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
@@ -163,6 +165,37 @@ const IconChevronRight = ({ color = '#888', size = 18 }) => (
   </Svg>
 );
 
+const IconShield = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <Path d="M9 12l2 2 4-4" />
+  </Svg>
+);
+
+const IconDownload = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <Path d="M7 10l5 5 5-5" />
+    <Path d="M12 15V3" />
+  </Svg>
+);
+
+const IconSpreadsheet = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <Path d="M14 2v6h6" />
+    <Path d="M8 13h8" />
+    <Path d="M8 17h8" />
+  </Svg>
+);
+
+const IconTrash = ({ color = '#E53935', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 6h18" />
+    <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
+
 export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { colors, isDark, mode } = useTheme();
@@ -170,9 +203,16 @@ export default function SettingsScreen({ navigation }) {
 
   const theme = useSelector(state => state.themeReducer);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
+  const tasks = useSelector(state => state.taskReducer?.tasks || []);
+  const boards = useSelector(state => state.taskReducer?.boards || []);
+  const stats = useSelector(state => state.statsReducer || {});
+  const pomodoro = useSelector(state => state.pomodoroReducer || {});
+  const user = useSelector(state => state.userReducer || {});
 
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
+  const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isNotificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [isSoundPickerOpen, setSoundPickerOpen] = useState(false);
   const [isAlarmSoundPickerOpen, setAlarmSoundPickerOpen] = useState(false);
@@ -435,28 +475,84 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
-  const handleDeleteData = () => {
+  const handleExportJson = async () => {
+    try {
+      setIsExporting(true);
+      await exportDataAsJsonAsync({ tasks, boards, stats, pomodoro, theme, user });
+    } catch (error) {
+      console.error('Failed to export JSON:', error);
+      Alert.alert(t('Export Failed') || 'Export Failed', error?.message || String(error));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      setIsExporting(true);
+      await exportTasksAsCsvAsync({ tasks, boards });
+    } catch (error) {
+      console.error('Failed to export CSV:', error);
+      Alert.alert(t('Export Failed') || 'Export Failed', error?.message || String(error));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleEraseAllData = () => {
     setConfirmConfig({
       isVisible: true,
-      title: t('Delete All Data'),
-      message: t('Are you sure you want to clear all your tasks? This action cannot be undone.'),
-      confirmText: t('Delete'),
-      cancelText: t('Cancel'),
+      title: t('Erase All Data (GDPR Art. 17)') || 'Erase All Data (GDPR Art. 17)',
+      message: t('Are you sure you want to permanently erase all tasks, boards, settings, alarms, and history from this device? This action is irreversible.') || 'Are you sure you want to permanently erase all tasks, boards, settings, alarms, and history from this device? This action is irreversible.',
+      confirmText: t('Erase Everything') || 'Erase Everything',
+      cancelText: t('Cancel') || 'Cancel',
       isDestructive: true,
       hideCancel: false,
-      onConfirm: () => {
-        dispatch(clearTasks());
-        setConfirmConfig({
-          isVisible: true,
-          title: t('Deleted'),
-          message: t('All tasks have been cleared.'),
-          confirmText: t('OK'),
-          hideCancel: true,
-          onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
-        });
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+
+        if (theme.appPin) {
+          const isAvail = await BiometricHelper.isAvailable();
+          if (isAvail) {
+            const authResult = await BiometricHelper.authenticate({
+              promptMessage: t('Authenticate to authorize data erasure') || 'Authenticate to authorize data erasure',
+              cancelLabel: t('Cancel') || 'Cancel'
+            });
+            if (!authResult.success) {
+              setConfirmConfig({
+                isVisible: true,
+                title: t('Authentication Failed') || 'Authentication Failed',
+                message: t('Biometric authentication is required to erase all data.') || 'Biometric authentication is required to erase all data.',
+                confirmText: t('OK') || 'OK',
+                hideCancel: true,
+                onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+              });
+              return;
+            }
+          }
+        }
+
+        try {
+          await wipeAllUserDataAsync({
+            dispatch,
+            getState: () => ({ taskReducer: { tasks } })
+          });
+          setConfirmConfig({
+            isVisible: true,
+            title: t('Data Erased') || 'Data Erased',
+            message: t('All your personal data, alarms, and storage have been permanently erased.') || 'All your personal data, alarms, and storage have been permanently erased.',
+            confirmText: t('OK') || 'OK',
+            hideCancel: true,
+            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+          });
+        } catch (err) {
+          Alert.alert(t('Error') || 'Error', err?.message || String(err));
+        }
       }
     });
   };
+
+  const handleDeleteData = handleEraseAllData;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
@@ -1002,6 +1098,117 @@ export default function SettingsScreen({ navigation }) {
           </Text>
         </View>
 
+        {/* Privacy & Data (GDPR & CCPA Compliance) */}
+        <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: 24 }]}>
+          {t('Privacy & Data (GDPR)') || 'Privacy & Data (GDPR)'}
+        </Text>
+
+        <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+          {/* Privacy Policy */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setPrivacyModalVisible(true)}
+            style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('Privacy & Security Policy') || 'Privacy & Security Policy'}. ${t('Local storage, AES-256 encryption, zero ad trackers') || 'Local storage, AES-256 encryption, zero ad trackers'}`}
+            accessibilityHint={t('Opens privacy policy and data protection disclosures') || 'Opens privacy policy and data protection disclosures'}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+              <IconShield color={primaryAccent} />
+            </View>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Privacy & Security Policy') || 'Privacy & Security Policy'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {t('Local storage, AES-256 encryption, zero ad trackers') || 'Local storage, AES-256 encryption, zero ad trackers'}
+              </Text>
+            </View>
+            <IconChevronRight color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Export JSON (GDPR Art. 20 Data Portability) */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            disabled={isExporting}
+            onPress={handleExportJson}
+            style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('Export All Data (JSON)') || 'Export All Data (JSON)'}. ${t('GDPR Art. 20 Data Portability · Full JSON backup') || 'GDPR Art. 20 Data Portability · Full JSON backup'}`}
+            accessibilityHint={t('Exports complete data backup as a JSON file') || 'Exports complete data backup as a JSON file'}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+              <IconDownload color={primaryAccent} />
+            </View>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Export All Data (JSON)') || 'Export All Data (JSON)'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {t('GDPR Art. 20 Data Portability · Full JSON backup') || 'GDPR Art. 20 Data Portability · Full JSON backup'}
+              </Text>
+            </View>
+            <IconChevronRight color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Export CSV (Spreadsheet) */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            disabled={isExporting}
+            onPress={handleExportCsv}
+            style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('Export Tasks (CSV)') || 'Export Tasks (CSV)'}. ${t('Formatted for spreadsheets · Excel, Sheets, Numbers') || 'Formatted for spreadsheets · Excel, Sheets, Numbers'}`}
+            accessibilityHint={t('Exports tasks as a CSV spreadsheet') || 'Exports tasks as a CSV spreadsheet'}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+              <IconSpreadsheet color={primaryAccent} />
+            </View>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Export Tasks (CSV)') || 'Export Tasks (CSV)'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {t('Formatted for spreadsheets · Excel, Sheets, Numbers') || 'Formatted for spreadsheets · Excel, Sheets, Numbers'}
+              </Text>
+            </View>
+            <IconChevronRight color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Erase All Data & Reset (GDPR Art. 17 Right to Erasure) */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={handleEraseAllData}
+            style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('Erase All Data & Reset') || 'Erase All Data & Reset'}. ${t('GDPR Art. 17 Right to Erasure · Permanent wipe') || 'GDPR Art. 17 Right to Erasure · Permanent wipe'}`}
+            accessibilityHint={t('Permanently deletes all tasks, lists, settings and resets the app') || 'Permanently deletes all tasks, lists, settings and resets the app'}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: isDark ? 'rgba(229, 57, 53, 0.15)' : '#FFEBEE' }]} accessible={false} importantForAccessibility="no">
+              <IconTrash color="#E53935" />
+            </View>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[styles.itemTitle, { color: '#E53935' }]}>
+                {t('Erase All Data & Reset') || 'Erase All Data & Reset'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {t('GDPR Art. 17 Right to Erasure · Permanent wipe') || 'GDPR Art. 17 Right to Erasure · Permanent wipe'}
+              </Text>
+            </View>
+            <IconChevronRight color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
         {/* More Options / Advanced Card */}
         <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: 24 }]}>
           {t('More') || 'More'}
@@ -1080,6 +1287,11 @@ export default function SettingsScreen({ navigation }) {
         submitText={t('Save') || 'Save'}
         maxLength={4}
         keyboardType="numeric"
+      />
+
+      <PrivacyPolicyModal
+        isVisible={isPrivacyModalVisible}
+        onClose={() => setPrivacyModalVisible(false)}
       />
 
       <ConfirmModal

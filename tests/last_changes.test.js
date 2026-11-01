@@ -861,3 +861,312 @@ describe('OWASP MASVS Security Standards (Data-at-Rest & Screen Privacy)', () =>
     assert.strictEqual(isSec, true);
   });
 });
+
+// ==============================================================================
+// TEST SUITE 10: GDPR Data Portability, Right to Erasure & Privacy Compliance
+// ==============================================================================
+describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
+  let gdprHelper;
+  let writtenFiles;
+  let sharedFiles;
+  let fallbackShares;
+  let cancelledAlarms;
+  let notificationsCancelled;
+  let storageCleared;
+  let cryptoStorageCleared;
+  let dispatchedActions;
+  let isSharingAvailable;
+
+  beforeEach(() => {
+    writtenFiles = {};
+    sharedFiles = [];
+    fallbackShares = [];
+    cancelledAlarms = [];
+    notificationsCancelled = false;
+    storageCleared = false;
+    cryptoStorageCleared = false;
+    dispatchedActions = [];
+    isSharingAvailable = true;
+
+    gdprHelper = loadTranspiledModule(path.resolve('src/utils/gdprHelper.js'), {
+      'expo-file-system': {
+        cacheDirectory: 'file:///data/user/0/com.taskcalendar/cache/',
+        documentDirectory: 'file:///data/user/0/com.taskcalendar/files/',
+        EncodingType: { UTF8: 'utf8' },
+        writeAsStringAsync: async (uri, content) => {
+          writtenFiles[uri] = content;
+        }
+      },
+      'expo-sharing': {
+        isAvailableAsync: async () => isSharingAvailable,
+        shareAsync: async (uri, opts) => {
+          sharedFiles.push({ uri, opts });
+        }
+      },
+      'expo-notifications': {
+        cancelAllScheduledNotificationsAsync: async () => {
+          notificationsCancelled = true;
+        }
+      },
+      'react-native': {
+        Platform: { OS: 'android' },
+        Share: {
+          share: async (content) => {
+            fallbackShares.push(content);
+          }
+        }
+      },
+      '@react-native-async-storage/async-storage': {
+        clear: async () => {
+          storageCleared = true;
+        }
+      },
+      './cryptoStorage': {
+        CryptoStorage: {
+          clear: async () => {
+            cryptoStorageCleared = true;
+          }
+        }
+      },
+      '../../modules/expo-task-alarm': {
+        cancelAlarm: async (id) => {
+          cancelledAlarms.push(id);
+        }
+      },
+      '../features/taskSlice': {
+        clearTasks: () => ({ type: 'task/clearTasks' })
+      },
+      '../features/themeSlice': {
+        resetTheme: () => ({ type: 'theme/resetTheme' })
+      },
+      '../features/userSlice': {
+        logout: () => ({ type: 'user/logout' })
+      }
+    });
+  });
+
+  test('exportDataAsJsonAsync creates valid JSON containing full user dataset and invokes sharing', async () => {
+    const tasks = [
+      {
+        id: 't-1',
+        taskname: 'Quarterly Review',
+        completed: false,
+        priority: 'high',
+        completionDate: '2026-11-15',
+        time: '14:00',
+        boardId: 'b-work',
+        reminder: '30 min before',
+        isAlarm: true,
+        isRecurring: true,
+        repeatConfig: { preset: 'Weekly', interval: 1 },
+        notes: 'Prepare slide deck',
+        subtasks: [{ id: 's-1', title: 'Collect metrics', completed: true }]
+      }
+    ];
+    const boards = [{ id: 'b-work', name: 'Work Projects', color: '#5D45DB' }];
+    const stats = { completedCount: 42, streak: 7 };
+    const pomodoro = { completedSessions: 12 };
+    const theme = { themeMode: 'dark', fontSize: 'large', defaultReminderTime: '30 min before' };
+    const user = { userEmail: 'user@example.com', isGuest: false };
+
+    const result = await gdprHelper.exportDataAsJsonAsync({ tasks, boards, stats, pomodoro, theme, user });
+    assert.strictEqual(result.success, true);
+    assert.ok(result.filename.startsWith('taskcalendar_export_'));
+    assert.ok(result.filename.endsWith('.json'));
+
+    // Check file content
+    const content = writtenFiles[result.uri];
+    assert.ok(content, 'File was written to cache directory');
+    const parsed = JSON.parse(content);
+
+    assert.strictEqual(parsed.app, 'TaskCalendar');
+    assert.strictEqual(parsed.schemaVersion, 1);
+    assert.strictEqual(parsed.account.email, 'user@example.com');
+    assert.strictEqual(parsed.boards.length, 1);
+    assert.strictEqual(parsed.boards[0].name, 'Work Projects');
+    assert.strictEqual(parsed.tasks.length, 1);
+    assert.strictEqual(parsed.tasks[0].taskname, 'Quarterly Review');
+    assert.strictEqual(parsed.tasks[0].subtasks.length, 1);
+    assert.strictEqual(parsed.tasks[0].subtasks[0].title, 'Collect metrics');
+    assert.strictEqual(parsed.preferences.themeMode, 'dark');
+
+    // Check native sharing was invoked
+    assert.strictEqual(sharedFiles.length, 1);
+    assert.strictEqual(sharedFiles[0].uri, result.uri);
+    assert.strictEqual(sharedFiles[0].opts.mimeType, 'application/json');
+  });
+
+  test('exportDataAsJsonAsync falls back to Share.share when expo-sharing is unavailable', async () => {
+    isSharingAvailable = false;
+    const result = await gdprHelper.exportDataAsJsonAsync({ tasks: [], boards: [] });
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(fallbackShares.length, 1);
+    assert.ok(fallbackShares[0].title.startsWith('taskcalendar_export_'));
+  });
+
+  test('exportTasksAsCsvAsync produces RFC 4180 compliant CSV with proper escaping', async () => {
+    const tasks = [
+      {
+        id: 't-101',
+        taskname: 'Meeting with "VIP" clients, urgent',
+        completed: true,
+        priority: 'high',
+        completionDate: '2026-11-02',
+        time: '09:00 AM',
+        boardId: 'b-1',
+        isRecurring: false,
+        notes: 'Line 1\nLine 2 with "quotes" and, commas',
+        subtasks: [
+          { id: 'sub-1', title: 'Part A', completed: true },
+          { id: 'sub-2', title: 'Part B', completed: false }
+        ]
+      },
+      {
+        id: 't-102',
+        taskname: 'Simple Task',
+        completed: false,
+        priority: 'normal',
+        boardId: 'non-existent-board'
+      }
+    ];
+    const boards = [{ id: 'b-1', name: 'Executive Team' }];
+
+    const result = await gdprHelper.exportTasksAsCsvAsync({ tasks, boards });
+    assert.strictEqual(result.success, true);
+    assert.ok(result.filename.startsWith('taskcalendar_tasks_'));
+    assert.ok(result.filename.endsWith('.csv'));
+
+    const content = writtenFiles[result.uri];
+    assert.ok(content);
+    const lines = content.split('\n');
+
+    // Header check
+    assert.strictEqual(lines[0], 'Task ID,Task Name,Status,Priority,Due Date,Due Time,Board,Recurring,Subtasks Total,Subtasks Completed,Notes');
+
+    // Row 1 checks: quotes doubled, comma escaped, subtasks 2 total 1 completed
+    assert.ok(content.includes('""VIP"" clients, urgent'));
+    assert.ok(content.includes('"Executive Team"'));
+    assert.ok(content.includes('"Completed"'));
+    assert.ok(content.includes('"2","1"'));
+
+    // Check share call
+    assert.strictEqual(sharedFiles.length, 1);
+    assert.strictEqual(sharedFiles[0].opts.mimeType, 'text/csv');
+  });
+
+  test('wipeAllUserDataAsync executes complete GDPR Art. 17 data erasure', async () => {
+    const mockTasks = [
+      { id: 'task-1', isAlarm: true },
+      { id: 'task-2', isAlarm: false }
+    ];
+    const mockGetState = () => ({
+      taskReducer: { tasks: mockTasks }
+    });
+    const mockDispatch = (action) => {
+      dispatchedActions.push(action);
+    };
+
+    const wipeResult = await gdprHelper.wipeAllUserDataAsync({
+      dispatch: mockDispatch,
+      getState: mockGetState
+    });
+
+    assert.strictEqual(wipeResult.success, true);
+
+    // 1. Notifications cancelled
+    assert.strictEqual(notificationsCancelled, true);
+
+    // 2. Active task alarms cancelled
+    assert.ok(cancelledAlarms.includes('task-1'));
+    assert.ok(cancelledAlarms.includes('task-2'));
+
+    // 3. Storage wiped
+    assert.strictEqual(cryptoStorageCleared, true);
+    assert.strictEqual(storageCleared, true);
+
+    // 4. Redux states reset
+    const actionTypes = dispatchedActions.map(a => a.type);
+    assert.ok(actionTypes.includes('task/clearTasks'));
+    assert.ok(actionTypes.includes('theme/resetTheme'));
+    assert.ok(actionTypes.includes('user/logout'));
+  });
+
+  test('PRIVACY_POLICY_DISCLOSURES provides 5 structured transparency items', () => {
+    const disclosures = gdprHelper.PRIVACY_POLICY_DISCLOSURES;
+    assert.strictEqual(disclosures.length, 5);
+
+    const ids = disclosures.map(d => d.id);
+    assert.deepStrictEqual(ids, ['ownership', 'encryption', 'no_trackers', 'biometrics', 'gdpr_rights']);
+
+    for (const item of disclosures) {
+      assert.ok(item.title && typeof item.title === 'string' && item.title.length > 5);
+      assert.ok(item.text && typeof item.text === 'string' && item.text.length > 20);
+    }
+  });
+
+  test('100% localization key parity and presence of all GDPR strings across all 10 locales', () => {
+    const localesDir = path.resolve('src/locales');
+    const languages = ['en', 'ru', 'es', 'fr', 'de', 'it', 'ja', 'ko', 'zh', 'hi'];
+
+    const loadedLocales = {};
+    for (const lang of languages) {
+      const filePath = path.join(localesDir, `${lang}.json`);
+      assert.ok(fs.existsSync(filePath), `Locale file for ${lang} must exist`);
+      const raw = fs.readFileSync(filePath, 'utf8');
+      loadedLocales[lang] = JSON.parse(raw);
+    }
+
+    const enKeys = Object.keys(loadedLocales['en']);
+    assert.strictEqual(enKeys.length, 728, 'English locale must contain exactly 728 keys');
+
+    // Required GDPR keys to check
+    const requiredGdprKeys = [
+      'Privacy & Data (GDPR)',
+      'Privacy & Security Policy',
+      'Local storage, AES-256 encryption, zero ad trackers',
+      'Export All Data (JSON)',
+      'GDPR Art. 20 Data Portability · Full JSON backup',
+      'Export Tasks (CSV)',
+      'Formatted for spreadsheets · Excel, Sheets, Numbers',
+      'Erase All Data & Reset',
+      'GDPR Art. 17 Right to Erasure · Permanent wipe',
+      'Privacy & Data Protection',
+      'GDPR & CCPA Transparency Notice',
+      'Got it',
+      'Erase All Data (GDPR Art. 17)',
+      'Are you sure you want to permanently erase all tasks, boards, settings, alarms, and history from this device? This action is irreversible.',
+      'Erase Everything',
+      'Data Erased',
+      'All your personal data, alarms, and storage have been permanently erased.',
+      'Authenticate to authorize data erasure',
+      'Biometric authentication is required to erase all data.',
+      'Export Failed',
+      'Data Ownership & Local Storage',
+      'You own 100% of your data. TaskCalendar is built on a local-first architecture. Your tasks, lists, notes, and habits are stored directly on your device rather than on third-party servers.',
+      'AES-256 Storage Encryption at Rest',
+      'All task records, descriptions, and user configurations saved on this device are encrypted at rest using industry-standard AES-256 CTR and HMAC-SHA256 authenticated encryption.',
+      'Zero Third-Party Ad Trackers',
+      'We never sell, rent, or monetize your personal data. The app contains zero advertising SDKs, tracking pixels, or commercial telemetry beacons.',
+      'Hardware-Enclave Biometric Security',
+      'Biometric authentication (fingerprint) operates exclusively through your device hardware Secure Enclave / KeyStore. Biometric samples are never captured, read, or transmitted by this app.',
+      'Your GDPR & CCPA Rights',
+      'In compliance with GDPR Articles 17 and 20 and the California Consumer Privacy Act (CCPA), you can export your complete personal data in standard JSON or CSV format (Data Portability) or permanently erase all your data (Right to Erasure) at any time from this Settings menu.'
+    ];
+
+    for (const lang of languages) {
+      const keys = Object.keys(loadedLocales[lang]);
+      assert.strictEqual(
+        keys.length,
+        enKeys.length,
+        `Locale ${lang} must have exactly ${enKeys.length} keys (has ${keys.length})`
+      );
+
+      for (const gdprKey of requiredGdprKeys) {
+        assert.ok(
+          loadedLocales[lang][gdprKey] !== undefined && loadedLocales[lang][gdprKey].trim().length > 0,
+          `Key "${gdprKey}" missing or empty in locale ${lang}`
+        );
+      }
+    }
+  });
+});
