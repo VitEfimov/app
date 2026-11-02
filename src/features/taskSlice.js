@@ -142,7 +142,7 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
     const sortedLocal = sortTasksChronologically(localTasks);
     const serializedLocal = JSON.stringify(sortedLocal);
     await CryptoStorage.setItem(taskKey, serializedLocal);
-    if (taskKey !== 'tasks') {
+    if (taskKey !== 'tasks' && Platform.OS !== 'web') {
         await CryptoStorage.setItem('tasks', serializedLocal);
     }
     return sortedLocal;
@@ -595,7 +595,7 @@ export const persistTasksToStorage = (tasks, getState) => {
                 }
                 const serialized = JSON.stringify(lastTasksToSave);
                 await CryptoStorage.setItem(key, serialized);
-                if (key !== 'tasks') {
+                if (key !== 'tasks' && Platform.OS !== 'web') {
                     await CryptoStorage.setItem('tasks', serialized);
                 }
             }

@@ -249,7 +249,7 @@ export default function SettingsScreen({ navigation }) {
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
-  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(true);
+  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {

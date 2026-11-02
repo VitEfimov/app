@@ -355,6 +355,96 @@ describe('TaskRow Inline Focus & Cancellation', () => {
     });
     assert.strictEqual(edit2Called, true);
   });
+
+  test('Privacy & Data (GDPR) in SettingsScreen is collapsed by default', () => {
+    const settingsPath = path.resolve('src/screens/SettingsScreen.js');
+    const content = fs.readFileSync(settingsPath, 'utf8');
+    assert.match(
+      content,
+      /const\s*\[isPrivacyExpanded,\s*setIsPrivacyExpanded\]\s*=\s*useState\(false\)/,
+      'Privacy & Data section must be collapsed (useState(false)) by default'
+    );
+  });
+
+  test('TaskRow due date tap and row tap trigger onPress to open TaskDetailsModal', () => {
+    const taskRowPath = path.resolve('src/components/TaskRow.js');
+    const content = fs.readFileSync(taskRowPath, 'utf8');
+
+    // 1. Task name touchable is bounded (alignSelf: 'flex-start') so it does not intercept row taps
+    assert.match(
+      content,
+      /alignSelf:\s*['"]flex-start['"]/,
+      'Task name touchable must be bounded (alignSelf: flex-start) so inline edit is only triggered on the text itself'
+    );
+
+    // 2. Due date supports completionDate, dateString, dueDate, and date
+    assert.match(
+      content,
+      /const\s+rawDueDate\s*=\s*task\.completionDate\s*\|\|\s*task\.dateString\s*\|\|\s*task\.dueDate\s*\|\|\s*task\.date/,
+      'TaskRow must resolve due date across completionDate, dateString, dueDate, and date'
+    );
+
+    // 3. Due date metadata touchable triggers onPress(task) to open edit task modal
+    assert.match(
+      content,
+      /if\s*\(\s*onPress\s*\)\s*onPress\s*\(\s*task\s*\)/,
+      'Metadata due date must dispatch onPress(task)'
+    );
+  });
+
+  test('user cannot change task name inline on completed section, opens edit task modal instead', () => {
+    const taskRowPath = path.resolve('src/components/TaskRow.js');
+    const content = fs.readFileSync(taskRowPath, 'utf8');
+
+    // Asserts isCompletedSection check
+    assert.match(
+      content,
+      /const\s+isCompletedSection\s*=\s*sectionId\s*===\s*['"]completed['"]\s*\|\|\s*!!task\?\.completed/,
+      'TaskRow must identify completed section or completed task'
+    );
+
+    // Asserts inline edit bypass for completed tasks
+    assert.match(
+      content,
+      /if\s*\(\s*disableInlineEdit\s*\|\|\s*isCompletedSection\s*\)\s*\{\s*if\s*\(\s*onPress\s*\)\s*onPress\s*\(\s*task\s*\);\s*return;\s*\}/,
+      'Tapping task name on completed section must bypass inline edit and trigger onPress(task)'
+    );
+
+    // Behavioral simulation
+    let inlineEditTriggered = false;
+    let editModalOpened = false;
+
+    function simulateTextPress({ task, sectionId, disableInlineEdit, onPress }) {
+      const isCompletedSection = sectionId === 'completed' || !!task?.completed;
+      if (disableInlineEdit || isCompletedSection) {
+        if (onPress) onPress(task);
+        return;
+      }
+      inlineEditTriggered = true;
+    }
+
+    // 1. Incompleted task in 'today' section allows inline edit
+    simulateTextPress({
+      task: { id: 't1', taskname: 'Active task', completed: false },
+      sectionId: 'today',
+      disableInlineEdit: false,
+      onPress: () => { editModalOpened = true; }
+    });
+    assert.strictEqual(inlineEditTriggered, true);
+    assert.strictEqual(editModalOpened, false);
+
+    // 2. Task in 'completed' section disables inline edit and opens modal
+    inlineEditTriggered = false;
+    editModalOpened = false;
+    simulateTextPress({
+      task: { id: 't2', taskname: 'Done task', completed: true },
+      sectionId: 'completed',
+      disableInlineEdit: false,
+      onPress: () => { editModalOpened = true; }
+    });
+    assert.strictEqual(inlineEditTriggered, false);
+    assert.strictEqual(editModalOpened, true);
+  });
 });
 
 // ==============================================================================

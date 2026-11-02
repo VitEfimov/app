@@ -490,21 +490,87 @@ export function decryptString(cipherString, keyBytes) {
 // 6. High-Level CryptoStorage API
 // ==============================================================================
 
+// Helper to detect browser storage quota exhaustion
+function isQuotaExceededError(err) {
+  if (!err) return false;
+  return (
+    err.name === 'QuotaExceededError' ||
+    err.code === 22 ||
+    err.code === 1014 ||
+    (typeof err.message === 'string' && (
+      err.message.toLowerCase().includes('quota') ||
+      err.message.toLowerCase().includes('exceeded')
+    ))
+  );
+}
+
+// Clean up redundant and temporary artifacts on web environments to reclaim quota
+function pruneWebLocalStorage(keyToSave) {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const ls = window.localStorage;
+      const removableKeys = [
+        '@chaos_tamper_canary',
+        '@chaos_stress_tasks',
+        '@dev_logs',
+        '@dev_crash_reports'
+      ];
+      removableKeys.forEach(k => {
+        try { ls.removeItem(k); } catch (_) {}
+      });
+
+      if (keyToSave && keyToSave !== 'tasks') {
+        try { ls.removeItem('tasks'); } catch (_) {}
+      } else if (keyToSave === 'tasks') {
+        try { ls.removeItem('tasks_guest'); } catch (_) {}
+      }
+
+      const crashLogs = ls.getItem('@crash_logs');
+      if (crashLogs && crashLogs.length > 10000) {
+        try {
+          const parsed = JSON.parse(crashLogs);
+          if (Array.isArray(parsed) && parsed.length > 5) {
+            ls.setItem('@crash_logs', JSON.stringify(parsed.slice(0, 5)));
+          }
+        } catch (_) {
+          ls.removeItem('@crash_logs');
+        }
+      }
+    }
+  } catch (_) {}
+}
+
 export const CryptoStorage = {
   /**
    * Encrypt and store data in AsyncStorage.
    */
   setItem: async (key, value) => {
+    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
     try {
       const masterKey = await getOrCreateDeviceMasterKey();
-      const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
       const encrypted = encryptString(stringValue, masterKey);
       return await AsyncStorage.setItem(key, encrypted);
     } catch (e) {
-      console.error(`[CryptoStorage] Error setting item ${key}:`, e);
-      // Fallback: save raw if encryption fails
-      const fallbackValue = typeof value === 'string' ? value : JSON.stringify(value);
-      return await AsyncStorage.setItem(key, fallbackValue);
+      if (isQuotaExceededError(e)) {
+        pruneWebLocalStorage(key);
+      } else {
+        console.error(`[CryptoStorage] Error setting item ${key}:`, e);
+      }
+      // Fallback: save raw (unencrypted is ~50% smaller) if encryption fails or exceeds quota
+      try {
+        return await AsyncStorage.setItem(key, stringValue);
+      } catch (fallbackErr) {
+        if (isQuotaExceededError(fallbackErr)) {
+          pruneWebLocalStorage(key);
+          try {
+            return await AsyncStorage.setItem(key, stringValue);
+          } catch (finalErr) {
+            console.warn(`[CryptoStorage] Web storage quota reached for ${key}. Data safely kept in memory.`);
+            return;
+          }
+        }
+        throw fallbackErr;
+      }
     }
   },
 

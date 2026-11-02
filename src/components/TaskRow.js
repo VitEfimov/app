@@ -357,12 +357,14 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
     );
   }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.borderColor, colors.textPrimary, colors.textSecondary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore, hideUnderline]);
 
+  const isCompletedSection = sectionId === 'completed' || !!task?.completed;
+
   const handleTextPress = useCallback(() => {
     if (isSelectionMode) {
       if (onToggleSelect && task) onToggleSelect(task.id, sectionId);
       return;
     }
-    if (disableInlineEdit) {
+    if (disableInlineEdit || isCompletedSection) {
       if (onPress) onPress(task);
       return;
     }
@@ -370,7 +372,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
     setEditName(taskTitleText);
     setCursorSelection({ start: taskTitleText.length, end: taskTitleText.length });
     setIsEditing(true);
-  }, [isSelectionMode, onToggleSelect, sectionId, disableInlineEdit, onPress, taskTitleText, task]);
+  }, [isSelectionMode, onToggleSelect, sectionId, disableInlineEdit, isCompletedSection, onPress, taskTitleText, task]);
 
   const submitEdit = useCallback(() => {
     setIsEditing(false);
@@ -429,6 +431,8 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
     }
   };
 
+  const rawDueDate = task.completionDate || task.dateString || task.dueDate || task.date;
+  const isDueDateValid = !!(rawDueDate && dayjs(rawDueDate).isValid());
   const priorityColor = getPriorityColor(task.priority);
   const hasNotes = (task.description?.text && task.description.text.trim() !== '') || (task.description?.img && task.description.img.trim() !== '') || (task.description?.attachments && task.description.attachments.length > 0);
   const subtasks = task.subtasks || [];
@@ -557,10 +561,10 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
               activeOpacity={0.7} 
               onPress={handleTextPress} 
               onLongPress={handleLongPress} 
-              style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}
+              style={{ alignSelf: 'flex-start', maxWidth: '100%', justifyContent: 'center' }}
               accessibilityRole="button"
               accessibilityLabel={task.taskname || task.name}
-              accessibilityHint={t('Double tap to edit task name') || 'Double tap to edit task name'}
+              accessibilityHint={isCompletedSection ? (t('Double tap to view or edit task details') || 'Double tap to view or edit task details') : (t('Double tap to edit task name') || 'Double tap to edit task name')}
             >
               <Text
                 testID="task_name_text"
@@ -625,29 +629,36 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
             </View>
           ) : null}
 
-          {task.completionDate && dayjs(task.completionDate).isValid() && dayjs(task.completionDate).year() !== dayjs().year() ? (
+          {isDueDateValid && dayjs(rawDueDate).year() !== dayjs().year() ? (
             <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
-              {dayjs(task.completionDate).format('YYYY')}
+              {dayjs(rawDueDate).format('YYYY')}
             </Text>
           ) : null}
         </View>
       </View>
 
       {/* Region 4: Metadata (Date) - Aligned with section header kebab menu */}
-      {(!hideDate && task.completionDate && dayjs(task.completionDate).isValid()) ? (
+      {(!hideDate && isDueDateValid) ? (
         <TouchableOpacity
           style={styles.metadata}
-          onPress={() => {
+          onPress={(e) => {
+            e?.stopPropagation?.();
+            closeOpenSwipeableRow();
             if (isSelectionMode) {
               if (onToggleSelect) onToggleSelect(task.id, sectionId);
               return;
             }
+            if (isEditing) {
+              submitEdit();
+            }
             if (onPress) onPress(task);
           }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('Due') || 'Due'}: ${dayjs(rawDueDate).format('MMM D')}`}
         >
           <Text style={[styles.date, { color: colors.textPrimary }]}>
-            {dayjs(task.completionDate).format('MMM D')}
+            {dayjs(rawDueDate).format('MMM D')}
           </Text>
         </TouchableOpacity>
       ) : null}
