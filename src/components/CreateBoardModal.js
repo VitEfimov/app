@@ -166,7 +166,7 @@ export default function CreateBoardModal({
     {
       id: 'expenses',
       title: t('Expenses & Bills') || 'Expenses & Bills',
-      badge: t('Budget Tracker') || 'Budget Tracker',
+      badge: `${t('Date-driven')} · ${t('Auto-repeat')}`,
       desc: t('Track monthly bills, recurring expenses, paid vs due amounts with live totals.') || 'Track monthly bills, recurring expenses, paid vs due amounts with live totals.',
       Icon: IconReceipt,
       defaultColor: '#EF4444',
@@ -200,15 +200,19 @@ export default function CreateBoardModal({
   const handleCreate = () => {
     const trimmed = boardName.trim();
     if (!trimmed) return;
+    const isExpenses = selectedType === 'expenses';
     onSubmit({
       name: trimmed,
       type: selectedType,
       color: selectedColor,
-      repeatConfig: isEvents ? repeatConfig : null,
+      repeatConfig: isEvents ? repeatConfig : (isExpenses ? { preset: 'every_month' } : null),
       repeatDuration: isEvents ? {
         count: parseInt(repeatDurationCount, 10) || 6,
         unit: repeatDurationUnit
-      } : null
+      } : (isExpenses ? {
+        count: 12,
+        unit: 'month'
+      } : null)
     });
     setBoardName('');
     setSelectedType('standard');

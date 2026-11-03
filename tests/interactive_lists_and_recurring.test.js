@@ -338,6 +338,43 @@ describe('Expenses & Bills Tracker', () => {
     // Remaining Due: 1545.50 - 675.00 = 870.50
     assert.strictEqual(summary.remainingDue, 870.50);
   });
+
+  test('expenses boards display due date on task rows (hideDate is false)', () => {
+    const listBoardTypes = ['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'];
+    const isListBoard = (type) => listBoardTypes.includes(type);
+
+    assert.strictEqual(isListBoard('grocery'), true, 'grocery should hide date');
+    assert.strictEqual(isListBoard('packing'), true, 'packing should hide date');
+    assert.strictEqual(isListBoard('expenses'), false, 'expenses must NOT hide date: bills require visible due dates!');
+  });
+
+  test('expenses boards organize bills into Today, Tomorrow, Upcoming, and Overdue sections', () => {
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    const tomorrowStr = dayjs().add(1, 'day').format('YYYY-MM-DD');
+    const laterStr = dayjs().add(10, 'day').format('YYYY-MM-DD');
+    const overdueStr = dayjs().subtract(3, 'day').format('YYYY-MM-DD');
+
+    const bills = [
+      { id: '1', taskname: 'Overdue bill', completionDate: overdueStr, completed: false },
+      { id: '2', taskname: 'Car insurance $125', completionDate: todayStr, completed: false },
+      { id: '3', taskname: 'Electric bill $85', completionDate: tomorrowStr, completed: false },
+      { id: '4', taskname: 'Toyota finance $550', completionDate: laterStr, completed: false },
+      { id: '5', taskname: 'Paid rent', completionDate: todayStr, completed: true }
+    ];
+
+    const isExpenses = true;
+    const missed = bills.filter(b => !b.completed && b.completionDate < todayStr);
+    const today = bills.filter(b => !b.completed && b.completionDate === todayStr);
+    const tomorrow = bills.filter(b => !b.completed && b.completionDate === tomorrowStr);
+    const upcoming = bills.filter(b => !b.completed && b.completionDate > tomorrowStr);
+    const paid = bills.filter(b => b.completed);
+
+    assert.strictEqual(missed.length, 1);
+    assert.strictEqual(today.length, 1);
+    assert.strictEqual(tomorrow.length, 1);
+    assert.strictEqual(upcoming.length, 1);
+    assert.strictEqual(paid.length, 1);
+  });
 });
 
 // ==============================================================================

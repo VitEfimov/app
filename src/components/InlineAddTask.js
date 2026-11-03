@@ -134,14 +134,15 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
     const targetBoardId = selectedBoardId || activeBoardId || 'main';
     const activeBoard = boards.find(b => b.id === targetBoardId);
     const isEventsBoard = activeBoard?.type === 'birthdays' || activeBoard?.type === 'events' || (activeBoard?.name && activeBoard.name.toLowerCase() === 'events');
-    const boardRepeatConfig = activeBoard?.repeatConfig || (isEventsBoard ? { preset: 'every_year' } : null);
+    const isExpensesBoard = activeBoard?.type === 'expenses';
+    const boardRepeatConfig = activeBoard?.repeatConfig || (isEventsBoard ? { preset: 'every_year' } : (isExpensesBoard ? { preset: 'every_month' } : null));
     const hasDefaultRepeat = Boolean(boardRepeatConfig && boardRepeatConfig.preset && boardRepeatConfig.preset !== 'None');
 
     const startDateStr = dayjs(selectedDate).format('YYYY-MM-DD');
     let endDateStr = startDateStr;
     if (hasDefaultRepeat) {
-      const dur = activeBoard?.repeatDuration || { count: 10, unit: 'year' };
-      const count = parseInt(dur.count, 10) || (boardRepeatConfig.preset === 'every_year' ? 10 : 1);
+      const dur = activeBoard?.repeatDuration || (isExpensesBoard ? { count: 12, unit: 'month' } : { count: 10, unit: 'year' });
+      const count = parseInt(dur.count, 10) || (boardRepeatConfig.preset === 'every_year' ? 10 : 12);
       const unit = dur.unit || (boardRepeatConfig.preset === 'every_year' ? 'year' : 'month');
       endDateStr = dayjs(selectedDate).add(count, unit).format('YYYY-MM-DD');
     }

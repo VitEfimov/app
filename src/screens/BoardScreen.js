@@ -690,7 +690,7 @@ export default function BoardScreen({ route, navigation }) {
     const isCompletedCollapsed = collapsedSections.includes('completed');
     const actualCompletedCount = completedTasks.length > 0 ? completedTasks.length : completedCount;
 
-    if (['simple_list', 'shopping', 'grocery', 'expenses', 'packing', 'habits', 'media'].includes(activeBoard?.type)) {
+    if (['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeBoard?.type)) {
       let listUncompleted = todoTasks.filter(t => !missedTasks.some(m => (m.id || m._id) === (t.id || t._id)));
       if (['packing', 'habits', 'media'].includes(activeBoard?.type) && listFilterCategory !== 'All') {
         listUncompleted = listUncompleted.filter(t => {
@@ -707,9 +707,6 @@ export default function BoardScreen({ route, navigation }) {
       if (activeBoard?.type === 'grocery' || activeBoard?.type === 'shopping') {
         todoTitle = t('To Buy') || 'To Buy';
         doneTitle = t('In Cart') || 'In Cart';
-      } else if (activeBoard?.type === 'expenses') {
-        todoTitle = t('Bills Due') || 'Bills Due';
-        doneTitle = t('Paid Bills') || 'Paid Bills';
       } else if (activeBoard?.type === 'packing') {
         todoTitle = t('To Pack') || 'To Pack';
         doneTitle = t('Packed') || 'Packed';
@@ -728,14 +725,58 @@ export default function BoardScreen({ route, navigation }) {
       ];
     }
 
+    const isExpenses = activeBoard?.type === 'expenses';
+
     return [
-      ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
-      { id: 'today', title: t('Today'), data: collapsedSections.includes('today') ? [] : todayTasks, count: todayTasks.length, color: '#ff9800' },
-      { id: 'tomorrow', title: t('Tomorrow'), data: collapsedSections.includes('tomorrow') ? [] : tomorrowTasks, count: tomorrowTasks.length, color: '#2196f3' },
-      { id: 'on-this-week', title: t('This week'), data: collapsedSections.includes('on-this-week') ? [] : thisWeekTasks, count: thisWeekTasks.length, color: '#9c27b0' },
-      { id: 'on-next-week', title: t('Next week'), data: collapsedSections.includes('on-next-week') ? [] : nextWeekTasks, count: nextWeekTasks.length, color: '#009688' },
-      { id: 'later', title: t('Upcoming'), data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
-      ...(actualCompletedCount > 0 ? [{ id: 'completed', title: t('Completed'), data: isCompletedCollapsed ? [] : completedTasks, count: actualCompletedCount, color: '#4caf50' }] : []),
+      ...(missedTasks.length > 0 ? [{
+        id: 'missed',
+        title: isExpenses ? (t('Overdue Bills') || 'Overdue Bills') : t('Missed tasks'),
+        data: collapsedSections.includes('missed') ? [] : missedTasks,
+        count: missedTasks.length,
+        color: '#f44336'
+      }] : []),
+      {
+        id: 'today',
+        title: t('Today'),
+        data: collapsedSections.includes('today') ? [] : todayTasks,
+        count: todayTasks.length,
+        color: '#ff9800'
+      },
+      {
+        id: 'tomorrow',
+        title: t('Tomorrow'),
+        data: collapsedSections.includes('tomorrow') ? [] : tomorrowTasks,
+        count: tomorrowTasks.length,
+        color: '#2196f3'
+      },
+      {
+        id: 'on-this-week',
+        title: t('This week'),
+        data: collapsedSections.includes('on-this-week') ? [] : thisWeekTasks,
+        count: thisWeekTasks.length,
+        color: '#9c27b0'
+      },
+      {
+        id: 'on-next-week',
+        title: t('Next week'),
+        data: collapsedSections.includes('on-next-week') ? [] : nextWeekTasks,
+        count: nextWeekTasks.length,
+        color: '#009688'
+      },
+      {
+        id: 'later',
+        title: t('Upcoming'),
+        data: collapsedSections.includes('later') ? [] : laterTasks,
+        count: laterTasks.length,
+        color: '#795548'
+      },
+      ...(actualCompletedCount > 0 ? [{
+        id: 'completed',
+        title: isExpenses ? (t('Paid Bills') || 'Paid Bills') : (t('Completed') || 'Completed'),
+        data: isCompletedCollapsed ? [] : completedTasks,
+        count: actualCompletedCount,
+        color: '#4caf50'
+      }] : []),
     ];
   }, [activeBoard?.type, activeBoard?.color, listFilterCategory, missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, completedCount, todoTasks, upcomingBirthdayTasks, needToBuyTasks, collapsedSections, t]);
 
@@ -1116,7 +1157,7 @@ export default function BoardScreen({ route, navigation }) {
     if (item.type === 'task') {
       const task = item.task;
       const section = item.section;
-      const isListBoard = ['simple_list', 'shopping', 'grocery', 'expenses', 'packing', 'habits', 'media'].includes(activeBoard?.type);
+      const isListBoard = ['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeBoard?.type);
       return (
         <TaskRow 
           task={task} 
@@ -1601,7 +1642,7 @@ export default function BoardScreen({ route, navigation }) {
             {t('Options for')} {sectionOptionsConfig.section?.title}
           </Text>
           
-          {(['simple_list', 'shopping', 'grocery', 'expenses', 'packing', 'habits', 'media'].includes(activeBoard?.type)) ? (
+          {(['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeBoard?.type)) ? (
             <>
               <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
                 setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 
