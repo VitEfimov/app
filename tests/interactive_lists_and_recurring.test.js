@@ -635,3 +635,4 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     assert.strictEqual(ru['Average Rating'], 'Средняя оценка');
   });
 });
+
