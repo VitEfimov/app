@@ -29,6 +29,45 @@ const IconGift = ({ color = '#6246EA' }) => (
   </Svg>
 );
 
+const IconCart = ({ color = '#6246EA' }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="9" cy="21" r="1" />
+    <Circle cx="20" cy="21" r="1" />
+    <Path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+  </Svg>
+);
+
+const IconReceipt = ({ color = '#6246EA' }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+    <Line x1="8" y1="8" x2="16" y2="8" />
+    <Line x1="8" y1="12" x2="16" y2="12" />
+    <Line x1="8" y1="16" x2="12" y2="16" />
+  </Svg>
+);
+
+const IconLuggage = ({ color = '#6246EA' }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="6" y="7" width="12" height="14" rx="2" />
+    <Path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+    <Line x1="9" y1="21" x2="9" y2="23" />
+    <Line x1="15" y1="21" x2="15" y2="23" />
+  </Svg>
+);
+
+const IconFlame = ({ color = '#6246EA' }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  </Svg>
+);
+
+const IconMediaBook = ({ color = '#6246EA' }) => (
+  <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <Path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </Svg>
+);
+
 const IconRepeat = ({ color = '#6246EA', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M17 1l4 4-4 4" />
@@ -115,6 +154,46 @@ export default function CreateBoardModal({
       badge: `${t('Auto-repeat')} · ${durationText}`,
       desc: t('Track birthdays and events with automatic reminders for 6 months.') || `Track birthdays and events with automatic reminders for ${durationText}.`,
       Icon: IconGift,
+    },
+    {
+      id: 'grocery',
+      title: t('Grocery & Shopping') || 'Grocery & Shopping',
+      badge: t('Interactive Cart') || 'Interactive Cart',
+      desc: t('Interactive grocery list with item prices, quantity stepper and live budget total.') || 'Interactive grocery list with item prices, quantity stepper and live budget total.',
+      Icon: IconCart,
+      defaultColor: '#10B981',
+    },
+    {
+      id: 'expenses',
+      title: t('Expenses & Bills') || 'Expenses & Bills',
+      badge: t('Budget Tracker') || 'Budget Tracker',
+      desc: t('Track monthly bills, recurring expenses, paid vs due amounts with live totals.') || 'Track monthly bills, recurring expenses, paid vs due amounts with live totals.',
+      Icon: IconReceipt,
+      defaultColor: '#EF4444',
+    },
+    {
+      id: 'packing',
+      title: t('Travel & Packing') || 'Travel & Packing',
+      badge: t('Trip Checklist') || 'Trip Checklist',
+      desc: t('Luggage checklist with categories, packing progress meter and quick trip reset.') || 'Luggage checklist with categories, packing progress meter and quick trip reset.',
+      Icon: IconLuggage,
+      defaultColor: '#3B82F6',
+    },
+    {
+      id: 'habits',
+      title: t('Habit Tracker') || 'Habit Tracker',
+      badge: t('Daily Streaks') || 'Daily Streaks',
+      desc: t('Daily habits and routines with streak counters, time-of-day filters and completion rate.') || 'Daily habits and routines with streak counters, time-of-day filters and completion rate.',
+      Icon: IconFlame,
+      defaultColor: '#F59E0B',
+    },
+    {
+      id: 'media',
+      title: t('Reading & Watchlist') || 'Reading & Watchlist',
+      badge: t('Ratings & Progress') || 'Ratings & Progress',
+      desc: t('Books, movies, TV shows and courses with 5-star ratings and progress tracking.') || 'Books, movies, TV shows and courses with 5-star ratings and progress tracking.',
+      Icon: IconMediaBook,
+      defaultColor: '#8B5CF6',
     },
   ];
 
@@ -374,7 +453,10 @@ export default function CreateBoardModal({
                           paddingHorizontal: isCompact ? 12 : 14,
                         },
                       ]}
-                      onPress={() => setSelectedType(tmpl.id)}
+                      onPress={() => {
+                        setSelectedType(tmpl.id);
+                        if (tmpl.defaultColor) setSelectedColor(tmpl.defaultColor);
+                      }}
                     >
                       <View style={styles.cardHeader}>
                         <View style={[

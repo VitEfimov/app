@@ -171,6 +171,28 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
 
   const isRepeatingTask = !!(task?.recurringSeriesId || task?.isRecurring || (task?.repeatConfig && task?.repeatConfig?.preset && task?.repeatConfig?.preset !== 'None') || (task?.repeatFrequency && task?.repeatFrequency !== 'None'));
 
+  const currentBoard = boards.find(b => b && (b.id === (task?.boardId || task?.board_id) || (b._id && b._id === (task?.boardId || task?.board_id))));
+  const boardType = currentBoard?.type || 'standard';
+
+  const getTaskAmount = useCallback((t) => {
+    if (t?.itemPrice !== undefined && t?.itemPrice !== null && !isNaN(Number(t.itemPrice))) {
+      return Number(t.itemPrice);
+    }
+    if (t?.amount !== undefined && t?.amount !== null && !isNaN(Number(t.amount))) {
+      return Number(t.amount);
+    }
+    const name = t?.taskname || t?.name || '';
+    const match = name.match(/\$(\d+(?:\.\d{1,2})?)/);
+    if (match) {
+      return parseFloat(match[1]);
+    }
+    return 0;
+  }, []);
+
+  const itemQty = task?.itemQuantity !== undefined && !isNaN(Number(task.itemQuantity)) ? Math.max(1, Number(task.itemQuantity)) : 1;
+  const unitPrice = getTaskAmount(task);
+  const itemTotal = unitPrice > 0 ? (itemQty * unitPrice).toFixed(2) : null;
+
   const [confirmConfig, setConfirmConfig] = useState({
     isVisible: false,
     title: '',
@@ -194,9 +216,19 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   const handleToggleComplete = useCallback(() => {
     if (!task) return;
     const newCompletedState = !task.completed;
+    const habitUpdates = boardType === 'habits' ? (
+      newCompletedState ? {
+        habitStreak: (task.habitStreak || 0) + 1,
+        habitLastCompleted: dayjs().format('YYYY-MM-DD')
+      } : {
+        habitStreak: Math.max(0, (task.habitStreak || 1) - 1)
+      }
+    ) : {};
+
     dispatch(updateTask({
-      taskId: task.id,
-      completed: newCompletedState
+      taskId: task.id || task._id,
+      completed: newCompletedState,
+      ...habitUpdates
     }));
     
     A11yHelper.announce(newCompletedState ? (t('Task Completed') || 'Task Completed') : (t('Task Uncompleted') || 'Task Uncompleted'));
@@ -211,10 +243,14 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
       t('Undo'),
       () => {
-        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState, isUndo: true }));
+        const undoHabitUpdates = boardType === 'habits' ? {
+          habitStreak: task.habitStreak || 0,
+          habitLastCompleted: task.habitLastCompleted || null
+        } : {};
+        dispatch(updateTask({ taskId: task.id || task._id, completed: !newCompletedState, isUndo: true, ...undoHabitUpdates }));
       }
     );
-  }, [task, dispatch, showToast, t]);
+  }, [task, boardType, dispatch, showToast, t]);
 
   const handleSwipeComplete = useCallback(() => {
     closeSwipeable();
@@ -612,6 +648,126 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
               <Text style={[styles.metaText, { color: colors.textSecondary }]}>
                 {boardName}
               </Text>
+            </View>
+          )}
+
+          {/* Interactive controls for specialized list types */}
+          {boardType === 'grocery' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', borderRadius: 10, paddingHorizontal: 3, paddingVertical: 1, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB', gap: 2 }}>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    const nextQty = Math.max(1, itemQty - 1);
+                    dispatch(updateTask({ taskId: task.id || task._id, itemQuantity: nextQty }));
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary, lineHeight: 14 }}>-</Text>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.textPrimary, minWidth: 16, textAlign: 'center' }}>
+                  {itemQty}
+                </Text>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    const nextQty = itemQty + 1;
+                    dispatch(updateTask({ taskId: task.id || task._id, itemQuantity: nextQty }));
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary, lineHeight: 14 }}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {unitPrice > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B9811A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981' }}>
+                    {itemQty > 1 ? `$${unitPrice.toFixed(2)} ea · $${itemTotal}` : `$${unitPrice.toFixed(2)}`}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+
+          {boardType === 'expenses' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {unitPrice > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: task.completed ? '#10B9811A' : '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: task.completed ? '#10B981' : '#EF4444' }}>
+                    ${unitPrice.toFixed(2)}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: task.completed ? '#10B9811A' : '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                <Text style={{ fontSize: 10, fontWeight: '600', color: task.completed ? '#10B981' : '#D97706' }}>
+                  {task.completed ? (t('Paid Bills') || 'Paid') : (t('Bills Due') || 'Due')}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {boardType === 'packing' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#3B82F61A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#3B82F6' }}>
+                  🎒 {t(task.itemCategory || 'Carry-On') || (task.itemCategory || 'Carry-On')}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {boardType === 'habits' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2 }}>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
+                  🔥 {task.habitStreak || 0} {t('days') || 'd'}
+                </Text>
+              </View>
+              {task.itemCategory ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+                  <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                    {t(task.itemCategory) || task.itemCategory}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+
+          {boardType === 'media' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      dispatch(updateTask({ taskId: task.id || task._id, itemRating: star === task.itemRating ? 0 : star }));
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: star <= (task.itemRating || 0) ? '#F59E0B' : (colors.borderColor || '#D1D5DB') }}>
+                      ★
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {task.itemCategory ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#8B5CF61A', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '600', color: '#8B5CF6' }}>
+                    {t(task.itemCategory) || task.itemCategory}
+                  </Text>
+                </View>
+              ) : null}
+              {task.itemProgress ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+                  <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                    {task.itemProgress}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           )}
 

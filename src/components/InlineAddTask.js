@@ -148,10 +148,35 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
 
     const seriesId = hasDefaultRepeat ? ('series_' + Date.now().toString() + Math.random().toString(36).substr(2, 9)) : undefined;
 
+    let finalTaskName = taskName.trim();
+    let itemPrice = undefined;
+    let itemQuantity = activeBoard?.type === 'grocery' ? 1 : undefined;
+    let itemCategory = undefined;
+
+    const priceMatch = finalTaskName.match(/\$(\d+(?:\.\d{1,2})?)/);
+    if (priceMatch) {
+      itemPrice = parseFloat(priceMatch[1]);
+    }
+
+    if (activeBoard?.type === 'grocery') {
+      const qtyMatch = finalTaskName.match(/(?:^|\s)(\d+)\s*(?:x|pcs|pk|pack|kg|lb)(?:\s|$)/i);
+      if (qtyMatch) {
+        itemQuantity = parseInt(qtyMatch[1], 10);
+      }
+    }
+
+    if (activeBoard?.type === 'packing') {
+      itemCategory = 'Carry-On';
+    } else if (activeBoard?.type === 'habits') {
+      itemCategory = 'Anytime';
+    } else if (activeBoard?.type === 'media') {
+      itemCategory = 'Book';
+    }
+
     const newTask = {
       id: new Date().getTime().toString(),
       boardId: targetBoardId,
-      taskname: taskName,
+      taskname: finalTaskName,
       creationDate: new Date().toISOString(),
       lastUpdatedDate: null,
       completionDate: dayjs(selectedDate).toISOString(),
@@ -159,6 +184,10 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       priority: 'none',
       completed: false,
       description: { text: '', img: '', url: '' },
+      ...(itemPrice !== undefined ? { itemPrice } : {}),
+      ...(itemQuantity !== undefined ? { itemQuantity } : {}),
+      ...(itemCategory !== undefined ? { itemCategory } : {}),
+      ...(activeBoard?.type === 'habits' ? { habitStreak: 0 } : {}),
       ...(hasDefaultRepeat ? {
         repeat: boardRepeatConfig.preset === 'every_year' ? 'yearly' : boardRepeatConfig.preset,
         repeatFrequency: boardRepeatConfig.preset,

@@ -321,6 +321,14 @@ const taskSlice = createSlice({
                 if (action.payload.isNagMode !== undefined) task.isNagMode = action.payload.isNagMode;
                 if (action.payload.escalationLevel !== undefined) task.escalationLevel = action.payload.escalationLevel;
                 if (action.payload.keepNotificationAllDay !== undefined) task.keepNotificationAllDay = action.payload.keepNotificationAllDay;
+                if (action.payload.itemPrice !== undefined) task.itemPrice = action.payload.itemPrice;
+                if (action.payload.itemQuantity !== undefined) task.itemQuantity = action.payload.itemQuantity;
+                if (action.payload.itemUnit !== undefined) task.itemUnit = action.payload.itemUnit;
+                if (action.payload.itemCategory !== undefined) task.itemCategory = action.payload.itemCategory;
+                if (action.payload.itemRating !== undefined) task.itemRating = action.payload.itemRating;
+                if (action.payload.itemProgress !== undefined) task.itemProgress = action.payload.itemProgress;
+                if (action.payload.habitStreak !== undefined) task.habitStreak = action.payload.habitStreak;
+                if (action.payload.habitLastCompleted !== undefined) task.habitLastCompleted = action.payload.habitLastCompleted;
                 if (description) {
                     task.description = {
                         text: description.text !== undefined ? description.text : (task.description?.text || ''),
@@ -374,6 +382,14 @@ const taskSlice = createSlice({
                 if (patch.isNagMode !== undefined) task.isNagMode = patch.isNagMode;
                 if (patch.escalationLevel !== undefined) task.escalationLevel = patch.escalationLevel;
                 if (patch.keepNotificationAllDay !== undefined) task.keepNotificationAllDay = patch.keepNotificationAllDay;
+                if (patch.itemPrice !== undefined) task.itemPrice = patch.itemPrice;
+                if (patch.itemQuantity !== undefined) task.itemQuantity = patch.itemQuantity;
+                if (patch.itemUnit !== undefined) task.itemUnit = patch.itemUnit;
+                if (patch.itemCategory !== undefined) task.itemCategory = patch.itemCategory;
+                if (patch.itemRating !== undefined) task.itemRating = patch.itemRating;
+                if (patch.itemProgress !== undefined) task.itemProgress = patch.itemProgress;
+                if (patch.habitStreak !== undefined) task.habitStreak = patch.habitStreak;
+                if (patch.habitLastCompleted !== undefined) task.habitLastCompleted = patch.habitLastCompleted;
                 if (patch.description) {
                     task.description = {
                         text: patch.description.text !== undefined ? patch.description.text : (task.description?.text || ''),

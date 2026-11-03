@@ -118,26 +118,29 @@ export default function DashboardScreen({ navigation }) {
       if (!task || task.completed) continue;
       const isRepeating = isRepeatingTask(task);
       const titleKey = String(task.taskname || task.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
-      const seriesKey = (isRepeating && titleKey)
-        ? ('title_' + titleKey)
-        : (task.recurringSeriesId ? ('series_' + task.recurringSeriesId) : null);
+      const rawBId = String(task.boardId || task.board_id || 'main');
+      const seriesKey = task.recurringSeriesId
+        ? ('series_' + task.recurringSeriesId)
+        : (isRepeating && titleKey ? (`title_${rawBId}_${titleKey}`) : null);
       if (!seriesKey) continue;
 
       const dateStr = getTaskDateStr(task);
       if (dateStr && dateStr < todayStr) continue;
 
       const existing = earliestSeriesMap.get(seriesKey);
+      const taskId = task.id || task._id;
+
       if (!existing) {
-        earliestSeriesMap.set(seriesKey, { task, dateStr: dateStr || '9999-12-31' });
+        earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: dateStr || '9999-12-31' });
       } else {
         const taskVal = dateStr || '9999-12-31';
         const existingVal = existing.dateStr;
 
         if (taskVal < existingVal) {
-          addToHidden(existing.task.id);
-          earliestSeriesMap.set(seriesKey, { task, dateStr: taskVal });
+          addToHidden(existing.taskId);
+          earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: taskVal });
         } else {
-          addToHidden(task.id);
+          addToHidden(taskId);
         }
       }
     }
@@ -151,10 +154,11 @@ export default function DashboardScreen({ navigation }) {
     const FILTERS = getFilters(now);
 
     const isHidden = (t) => {
-      if (!t || t.id === undefined || t.id === null) return false;
-      return hiddenRecurringTaskIds.has(t.id) ||
-             hiddenRecurringTaskIds.has(String(t.id)) ||
-             (!isNaN(Number(t.id)) && hiddenRecurringTaskIds.has(Number(t.id)));
+      const taskId = t?.id || t?._id;
+      if (!t || taskId === undefined || taskId === null) return false;
+      return hiddenRecurringTaskIds.has(taskId) ||
+             hiddenRecurringTaskIds.has(String(taskId)) ||
+             (!isNaN(Number(taskId)) && hiddenRecurringTaskIds.has(Number(taskId)));
     };
 
     return {

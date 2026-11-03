@@ -225,6 +225,25 @@ export default function BoardScreen({ route, navigation }) {
   const [isMoveBoardVisible, setMoveBoardVisible] = useState(false);
   const [sortConfig, setSortConfig] = useState({});
   const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
+  const [listFilterCategory, setListFilterCategory] = useState('All');
+
+  useEffect(() => {
+    setListFilterCategory('All');
+  }, [activeBoardId]);
+
+  const getTaskAmount = useCallback((task) => {
+    if (!task) return 0;
+    if (task.itemPrice !== undefined && task.itemPrice !== null && !isNaN(Number(task.itemPrice))) {
+      return Number(task.itemPrice);
+    }
+    const title = task.taskname || task.name || '';
+    const match = title.match(/\$(\d+(?:\.\d{1,2})?)/);
+    if (match) {
+      const parsed = parseFloat(match[1]);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  }, []);
 
   const allSectionIds = ['missed', 'today', 'tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed'];
 
@@ -538,27 +557,29 @@ export default function BoardScreen({ route, navigation }) {
       if (!task || task.completed) continue;
       const isRepeating = isRepeatingTask(task);
       const titleKey = String(task.taskname || task.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
-      const seriesKey = (isRepeating && titleKey)
-        ? ('title_' + titleKey)
-        : (task.recurringSeriesId ? ('series_' + task.recurringSeriesId) : null);
+      const rawBId = String(task.boardId || task.board_id || 'main');
+      const seriesKey = task.recurringSeriesId
+        ? ('series_' + task.recurringSeriesId)
+        : (isRepeating && titleKey ? (`title_${rawBId}_${titleKey}`) : null);
       if (!seriesKey) continue;
 
       const dateStr = getTaskDateStr(task);
       if (dateStr && dateStr < todayStr) continue; // Missed tasks remain visible in Missed section
 
       const existing = earliestSeriesMap.get(seriesKey);
+      const taskId = task.id || task._id;
 
       if (!existing) {
-        earliestSeriesMap.set(seriesKey, { task, dateStr: dateStr || '9999-12-31' });
+        earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: dateStr || '9999-12-31' });
       } else {
         const taskVal = dateStr || '9999-12-31';
         const existingVal = existing.dateStr;
 
         if (taskVal < existingVal) {
-          addToHidden(existing.task.id);
-          earliestSeriesMap.set(seriesKey, { task, dateStr: taskVal });
+          addToHidden(existing.taskId);
+          earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: taskVal });
         } else {
-          addToHidden(task.id);
+          addToHidden(taskId);
         }
       }
     }
@@ -600,9 +621,10 @@ export default function BoardScreen({ route, navigation }) {
       if (item.isCompleted) {
         buckets.completed.push(item);
       } else {
-        const isHidden = hiddenRecurringTaskIds.has(task.id) || 
-          (task.id !== undefined && task.id !== null && hiddenRecurringTaskIds.has(String(task.id))) ||
-          (!isNaN(Number(task.id)) && hiddenRecurringTaskIds.has(Number(task.id)));
+        const taskId = task.id || task._id;
+        const isHidden = hiddenRecurringTaskIds.has(taskId) || 
+          (taskId !== undefined && taskId !== null && hiddenRecurringTaskIds.has(String(taskId))) ||
+          (!isNaN(Number(taskId)) && hiddenRecurringTaskIds.has(Number(taskId)));
 
         if (isHidden) continue;
 
@@ -651,12 +673,41 @@ export default function BoardScreen({ route, navigation }) {
     const isCompletedCollapsed = collapsedSections.includes('completed');
     const actualCompletedCount = completedTasks.length > 0 ? completedTasks.length : completedCount;
 
-    if (activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping') {
-      const listUncompleted = todoTasks.filter(t => !missedTasks.some(m => m.id === t.id));
+    if (['simple_list', 'shopping', 'grocery', 'expenses', 'packing', 'habits', 'media'].includes(activeBoard?.type)) {
+      let listUncompleted = todoTasks.filter(t => !missedTasks.some(m => (m.id || m._id) === (t.id || t._id)));
+      if (['packing', 'habits', 'media'].includes(activeBoard?.type) && listFilterCategory !== 'All') {
+        listUncompleted = listUncompleted.filter(t => {
+          if (activeBoard?.type === 'packing') return (t.itemCategory || 'Carry-On') === listFilterCategory;
+          if (activeBoard?.type === 'habits') return (t.itemCategory || 'Anytime') === listFilterCategory;
+          if (activeBoard?.type === 'media') return (t.itemCategory || 'Books') === listFilterCategory;
+          return true;
+        });
+      }
+
+      let todoTitle = t('List') || 'List';
+      let doneTitle = t('Completed') || 'Completed';
+
+      if (activeBoard?.type === 'grocery' || activeBoard?.type === 'shopping') {
+        todoTitle = t('To Buy') || 'To Buy';
+        doneTitle = t('In Cart') || 'In Cart';
+      } else if (activeBoard?.type === 'expenses') {
+        todoTitle = t('Bills Due') || 'Bills Due';
+        doneTitle = t('Paid Bills') || 'Paid Bills';
+      } else if (activeBoard?.type === 'packing') {
+        todoTitle = t('To Pack') || 'To Pack';
+        doneTitle = t('Packed') || 'Packed';
+      } else if (activeBoard?.type === 'habits') {
+        todoTitle = t("Today's Habits") || "Today's Habits";
+        doneTitle = t('Done Today') || 'Done Today';
+      } else if (activeBoard?.type === 'media') {
+        todoTitle = t('Watchlist & Reading') || 'Watchlist & Reading';
+        doneTitle = t('Finished') || 'Finished';
+      }
+
       return [
         ...(missedTasks.length > 0 ? [{ id: 'missed', title: t('Missed tasks'), data: collapsedSections.includes('missed') ? [] : missedTasks, count: missedTasks.length, color: '#f44336' }] : []),
-        { id: 'today', title: t('List') || 'List', data: collapsedSections.includes('today') ? [] : listUncompleted, count: listUncompleted.length, color: '#10B981' },
-        ...(actualCompletedCount > 0 ? [{ id: 'completed', title: t('Completed') || 'Completed', data: isCompletedCollapsed ? [] : completedTasks, count: actualCompletedCount, color: '#4CAF50' }] : [])
+        { id: 'today', title: todoTitle, data: collapsedSections.includes('today') ? [] : listUncompleted, count: listUncompleted.length, color: activeBoard?.color || '#10B981' },
+        ...(actualCompletedCount > 0 ? [{ id: 'completed', title: doneTitle, data: isCompletedCollapsed ? [] : completedTasks, count: actualCompletedCount, color: '#4CAF50' }] : [])
       ];
     }
 
@@ -669,7 +720,7 @@ export default function BoardScreen({ route, navigation }) {
       { id: 'later', title: t('Upcoming'), data: collapsedSections.includes('later') ? [] : laterTasks, count: laterTasks.length, color: '#795548' },
       ...(actualCompletedCount > 0 ? [{ id: 'completed', title: t('Completed'), data: isCompletedCollapsed ? [] : completedTasks, count: actualCompletedCount, color: '#4caf50' }] : []),
     ];
-  }, [activeBoard.type, missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, completedCount, todoTasks, upcomingBirthdayTasks, needToBuyTasks, collapsedSections, t]);
+  }, [activeBoard?.type, activeBoard?.color, listFilterCategory, missedTasks, todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, completedTasks, completedCount, todoTasks, upcomingBirthdayTasks, needToBuyTasks, collapsedSections, t]);
 
   const flattenedData = useMemo(() => {
     const result = [];
@@ -686,6 +737,51 @@ export default function BoardScreen({ route, navigation }) {
     });
     return result;
   }, [sections]);
+
+  const allHiddenRecurringTaskIds = useMemo(() => {
+    if (showRecurringTasksOnBoard) return new Set();
+    const hiddenIds = new Set();
+    const todayStr = dayjs().format('YYYY-MM-DD');
+
+    const addToHidden = (id) => {
+      if (id === undefined || id === null) return;
+      hiddenIds.add(id);
+      hiddenIds.add(String(id));
+      const num = Number(id);
+      if (!isNaN(num)) hiddenIds.add(num);
+    };
+
+    const earliestSeriesMap = new Map();
+    for (const task of tasks) {
+      if (!task || task.completed) continue;
+      const isRepeating = isRepeatingTask(task);
+      const titleKey = String(task.taskname || task.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const rawBId = String(task.boardId || task.board_id || 'main');
+      const seriesKey = task.recurringSeriesId
+        ? ('series_' + task.recurringSeriesId)
+        : (isRepeating && titleKey ? (`title_${rawBId}_${titleKey}`) : null);
+      if (!seriesKey) continue;
+
+      const dateStr = getTaskDateStr(task);
+      if (dateStr && dateStr < todayStr) continue;
+
+      const existing = earliestSeriesMap.get(seriesKey);
+      const taskId = task.id || task._id;
+      if (!existing) {
+        earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: dateStr || '9999-12-31' });
+      } else {
+        const taskVal = dateStr || '9999-12-31';
+        const existingVal = existing.dateStr;
+        if (taskVal < existingVal) {
+          addToHidden(existing.taskId);
+          earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: taskVal });
+        } else {
+          addToHidden(taskId);
+        }
+      }
+    }
+    return hiddenIds;
+  }, [tasks, showRecurringTasksOnBoard, isRepeatingTask]);
 
   const boardCounts = useMemo(() => {
     const counts = {};
@@ -704,6 +800,8 @@ export default function BoardScreen({ route, navigation }) {
     for (let i = 0; i < tasks.length; i++) {
       const t = tasks[i];
       if (!t || t.completed) continue;
+      const tid = t.id || t._id;
+      if (!showRecurringTasksOnBoard && (allHiddenRecurringTaskIds.has(tid) || allHiddenRecurringTaskIds.has(String(tid)))) continue;
       const rawBId = t.boardId || t.board_id;
       if (!rawBId) {
         if (counts[fallbackMainId] !== undefined) counts[fallbackMainId]++;
@@ -716,7 +814,7 @@ export default function BoardScreen({ route, navigation }) {
       }
     }
     return counts;
-  }, [tasks, boards, mainBoardId]);
+  }, [tasks, boards, mainBoardId, showRecurringTasksOnBoard, allHiddenRecurringTaskIds]);
 
   const getSectionTasks = useCallback((section) => {
     if (!section) return [];
@@ -958,7 +1056,7 @@ export default function BoardScreen({ route, navigation }) {
 
     if (selectionMode.isActive) {
       const sectionTasks = getSectionTasks(section);
-      const sectionTaskIds = sectionTasks.map(t => t.id);
+      const sectionTaskIds = sectionTasks.map(t => t.id || t._id);
       const selectedCountInSection = sectionTaskIds.filter(id => selectedTaskIdsSet.has(id)).length;
       isAllSectionSelected = sectionTasks.length > 0 && selectedCountInSection === sectionTasks.length;
       isPartiallySelected = selectedCountInSection > 0 && !isAllSectionSelected;
@@ -1001,7 +1099,7 @@ export default function BoardScreen({ route, navigation }) {
     if (item.type === 'task') {
       const task = item.task;
       const section = item.section;
-      const isListBoard = activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping';
+      const isListBoard = ['simple_list', 'shopping', 'grocery', 'expenses', 'packing', 'habits', 'media'].includes(activeBoard?.type);
       return (
         <TaskRow 
           task={task} 
@@ -1009,7 +1107,7 @@ export default function BoardScreen({ route, navigation }) {
           hideDate={isListBoard}
           hideBoardBadge={true}
           isSelectionMode={selectionMode.isActive}
-          isSelected={selectedTaskIdsSet.has(task.id)}
+          isSelected={selectedTaskIdsSet.has(task.id) || selectedTaskIdsSet.has(task._id)}
           onToggleSelect={handleToggleSelectTask}
           onPressSnooze={handleSnoozePress}
           onPressMore={isListBoard ? undefined : handleQuickMenuPress}
@@ -1048,6 +1146,267 @@ export default function BoardScreen({ route, navigation }) {
     boardAutomationModal.isVisible || 
     isMoveBoardVisible || 
     isGoogleDrawerOpen;
+
+  const renderListSummaryBar = () => {
+    const type = activeBoard?.type;
+    if (!['grocery', 'shopping', 'expenses', 'packing', 'habits', 'media'].includes(type)) {
+      return null;
+    }
+
+    const totalCount = boardTasks.length;
+    const completedList = boardTasks.filter(t => t.completed);
+    const uncompletedList = boardTasks.filter(t => !t.completed);
+    const completedCount = completedList.length;
+
+    if (type === 'grocery' || type === 'shopping') {
+      let grandTotal = 0;
+      let inCartSpent = 0;
+      boardTasks.forEach(t => {
+        const qty = t.itemQuantity !== undefined && !isNaN(Number(t.itemQuantity)) ? Math.max(1, Number(t.itemQuantity)) : 1;
+        const price = getTaskAmount(t);
+        const itemTot = qty * price;
+        grandTotal += itemTot;
+        if (t.completed) inCartSpent += itemTot;
+      });
+      const remaining = Math.max(0, grandTotal - inCartSpent);
+      const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+      return (
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <View>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Grand Total') || 'Grand Total'}</Text>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 }}>${grandTotal.toFixed(2)}</Text>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('In Cart') || 'In Cart'}</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10B981', marginTop: 2 }}>${inCartSpent.toFixed(2)}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Remaining') || 'Remaining'}</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#F59E0B', marginTop: 2 }}>${remaining.toFixed(2)}</Text>
+            </View>
+          </View>
+
+          <View style={{ height: 6, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#10B981', borderRadius: 3 }} />
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+              {completedCount}/{totalCount} {t('In Cart') || 'In Cart'} ({progressPercent}%)
+            </Text>
+            {completedCount > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  const completedIds = completedList.map(t => t.id || t._id).filter(Boolean);
+                  dispatch(updateMultipleTasks({ taskIds: completedIds, changes: { completed: false } }));
+                  showToast(t('All items reset') || 'All items reset');
+                }}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary }}>
+                  {t('Uncheck All') || 'Uncheck All'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    if (type === 'expenses') {
+      let totalBills = 0;
+      let totalPaid = 0;
+      boardTasks.forEach(t => {
+        const amt = getTaskAmount(t);
+        totalBills += amt;
+        if (t.completed) totalPaid += amt;
+      });
+      const remainingDue = Math.max(0, totalBills - totalPaid);
+
+      return (
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Total Bills') || 'Total Bills'}</Text>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 }}>${totalBills.toFixed(2)}</Text>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Paid') || 'Paid'}</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10B981', marginTop: 2 }}>${totalPaid.toFixed(2)}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Remaining Due') || 'Remaining Due'}</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginTop: 2 }}>${remainingDue.toFixed(2)}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (type === 'packing') {
+      const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      const categories = ['All', 'Carry-On', 'Checked Bag', 'Backpack', 'Essentials'];
+
+      return (
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textPrimary }}>
+              🧳 {t('Packed') || 'Packed'}: {completedCount}/{totalCount} ({progressPercent}%)
+            </Text>
+            {completedCount > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  const completedIds = completedList.map(t => t.id || t._id).filter(Boolean);
+                  dispatch(updateMultipleTasks({ taskIds: completedIds, changes: { completed: false } }));
+                  showToast(t('Ready for your next trip!') || 'Ready for your next trip!');
+                }}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary }}>
+                  {t('Reset for Next Trip') || 'Reset for Next Trip'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={{ height: 6, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
+            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#3B82F6', borderRadius: 3 }} />
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {categories.map((cat) => {
+              const isSelected = listFilterCategory === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  onPress={() => setListFilterCategory(cat)}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: isSelected ? '#3B82F6' : (colors.background || '#F3F4F6'),
+                    borderWidth: 1,
+                    borderColor: isSelected ? '#3B82F6' : (colors.borderColor || '#E5E7EB')
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                    {t(cat) || cat}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (type === 'habits') {
+      const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      const timesOfDay = ['All', 'Morning', 'Afternoon', 'Evening', 'Anytime'];
+      const bestStreak = boardTasks.reduce((max, t) => Math.max(max, Number(t.habitStreak) || 0), 0);
+
+      return (
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textPrimary }}>
+              ⚡ {t("Today's Habits") || 'Habits'}: {completedCount}/{totalCount} ({progressPercent}%)
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#D97706' }}>
+                🔥 {t('Best Streak') || 'Best Streak'}: {bestStreak} {t('days') || 'd'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ height: 6, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
+            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#F59E0B', borderRadius: 3 }} />
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {timesOfDay.map((tod) => {
+              const isSelected = listFilterCategory === tod;
+              return (
+                <TouchableOpacity
+                  key={tod}
+                  onPress={() => setListFilterCategory(tod)}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: isSelected ? '#F59E0B' : (colors.background || '#F3F4F6'),
+                    borderWidth: 1,
+                    borderColor: isSelected ? '#F59E0B' : (colors.borderColor || '#E5E7EB')
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                    {t(tod) || tod}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (type === 'media') {
+      const inProgressCount = uncompletedList.filter(t => t.itemProgress || t.itemRating).length;
+      const ratedTasks = boardTasks.filter(t => Number(t.itemRating) > 0);
+      const avgRating = ratedTasks.length > 0
+        ? (ratedTasks.reduce((sum, t) => sum + Number(t.itemRating), 0) / ratedTasks.length).toFixed(1)
+        : null;
+      const mediaTypes = ['All', 'Books', 'Movies/TV', 'Courses'];
+
+      return (
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <View>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Watchlist & Reading') || 'Media'}</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 }}>{totalCount} {t('Items') || 'items'}</Text>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('In Progress') || 'In Progress'}</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#8B5CF6', marginTop: 2 }}>{inProgressCount}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Average Rating') || 'Avg Rating'}</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#F59E0B', marginTop: 2 }}>
+                {avgRating ? `⭐ ${avgRating}` : '—'}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {mediaTypes.map((mt) => {
+              const isSelected = listFilterCategory === mt;
+              return (
+                <TouchableOpacity
+                  key={mt}
+                  onPress={() => setListFilterCategory(mt)}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: isSelected ? '#8B5CF6' : (colors.background || '#F3F4F6'),
+                    borderWidth: 1,
+                    borderColor: isSelected ? '#8B5CF6' : (colors.borderColor || '#E5E7EB')
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                    {t(mt) || mt}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
@@ -1165,13 +1524,15 @@ export default function BoardScreen({ route, navigation }) {
           </ScrollView>
         </View>
 
+      {renderListSummaryBar()}
+
       <FlashList
         key={activeBoardId}
         data={flattenedData}
         extraData={flashListExtraData}
         keyExtractor={(item) => {
           if (item?.type === 'task') {
-            const taskId = item.task?.id || 'unknown';
+            const taskId = item.task?.id || item.task?._id || 'unknown';
             return `task_${taskId}_${item.section?.id || 'sec'}`;
           }
           return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
@@ -1223,7 +1584,7 @@ export default function BoardScreen({ route, navigation }) {
             {t('Options for')} {sectionOptionsConfig.section?.title}
           </Text>
           
-          {(activeBoard?.type === 'simple_list' || activeBoard?.type === 'shopping') ? (
+          {(['simple_list', 'shopping', 'grocery', 'expenses', 'packing', 'habits', 'media'].includes(activeBoard?.type)) ? (
             <>
               <TouchableOpacity testID="section_option_select_tasks" accessible={true} accessibilityRole="button" accessibilityLabel="Select Tasks" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { 
                 setSelectionMode({ isActive: true, sectionId: sectionOptionsConfig.section?.id, selectedTaskIds: [] }); 

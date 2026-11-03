@@ -233,7 +233,11 @@ describe('BoardScreen Recurring Tasks Filtering', () => {
     for (const task of boardTasks) {
       if (!task || task.completed) continue;
       const isRepeating = isRepeatingTask(task);
-      const seriesKey = task.recurringSeriesId || (isRepeating ? ('title_' + (task.taskname || task.name || '').trim().toLowerCase()) : null);
+      const titleKey = String(task.taskname || task.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const rawBId = String(task.boardId || task.board_id || 'main');
+      const seriesKey = task.recurringSeriesId
+        ? ('series_' + task.recurringSeriesId)
+        : (isRepeating && titleKey ? (`title_${rawBId}_${titleKey}`) : null);
       if (!seriesKey) continue;
 
       const dateStr = getTaskDateStr(task);
@@ -241,14 +245,15 @@ describe('BoardScreen Recurring Tasks Filtering', () => {
 
       const existing = earliestSeriesMap.get(seriesKey);
       const currentDate = dateStr || '9999-12-31';
+      const taskId = task.id || task._id;
       if (!existing) {
-        earliestSeriesMap.set(seriesKey, { task, dateStr: currentDate });
+        earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: currentDate });
       } else {
         if (currentDate < existing.dateStr) {
-          addToHidden(existing.task.id);
-          earliestSeriesMap.set(seriesKey, { task, dateStr: currentDate });
+          addToHidden(existing.taskId);
+          earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: currentDate });
         } else {
-          addToHidden(task.id);
+          addToHidden(taskId);
         }
       }
     }
@@ -370,6 +375,20 @@ describe('BoardScreen Recurring Tasks Filtering', () => {
     const hiddenOn = computeHiddenRecurringTaskIds(recurringTasks, true, 'simple_list');
     const todoTasksOn = recurringTasks.filter(t => !hiddenOn.has(t.id));
     assert.strictEqual(todoTasksOn.length, 48, 'All tasks should be shown when toggle is ON');
+  });
+
+  test('tasks with MongoDB _id (no id property) properly deduplicate recurring tasks', () => {
+    const nov27 = dayjs().add(20, 'day').format('YYYY-MM-DD');
+    const dec27 = dayjs().add(50, 'day').format('YYYY-MM-DD');
+
+    const tasksWithMongoId = [
+      { _id: 'mongo_nov_123', taskname: 'Toyota finance $550', date: nov27, isRecurring: true, recurringSeriesId: 'series_toyota' },
+      { _id: 'mongo_dec_456', taskname: 'Toyota finance $550', date: dec27, isRecurring: true, recurringSeriesId: 'series_toyota' }
+    ];
+
+    const hidden = computeHiddenRecurringTaskIds(tasksWithMongoId, false, 'standard');
+    assert.strictEqual(hidden.has('mongo_nov_123'), false, 'Earliest MongoDB occurrence is shown');
+    assert.strictEqual(hidden.has('mongo_dec_456'), true, 'Future MongoDB occurrence is hidden');
   });
 });
 
@@ -1513,7 +1532,7 @@ describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
     }
 
     const enKeys = Object.keys(loadedLocales['en']);
-    assert.strictEqual(enKeys.length, 791, 'English locale must contain exactly 791 keys');
+    assert.strictEqual(enKeys.length, 833, 'English locale must contain exactly 833 keys');
     assert.strictEqual(loadedLocales['ru']['Not available on this device'], 'Недоступно на этом устройстве');
     assert.strictEqual(loadedLocales['ko']['Purple'], '보라');
     assert.strictEqual(loadedLocales['ru']['Purple'], 'Пурпурный');
@@ -2033,5 +2052,123 @@ describe('Deep Persistent Debugger, Looping Alarm & Date Normalization', () => {
       /!!keepNotificationAllDay/,
       'scheduleExactAlarm must forward keepNotificationAllDay to native module'
     );
+  });
+});
+
+describe('Interactive Specialized List Types (Grocery, Expenses, Packing, Habits, Media)', () => {
+  const listTypes = ['simple_list', 'grocery', 'expenses', 'packing', 'habits', 'media'];
+
+  test('CreateBoardModal exports 6 list type options with icons and colors', () => {
+    const modalPath = path.resolve('src/components/CreateBoardModal.js');
+    const content = fs.readFileSync(modalPath, 'utf8');
+
+    for (const type of listTypes) {
+      assert.match(content, new RegExp(`id:\\s*['"]${type}['"]`), `Must support list template id: ${type}`);
+    }
+  });
+
+  test('InlineAddTask parses price and quantity intelligently from task titles', () => {
+    const parseTaskInput = (text) => {
+      let title = text.trim();
+      let itemPrice = null;
+      let itemQuantity = null;
+
+      const priceMatch = title.match(/\$(\d+(?:\.\d{1,2})?)/);
+      if (priceMatch) {
+        itemPrice = parseFloat(priceMatch[1]);
+      }
+
+      const qtyMatch = title.match(/(\d+)\s*(?:x|pcs|packs?|kg|lbs?|items?)\b/i) || title.match(/\b(?:x|\*)\s*(\d+)\b/i);
+      if (qtyMatch) {
+        itemQuantity = parseInt(qtyMatch[1], 10);
+      }
+
+      return { title, itemPrice, itemQuantity };
+    };
+
+    const t1 = parseTaskInput('Milk 2x $4.50');
+    assert.strictEqual(t1.itemPrice, 4.5);
+    assert.strictEqual(t1.itemQuantity, 2);
+
+    const t2 = parseTaskInput('Toyota finance $550');
+    assert.strictEqual(t2.itemPrice, 550);
+    assert.strictEqual(t2.itemQuantity, null);
+
+    const t3 = parseTaskInput('Apples 3 kg');
+    assert.strictEqual(t3.itemPrice, null);
+    assert.strictEqual(t3.itemQuantity, 3);
+  });
+
+  test('taskSlice persists item and habit interactive fields', () => {
+    const slicePath = path.resolve('src/features/taskSlice.js');
+    const content = fs.readFileSync(slicePath, 'utf8');
+
+    const expectedFields = [
+      'itemPrice',
+      'itemQuantity',
+      'itemUnit',
+      'itemCategory',
+      'itemRating',
+      'itemProgress',
+      'habitStreak',
+      'habitLastCompleted'
+    ];
+
+    for (const field of expectedFields) {
+      assert.match(content, new RegExp(`task\\.${field}\\s*=\\s*action\\.payload\\.${field}`), `taskSlice must update ${field}`);
+    }
+  });
+
+  test('All 10 locale files contain all interactive list keys', () => {
+    const localesDir = path.resolve('src/locales');
+    const languages = ['en', 'ru', 'es', 'fr', 'de', 'it', 'ja', 'ko', 'zh', 'hi'];
+
+    const interactiveKeys = [
+      'Grocery & Shopping',
+      'Interactive Cart',
+      'Expenses & Bills',
+      'Budget Tracker',
+      'Travel & Packing',
+      'Trip Checklist',
+      'Habit Tracker',
+      'Daily Streaks',
+      'Reading & Watchlist',
+      'Ratings & Progress',
+      'To Buy',
+      'In Cart',
+      'Bills Due',
+      'Paid Bills',
+      'Overdue Bills',
+      'To Pack',
+      'Packed',
+      'Today\'s Habits',
+      'Done Today',
+      'Watchlist & Reading',
+      'Finished',
+      'Total Bills',
+      'Remaining Due',
+      'Grand Total',
+      'Remaining',
+      'Uncheck All',
+      'Reset for Next Trip',
+      'Carry-On',
+      'Checked Bag',
+      'Backpack',
+      'Essentials',
+      'Morning',
+      'Afternoon',
+      'Evening',
+      'Anytime',
+      'Best Streak',
+      'Average Rating'
+    ];
+
+    for (const lang of languages) {
+      const raw = fs.readFileSync(path.join(localesDir, `${lang}.json`), 'utf8');
+      const json = JSON.parse(raw);
+      for (const k of interactiveKeys) {
+        assert.ok(json[k] && json[k].length > 0, `Locale ${lang} is missing key: ${k}`);
+      }
+    }
   });
 });
