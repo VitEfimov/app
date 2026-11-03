@@ -245,6 +245,23 @@ export default function BoardScreen({ route, navigation }) {
     return 0;
   }, []);
 
+  const getHabitTimeCategory = useCallback((task) => {
+    if (!task) return 'Anytime';
+    if (task.itemCategory && ['Morning', 'Afternoon', 'Evening', 'Anytime'].includes(task.itemCategory)) {
+      if (task.itemCategory !== 'Anytime') return task.itemCategory;
+    }
+    if (task.time && typeof task.time === 'string' && task.time.includes(':')) {
+      const [h] = task.time.split(':');
+      const hour = parseInt(h, 10);
+      if (!isNaN(hour)) {
+        if (hour >= 4 && hour < 12) return 'Morning';
+        if (hour >= 12 && hour < 17) return 'Afternoon';
+        if (hour >= 17 && hour <= 23) return 'Evening';
+      }
+    }
+    return task.itemCategory || 'Anytime';
+  }, []);
+
   const allSectionIds = ['missed', 'today', 'tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed'];
 
   const [collapsedSections, setCollapsedSections] = useState(() => {
@@ -678,7 +695,7 @@ export default function BoardScreen({ route, navigation }) {
       if (['packing', 'habits', 'media'].includes(activeBoard?.type) && listFilterCategory !== 'All') {
         listUncompleted = listUncompleted.filter(t => {
           if (activeBoard?.type === 'packing') return (t.itemCategory || 'Carry-On') === listFilterCategory;
-          if (activeBoard?.type === 'habits') return (t.itemCategory || 'Anytime') === listFilterCategory;
+          if (activeBoard?.type === 'habits') return getHabitTimeCategory(t) === listFilterCategory;
           if (activeBoard?.type === 'media') return (t.itemCategory || 'Books') === listFilterCategory;
           return true;
         });

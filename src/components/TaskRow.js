@@ -432,6 +432,34 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
 
   if (!task) return null;
 
+  const getEffectiveHabitCategory = useCallback(() => {
+    if (task.itemCategory && ['Morning', 'Afternoon', 'Evening', 'Anytime'].includes(task.itemCategory)) {
+      if (task.itemCategory !== 'Anytime') return task.itemCategory;
+    }
+    if (task.time && typeof task.time === 'string' && task.time.includes(':')) {
+      const [h] = task.time.split(':');
+      const hour = parseInt(h, 10);
+      if (!isNaN(hour)) {
+        if (hour >= 4 && hour < 12) return 'Morning';
+        if (hour >= 12 && hour < 17) return 'Afternoon';
+        if (hour >= 17 && hour <= 23) return 'Evening';
+      }
+    }
+    return task.itemCategory || 'Anytime';
+  }, [task.itemCategory, task.time]);
+
+  const handleCycleHabitCategory = useCallback((e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const cycle = ['Morning', 'Afternoon', 'Evening', 'Anytime'];
+    const current = getEffectiveHabitCategory();
+    const nextIdx = (cycle.indexOf(current) + 1) % cycle.length;
+    const nextCategory = cycle[nextIdx];
+    dispatch(updateTask({
+      taskId: task.id || task._id,
+      itemCategory: nextCategory
+    }));
+  }, [getEffectiveHabitCategory, task.id, task._id, dispatch]);
+
   const formatDisplayTime = (timeStr) => {
     if (!timeStr || timeStr === '--:--') return '--:--';
     try {
@@ -720,19 +748,21 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
           )}
 
           {boardType === 'habits' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2 }}>
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
                   🔥 {task.habitStreak || 0} {t('days') || 'd'}
                 </Text>
               </View>
-              {task.itemCategory ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
-                  <Text style={{ fontSize: 10, color: colors.textSecondary }}>
-                    {t(task.itemCategory) || task.itemCategory}
-                  </Text>
-                </View>
-              ) : null}
+              <TouchableOpacity
+                onPress={handleCycleHabitCategory}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}
+              >
+                <Text style={{ fontSize: 10, fontWeight: '600', color: colors.textSecondary }}>
+                  {t(getEffectiveHabitCategory()) || getEffectiveHabitCategory()}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 

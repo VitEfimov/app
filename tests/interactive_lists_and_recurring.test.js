@@ -455,6 +455,41 @@ describe('Daily Habit Tracker', () => {
     const bestStreak = habits.reduce((max, t) => Math.max(max, Number(t.habitStreak) || 0), 0);
     assert.strictEqual(bestStreak, 21);
   });
+
+  test('correctly infers time of day from task.time and filters morning habits', () => {
+    const getHabitTimeCategory = (task) => {
+      if (!task) return 'Anytime';
+      if (task.itemCategory && ['Morning', 'Afternoon', 'Evening', 'Anytime'].includes(task.itemCategory)) {
+        if (task.itemCategory !== 'Anytime') return task.itemCategory;
+      }
+      if (task.time && typeof task.time === 'string' && task.time.includes(':')) {
+        const [h] = task.time.split(':');
+        const hour = parseInt(h, 10);
+        if (!isNaN(hour)) {
+          if (hour >= 4 && hour < 12) return 'Morning';
+          if (hour >= 12 && hour < 17) return 'Afternoon';
+          if (hour >= 17 && hour <= 23) return 'Evening';
+        }
+      }
+      return task.itemCategory || 'Anytime';
+    };
+
+    const hMorning = { id: 'h1', taskname: 'Morning walk', time: '09:24' };
+    const hAfternoon = { id: 'h2', taskname: 'Post-lunch walk', time: '14:15' };
+    const hEvening = { id: 'h3', taskname: 'Read before bed', time: '21:00' };
+    const hAnytime = { id: 'h4', taskname: 'Drink 2L Water' };
+
+    assert.strictEqual(getHabitTimeCategory(hMorning), 'Morning');
+    assert.strictEqual(getHabitTimeCategory(hAfternoon), 'Afternoon');
+    assert.strictEqual(getHabitTimeCategory(hEvening), 'Evening');
+    assert.strictEqual(getHabitTimeCategory(hAnytime), 'Anytime');
+
+    // When user filters by 'Morning', hMorning (9:24 AM) must be included!
+    const allHabits = [hMorning, hAfternoon, hEvening, hAnytime];
+    const morningHabits = allHabits.filter(h => getHabitTimeCategory(h) === 'Morning');
+    assert.strictEqual(morningHabits.length, 1);
+    assert.strictEqual(morningHabits[0].id, 'h1');
+  });
 });
 
 // ==============================================================================
