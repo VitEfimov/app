@@ -66,8 +66,8 @@
     "ios": "expo run:ios",
     "web": "npx cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --web",
     "clean": "node -e \"['.expo','dist','test-results','playwright-report','bundle.txt','modal_debug.png','screen.png'].forEach(f => { try { fs.rmSync(f, {recursive: true, force: true}); } catch(e){} })\"",
-    "test": "node --test tests/last_changes.test.js",
-    "test:unit": "node --test tests/last_changes.test.js",
+    "test": "node --test tests/last_changes.test.js tests/interactive_lists_and_recurring.test.js",
+    "test:unit": "node --test tests/last_changes.test.js tests/interactive_lists_and_recurring.test.js",
     "test:e2e": "wdio run task/appium/wdio.conf.js --instances 1",
     "test:playwright": "playwright test"
   },
