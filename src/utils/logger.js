@@ -1,5 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 let logs = [];
 const listeners = new Set();
+const STORAGE_KEY_DEV_LOGS = '@system_dev_logs';
+const MAX_PERSISTED_LOGS = 100;
+let isInitialized = false;
+let saveLogsTimeout = null;
 
 const SENSITIVE_KEY_REGEX = /(password|pin|token|auth|secret|credential|key|authorization|bearer|cookie|session)/i;
 const JWT_REGEX = /eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*/g;
@@ -42,7 +48,40 @@ function sanitizeValue(value, seen = new WeakSet()) {
   return String(value);
 }
 
+const persistLogsToStorage = () => {
+  if (saveLogsTimeout) clearTimeout(saveLogsTimeout);
+  saveLogsTimeout = setTimeout(async () => {
+    try {
+      const sliceToPersist = logs.slice(0, MAX_PERSISTED_LOGS);
+      await AsyncStorage.setItem(STORAGE_KEY_DEV_LOGS, JSON.stringify(sliceToPersist));
+    } catch (e) {
+      // Avoid recursive logging on storage failure
+    }
+  }, 500);
+};
+
 export const DevLogger = {
+  init: async () => {
+    if (isInitialized) return logs;
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY_DEV_LOGS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge stored logs with any in-memory logs
+          const existingIds = new Set(logs.map(l => l.id));
+          const newEntries = parsed.filter(l => !existingIds.has(l.id));
+          logs = [...logs, ...newEntries].slice(0, 200);
+        }
+      }
+    } catch (e) {
+      // Storage unavailable or empty
+    }
+    isInitialized = true;
+    listeners.forEach(listener => listener([...logs]));
+    return logs;
+  },
+
   log: (message, details = null, type = 'info') => {
     const timestamp = new Date().toISOString();
     const safeMessage = typeof message === 'string' ? sanitizeValue(message) : message;
@@ -62,6 +101,7 @@ export const DevLogger = {
     }
     
     listeners.forEach(listener => listener([...logs]));
+    persistLogsToStorage();
   },
   error: (message, details = null) => DevLogger.log(message, details, 'error'),
   success: (message, details = null) => DevLogger.log(message, details, 'success'),
@@ -70,14 +110,22 @@ export const DevLogger = {
   
   getLogs: () => [...logs],
   
-  clearLogs: () => {
+  clearLogs: async () => {
     logs = [];
+    if (saveLogsTimeout) clearTimeout(saveLogsTimeout);
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY_DEV_LOGS);
+    } catch (e) {}
     listeners.forEach(listener => listener([]));
   },
   
   subscribe: (listener) => {
     listeners.add(listener);
-    listener([...logs]); // Initial call
+    if (!isInitialized) {
+      DevLogger.init().then(() => listener([...logs])).catch(() => listener([...logs]));
+    } else {
+      listener([...logs]);
+    }
     return () => listeners.delete(listener);
   }
 };

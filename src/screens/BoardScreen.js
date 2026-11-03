@@ -33,6 +33,7 @@ import { shareTaskAsync } from '../../modules/expo-task-alarm';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
 import { A11yHelper } from '../utils/a11yHelper';
 import { ResponsiveHelper } from '../utils/responsiveHelper';
+import { SecurityLockHelper } from '../utils/securityLockHelper';
 
 let RNShare;
 if (Platform.OS !== 'web') {
@@ -249,6 +250,18 @@ export default function BoardScreen({ route, navigation }) {
       dispatch(processAutoManageTasks());
     }, [dispatch])
   );
+
+  // Security & Privacy Shield: Immediately dismiss all modals and inline editing when device locks
+  useEffect(() => {
+    const unsubscribe = SecurityLockHelper.subscribeLock(() => {
+      setDetailsVisible(false);
+      setSnoozeVisible(false);
+      setQuickMenuVisible(false);
+      cancelAllInlineEditing();
+      try { Keyboard?.dismiss?.(); } catch (e) {}
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (route?.params?.editTaskId) {
@@ -493,56 +506,59 @@ export default function BoardScreen({ route, navigation }) {
     if (!task) return false;
     return !!(
       task.recurringSeriesId ||
-      task.isRecurring ||
-      (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None') ||
-      (task.repeatFrequency && task.repeatFrequency !== 'None') ||
+      task.isRecurring === true || task.isRecurring === 'true' || task.isRecurring === 1 ||
+      (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None' && task.repeatConfig.preset !== 'none') ||
+      (task.repeatFrequency && task.repeatFrequency !== 'None' && task.repeatFrequency !== 'none') ||
       (task.repeat && task.repeat !== 'none' && task.repeat !== 'None')
     );
   }, []);
 
   // Single-pass O(N) deduplication of recurring tasks (eliminates per-series sorting allocations)
   const hiddenRecurringTaskIds = useMemo(() => {
-    if (activeBoard?.type === 'birthdays') return new Set();
-
     const hiddenIds = new Set();
     const todayStr = dayjs().format('YYYY-MM-DD');
 
-    // When toggle is OFF: Hide ALL recurring tasks from future/upcoming sections
-    if (!showRecurringTasksOnBoard) {
-      for (const task of boardTasks) {
-        if (!task || task.completed) continue;
-        if (isRepeatingTask(task)) {
-          const dateStr = getTaskDateStr(task);
-          // Keep missed and today tasks visible so actionable items aren't lost
-          if (!dateStr || dateStr > todayStr) {
-            hiddenIds.add(task.id);
-          }
-        }
-      }
-      return hiddenIds;
+    const addToHidden = (id) => {
+      if (id === undefined || id === null) return;
+      hiddenIds.add(id);
+      hiddenIds.add(String(id));
+      const num = Number(id);
+      if (!isNaN(num)) hiddenIds.add(num);
+    };
+
+    // When toggle is ON ('Show recurring tasks'): Show ALL recurring tasks!
+    if (showRecurringTasksOnBoard) {
+      return hiddenIds; // empty Set -> show all tasks
     }
 
-    // When toggle is ON: Deduplicate each recurring series so only the earliest upcoming occurrence appears
+    // When toggle is OFF ('Do not show recurring tasks'): Show JUST NEXT ONE!
+    // Deduplicate each recurring series so only the single next (earliest upcoming) occurrence appears
     const earliestSeriesMap = new Map();
     for (const task of boardTasks) {
-      if (!task || task.completed || !task.recurringSeriesId) continue;
+      if (!task || task.completed) continue;
+      const isRepeating = isRepeatingTask(task);
+      const titleKey = String(task.taskname || task.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const seriesKey = (isRepeating && titleKey)
+        ? ('title_' + titleKey)
+        : (task.recurringSeriesId ? ('series_' + task.recurringSeriesId) : null);
+      if (!seriesKey) continue;
+
       const dateStr = getTaskDateStr(task);
       if (dateStr && dateStr < todayStr) continue; // Missed tasks remain visible in Missed section
 
-      const seriesId = task.recurringSeriesId;
-      const existing = earliestSeriesMap.get(seriesId);
+      const existing = earliestSeriesMap.get(seriesKey);
 
       if (!existing) {
-        earliestSeriesMap.set(seriesId, { task, dateStr: dateStr || '9999-12-31' });
+        earliestSeriesMap.set(seriesKey, { task, dateStr: dateStr || '9999-12-31' });
       } else {
         const taskVal = dateStr || '9999-12-31';
         const existingVal = existing.dateStr;
 
         if (taskVal < existingVal) {
-          hiddenIds.add(existing.task.id);
-          earliestSeriesMap.set(seriesId, { task, dateStr: taskVal });
+          addToHidden(existing.task.id);
+          earliestSeriesMap.set(seriesKey, { task, dateStr: taskVal });
         } else {
-          hiddenIds.add(task.id);
+          addToHidden(task.id);
         }
       }
     }
@@ -565,7 +581,7 @@ export default function BoardScreen({ route, navigation }) {
     };
 
     const processedTasks = boardTasks.map(task => {
-      const hasDate = !!(task.completionDate || task.dateString);
+      const hasDate = !!(task.completionDate || task.dateString || task.dueDate || task.date);
       const dateStr = getTaskDateStr(task);
       const priorityScore = PRIORITY_SCORES[task.priority?.toLowerCase()] || 0;
       const idNum = parseInt(task.id || '0');
@@ -584,8 +600,13 @@ export default function BoardScreen({ route, navigation }) {
       if (item.isCompleted) {
         buckets.completed.push(item);
       } else {
+        const isHidden = hiddenRecurringTaskIds.has(task.id) || 
+          (task.id !== undefined && task.id !== null && hiddenRecurringTaskIds.has(String(task.id))) ||
+          (!isNaN(Number(task.id)) && hiddenRecurringTaskIds.has(Number(task.id)));
+
+        if (isHidden) continue;
+
         buckets.todo.push(item);
-        if (hiddenRecurringTaskIds.has(task.id)) continue;
 
         const section = classifyTaskDate(item.dateStr, thresholds, item.hasDate);
         if (buckets[section]) {
@@ -1148,12 +1169,12 @@ export default function BoardScreen({ route, navigation }) {
         key={activeBoardId}
         data={flattenedData}
         extraData={flashListExtraData}
-        keyExtractor={(item, index) => {
+        keyExtractor={(item) => {
           if (item?.type === 'task') {
-            const taskId = item.task?.id || `idx_${index}`;
-            return `task_${taskId}_${item.section?.id || 'sec'}_${index}`;
+            const taskId = item.task?.id || 'unknown';
+            return `task_${taskId}_${item.section?.id || 'sec'}`;
           }
-          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}_${index}`;
+          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
         }}
         getItemType={(item) => item.type}
         renderItem={renderItem}
@@ -1164,7 +1185,7 @@ export default function BoardScreen({ route, navigation }) {
         onScrollBeginDrag={closeOpenSwipeableRow}
         estimatedItemSize={65}
         drawDistance={Platform.OS === 'web' ? 400 : 350}
-        removeClippedSubviews={Platform.OS !== 'web'}
+        removeClippedSubviews={false}
       />
 
       <TaskDetailsModal 

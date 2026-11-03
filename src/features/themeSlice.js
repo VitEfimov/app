@@ -71,6 +71,7 @@ const initialState = {
   // Security
   appPin: loaded?.appPin || null,
   biometricUnlockEnabled: loaded?.biometricUnlockEnabled !== undefined ? loaded.biometricUnlockEnabled : true,
+  blockScreenshots: loaded?.blockScreenshots !== undefined ? loaded.blockScreenshots : false,
 
   // Default Reminder Settings for New Tasks
   defaultReminderEnabled: loaded?.defaultReminderEnabled || false,
@@ -175,6 +176,7 @@ const themeSlice = createSlice({
       state.randomColorDaily = false;
       state.lastRandomColorDate = null;
       state.showRecurringTasksOnBoard = false;
+      state.blockScreenshots = false;
       
       // Reset auto-manage settings
       state.autoTransferMode = 'none';
@@ -273,6 +275,9 @@ const themeSlice = createSlice({
     },
     setSelectedCalendarId: (state, action) => {
       state.selectedCalendarId = action.payload;
+    },
+    setBlockScreenshots: (state, action) => {
+      state.blockScreenshots = action.payload;
     }
   }
 });
@@ -326,6 +331,7 @@ export const {
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
   setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId,
+  setBlockScreenshots,
   setGoogleDrawerOpen, triggerJumpToToday
 } = themeSlice.actions;
 

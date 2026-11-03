@@ -136,7 +136,7 @@ class ExpoTaskAlarmModule : Module() {
       return@AsyncFunction false
     }
 
-    AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, channelId: String, presentationStyle: String? ->
+    AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, channelId: String, presentationStyle: String?, keepNotificationAllDay: Boolean? ->
       val context = appContext.reactContext ?: return@AsyncFunction false
       
       val targetChannelId = if (!channelId.isNullOrEmpty()) channelId else "task_alarm_channel"
@@ -179,6 +179,7 @@ class ExpoTaskAlarmModule : Module() {
           putExtra("channelId", targetChannelId)
           putExtra("requestCode", requestCode)
           putExtra("presentationStyle", style)
+          putExtra("keepNotificationAllDay", keepNotificationAllDay ?: false)
       }
 
       val pendingIntent = PendingIntent.getBroadcast(

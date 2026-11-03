@@ -776,5 +776,18 @@
   "Red": "红色",
   "Teal": "水鸭色",
   "Yellow": "黄色",
-  "Color": "颜色"
+  "Color": "颜色",
+  "Open full image": "打开完整图片",
+  "Open screenshot with external viewer or share": "在外部查看器中打开截图或分享",
+  "Import Data (JSON)": "导入数据 (JSON)",
+  "Restore backup or task list from JSON": "从 JSON 恢复备份或任务列表",
+  "Import Tasks (CSV)": "导入任务 (CSV)",
+  "Import spreadsheet tasks from Excel or Google Sheets": "从 Excel 或 Google 表格导入任务",
+  "Import Successful": "导入成功",
+  "Import Failed": "导入失败",
+  "Successfully imported {{count}} task(s)!": "成功导入 {{count}} 个任务！",
+  "No valid tasks found in file": "文件中未找到有效任务",
+  "Block screenshots": "阻止屏幕截图",
+  "Prevent screenshots and screen recording for extra privacy": "阻止屏幕截图和屏幕录制以保护隐私",
+  "Enables or disables blocking screenshots and screen recording": "启用或禁用阻止屏幕截图和录制屏幕"
 }

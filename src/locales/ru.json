@@ -776,5 +776,18 @@
   "Red": "Красный",
   "Teal": "Темно-бирюзовый",
   "Yellow": "Желтый",
-  "Color": "Цвет"
+  "Color": "Цвет",
+  "Open full image": "Открыть снимок полностью",
+  "Open screenshot with external viewer or share": "Открыть снимок во внешнем приложении или поделиться",
+  "Import Data (JSON)": "Импорт данных (JSON)",
+  "Restore backup or task list from JSON": "Восстановить резервную копию или список задач из JSON",
+  "Import Tasks (CSV)": "Импорт задач (CSV)",
+  "Import spreadsheet tasks from Excel or Google Sheets": "Импорт задач из таблиц Excel или Google Sheets",
+  "Import Successful": "Импорт выполнен",
+  "Import Failed": "Ошибка импорта",
+  "Successfully imported {{count}} task(s)!": "Успешно импортировано задач: {{count}}!",
+  "No valid tasks found in file": "В файле не найдено подходящих задач",
+  "Block screenshots": "Запретить снимки экрана",
+  "Prevent screenshots and screen recording for extra privacy": "Запретить создание снимков и запись экрана для дополнительной конфиденциальности",
+  "Enables or disables blocking screenshots and screen recording": "Включает или выключает запрет скриншотов и записи экрана"
 }

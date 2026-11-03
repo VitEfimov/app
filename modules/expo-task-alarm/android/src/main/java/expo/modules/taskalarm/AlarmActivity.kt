@@ -44,7 +44,14 @@ class AlarmActivity : Activity() {
         val channelId = intent.getStringExtra("channelId") ?: "task_alarm_channel"
         val requestCode = intent.getIntExtra("requestCode", 0)
         val taskId = intent.getStringExtra("taskId") ?: ""
-        
+        val keepAllDay = intent.getBooleanExtra("keepNotificationAllDay", false)
+        val isCar = intent.getBooleanExtra("isCar", false)
+        val soundName = intent.getStringExtra("soundName")
+
+        if (!isCar) {
+            AlarmAudioManager.startAlarmSound(this, soundName)
+        }
+
         val titleId = resources.getIdentifier("alarm_title", "id", packageName)
         val nameId = resources.getIdentifier("alarm_task_name", "id", packageName)
         val dismissBtnId = resources.getIdentifier("alarm_dismiss_button", "id", packageName)
@@ -54,8 +61,12 @@ class AlarmActivity : Activity() {
         titleView?.text = taskName
         
         titleView?.setOnClickListener {
-            AlarmAudioManager.abandonAlarmFocus(this)
-            NotificationManagerCompat.from(this).cancel(requestCode)
+            AlarmAudioManager.stopAlarmSound(this)
+            if (keepAllDay) {
+                AlarmActionReceiver.postSilentPersistentReminder(this, requestCode, taskName, taskId)
+            } else {
+                NotificationManagerCompat.from(this).cancel(requestCode)
+            }
             
             try {
                 if (taskId.isNotEmpty()) {
@@ -84,13 +95,17 @@ class AlarmActivity : Activity() {
         findViewById<TextView>(nameId)?.text = currentDateTime
 
         findViewById<Button>(dismissBtnId)?.setOnClickListener {
-            AlarmAudioManager.abandonAlarmFocus(this)
-            NotificationManagerCompat.from(this).cancel(requestCode)
+            AlarmAudioManager.stopAlarmSound(this)
+            if (keepAllDay) {
+                AlarmActionReceiver.postSilentPersistentReminder(this, requestCode, taskName, taskId)
+            } else {
+                NotificationManagerCompat.from(this).cancel(requestCode)
+            }
             finish()
         }
 
         findViewById<Button>(snoozeBtnId)?.setOnClickListener {
-            AlarmAudioManager.abandonAlarmFocus(this)
+            AlarmAudioManager.stopAlarmSound(this)
             NotificationManagerCompat.from(this).cancel(requestCode)
             
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -100,6 +115,7 @@ class AlarmActivity : Activity() {
                 putExtra("channelId", channelId)
                 putExtra("requestCode", requestCode)
                 putExtra("presentationStyle", intent.getStringExtra("presentationStyle") ?: "fullscreen")
+                putExtra("keepNotificationAllDay", keepAllDay)
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 this,
@@ -135,7 +151,7 @@ class AlarmActivity : Activity() {
     }
 
     override fun onDestroy() {
-        AlarmAudioManager.abandonAlarmFocus(this)
+        AlarmAudioManager.stopAlarmSound(this)
         super.onDestroy()
     }
 }

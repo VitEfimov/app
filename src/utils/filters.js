@@ -5,7 +5,7 @@ dayjs.extend(isoWeek);
 
 export function getTaskDateStr(task) {
     if (!task) return '';
-    const dateVal = task.completionDate || task.dateString;
+    const dateVal = task.completionDate || task.dateString || task.dueDate || task.date;
     if (!dateVal) return '';
     
     if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {

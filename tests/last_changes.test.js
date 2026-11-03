@@ -80,6 +80,26 @@ describe('SecurityLockHelper', () => {
     SecurityLockHelper.markPickingAttachment(true);
     assert.strictEqual(SecurityLockHelper.isAttachmentPickerActive(), true);
   });
+
+  test('notifyAppLocked triggers all registered subscribers', () => {
+    let callCountA = 0;
+    let callCountB = 0;
+
+    const unsubA = SecurityLockHelper.subscribeLock(() => { callCountA++; });
+    const unsubB = SecurityLockHelper.subscribeLock(() => { callCountB++; });
+
+    SecurityLockHelper.notifyAppLocked();
+    assert.strictEqual(callCountA, 1);
+    assert.strictEqual(callCountB, 1);
+
+    // Unsubscribe A
+    unsubA();
+    SecurityLockHelper.notifyAppLocked();
+    assert.strictEqual(callCountA, 1);
+    assert.strictEqual(callCountB, 2);
+
+    unsubB();
+  });
 });
 
 // ==============================================================================
@@ -191,43 +211,44 @@ describe('BoardScreen Recurring Tasks Filtering', () => {
   };
 
   const computeHiddenRecurringTaskIds = (boardTasks, showRecurringTasksOnBoard, activeBoardType = 'standard') => {
-    if (activeBoardType === 'birthdays') return new Set();
-
     const hiddenIds = new Set();
     const todayStr = dayjs().format('YYYY-MM-DD');
 
-    // When toggle is OFF: Hide ALL recurring tasks from future/upcoming sections
-    if (!showRecurringTasksOnBoard) {
-      for (const task of boardTasks) {
-        if (!task || task.completed) continue;
-        if (isRepeatingTask(task)) {
-          const dateStr = getTaskDateStr(task);
-          if (!dateStr || dateStr > todayStr) {
-            hiddenIds.add(task.id);
-          }
-        }
-      }
-      return hiddenIds;
+    const addToHidden = (id) => {
+      if (id === undefined || id === null) return;
+      hiddenIds.add(id);
+      hiddenIds.add(String(id));
+      const num = Number(id);
+      if (!isNaN(num)) hiddenIds.add(num);
+    };
+
+    // When toggle is ON ('Show recurring tasks'): All recurring tasks should be shown!
+    if (showRecurringTasksOnBoard) {
+      return hiddenIds; // empty Set -> show all tasks!
     }
 
-    // When toggle is ON: Deduplicate each recurring series so only the earliest upcoming occurrence appears
+    // When toggle is OFF ('Do not show recurring tasks'): Show JUST NEXT ONE!
+    // Deduplicate each recurring series so only the single next (earliest upcoming) occurrence appears
     const earliestSeriesMap = new Map();
     for (const task of boardTasks) {
-      if (!task || task.completed || !task.recurringSeriesId) continue;
+      if (!task || task.completed) continue;
+      const isRepeating = isRepeatingTask(task);
+      const seriesKey = task.recurringSeriesId || (isRepeating ? ('title_' + (task.taskname || task.name || '').trim().toLowerCase()) : null);
+      if (!seriesKey) continue;
+
       const dateStr = getTaskDateStr(task);
       if (dateStr && dateStr < todayStr) continue;
 
-      const seriesId = task.recurringSeriesId;
-      if (!earliestSeriesMap.has(seriesId)) {
-        earliestSeriesMap.set(seriesId, { id: task.id, dateStr: dateStr || '9999-99-99' });
+      const existing = earliestSeriesMap.get(seriesKey);
+      const currentDate = dateStr || '9999-12-31';
+      if (!existing) {
+        earliestSeriesMap.set(seriesKey, { task, dateStr: currentDate });
       } else {
-        const existing = earliestSeriesMap.get(seriesId);
-        const currentDate = dateStr || '9999-99-99';
         if (currentDate < existing.dateStr) {
-          hiddenIds.add(existing.id);
-          earliestSeriesMap.set(seriesId, { id: task.id, dateStr: currentDate });
+          addToHidden(existing.task.id);
+          earliestSeriesMap.set(seriesKey, { task, dateStr: currentDate });
         } else {
-          hiddenIds.add(task.id);
+          addToHidden(task.id);
         }
       }
     }
@@ -248,37 +269,36 @@ describe('BoardScreen Recurring Tasks Filtering', () => {
     assert.strictEqual(isRepeatingTask(null), false);
   });
 
-  test('when showRecurringTasksOnBoard is OFF, upcoming recurring tasks are hidden but today/missed remain visible', () => {
-    const today = dayjs().format('YYYY-MM-DD');
-    const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD');
-    const nextMonth = dayjs().add(30, 'day').format('YYYY-MM-DD');
-    const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+  test('when showRecurringTasksOnBoard is OFF, show just next one: only earliest occurrence shown, future duplicates hidden', () => {
+    const nov27 = dayjs().add(20, 'day').format('YYYY-MM-DD');
+    const dec27 = dayjs().add(50, 'day').format('YYYY-MM-DD');
+    const jan27 = dayjs().add(80, 'day').format('YYYY-MM-DD');
 
     const tasks = [
-      { id: 'rec_today', taskname: 'Daily Standup', date: today, isRecurring: true },
-      { id: 'rec_missed', taskname: 'Yesterday Workout', date: yesterday, isRecurring: true },
-      { id: 'rec_tomorrow', taskname: 'Tomorrow Meds', date: tomorrow, isRecurring: true },
-      { id: 'rec_future_finance', taskname: 'Toyota finance $550', date: nextMonth, recurringSeriesId: 'series_toyota' },
-      { id: 'rec_future_insurance', taskname: 'Insurance for car $125', date: nextMonth, repeatConfig: { preset: 'Monthly' } },
-      { id: 'normal_future', taskname: 'Friend Wedding', date: nextMonth } // non-recurring
+      { id: 'toyota_nov', taskname: 'Toyota finance $550', date: nov27, recurringSeriesId: 'series_toyota' },
+      { id: 'toyota_dec', taskname: 'Toyota finance $550', date: dec27, recurringSeriesId: 'series_toyota' },
+      { id: 'toyota_jan', taskname: 'Toyota finance $550', date: jan27, recurringSeriesId: 'series_toyota' },
+      { id: 'insurance_nov', taskname: 'Insurance for car $125', date: nov27, repeatConfig: { preset: 'Monthly' } },
+      { id: 'insurance_dec', taskname: 'Insurance for car $125', date: dec27, repeatConfig: { preset: 'Monthly' } },
+      { id: 'normal_future', taskname: 'Friend Wedding', date: nov27 } // non-recurring
     ];
 
     const hidden = computeHiddenRecurringTaskIds(tasks, false);
 
-    // Upcoming recurring tasks MUST be hidden
-    assert.strictEqual(hidden.has('rec_tomorrow'), true);
-    assert.strictEqual(hidden.has('rec_future_finance'), true);
-    assert.strictEqual(hidden.has('rec_future_insurance'), true);
+    // Earliest (next one) MUST stay visible!
+    assert.strictEqual(hidden.has('toyota_nov'), false, 'Next occurrence (Nov) must stay visible');
+    assert.strictEqual(hidden.has('insurance_nov'), false, 'Next occurrence (Nov) must stay visible');
 
-    // Today and missed recurring tasks MUST stay visible
-    assert.strictEqual(hidden.has('rec_today'), false);
-    assert.strictEqual(hidden.has('rec_missed'), false);
+    // Future duplicate occurrences MUST be hidden!
+    assert.strictEqual(hidden.has('toyota_dec'), true, 'Future duplicate (Dec) must be hidden');
+    assert.strictEqual(hidden.has('toyota_jan'), true, 'Future duplicate (Jan) must be hidden');
+    assert.strictEqual(hidden.has('insurance_dec'), true, 'Future duplicate (Dec) must be hidden');
 
-    // Non-recurring future tasks MUST stay visible
+    // Non-recurring future tasks stay visible
     assert.strictEqual(hidden.has('normal_future'), false);
   });
 
-  test('when showRecurringTasksOnBoard is ON, duplicate future occurrences of a series are hidden', () => {
+  test('when showRecurringTasksOnBoard is ON, all recurring tasks are shown without hiding', () => {
     const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD');
     const nextWeek = dayjs().add(7, 'day').format('YYYY-MM-DD');
     const nextMonth = dayjs().add(30, 'day').format('YYYY-MM-DD');
@@ -292,14 +312,64 @@ describe('BoardScreen Recurring Tasks Filtering', () => {
 
     const hidden = computeHiddenRecurringTaskIds(tasks, true);
 
-    // Earliest occurrence of series_1 stays visible
+    // All recurring occurrences must be shown!
+    assert.strictEqual(hidden.size, 0);
     assert.strictEqual(hidden.has('series_1_occ1'), false);
-    // Future duplicates of series_1 are hidden
-    assert.strictEqual(hidden.has('series_1_occ2'), true);
-    assert.strictEqual(hidden.has('series_1_occ3'), true);
-
-    // Earliest of series_2 stays visible
+    assert.strictEqual(hidden.has('series_1_occ2'), false);
+    assert.strictEqual(hidden.has('series_1_occ3'), false);
     assert.strictEqual(hidden.has('series_2_occ1'), false);
+  });
+
+  test('when showRecurringTasksOnBoard is OFF on an Events or Payments board, only next occurrence is shown', () => {
+    const nov27 = dayjs().add(20, 'day').format('YYYY-MM-DD');
+    const dec27 = dayjs().add(50, 'day').format('YYYY-MM-DD');
+    const tasks = [
+      { id: 'pay_toyota_nov', taskname: 'Toyota finance $550', date: nov27, recurringSeriesId: 'series_toyota' },
+      { id: 'pay_toyota_dec', taskname: 'Toyota finance $550', date: dec27, recurringSeriesId: 'series_toyota' }
+    ];
+
+    const hidden = computeHiddenRecurringTaskIds(tasks, false, 'birthdays');
+    assert.strictEqual(hidden.has('pay_toyota_nov'), false, 'Next occurrence must be shown');
+    assert.strictEqual(hidden.has('pay_toyota_dec'), true, 'Subsequent occurrence must be hidden');
+  });
+
+  test('when showRecurringTasksOnBoard is OFF, duplicate occurrences matching by normalized title show just next one', () => {
+    const nov27 = dayjs().add(20, 'day').format('YYYY-MM-DD');
+    const dec27 = dayjs().add(50, 'day').format('YYYY-MM-DD');
+    const tasks = [
+      { id: 'toyota_nov', taskname: 'Toyota finance $550', date: nov27, repeatConfig: { preset: 'every_month' } },
+      { id: 'toyota_dec', taskname: 'Toyota finance $550', date: dec27, repeatConfig: { preset: 'every_month' } }
+    ];
+
+    const hidden = computeHiddenRecurringTaskIds(tasks, false, 'standard');
+    assert.strictEqual(hidden.has('toyota_nov'), false); // earliest stays visible (just next one)
+    assert.strictEqual(hidden.has('toyota_dec'), true);  // future duplicate is hidden
+  });
+
+  test('simple_list and shopping boards properly show just next one when OFF, and all when ON', () => {
+    // Simulate 48 recurring occurrences for a simple_list board
+    const recurringTasks = [];
+    for (let i = 0; i < 48; i++) {
+      recurringTasks.push({
+        id: `task_rec_${i}`,
+        taskname: '546415352',
+        time: '1:20 AM',
+        date: dayjs().add(i + 1, 'day').format('YYYY-MM-DD'),
+        isRecurring: true,
+        recurringSeriesId: 'series_546415352'
+      });
+    }
+
+    // Case 1: showRecurringTasksOnBoard is OFF -> show just next one (1 task shown, 47 hidden)
+    const hiddenOff = computeHiddenRecurringTaskIds(recurringTasks, false, 'simple_list');
+    const todoTasksOff = recurringTasks.filter(t => !hiddenOff.has(t.id));
+    assert.strictEqual(todoTasksOff.length, 1, 'Show just next one (1 task) on simple_list when toggle is OFF');
+    assert.strictEqual(todoTasksOff[0].id, 'task_rec_0');
+
+    // Case 2: showRecurringTasksOnBoard is ON -> all tasks should be shown (all 48 shown)
+    const hiddenOn = computeHiddenRecurringTaskIds(recurringTasks, true, 'simple_list');
+    const todoTasksOn = recurringTasks.filter(t => !hiddenOn.has(t.id));
+    assert.strictEqual(todoTasksOn.length, 48, 'All tasks should be shown when toggle is ON');
   });
 });
 
@@ -392,22 +462,15 @@ describe('TaskRow Inline Focus & Cancellation', () => {
     );
   });
 
-  test('user cannot change task name inline on completed section, opens edit task modal instead', () => {
+  test('user can change task name inline on completed section', () => {
     const taskRowPath = path.resolve('src/components/TaskRow.js');
     const content = fs.readFileSync(taskRowPath, 'utf8');
 
-    // Asserts isCompletedSection check
+    // Asserts handleTextPress does not block inline editing for completed tasks
     assert.match(
       content,
-      /const\s+isCompletedSection\s*=\s*sectionId\s*===\s*['"]completed['"]\s*\|\|\s*!!task\?\.completed/,
-      'TaskRow must identify completed section or completed task'
-    );
-
-    // Asserts inline edit bypass for completed tasks
-    assert.match(
-      content,
-      /if\s*\(\s*disableInlineEdit\s*\|\|\s*isCompletedSection\s*\)\s*\{\s*if\s*\(\s*onPress\s*\)\s*onPress\s*\(\s*task\s*\);\s*return;\s*\}/,
-      'Tapping task name on completed section must bypass inline edit and trigger onPress(task)'
+      /if\s*\(\s*disableInlineEdit\s*\)\s*\{\s*if\s*\(\s*onPress\s*\)\s*onPress\s*\(\s*task\s*\);\s*return;\s*\}/,
+      'Tapping task name on completed section allows inline edit (only blocked if disableInlineEdit is explicitly true)'
     );
 
     // Behavioral simulation
@@ -415,8 +478,7 @@ describe('TaskRow Inline Focus & Cancellation', () => {
     let editModalOpened = false;
 
     function simulateTextPress({ task, sectionId, disableInlineEdit, onPress }) {
-      const isCompletedSection = sectionId === 'completed' || !!task?.completed;
-      if (disableInlineEdit || isCompletedSection) {
+      if (disableInlineEdit) {
         if (onPress) onPress(task);
         return;
       }
@@ -433,7 +495,7 @@ describe('TaskRow Inline Focus & Cancellation', () => {
     assert.strictEqual(inlineEditTriggered, true);
     assert.strictEqual(editModalOpened, false);
 
-    // 2. Task in 'completed' section disables inline edit and opens modal
+    // 2. Task in 'completed' section also allows inline edit
     inlineEditTriggered = false;
     editModalOpened = false;
     simulateTextPress({
@@ -442,8 +504,8 @@ describe('TaskRow Inline Focus & Cancellation', () => {
       disableInlineEdit: false,
       onPress: () => { editModalOpened = true; }
     });
-    assert.strictEqual(inlineEditTriggered, false);
-    assert.strictEqual(editModalOpened, true);
+    assert.strictEqual(inlineEditTriggered, true);
+    assert.strictEqual(editModalOpened, false);
   });
 });
 
@@ -1043,6 +1105,45 @@ describe('OWASP MASVS Security Standards (Data-at-Rest & Screen Privacy)', () =>
     assert.strictEqual(scheduledWith.id, 't-123');
     assert.strictEqual(scheduledWith.sound, 'bell.mp3');
   });
+
+  test('App screen security policy allows screenshots when unlocked and blocks during PIN screen, background or when user enabled blockScreenshots', () => {
+    const computeScreenSecurity = ({ blockScreenshots, appPin, isUnlocked, isAppBackgrounded }) => {
+      const isLocked = !!(appPin && !isUnlocked);
+      return !!(blockScreenshots || isLocked || isAppBackgrounded);
+    };
+
+    // Case 1: Unlocked, PIN enabled, actively in foreground, blockScreenshots OFF (default)
+    // -> Screenshots MUST be allowed!
+    assert.strictEqual(
+      computeScreenSecurity({ blockScreenshots: false, appPin: '1234', isUnlocked: true, isAppBackgrounded: false }),
+      false,
+      'Screenshots must be allowed during normal foreground usage even when App PIN is set'
+    );
+
+    // Case 2: App locked with PIN (on PIN screen)
+    // -> Screenshots must be blocked to protect PIN
+    assert.strictEqual(
+      computeScreenSecurity({ blockScreenshots: false, appPin: '1234', isUnlocked: false, isAppBackgrounded: false }),
+      true,
+      'Screenshots must be blocked when PIN lock screen is displayed'
+    );
+
+    // Case 3: App is backgrounded (in OS task switcher)
+    // -> Screen security must be enabled to prevent OS recents leaks
+    assert.strictEqual(
+      computeScreenSecurity({ blockScreenshots: false, appPin: '1234', isUnlocked: true, isAppBackgrounded: true }),
+      true,
+      'Screen security must be active in app switcher'
+    );
+
+    // Case 4: User explicitly enabled "Block screenshots" in Settings
+    // -> Always blocked even when unlocked
+    assert.strictEqual(
+      computeScreenSecurity({ blockScreenshots: true, appPin: '1234', isUnlocked: true, isAppBackgrounded: false }),
+      true,
+      'Screenshots must be blocked when user enables Block screenshots setting'
+    );
+  });
 });
 
 // ==============================================================================
@@ -1111,19 +1212,29 @@ describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
           }
         }
       },
+      'expo-document-picker': {
+        getDocumentAsync: async () => ({ canceled: true })
+      },
+      './securityLockHelper': {
+        SecurityLockHelper: {
+          markPickingAttachment: () => {}
+        }
+      },
       '../../modules/expo-task-alarm': {
         cancelAlarm: async (id) => {
           cancelledAlarms.push(id);
         }
       },
       '../features/taskSlice': {
-        clearTasks: () => ({ type: 'task/clearTasks' })
+        clearTasks: () => ({ type: 'task/clearTasks' }),
+        addMultipleTasks: (payload) => ({ type: 'task/addMultipleTasks', payload })
       },
       '../features/themeSlice': {
         resetTheme: () => ({ type: 'theme/resetTheme' })
       },
       '../features/userSlice': {
-        logout: () => ({ type: 'user/logout' })
+        logout: () => ({ type: 'user/logout' }),
+        addBoardAsync: (payload) => ({ type: 'user/addBoard', payload })
       }
     });
   });
@@ -1237,6 +1348,108 @@ describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
     assert.strictEqual(sharedFiles[0].opts.mimeType, 'text/csv');
   });
 
+  test('parseCsv handles standard RFC 4180 quotes, commas, and newlines', () => {
+    const csv = 'Task Name,Priority,Notes\n"Buy ""Organic"" Milk",High,"Line 1\nLine 2, with comma"\nSimple,Low,Done';
+    const rows = gdprHelper.parseCsv(csv);
+    assert.strictEqual(rows.length, 3);
+    assert.deepStrictEqual(rows[0], ['Task Name', 'Priority', 'Notes']);
+    assert.strictEqual(rows[1][0], 'Buy "Organic" Milk');
+    assert.strictEqual(rows[1][1], 'High');
+    assert.strictEqual(rows[1][2], 'Line 1\nLine 2, with comma');
+    assert.deepStrictEqual(rows[2], ['Simple', 'Low', 'Done']);
+  });
+
+  test('importTasksFromCsvAsync imports tasks accurately into Redux state', async () => {
+    const csv = [
+      'Task Name,Status,Priority,Due Date,Due Time,Board,Notes,Subtasks',
+      '"Project Alpha Launch",Completed,High,2026-11-20,10:00 AM,Work,"Crucial deadline","Prep slides; Review budget"',
+      '"Grocery Run",Pending,Normal,2026-11-05,08:30 AM,Personal,"Apples, Milk",Sub 1'
+    ].join('\n');
+
+    const added = [];
+    const mockDispatch = (action) => {
+      if (action.type === 'task/addMultipleTasks') {
+        added.push(...action.payload.tasks);
+      }
+    };
+    const boards = [{ id: 'b_work', name: 'Work' }, { id: 'b_pers', name: 'Personal' }];
+
+    const res = await gdprHelper.importTasksFromCsvAsync({
+      csvString: csv,
+      dispatch: mockDispatch,
+      existingBoards: boards
+    });
+
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.count, 2);
+    assert.strictEqual(added.length, 2);
+
+    // Row 1 assertions
+    assert.strictEqual(added[0].taskname, 'Project Alpha Launch');
+    assert.strictEqual(added[0].completed, true);
+    assert.strictEqual(added[0].priority, 'high');
+    assert.strictEqual(added[0].boardId, 'b_work');
+    assert.strictEqual(added[0].time, '10:00 AM');
+    assert.strictEqual(added[0].description.text, 'Crucial deadline');
+    assert.strictEqual(added[0].subtasks.length, 2);
+    assert.strictEqual(added[0].subtasks[0].text, 'Prep slides');
+    assert.strictEqual(added[0].subtasks[1].text, 'Review budget');
+
+    // Row 2 assertions
+    assert.strictEqual(added[1].taskname, 'Grocery Run');
+    assert.strictEqual(added[1].completed, false);
+    assert.strictEqual(added[1].priority, 'medium');
+    assert.strictEqual(added[1].boardId, 'b_pers');
+  });
+
+  test('importDataFromJsonAsync restores tasks and creates missing boards', async () => {
+    const backupJson = JSON.stringify({
+      app: 'TaskCalendar',
+      schemaVersion: 1,
+      boards: [
+        { id: 'custom_board_1', name: 'Fitness & Health', color: '#10B981' }
+      ],
+      tasks: [
+        {
+          id: 'json_task_1',
+          taskname: '5k Morning Run',
+          completed: false,
+          priority: 'high',
+          completionDate: '2026-11-10T07:00:00.000Z',
+          boardId: 'custom_board_1',
+          description: { text: 'Drink water before starting' },
+          subtasks: [{ id: 'sub_run_1', title: 'Stretch legs', completed: true }]
+        }
+      ]
+    });
+
+    const addedTasks = [];
+    const addedBoards = [];
+    const mockDispatch = (action) => {
+      if (action.type === 'task/addMultipleTasks') {
+        addedTasks.push(...action.payload.tasks);
+      } else if (action.type === 'user/addBoard') {
+        addedBoards.push(action.payload);
+      }
+    };
+
+    const res = await gdprHelper.importDataFromJsonAsync({
+      jsonString: backupJson,
+      dispatch: mockDispatch,
+      existingBoards: [{ id: 'main', name: 'Main' }]
+    });
+
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.count, 1);
+    assert.strictEqual(res.boardsCount, 1);
+    assert.strictEqual(addedBoards.length, 1);
+    assert.strictEqual(addedBoards[0].name, 'Fitness & Health');
+    assert.strictEqual(addedTasks.length, 1);
+    assert.strictEqual(addedTasks[0].taskname, '5k Morning Run');
+    assert.strictEqual(addedTasks[0].priority, 'high');
+    assert.strictEqual(addedTasks[0].boardId, 'custom_board_1');
+  });
+
   test('wipeAllUserDataAsync executes complete GDPR Art. 17 data erasure', async () => {
     const mockTasks = [
       { id: 'task-1', isAlarm: true },
@@ -1300,10 +1513,19 @@ describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
     }
 
     const enKeys = Object.keys(loadedLocales['en']);
-    assert.strictEqual(enKeys.length, 778, 'English locale must contain exactly 778 keys');
+    assert.strictEqual(enKeys.length, 791, 'English locale must contain exactly 791 keys');
     assert.strictEqual(loadedLocales['ru']['Not available on this device'], 'Недоступно на этом устройстве');
     assert.strictEqual(loadedLocales['ko']['Purple'], '보라');
     assert.strictEqual(loadedLocales['ru']['Purple'], 'Пурпурный');
+    assert.strictEqual(loadedLocales['ru']['Block screenshots'], 'Запретить снимки экрана');
+    assert.strictEqual(loadedLocales['ko']['Block screenshots'], '스크린샷 차단');
+    assert.strictEqual(loadedLocales['de']['Block screenshots'], 'Screenshots blockieren');
+    assert.strictEqual(loadedLocales['ru']['Open full image'], 'Открыть снимок полностью');
+    assert.strictEqual(loadedLocales['ko']['Open full image'], '전체 이미지 열기');
+    assert.strictEqual(loadedLocales['ru']['Import Data (JSON)'], 'Импорт данных (JSON)');
+    assert.strictEqual(loadedLocales['ru']['Import Tasks (CSV)'], 'Импорт задач (CSV)');
+    assert.strictEqual(loadedLocales['ko']['Import Data (JSON)'], '데이터 가져오기 (JSON)');
+    assert.strictEqual(loadedLocales['ko']['Import Tasks (CSV)'], '작업 가져오기 (CSV)');
 
     // Required GDPR keys to check
     const requiredGdprKeys = [
@@ -1314,8 +1536,16 @@ describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
       'Local storage, AES-256 encryption, zero ad trackers',
       'Export All Data (JSON)',
       'GDPR Art. 20 Data Portability · Full JSON backup',
+      'Import Data (JSON)',
+      'Restore backup or task list from JSON',
       'Export Tasks (CSV)',
       'Formatted for spreadsheets · Excel, Sheets, Numbers',
+      'Import Tasks (CSV)',
+      'Import spreadsheet tasks from Excel or Google Sheets',
+      'Import Successful',
+      'Import Failed',
+      'Successfully imported {{count}} task(s)!',
+      'No valid tasks found in file',
       'Erase All Data & Reset',
       'GDPR Art. 17 Right to Erasure · Permanent wipe',
       'Privacy & Data Protection',
@@ -1721,5 +1951,87 @@ describe('Tier 2 Large Screens, Foldables & Chaos Stress Harness', () => {
     assert.strictEqual(result.isTamperCaught, true);
     assert.ok(result.message.includes('Integrity Verified'));
     assert.strictEqual(rawStored['@chaos_tamper_canary'], undefined);
+  });
+});
+
+// ==============================================================================
+// TEST SUITE 14: Deep Persistent Debugger, Looping Alarm & Date Normalization
+// ==============================================================================
+describe('Deep Persistent Debugger, Looping Alarm & Date Normalization', () => {
+  test('DevLogger persists logs to AsyncStorage across reloads', async () => {
+    let mockStorage = {};
+    const mockAsyncStorage = {
+      getItem: async (key) => mockStorage[key] || null,
+      setItem: async (key, val) => { mockStorage[key] = val; },
+      removeItem: async (key) => { delete mockStorage[key]; }
+    };
+
+    const loggerMod = loadTranspiledModule(path.resolve('src/utils/logger.js'), {
+      '@react-native-async-storage/async-storage': mockAsyncStorage
+    });
+    const { DevLogger } = loggerMod;
+
+    await DevLogger.init();
+    DevLogger.info('Diagnostic message 1');
+    DevLogger.error('Diagnostic error 2');
+
+    // Wait for debounced persist (500ms + buffer)
+    await new Promise(r => setTimeout(r, 600));
+
+    assert.ok(mockStorage['@system_dev_logs'], 'Logs must be saved in @system_dev_logs');
+    const storedEntries = JSON.parse(mockStorage['@system_dev_logs']);
+    assert.ok(Array.isArray(storedEntries));
+    assert.ok(storedEntries.length >= 2);
+    assert.strictEqual(storedEntries[0].message, 'Diagnostic error 2');
+    assert.strictEqual(storedEntries[1].message, 'Diagnostic message 1');
+
+    await DevLogger.clearLogs();
+  });
+
+  test('date normalization prevents UTC shift backwards by a day in local time', () => {
+    const utcIsoString = '2026-11-03T00:00:00.000Z';
+    const dateOnly = (typeof utcIsoString === 'string' && utcIsoString.includes('T'))
+      ? utcIsoString.split('T')[0]
+      : dayjs(utcIsoString).format('YYYY-MM-DD');
+
+    assert.strictEqual(dateOnly, '2026-11-03', 'Must stay 2026-11-03 and never shift to 2026-11-02');
+
+    const combinedDateTime = `${dateOnly} 10:00 AM`;
+    const parsed = dayjs(combinedDateTime, ['YYYY-MM-DD h:mm A'], true);
+    assert.strictEqual(parsed.isValid(), true);
+    assert.strictEqual(parsed.format('YYYY-MM-DD'), '2026-11-03');
+  });
+
+  test('persistent all-day notification is silent and does not play audible chime', () => {
+    const notificationsPath = path.resolve('src/utils/notifications.js');
+    const content = fs.readFileSync(notificationsPath, 'utf8');
+
+    // Asserts channel is silent and sound is null for all-day notifications
+    assert.match(
+      content,
+      /const\s+channelId\s*=\s*['"]task_silent_notification_v2['"]/,
+      'Persistent notifications must use task_silent_notification_v2'
+    );
+    assert.match(
+      content,
+      /const\s+sound\s*=\s*null/,
+      'Persistent notification sound must be null'
+    );
+  });
+
+  test('native alarm passes keepNotificationAllDay and supports continuous loop', () => {
+    const alarmModPath = path.resolve('modules/expo-task-alarm/index.ts');
+    const content = fs.readFileSync(alarmModPath, 'utf8');
+
+    assert.match(
+      content,
+      /keepNotificationAllDay\?:?\s*boolean/,
+      'scheduleExactAlarm must accept keepNotificationAllDay'
+    );
+    assert.match(
+      content,
+      /!!keepNotificationAllDay/,
+      'scheduleExactAlarm must forward keepNotificationAllDay to native module'
+    );
   });
 });

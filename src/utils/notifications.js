@@ -608,7 +608,7 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     return [];
   }
 
-  // Schedule persistent all-day notification if requested
+  // Schedule persistent all-day notification if requested (silently in background)
   if (isKeepAllDay) {
     const now = dayjs();
     const isTodayOrPast = targetDate.isSameOrBefore(now, 'day');
@@ -637,8 +637,11 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     if (persistentId) ids.push(persistentId);
   }
 
+  const dateOnly = (typeof completionDateStr === 'string' && completionDateStr.includes('T'))
+    ? completionDateStr.split('T')[0]
+    : dayjs(completionDateStr).format('YYYY-MM-DD');
+
   if (timeStr) {
-    const dateOnly = targetDate.format('YYYY-MM-DD');
     const parsedTime = dayjs(
       `${dateOnly} ${timeStr}`,
       [
@@ -742,20 +745,27 @@ export async function schedulePersistentTaskNotification(
   const targetDate = dayjs(triggerDateObj);
   DevLogger.info(`schedulePersistentTaskNotification for: ${taskName}`, { targetDate: targetDate.format(), taskId });
 
-  const notificationSound = themeState.notificationSound || 'default';
-  const vibrationEnabled = themeState.vibrationEnabled !== false;
-  const channelId = getChannelId(false, notificationSound, vibrationEnabled);
-  const sound = notificationSound;
+  const channelId = 'task_silent_notification_v2';
+  const sound = null;
 
   try {
-    await configureAndroidNotificationChannels(notificationSound, 'default', vibrationEnabled);
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync(channelId, {
+        name: 'Silent all-day reminders',
+        description: 'Persistent reminders without sound',
+        importance: Notifications.AndroidImportance.LOW,
+        sound: null,
+        enableVibrate: false,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+    }
 
     const scheduledId = await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Task Reminder',
         body: timeStr ? `${taskName} (${timeStr})` : taskName,
-        ...(Platform.OS !== 'android' && { sound }),
-        priority: Notifications.AndroidNotificationPriority.MAX,
+        sound: null,
+        priority: Notifications.AndroidNotificationPriority.LOW,
         categoryIdentifier: 'task_persistent',
         data: {
           taskId,
@@ -840,7 +850,8 @@ export async function scheduleExactTaskReminder(
         taskName,
         targetDate.valueOf(),
         channelId,
-        alarmPresentationStyle
+        alarmPresentationStyle,
+        advancedOptions?.keepNotificationAllDay
       );
       if (success) {
         DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, channelId, taskName, alarmPresentationStyle, isCar });

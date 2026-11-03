@@ -7,8 +7,29 @@ let isPickingAttachment = false;
 let isAuthenticatingBiometric = false;
 let pickingTimeout = null;
 let biometricTimeout = null;
+const lockListeners = new Set();
 
 export const SecurityLockHelper = {
+  subscribeLock: (listener) => {
+    if (typeof listener === 'function') {
+      lockListeners.add(listener);
+      return () => {
+        lockListeners.delete(listener);
+      };
+    }
+    return () => {};
+  },
+
+  notifyAppLocked: () => {
+    lockListeners.forEach(listener => {
+      try {
+        listener();
+      } catch (e) {
+        console.warn('[SecurityLockHelper] listener error:', e);
+      }
+    });
+  },
+
   markPickingAttachment: (active = true) => {
     if (pickingTimeout) {
       clearTimeout(pickingTimeout);
@@ -66,6 +87,7 @@ export const SecurityLockHelper = {
     }
     isPickingAttachment = false;
     isAuthenticatingBiometric = false;
+    lockListeners.clear();
   }
 };
 

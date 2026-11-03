@@ -14,9 +14,10 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val taskName = intent.getStringExtra("taskName") ?: "Task Alarm"
         val channelId = intent.getStringExtra("channelId") ?: "task_alarm_channel"
         val requestCode = intent.getIntExtra("requestCode", 0)
-
         val taskId = intent.getStringExtra("taskId") ?: ""
         val presentationStyle = intent.getStringExtra("presentationStyle") ?: "fullscreen"
+        val keepNotificationAllDay = intent.getBooleanExtra("keepNotificationAllDay", false)
+        val soundName = intent.getStringExtra("soundName")
 
         val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -24,7 +25,6 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val isLocked = keyguardManager?.isKeyguardLocked ?: false
 
         val isFullScreenMode = (presentationStyle == "fullscreen") || (presentationStyle == "adaptive" && (!isInteractive || isLocked))
-
         val activeChannelId = if (isFullScreenMode) "${channelId}_fs" else channelId
         val isCar = CarUtils.isConnectedToCar(context)
 
@@ -37,6 +37,8 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             putExtra("requestCode", requestCode)
             putExtra("isCar", isCar)
             putExtra("presentationStyle", presentationStyle)
+            putExtra("keepNotificationAllDay", keepNotificationAllDay)
+            putExtra("soundName", soundName)
         }
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
@@ -55,6 +57,10 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val stopIntent = Intent(context, AlarmActionReceiver::class.java).apply {
             action = "STOP_ALARM"
             putExtra("requestCode", requestCode)
+            putExtra("taskId", taskId)
+            putExtra("taskName", taskName)
+            putExtra("channelId", channelId)
+            putExtra("keepNotificationAllDay", keepNotificationAllDay)
         }
         val stopPendingIntent = PendingIntent.getBroadcast(context, requestCode + 1000, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
@@ -65,6 +71,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             putExtra("taskName", taskName)
             putExtra("channelId", channelId)
             putExtra("presentationStyle", presentationStyle)
+            putExtra("keepNotificationAllDay", keepNotificationAllDay)
         }
         val snoozePendingIntent = PendingIntent.getBroadcast(context, requestCode + 2000, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
@@ -81,31 +88,26 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             .addAction(0, "Stop", stopPendingIntent)
 
         if (isFullScreenMode) {
-            // In Full-Screen mode, priority is DEFAULT so Android does not show a heads-up popup banner over the full-screen activity
             notificationBuilder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
             if (!isInteractive || isLocked) {
-                // If screen is locked or off, fullScreenIntent will wake the device to full-screen activity (no heads-up banner on lockscreen)
                 notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
             }
         } else {
-            // In Popup mode, priority is MAX so Android drops down the heads-up notification banner with action buttons
             notificationBuilder.setPriority(NotificationCompat.PRIORITY_MAX)
         }
 
         if (isCar) {
-            // Mute completely when connected to Android Auto / car
             notificationBuilder.setSound(null)
             notificationBuilder.setVibrate(null)
         } else {
-            // Request audio focus to pause/stop background media (e.g. YouTube, Spotify)
-            AlarmAudioManager.requestAlarmFocus(context)
             notificationBuilder.setDefaults(NotificationCompat.DEFAULT_LIGHTS)
+            // In popup mode, start looping audio directly
+            if (!isFullScreenMode) {
+                AlarmAudioManager.startAlarmSound(context, soundName)
+            }
         }
 
         val notification = notificationBuilder.build()
-        if (!isCar) {
-            notification.flags = notification.flags or android.app.Notification.FLAG_INSISTENT
-        }
 
         try {
             NotificationManagerCompat.from(context).notify(requestCode, notification)

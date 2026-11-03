@@ -776,5 +776,18 @@
   "Red": "レッド",
   "Teal": "ティール",
   "Yellow": "イエロー",
-  "Color": "色"
+  "Color": "色",
+  "Open full image": "画像を全画面で開く",
+  "Open screenshot with external viewer or share": "スクリーンショットを外部ビューアで開くか共有",
+  "Import Data (JSON)": "データをインポート (JSON)",
+  "Restore backup or task list from JSON": "JSONからバックアップまたはタスクリストを復元",
+  "Import Tasks (CSV)": "タスクをインポート (CSV)",
+  "Import spreadsheet tasks from Excel or Google Sheets": "ExcelやGoogleスプレッドシートからタスクをインポート",
+  "Import Successful": "インポート成功",
+  "Import Failed": "インポート失敗",
+  "Successfully imported {{count}} task(s)!": "{{count}} 件のタスクを正常にインポートしました！",
+  "No valid tasks found in file": "ファイル内に有効なタスクが見つかりませんでした",
+  "Block screenshots": "スクリーンショットをブロック",
+  "Prevent screenshots and screen recording for extra privacy": "プライバシー保護のためスクリーンショットと画面録画を防止",
+  "Enables or disables blocking screenshots and screen recording": "スクリーンショットと画面録画のブロックを有効または無効にします"
 }

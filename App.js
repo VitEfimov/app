@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import store from './src/store';
 if (typeof window !== 'undefined') window.__store = store;
 import AppNavigator from './src/navigation/AppNavigator';
-import { View, Text, ActivityIndicator, TouchableOpacity, AppState, LogBox, StyleSheet, Animated } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, AppState, LogBox, StyleSheet, Animated, Modal } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
 
@@ -33,6 +33,8 @@ import PinLockScreen from './src/screens/PinLockScreen';
 import { SecurityLockHelper } from './src/utils/securityLockHelper';
 import { CryptoStorage } from './src/utils/cryptoStorage';
 import { setScreenSecurityAsync } from './modules/expo-task-alarm';
+import { CrashLogger } from './src/utils/crashLogger';
+import { DevLogger } from './src/utils/logger';
 import { A11yHelper } from './src/utils/a11yHelper';
 import { HapticHelper } from './src/utils/hapticHelper';
 
@@ -51,15 +53,31 @@ if (typeof queueMicrotask === 'undefined') {
   };
 }
 
+// Initialize persistent dev logs & crash logs early
+CrashLogger.init().catch(() => {});
+DevLogger.init().catch(() => {});
+
 // Global unhandled error and promise rejection listeners
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
     console.warn('[Global Guard] Handled unhandledrejection:', event.reason);
+    DevLogger.error('Unhandled Promise Rejection', event.reason?.message || String(event.reason));
+    CrashLogger.recordCrash({
+      screenName: 'GlobalWeb',
+      error: event.reason,
+      context: { type: 'unhandledrejection' }
+    });
     // Prevent unhandled rejection from killing the app
     event.preventDefault();
   });
   window.addEventListener('error', (event) => {
     console.error('[Global Guard] Handled window error:', event.error || event.message);
+    DevLogger.error('Global Window Error', event.error?.message || event.message);
+    CrashLogger.recordCrash({
+      screenName: 'GlobalWeb',
+      error: event.error || new Error(event.message || 'Window error'),
+      context: { filename: event.filename, lineno: event.lineno }
+    });
   });
 }
 if (global.ErrorUtils && !global.__customErrorUtilsGuardSet) {
@@ -67,6 +85,12 @@ if (global.ErrorUtils && !global.__customErrorUtilsGuardSet) {
   const originalHandler = global.ErrorUtils.getGlobalHandler();
   global.ErrorUtils.setGlobalHandler((error, isFatal) => {
     console.error('[Global ErrorUtils Guard]', error, 'isFatal:', isFatal);
+    DevLogger.error(`Global Error (fatal: ${isFatal})`, error?.message || String(error));
+    CrashLogger.recordCrash({
+      screenName: 'GlobalNative',
+      error,
+      context: { isFatal }
+    });
     if (originalHandler) {
       originalHandler(error, false);
     }
@@ -89,6 +113,12 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
+    DevLogger.error('ErrorBoundary caught error', { message: error?.message, stack: error?.stack, componentStack: errorInfo?.componentStack });
+    CrashLogger.recordCrash({
+      screenName: 'ErrorBoundary',
+      error,
+      errorInfo
+    });
     this.setState({ errorInfo });
   }
 
@@ -128,6 +158,7 @@ function InitApp() {
   const shareIntentResult = Platform.OS !== 'web' ? useShareIntent() : null;
   const { hasShareIntent, shareIntent, resetShareIntent } = shareIntentResult || {};
   const appPin = useSelector(state => state.themeReducer?.appPin);
+  const blockScreenshots = useSelector(state => state.themeReducer?.blockScreenshots);
   const vibrationEnabled = useSelector(state => state.themeReducer?.vibrationEnabled);
   const lastBackgroundTimestampRef = useRef(null);
 
@@ -136,14 +167,19 @@ function InitApp() {
     HapticHelper.setVibrationEnabled(vibrationEnabled !== false);
   }, [vibrationEnabled]);
 
-  // OWASP MASVS-RESILIENCE-1: Enable native window FLAG_SECURE whenever App PIN is configured
+  // OWASP MASVS-RESILIENCE-1 & Screen Privacy:
+  // Native window FLAG_SECURE prevents screenshots and app switcher snooping.
+  // - If user explicitly toggles 'Block screenshots' in Settings -> always protected
+  // - If app is locked with PIN or in background -> protected against OS app switcher exposure
+  // - Otherwise -> allowed, so the user can freely capture screenshots of tasks & lists!
   useEffect(() => {
-    if (appPin) {
+    const isLocked = !!(appPin && !isUnlocked);
+    if (blockScreenshots || isLocked || isAppBackgrounded) {
       setScreenSecurityAsync(true);
     } else {
       setScreenSecurityAsync(false);
     }
-  }, [appPin]);
+  }, [blockScreenshots, appPin, isUnlocked, isAppBackgrounded]);
 
   useEffect(() => {
     const isLocked = !!(appPin && !isUnlocked);
@@ -433,6 +469,7 @@ function InitApp() {
           const elapsed = Date.now() - lastBackgroundTimestampRef.current;
           if (elapsed > 30000 && !SecurityLockHelper.isAttachmentPickerActive() && !SecurityLockHelper.isAuthenticatingBiometric()) {
             setIsUnlocked(false);
+            SecurityLockHelper.notifyAppLocked();
           }
           lastBackgroundTimestampRef.current = null;
         }
@@ -595,9 +632,17 @@ function InitApp() {
       )}
 
       {isLocked && (
-        <View style={StyleSheet.absoluteFillObject}>
-          <PinLockScreen correctPin={appPin} onUnlock={() => setIsUnlocked(true)} />
-        </View>
+        <Modal
+          visible={isLocked}
+          transparent={false}
+          animationType="none"
+          statusBarTranslucent={true}
+          onRequestClose={() => {}}
+        >
+          <View style={StyleSheet.absoluteFillObject}>
+            <PinLockScreen correctPin={appPin} onUnlock={() => setIsUnlocked(true)} />
+          </View>
+        </Modal>
       )}
 
       {/* OWASP MASVS-RESILIENCE-1: Privacy Shield covering app switcher snapshot when minimized */}

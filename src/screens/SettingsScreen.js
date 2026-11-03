@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as R
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync } from '../utils/calendarSync';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
@@ -17,7 +17,7 @@ import PremiumModal from '../components/PremiumModal';
 import CustomDropdown from '../components/CustomDropdown';
 import PromptModal from '../components/PromptModal';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
-import { exportDataAsJsonAsync, exportTasksAsCsvAsync, wipeAllUserDataAsync } from '../utils/gdprHelper';
+import { exportDataAsJsonAsync, exportTasksAsCsvAsync, importDataFromJsonAsync, importTasksFromCsvAsync, pickAndReadTextFileAsync, wipeAllUserDataAsync } from '../utils/gdprHelper';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
@@ -225,6 +225,23 @@ const IconSpreadsheet = ({ color = '#6246EA', size = 20 }) => (
   </Svg>
 );
 
+const IconUpload = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <Path d="M17 8l-5-5-5 5" />
+    <Path d="M12 3v12" />
+  </Svg>
+);
+
+const IconImportCsv = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <Path d="M14 2v6h6" />
+    <Path d="M12 18v-6" />
+    <Path d="M9 15l3-3 3 3" />
+  </Svg>
+);
+
 const IconTrash = ({ color = '#E53935', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M3 6h18" />
@@ -251,6 +268,7 @@ export default function SettingsScreen({ navigation }) {
   const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('@settings_privacy_expanded').then(val => {
@@ -565,6 +583,63 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
+  const handleImportJson = async () => {
+    try {
+      setIsImporting(true);
+      const fileData = await pickAndReadTextFileAsync(['application/json', '*/*']);
+      if (!fileData || !fileData.content) {
+        return; // User cancelled file picker
+      }
+
+      const result = await importDataFromJsonAsync({
+        jsonString: fileData.content,
+        dispatch,
+        existingBoards: boards
+      });
+
+      if (result.success) {
+        Alert.alert(
+          t('Import Successful') || 'Import Successful',
+          t('Successfully imported {{count}} task(s)!', { count: result.count }) || `Successfully imported ${result.count} task(s)!`
+        );
+      }
+    } catch (error) {
+      console.error('Failed to import JSON:', error);
+      Alert.alert(t('Import Failed') || 'Import Failed', error?.message || String(error));
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleImportCsv = async () => {
+    try {
+      setIsImporting(true);
+      const fileData = await pickAndReadTextFileAsync(['text/csv', 'text/comma-separated-values', 'text/plain', '*/*']);
+      if (!fileData || !fileData.content) {
+        return; // User cancelled file picker
+      }
+
+      const result = await importTasksFromCsvAsync({
+        csvString: fileData.content,
+        dispatch,
+        defaultBoardId: 'main',
+        existingBoards: boards
+      });
+
+      if (result.success) {
+        Alert.alert(
+          t('Import Successful') || 'Import Successful',
+          t('Successfully imported {{count}} task(s)!', { count: result.count }) || `Successfully imported ${result.count} task(s)!`
+        );
+      }
+    } catch (error) {
+      console.error('Failed to import CSV:', error);
+      Alert.alert(t('Import Failed') || 'Import Failed', error?.message || String(error));
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleEraseAllData = () => {
     setConfirmConfig({
       isVisible: true,
@@ -808,6 +883,32 @@ export default function SettingsScreen({ navigation }) {
               accessibilityState={{ checked: isBiometricHardwareAvailable && (theme.biometricUnlockEnabled !== false) }}
               accessibilityLabel={t('Biometric Unlock') || 'Biometric Unlock'}
               accessibilityHint={t('Enables or disables unlocking with device biometrics') || 'Enables or disables unlocking with device biometrics'}
+            />
+          </View>
+
+          {/* Block Screenshots (Screen Privacy) */}
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          <View style={styles.cardItemRow}>
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+              <IconShield color={primaryAccent} />
+            </View>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Block screenshots') || 'Block screenshots'}
+              </Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {t('Prevent screenshots and screen recording for extra privacy') || 'Prevent screenshots and screen recording for extra privacy'}
+              </Text>
+            </View>
+            <Switch
+              value={!!theme.blockScreenshots}
+              onValueChange={(val) => dispatch(setBlockScreenshots(val))}
+              trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: !!theme.blockScreenshots }}
+              accessibilityLabel={t('Block screenshots') || 'Block screenshots'}
+              accessibilityHint={t('Enables or disables blocking screenshots and screen recording') || 'Enables or disables blocking screenshots and screen recording'}
             />
           </View>
         </View>
@@ -1216,7 +1317,7 @@ export default function SettingsScreen({ navigation }) {
             </Text>
             <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(93, 69, 219, 0.20)' : 'rgba(93, 69, 219, 0.10)' }]}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
-                {isPrivacyExpanded ? '4 options' : (t('Tap to expand') || 'Tap to expand')}
+                {isPrivacyExpanded ? '6 options' : (t('Tap to expand') || 'Tap to expand')}
               </Text>
             </View>
           </View>
@@ -1254,7 +1355,7 @@ export default function SettingsScreen({ navigation }) {
             {/* Export JSON (GDPR Art. 20 Data Portability) */}
             <TouchableOpacity
               activeOpacity={0.75}
-              disabled={isExporting}
+              disabled={isExporting || isImporting}
               onPress={handleExportJson}
               style={styles.cardItemRow}
               accessible={true}
@@ -1278,10 +1379,37 @@ export default function SettingsScreen({ navigation }) {
 
             <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
+            {/* Import JSON */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              disabled={isExporting || isImporting}
+              onPress={handleImportJson}
+              style={styles.cardItemRow}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('Import Data (JSON)') || 'Import Data (JSON)'}. ${t('Restore backup or task list from JSON') || 'Restore backup or task list from JSON'}`}
+              accessibilityHint={t('Restores data backup or tasks from a JSON file') || 'Restores data backup or tasks from a JSON file'}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+                <IconUpload color={primaryAccent} />
+              </View>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t('Import Data (JSON)') || 'Import Data (JSON)'}
+                </Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                  {t('Restore backup or task list from JSON') || 'Restore backup or task list from JSON'}
+                </Text>
+              </View>
+              <IconChevronRight color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
             {/* Export CSV (Spreadsheet) */}
             <TouchableOpacity
               activeOpacity={0.75}
-              disabled={isExporting}
+              disabled={isExporting || isImporting}
               onPress={handleExportCsv}
               style={styles.cardItemRow}
               accessible={true}
@@ -1298,6 +1426,33 @@ export default function SettingsScreen({ navigation }) {
                 </Text>
                 <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
                   {t('Formatted for spreadsheets · Excel, Sheets, Numbers') || 'Formatted for spreadsheets · Excel, Sheets, Numbers'}
+                </Text>
+              </View>
+              <IconChevronRight color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+            {/* Import CSV */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              disabled={isExporting || isImporting}
+              onPress={handleImportCsv}
+              style={styles.cardItemRow}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('Import Tasks (CSV)') || 'Import Tasks (CSV)'}. ${t('Import spreadsheet tasks from Excel or Google Sheets') || 'Import spreadsheet tasks from Excel or Google Sheets'}`}
+              accessibilityHint={t('Imports tasks from a CSV spreadsheet') || 'Imports tasks from a CSV spreadsheet'}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+                <IconImportCsv color={primaryAccent} />
+              </View>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t('Import Tasks (CSV)') || 'Import Tasks (CSV)'}
+                </Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                  {t('Import spreadsheet tasks from Excel or Google Sheets') || 'Import spreadsheet tasks from Excel or Google Sheets'}
                 </Text>
               </View>
               <IconChevronRight color={colors.textSecondary} />

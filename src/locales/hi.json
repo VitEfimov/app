@@ -776,5 +776,18 @@
   "Red": "लाल",
   "Teal": "टील",
   "Yellow": "पीला",
-  "Color": "रंग"
+  "Color": "रंग",
+  "Open full image": "पूरी छवि खोलें",
+  "Open screenshot with external viewer or share": "बाहरी व्यूअर में स्क्रीनशॉट खोलें या साझा करें",
+  "Import Data (JSON)": "डेटा आयात करें (JSON)",
+  "Restore backup or task list from JSON": "JSON से बैकअप या कार्य सूची पुनर्स्थापित करें",
+  "Import Tasks (CSV)": "कार्य आयात करें (CSV)",
+  "Import spreadsheet tasks from Excel or Google Sheets": "Excel या Google Sheets से स्प्रेडशीट कार्य आयात करें",
+  "Import Successful": "आयात सफल",
+  "Import Failed": "आयात विफल",
+  "Successfully imported {{count}} task(s)!": "सफलतापूर्वक {{count}} कार्य आयात किए गए!",
+  "No valid tasks found in file": "फ़ाइल में कोई मान्य कार्य नहीं मिला",
+  "Block screenshots": "स्क्रीनशॉट ब्लॉक करें",
+  "Prevent screenshots and screen recording for extra privacy": "अतिरिक्त गोपनीयता के लिए स्क्रीनशॉट और स्क्रीन रिकॉर्डिंग रोकें",
+  "Enables or disables blocking screenshots and screen recording": "स्क्रीनशॉट और स्क्रीन रिकॉर्डिंग को ब्लॉक करने को सक्षम या अक्षम करता है"
 }

@@ -776,5 +776,18 @@
   "Red": "Rojo",
   "Teal": "Verde azulado",
   "Yellow": "Amarillo",
-  "Color": "Color"
+  "Color": "Color",
+  "Open full image": "Abrir imagen completa",
+  "Open screenshot with external viewer or share": "Abrir captura con visor externo o compartir",
+  "Import Data (JSON)": "Importar datos (JSON)",
+  "Restore backup or task list from JSON": "Restaurar copia de seguridad o lista de tareas desde JSON",
+  "Import Tasks (CSV)": "Importar tareas (CSV)",
+  "Import spreadsheet tasks from Excel or Google Sheets": "Importar tareas de hoja de cálculo de Excel o Google Sheets",
+  "Import Successful": "Importación exitosa",
+  "Import Failed": "Error de importación",
+  "Successfully imported {{count}} task(s)!": "¡Se importaron {{count}} tarea(s) con éxito!",
+  "No valid tasks found in file": "No se encontraron tareas válidas en el archivo",
+  "Block screenshots": "Bloquear capturas de pantalla",
+  "Prevent screenshots and screen recording for extra privacy": "Evitar capturas y grabación de pantalla para mayor privacidad",
+  "Enables or disables blocking screenshots and screen recording": "Activa o desactiva el bloqueo de capturas y grabación de pantalla"
 }

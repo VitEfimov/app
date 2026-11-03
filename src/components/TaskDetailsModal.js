@@ -241,6 +241,16 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [selectedFullscreenImage, setSelectedFullscreenImage] = useState(null);
   const [isAttachmentOptionsVisible, setAttachmentOptionsVisible] = useState(false);
 
+  // Security & Privacy Shield: Instantly close modal if device locks to prevent background leaks
+  useEffect(() => {
+    const unsubscribe = SecurityLockHelper.subscribeLock(() => {
+      setSelectedFullscreenImage(null);
+      setAttachmentOptionsVisible(false);
+      onClose();
+    });
+    return unsubscribe;
+  }, [onClose]);
+
   const cardBg = colors.cardBg || (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)');
   const cardBorder = colors.cardBorder || colors.outlineVariant || colors.borderColor;
   const cardBgNested = colors.surfaceContainerHigh || (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.05)');
@@ -355,7 +365,10 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
       const initialSubtasks = task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : [];
       const initialPriority = (task.priority || 'none').toLowerCase();
       const initialBoardId = task.boardId || 'main';
-      const initialDate = task.completionDate || '';
+      const rawDate = task.completionDate || task.dateString || task.dueDate || task.date || '';
+      const initialDate = (typeof rawDate === 'string' && rawDate.includes('T'))
+        ? rawDate.split('T')[0]
+        : (rawDate ? dayjs(rawDate).format('YYYY-MM-DD') : '');
       const initialTimeVal = task.time || null;
 
       let config = task.repeatConfig || { preset: task.repeatFrequency || (task.repeat === 'yearly' ? 'every_year' : 'None') };
@@ -2123,28 +2136,49 @@ useEffect(() => {
           colors={colors}
         />
 
-        <RNModal visible={!!selectedFullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setSelectedFullscreenImage(null)}>
-          <View style={styles.fullscreenImageOverlay}>
+        {selectedFullscreenImage && (
+          <View style={[StyleSheet.absoluteFillObject, styles.fullscreenImageOverlay, { zIndex: 999999, elevation: 999999 }]}>
             <View style={styles.fullscreenImageContainer}>
-              <TouchableOpacity 
-                style={styles.fullscreenImageClose} 
-                onPress={() => setSelectedFullscreenImage(null)}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel={t('Close full screen view') || 'Close full screen view'}
-              >
-                <IconClose color="#fff" />
-              </TouchableOpacity>
-              {selectedFullscreenImage && (
-                <Image 
-                  source={{ uri: selectedFullscreenImage }} 
-                  style={styles.fullscreenImage}
-                  resizeMode="contain"
-                />
-              )}
+              <View style={styles.fullscreenImageTopBar}>
+                <TouchableOpacity 
+                  style={styles.fullscreenActionButton}
+                  onPress={() => openDocument(selectedFullscreenImage, 'image/jpeg')}
+                  activeOpacity={0.8}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('Open full image') || 'Open full image'}
+                  accessibilityHint={t('Open screenshot with external viewer or share') || 'Open screenshot with external viewer or share'}
+                >
+                  <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <Polyline points="15 3 21 3 21 9" />
+                    <Line x1="10" y1="14" x2="21" y2="3" />
+                  </Svg>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', marginLeft: 8 }}>
+                    {t('Open full image') || 'Open full image'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.fullscreenImageClose} 
+                  onPress={() => setSelectedFullscreenImage(null)}
+                  activeOpacity={0.8}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('Close full screen view') || 'Close full screen view'}
+                >
+                  <IconClose color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <Image 
+                source={{ uri: selectedFullscreenImage }} 
+                style={styles.fullscreenImage}
+                resizeMode="contain"
+              />
             </View>
           </View>
-        </RNModal>
+        )}
       <CustomRepeatModal
         isVisible={isRepeatModalVisible}
         onClose={() => setIsRepeatModalVisible(false)}
@@ -2377,8 +2411,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   fullscreenImageOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.95)',
+    backgroundColor: 'rgba(0,0,0,0.96)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2388,17 +2421,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fullscreenImageClose: {
+  fullscreenImageTopBar: {
     position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    top: Platform.OS === 'ios' ? 52 : 24,
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  fullscreenActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  fullscreenImageClose: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   fullscreenImage: {
     width: '100%',
-    height: '100%',
+    height: '82%',
   },
   optionsCollapsibleHeader: {
     flexDirection: 'row',

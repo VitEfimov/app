@@ -83,74 +83,99 @@ export default function DashboardScreen({ navigation }) {
 
   const showRecurringTasksOnBoard = useSelector(state => state.themeReducer.showRecurringTasksOnBoard || false);
 
+  const isRepeatingTask = useCallback((task) => {
+    if (!task) return false;
+    return !!(
+      task.recurringSeriesId ||
+      task.isRecurring === true || task.isRecurring === 'true' || task.isRecurring === 1 ||
+      (task.repeatConfig && task.repeatConfig.preset && task.repeatConfig.preset !== 'None' && task.repeatConfig.preset !== 'none') ||
+      (task.repeatFrequency && task.repeatFrequency !== 'None' && task.repeatFrequency !== 'none') ||
+      (task.repeat && task.repeat !== 'none' && task.repeat !== 'None')
+    );
+  }, []);
+
   const hiddenRecurringTaskIds = useMemo(() => {
-    if (showRecurringTasksOnBoard) return new Set();
-
-    const seriesMap = new Map();
-    filteredTasks.forEach(task => {
-      if (!task.recurringSeriesId || task.completed) return;
-      const seriesId = task.recurringSeriesId;
-      if (!seriesMap.has(seriesId)) {
-        seriesMap.set(seriesId, []);
-      }
-      seriesMap.get(seriesId).push(task);
-    });
-
     const hiddenIds = new Set();
+    const todayStr = dayjs().format('YYYY-MM-DD');
 
-    seriesMap.forEach(taskList => {
-      taskList.sort((a, b) => {
-        const dayA = a.completionDate ? dayjs(a.completionDate).valueOf() : Infinity;
-        const dayB = b.completionDate ? dayjs(b.completionDate).valueOf() : Infinity;
-        if (dayA !== dayB) return dayA - dayB;
-        if (a.time && b.time) return a.time.localeCompare(b.time);
-        if (a.time && !b.time) return -1;
-        if (!a.time && b.time) return 1;
-        return parseInt(a.id || '0') - parseInt(b.id || '0');
-      });
+    const addToHidden = (id) => {
+      if (id === undefined || id === null) return;
+      hiddenIds.add(id);
+      hiddenIds.add(String(id));
+      const num = Number(id);
+      if (!isNaN(num)) hiddenIds.add(num);
+    };
 
-      let hasFoundFirstActiveNonMissed = false;
+    // When toggle is ON ('Show recurring tasks'): Show ALL recurring tasks!
+    if (showRecurringTasksOnBoard) {
+      return hiddenIds; // empty Set -> show all tasks
+    }
 
-      taskList.forEach(task => {
-        if (isTaskMissed(task)) {
-          return;
-        }
+    // When toggle is OFF ('Do not show recurring tasks'): Show JUST NEXT ONE!
+    // Deduplicate each recurring series so only the single next (earliest upcoming) occurrence appears
+    const earliestSeriesMap = new Map();
+    for (const task of filteredTasks) {
+      if (!task || task.completed) continue;
+      const isRepeating = isRepeatingTask(task);
+      const titleKey = String(task.taskname || task.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const seriesKey = (isRepeating && titleKey)
+        ? ('title_' + titleKey)
+        : (task.recurringSeriesId ? ('series_' + task.recurringSeriesId) : null);
+      if (!seriesKey) continue;
 
-        if (!hasFoundFirstActiveNonMissed) {
-          hasFoundFirstActiveNonMissed = true;
+      const dateStr = getTaskDateStr(task);
+      if (dateStr && dateStr < todayStr) continue;
+
+      const existing = earliestSeriesMap.get(seriesKey);
+      if (!existing) {
+        earliestSeriesMap.set(seriesKey, { task, dateStr: dateStr || '9999-12-31' });
+      } else {
+        const taskVal = dateStr || '9999-12-31';
+        const existingVal = existing.dateStr;
+
+        if (taskVal < existingVal) {
+          addToHidden(existing.task.id);
+          earliestSeriesMap.set(seriesKey, { task, dateStr: taskVal });
         } else {
-          hiddenIds.add(task.id);
+          addToHidden(task.id);
         }
-      });
-    });
+      }
+    }
 
     return hiddenIds;
-  }, [filteredTasks, showRecurringTasksOnBoard]);
+  }, [filteredTasks, showRecurringTasksOnBoard, isRepeatingTask]);
 
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks } = useMemo(() => {
     const now = dayjs();
     const nowDateStr = now.format('YYYY-MM-DD');
     const FILTERS = getFilters(now);
 
+    const isHidden = (t) => {
+      if (!t || t.id === undefined || t.id === null) return false;
+      return hiddenRecurringTaskIds.has(t.id) ||
+             hiddenRecurringTaskIds.has(String(t.id)) ||
+             (!isNaN(Number(t.id)) && hiddenRecurringTaskIds.has(Number(t.id)));
+    };
+
     return {
-      todayTasks: filteredTasks.filter(task => !hiddenRecurringTaskIds.has(task.id) && isTaskToday(task, now, nowDateStr)),
+      todayTasks: filteredTasks.filter(task => !isHidden(task) && isTaskToday(task, now, nowDateStr)),
       tomorrowTasks: filteredTasks.filter(task => {
-        if (hiddenRecurringTaskIds.has(task.id)) return false;
+        if (isHidden(task)) return false;
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d === FILTERS.tomorrow && !task.completed;
       }),
       thisWeekTasks: filteredTasks.filter(task => {
-        if (hiddenRecurringTaskIds.has(task.id)) return false;
+        if (isHidden(task)) return false;
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d > FILTERS.today && d !== FILTERS.tomorrow && d <= FILTERS['on-this-week'] && !task.completed;
       }),
       nextWeekTasks: filteredTasks.filter(task => {
-        if (hiddenRecurringTaskIds.has(task.id)) return false;
+        if (isHidden(task)) return false;
         const d = task.dateString || (task.completionDate && typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : '');
         return d > FILTERS['on-this-week'] && d <= FILTERS['on-next-week'] && !task.completed;
       }),
       laterTasks: filteredTasks.filter(task => {
-        if (hiddenRecurringTaskIds.has(task.id)) return false;
+        if (isHidden(task)) return false;
         return isTaskUpcoming(task, now);
       }),
       missedTasks: filteredTasks.filter(task => isTaskMissed(task, now, nowDateStr))

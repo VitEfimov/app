@@ -364,7 +364,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       if (onToggleSelect && task) onToggleSelect(task.id, sectionId);
       return;
     }
-    if (disableInlineEdit || isCompletedSection) {
+    if (disableInlineEdit) {
       if (onPress) onPress(task);
       return;
     }
@@ -372,7 +372,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
     setEditName(taskTitleText);
     setCursorSelection({ start: taskTitleText.length, end: taskTitleText.length });
     setIsEditing(true);
-  }, [isSelectionMode, onToggleSelect, sectionId, disableInlineEdit, isCompletedSection, onPress, taskTitleText, task]);
+  }, [isSelectionMode, onToggleSelect, sectionId, disableInlineEdit, onPress, taskTitleText, task]);
 
   const submitEdit = useCallback(() => {
     setIsEditing(false);
@@ -564,7 +564,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
               style={{ alignSelf: 'flex-start', maxWidth: '100%', justifyContent: 'center' }}
               accessibilityRole="button"
               accessibilityLabel={task.taskname || task.name}
-              accessibilityHint={isCompletedSection ? (t('Double tap to view or edit task details') || 'Double tap to view or edit task details') : (t('Double tap to edit task name') || 'Double tap to edit task name')}
+              accessibilityHint={t('Double tap to edit task name') || 'Double tap to edit task name'}
             >
               <Text
                 testID="task_name_text"
