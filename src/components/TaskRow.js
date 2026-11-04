@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard, Platform, Dimensions } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
