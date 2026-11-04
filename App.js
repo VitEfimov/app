@@ -37,6 +37,9 @@ import { CrashLogger } from './src/utils/crashLogger';
 import { DevLogger } from './src/utils/logger';
 import { A11yHelper } from './src/utils/a11yHelper';
 import { HapticHelper } from './src/utils/hapticHelper';
+import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
+import { ToastProvider } from './src/styles/ToastContext';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // WCAG 1.4.4: Configure global font scaling upper bound to prevent UI clipping
 A11yHelper.configureGlobalFontScaling(1.5);
@@ -148,6 +151,7 @@ import AnimatedLoadingScreen from './src/components/AnimatedLoadingScreen';
 
 function InitApp() {
   const dispatch = useDispatch();
+  const { colors, isDark, mode } = useTheme();
   const [ready, setReady] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadingDismissed, setLoadingDismissed] = useState(false);
@@ -652,7 +656,7 @@ function InitApp() {
             StyleSheet.absoluteFillObject, 
             { 
               zIndex: 999998, 
-              backgroundColor: '#121212', 
+              backgroundColor: colors?.bgMain || (isDark ? '#141419' : '#FAF9F6'), 
               justifyContent: 'center', 
               alignItems: 'center' 
             }
@@ -660,7 +664,7 @@ function InitApp() {
           accessible={false}
           importantForAccessibility="no-hide-descendants"
         >
-          <Text style={{ fontSize: 24, fontWeight: '700', color: '#ffffff', letterSpacing: 0.5 }}>TaskCalendar</Text>
+          <Text style={{ fontSize: 24, fontWeight: '700', color: colors?.textPrimary || '#ffffff', letterSpacing: 0.5 }}>TaskCalendar</Text>
         </View>
       )}
 
@@ -670,6 +674,7 @@ function InitApp() {
             StyleSheet.absoluteFillObject,
             {
               zIndex: 9999,
+              backgroundColor: colors?.bgMain || (isDark ? '#141419' : '#FAF9F6'),
               opacity: loadingFadeAnim,
             },
           ]}
@@ -683,17 +688,13 @@ function InitApp() {
 }
 
 function RootWrapper({ children }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bgMain }}>
+    <View style={{ flex: 1, backgroundColor: colors?.bgMain || (isDark ? '#141419' : '#FAF9F6') }}>
       {children}
     </View>
   );
 }
-
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
-import { ToastProvider } from './src/styles/ToastContext';
 
 export default function App() {
   return (

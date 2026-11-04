@@ -2,7 +2,44 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+const { transform } = require('sucrase');
 const dayjs = require('dayjs');
+
+function loadTranspiledModule(filePath, customMocks = {}) {
+  const code = fs.readFileSync(filePath, 'utf8');
+  const transformed = transform(code, {
+    transforms: ['imports', 'jsx', 'typescript'],
+    jsxRuntime: 'classic'
+  }).code;
+
+  const mockModule = { exports: {} };
+  const mockRequire = (reqPath) => {
+    if (customMocks[reqPath]) {
+      return customMocks[reqPath];
+    }
+    if (reqPath.startsWith('.')) {
+      const resolved = path.resolve(path.dirname(filePath), reqPath);
+      for (const ext of ['', '.js', '.jsx', '.json', '.ts']) {
+        const fullPath = resolved + ext;
+        if (fs.existsSync(fullPath) && !fs.statSync(fullPath).isDirectory()) {
+          if (ext === '.json' || fullPath.endsWith('.json')) {
+            return JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          }
+          return loadTranspiledModule(fullPath, customMocks);
+        }
+      }
+    }
+    try {
+      return require(reqPath);
+    } catch (e) {
+      return {};
+    }
+  };
+
+  const fn = new Function('exports', 'require', 'module', '__filename', '__dirname', transformed);
+  fn(mockModule.exports, mockRequire, mockModule, filePath, path.dirname(filePath));
+  return mockModule.exports;
+}
 
 // ==============================================================================
 // 1. RECURRING TASK DEDUPLICATION ENGINE TESTS
@@ -821,5 +858,58 @@ describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
     assert.match(sliceContent, /hasReminder \|\| isKeepAllDay \|\| isAlarm/, 'addTask must schedule alarm even when reminder is None');
   });
 });
+
+// ==============================================================================
+// 10. THEME-AWARE LOADING SCREEN & SYNCHRONOUS BOOT INTEGRITY
+// ==============================================================================
+describe('Theme-Aware Loading Screen & Synchronous Boot Integrity', () => {
+  test('loadInitialThemeMode resolves dark, contrast and light synchronously from state or system', () => {
+    const themeMod = loadTranspiledModule(path.resolve('src/features/themeSlice.js'), {
+      '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} },
+      '@reduxjs/toolkit': { createSlice: () => ({ reducer: () => ({}), actions: {} }) }
+    });
+    const { loadInitialThemeMode } = themeMod;
+
+    // 1. Pre-loaded / saved customTheme
+    assert.strictEqual(loadInitialThemeMode({ themeMode: 'dark' }), 'dark');
+    assert.strictEqual(loadInitialThemeMode({ themeMode: 'contrast' }), 'contrast');
+    assert.strictEqual(loadInitialThemeMode({ themeMode: 'light' }), 'light');
+
+    // 2. Default fallback when no saved state
+    const fallback = loadInitialThemeMode(null);
+    assert.ok(fallback === 'light' || fallback === 'dark', 'Must resolve to light or dark');
+  });
+
+  test('AnimatedLoadingScreen adapts background, badge and spinner to light, dark and contrast', () => {
+    const screenPath = path.resolve('src/components/AnimatedLoadingScreen.js');
+    const screenContent = fs.readFileSync(screenPath, 'utf8');
+
+    // Contrast theme styling
+    assert.match(screenContent, /isContrast\s*\?\s*['"]#000000['"]/, 'Must use pitch black #000000 in contrast mode');
+    assert.match(screenContent, /isContrast\s*\?\s*2\s*:\s*1\.5/, 'Must use thick 2px border in contrast mode');
+    assert.match(screenContent, /isContrast\s*\?\s*['"]#FFFFFF['"]/, 'Must use pure white elements in contrast mode');
+
+    // Dark vs Light fallback
+    assert.match(screenContent, /isDark\s*\?\s*['"]#141419['"]\s*:\s*['"]#FAF9F6['"]/, 'Must use #141419 for dark and #FAF9F6 for light');
+
+    // StatusBar sync
+    assert.match(screenContent, /<StatusBar[\s\S]*?barStyle=\{isDark\s*\|\|\s*isContrast\s*\?\s*['"]light-content['"]\s*:\s*['"]dark-content['"]\}/, 'StatusBar must match theme brightness');
+  });
+
+  test('ExpoTaskAlarmModule and index.ts expose synchronous getSavedThemeMode and setSavedThemeMode', () => {
+    const ktPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
+    const ktContent = fs.readFileSync(ktPath, 'utf8');
+
+    assert.match(ktContent, /Function\("getSavedThemeMode"\)/, 'ExpoTaskAlarmModule must define synchronous getSavedThemeMode');
+    assert.match(ktContent, /Function\("setSavedThemeMode"\)/, 'ExpoTaskAlarmModule must define synchronous setSavedThemeMode');
+
+    const tsPath = path.resolve('modules/expo-task-alarm/index.ts');
+    const tsContent = fs.readFileSync(tsPath, 'utf8');
+
+    assert.match(tsContent, /export function getSavedThemeMode\(\)/, 'index.ts must export getSavedThemeMode');
+    assert.match(tsContent, /export function setSavedThemeMode\(/, 'index.ts must export setSavedThemeMode');
+  });
+});
+
 
 

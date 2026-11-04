@@ -29,6 +29,19 @@ class ExpoTaskAlarmModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ExpoTaskAlarm")
 
+    Function("getSavedThemeMode") {
+      val context = appContext.reactContext ?: return@Function null
+      val prefs = context.getSharedPreferences("taskflow_theme", Context.MODE_PRIVATE)
+      return@Function prefs.getString("themeMode", null)
+    }
+
+    Function("setSavedThemeMode") { mode: String ->
+      val context = appContext.reactContext ?: return@Function false
+      val prefs = context.getSharedPreferences("taskflow_theme", Context.MODE_PRIVATE)
+      prefs.edit().putString("themeMode", mode).apply()
+      return@Function true
+    }
+
     AsyncFunction("isCarConnected") {
       val context = appContext.reactContext ?: return@AsyncFunction false
       return@AsyncFunction CarUtils.isConnectedToCar(context)

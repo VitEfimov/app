@@ -29,6 +29,24 @@ export async function scheduleExactAlarm(
   }
 }
 
+export function getSavedThemeMode(): string | null {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getSavedThemeMode !== 'function') return null;
+  try {
+    return ExpoTaskAlarm.getSavedThemeMode();
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setSavedThemeMode(mode: string): boolean {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.setSavedThemeMode !== 'function') return false;
+  try {
+    return ExpoTaskAlarm.setSavedThemeMode(mode);
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function isCarConnected(): Promise<boolean> {
   if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.isCarConnected !== 'function') return false;
   try {

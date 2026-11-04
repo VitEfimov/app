@@ -1,6 +1,74 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CryptoStorage } from '../utils/cryptoStorage';
+import { CryptoStorage } from '../utils/cryptoStorage.js';
 import { createSlice } from '@reduxjs/toolkit';
+
+const getNativeThemeMode = () => {
+  try {
+    const alarmMod = require('../../modules/expo-task-alarm');
+    if (alarmMod && typeof alarmMod.getSavedThemeMode === 'function') {
+      return alarmMod.getSavedThemeMode();
+    }
+  } catch (e) {}
+  return null;
+};
+
+const setNativeThemeMode = (mode) => {
+  try {
+    const alarmMod = require('../../modules/expo-task-alarm');
+    if (alarmMod && typeof alarmMod.setSavedThemeMode === 'function') {
+      return alarmMod.setSavedThemeMode(mode);
+    }
+  } catch (e) {}
+  return false;
+};
+
+const getSystemScheme = () => {
+  try {
+    const { Appearance } = require('react-native');
+    if (Appearance && typeof Appearance.getColorScheme === 'function') {
+      return Appearance.getColorScheme();
+    }
+  } catch (e) {}
+  return 'light';
+};
+
+export const loadInitialThemeMode = (loadedTheme = null) => {
+  // 1. Pre-loaded theme state if available
+  if (loadedTheme?.themeMode) {
+    return loadedTheme.themeMode;
+  }
+
+  // 2. Web LocalStorage
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const mode = window.localStorage.getItem('app_theme_mode');
+      if (mode && (mode === 'dark' || mode === 'light' || mode === 'contrast')) {
+        return mode;
+      }
+      const saved = window.localStorage.getItem('customTheme');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.themeMode) return parsed.themeMode;
+      }
+    } catch (e) {}
+  }
+
+  // 3. Android Native SharedPreferences (synchronous 0ms query from the start)
+  try {
+    const nativeMode = getNativeThemeMode();
+    if (nativeMode && (nativeMode === 'dark' || nativeMode === 'light' || nativeMode === 'contrast')) {
+      return nativeMode;
+    }
+  } catch (e) {}
+
+  // 4. Device System Appearance fallback (Appearance.getColorScheme)
+  try {
+    const sys = getSystemScheme();
+    if (sys === 'dark') return 'dark';
+  } catch (e) {}
+
+  return 'light';
+};
 
 const loadThemeState = () => {
   if (typeof window !== 'undefined' && window.localStorage) {
@@ -33,7 +101,7 @@ const initialState = {
   userPicture: loaded?.userPicture || null,
   headerBackgroundFit: loaded?.headerBackgroundFit || 'cover',
   sourceColor: loaded?.sourceColor || '#6750A4',
-  themeMode: loaded?.themeMode || 'light',
+  themeMode: loadInitialThemeMode(loaded),
   calendarPanePosition: loaded?.calendarPanePosition || null,
   progressMode: loaded?.progressMode || 'daily',
   defaultSnoozeTime: loaded?.defaultSnoozeTime || 30,
@@ -104,6 +172,12 @@ const themeSlice = createSlice({
       state.jumpToTodayTrigger = Date.now();
     },
     hydrateThemeState: (state, action) => {
+      if (action.payload?.themeMode) {
+        try { setNativeThemeMode(action.payload.themeMode); } catch (e) {}
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try { window.localStorage.setItem('app_theme_mode', action.payload.themeMode); } catch (e) {}
+        }
+      }
       return { ...state, ...action.payload };
     },
     setThemeColor: (state, action) => {
@@ -118,6 +192,10 @@ const themeSlice = createSlice({
     },
     setThemeMode: (state, action) => {
       state.themeMode = action.payload;
+      try { setNativeThemeMode(action.payload); } catch (e) {}
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try { window.localStorage.setItem('app_theme_mode', action.payload); } catch (e) {}
+      }
     },
     setColumnWidth: (state, action) => {
       const { key, value } = action.payload;
@@ -301,6 +379,12 @@ export const persistThemeToStorage = (themeState) => {
       const clean = sanitizeThemeForStorage(lastThemeToSave);
       if (clean) {
         await CryptoStorage.setItem('customTheme', JSON.stringify(clean));
+        if (clean.themeMode) {
+          try { setNativeThemeMode(clean.themeMode); } catch (e) {}
+          if (typeof window !== 'undefined' && window.localStorage) {
+            try { window.localStorage.setItem('app_theme_mode', clean.themeMode); } catch (e) {}
+          }
+        }
       }
     } catch (e) {
       console.error('Error saving theme to AsyncStorage:', e);
@@ -318,6 +402,12 @@ export const flushPendingThemeSaves = async (getState) => {
     const clean = sanitizeThemeForStorage(raw);
     if (clean) {
       await CryptoStorage.setItem('customTheme', JSON.stringify(clean));
+      if (clean.themeMode) {
+        try { setNativeThemeMode(clean.themeMode); } catch (e) {}
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try { window.localStorage.setItem('app_theme_mode', clean.themeMode); } catch (e) {}
+        }
+      }
     }
   } catch (e) {
     console.error('Error flushing theme to storage:', e);
