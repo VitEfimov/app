@@ -31,7 +31,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import CreateBoardModal from '../components/CreateBoardModal';
 import CalendarDayOptionsModal from '../components/calendar/CalendarDayOptionsModal';
-import YearPickerModal from '../components/YearPickerModal';
+import YearPickerModal, { parseCalendarHeaderDate } from '../components/YearPickerModal';
 import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks } from '../features/taskSlice';
 import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
@@ -121,6 +121,19 @@ export default function CalendarScreen({ navigation, route }) {
     const newMonthStr = currentMonthMoment.set('year', year).format('YYYY-MM-DD');
     setCalendarMonth(newMonthStr);
     const newSelectedDate = dayjs(selectedDate).set('year', year).format('YYYY-MM-DD');
+    setSelectedDate(newSelectedDate);
+    setIsYearPickerVisible(false);
+  };
+
+  const handleSelectMonthYear = (year, month) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const newMonthStr = `${year}-${pad(month + 1)}-01`;
+    const maxDays = dayjs(newMonthStr).daysInMonth();
+    const currentDay = dayjs(selectedDate).date() || 1;
+    const targetDay = Math.min(currentDay, maxDays);
+    const newSelectedDate = `${year}-${pad(month + 1)}-${pad(targetDay)}`;
+
+    setCalendarMonth(newMonthStr);
     setSelectedDate(newSelectedDate);
     setIsYearPickerVisible(false);
   };
@@ -617,20 +630,30 @@ export default function CalendarScreen({ navigation, route }) {
           markedDates={markedDates}
           dayComponent={renderCustomDay}
           renderHeader={(date) => {
-            let dateObj = dayjs(date ? (date.dateString || date.toString()) : calendarMonth);
-            if (!dateObj.isValid()) {
-              dateObj = dayjs(calendarMonth);
-            }
+            const dateObj = parseCalendarHeaderDate(date, calendarMonth);
             const monthYearStr = dateObj.format('MMMM YYYY');
             return (
               <TouchableOpacity
                 testID="calendar_month_year_header"
                 accessible={true}
                 accessibilityRole="button"
-                accessibilityLabel={`Select year, current month ${monthYearStr}`}
+                accessibilityLabel={`Select month and year, current month ${monthYearStr}`}
                 activeOpacity={0.7}
-                style={styles.monthYearHeaderBtn}
-                onPress={() => setIsYearPickerVisible(true)}
+                style={[
+                  styles.monthYearHeaderBtn,
+                  {
+                    borderColor: mode === 'contrast'
+                      ? '#FFFFFF'
+                      : (colors.borderColor || (isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)')),
+                    backgroundColor: mode === 'contrast'
+                      ? '#000000'
+                      : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)'),
+                  }
+                ]}
+                onPress={() => {
+                  setCalendarMonth(dateObj.format('YYYY-MM-DD'));
+                  setIsYearPickerVisible(true);
+                }}
               >
                 <Text style={[styles.monthYearHeaderText, { color: colors.textPrimary }]}>
                   {monthYearStr}
@@ -1004,14 +1027,16 @@ export default function CalendarScreen({ navigation, route }) {
         colors={colors}
       />
 
-      {/* Year Picker Modal (total 18 years from current year) */}
+      {/* Month & Year Picker Modal */}
       <YearPickerModal
         isVisible={isYearPickerVisible}
         onClose={() => setIsYearPickerVisible(false)}
         currentYear={dayjs(calendarMonth).year()}
+        currentMonth={dayjs(calendarMonth).month()}
         minYear={Math.min(dayjs().year(), dayjs(calendarMonth).year())}
         maxYear={Math.max(dayjs().year() + 17, dayjs(calendarMonth).year())}
         onSelectYear={handleSelectYear}
+        onSelectMonthYear={handleSelectMonthYear}
         colors={colors}
       />
       </View>
@@ -1083,9 +1108,10 @@ const styles = StyleSheet.create({
   monthYearHeaderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 14,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   monthYearHeaderText: {
     fontSize: 16,

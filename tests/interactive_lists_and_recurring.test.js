@@ -911,5 +911,81 @@ describe('Theme-Aware Loading Screen & Synchronous Boot Integrity', () => {
   });
 });
 
+// ==============================================================================
+// 11. DUAL MONTH & YEAR SELECTOR WITH HOT TAPS (NEXT 5 MONTHS & NEXT 5 YEARS)
+// ==============================================================================
+describe('Dual Month & Year Selector with Hot Taps Engine', () => {
+  test('YearPickerModal exports backwards-compatible MonthYearPickerModal and YearPickerModal', () => {
+    const pickerPath = path.resolve('src/components/YearPickerModal.js');
+    const content = fs.readFileSync(pickerPath, 'utf8');
+
+    assert.match(content, /export\s+function\s+YearPickerModal/, 'Must export YearPickerModal');
+    assert.match(content, /export\s+\{\s*YearPickerModal\s+as\s+MonthYearPickerModal\s*\}/, 'Must export MonthYearPickerModal alias');
+    assert.match(content, /export\s+default\s+YearPickerModal/, 'Must have default export');
+  });
+
+  test('YearPickerModal generates next 5 months and next 5 years hot taps', () => {
+    const pickerPath = path.resolve('src/components/YearPickerModal.js');
+    const content = fs.readFileSync(pickerPath, 'utf8');
+
+    // Hot taps logic
+    assert.match(content, /hotMonths/, 'Must define hotMonths list');
+    assert.match(content, /base\.add\(i,\s*['"]month['"]\)/, 'Must compute next 5 months');
+    assert.match(content, /hotYears/, 'Must define hotYears list');
+    assert.match(content, /baseYear\s*\+\s*i/, 'Must compute next 5 years');
+    assert.match(content, /handleHotMonthPress/, 'Must provide 1-tap quick jump for months');
+    assert.match(content, /handleHotYearPress/, 'Must provide 1-tap quick jump for years');
+  });
+
+  test('YearPickerModal contains 3x4 Month grid, Year list, and Done/Apply button', () => {
+    const pickerPath = path.resolve('src/components/YearPickerModal.js');
+    const content = fs.readFileSync(pickerPath, 'utf8');
+
+    assert.match(content, /tab_month_picker/, 'Must contain Month tab testID');
+    assert.match(content, /tab_year_picker/, 'Must contain Year tab testID');
+    assert.match(content, /month_option_/, 'Must contain month option testIDs for all 12 months');
+    assert.match(content, /year_option_/, 'Must contain year option testIDs');
+    assert.match(content, /month_year_apply_btn/, 'Must contain Done / Apply button');
+  });
+
+  test('CalendarScreen wires header pill button and handleSelectMonthYear to YearPickerModal', () => {
+    const calPath = path.resolve('src/screens/CalendarScreen.js');
+    const content = fs.readFileSync(calPath, 'utf8');
+
+    assert.match(content, /handleSelectMonthYear/, 'CalendarScreen must implement handleSelectMonthYear');
+    assert.match(content, /calendar_month_year_header/, 'CalendarScreen header must have month-year pill button');
+    assert.match(content, /onSelectMonthYear=\{handleSelectMonthYear\}/, 'YearPickerModal must receive onSelectMonthYear callback');
+    assert.match(content, /currentMonth=\{dayjs\(calendarMonth\)\.month\(\)\}/, 'YearPickerModal must receive currentMonth');
+  });
+
+  test('parseCalendarHeaderDate avoids UTC timezone backward drift for Jan 2027', () => {
+    const mod = loadTranspiledModule(path.resolve('src/components/YearPickerModal.js'), {
+      'react-native': {
+        View: () => null,
+        Text: () => null,
+        TouchableOpacity: () => null,
+        ScrollView: () => null,
+        StyleSheet: { create: (s) => s, absoluteFillObject: {} }
+      },
+      'react-native-modal': () => null,
+      'react-i18next': { useTranslation: () => ({ t: (k) => k, i18n: { language: 'en' } }) }
+    });
+    const { parseCalendarHeaderDate } = mod;
+
+    // Simulate XDate in UTC mode as passed by react-native-calendars
+    const mockUtcXDate = {
+      getFullYear: () => 2027,
+      getMonth: () => 0, // 0 = January
+      toString: (fmt) => fmt === 'yyyy-MM-dd' ? '2027-01-01' : 'Fri, 01 Jan 2027 00:00:00 GMT'
+    };
+
+    const parsed = parseCalendarHeaderDate(mockUtcXDate, '2026-11-04');
+    assert.strictEqual(parsed.format('MMMM YYYY'), 'January 2027', 'Must resolve to January 2027 and not drift to December 2026');
+    assert.strictEqual(parsed.year(), 2027);
+    assert.strictEqual(parsed.month(), 0);
+  });
+});
+
+
 
 

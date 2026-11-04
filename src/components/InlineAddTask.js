@@ -10,7 +10,7 @@ import Svg, { Path } from 'react-native-svg';
 import { Calendar } from 'react-native-calendars';
 import getFilters from '../utils/filters';
 import { getBoardColor } from '../utils/boardColors';
-import YearPickerModal from './YearPickerModal';
+import YearPickerModal, { parseCalendarHeaderDate } from './YearPickerModal';
 
 const IconPlus = ({ color }) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -383,7 +383,7 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
               markedDates={getCalendarMarkedDates()}
               enableSwipeMonths={true}
               renderHeader={(date) => {
-                const dateObj = dayjs(date ? (date.dateString || date.toString()) : selectedDate);
+                const dateObj = parseCalendarHeaderDate(date, selectedDate);
                 const monthStr = dateObj.format('MMMM YYYY');
                 return (
                   <TouchableOpacity
@@ -471,8 +471,13 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
         isVisible={isYearPickerVisible}
         onClose={() => setYearPickerVisible(false)}
         currentYear={dayjs(selectedDate).year()}
+        currentMonth={dayjs(selectedDate).month()}
         onSelectYear={(year) => {
           const newDate = dayjs(selectedDate).year(year).format('YYYY-MM-DD');
+          setSelectedDate(newDate);
+        }}
+        onSelectMonthYear={(year, month) => {
+          const newDate = dayjs(selectedDate).year(year).month(month).format('YYYY-MM-DD');
           setSelectedDate(newDate);
         }}
         colors={colors}

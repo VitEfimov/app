@@ -27,7 +27,7 @@ import { takePhotoAsync, shareTaskAsync, openDocumentAsync as nativeOpenDocument
 import CustomDropdown from './CustomDropdown';
 import CustomRepeatModal from './CustomRepeatModal';
 import CustomReminderModal from './CustomReminderModal';
-import YearPickerModal from './YearPickerModal';
+import YearPickerModal, { parseCalendarHeaderDate } from './YearPickerModal';
 import ConfirmModal from './ConfirmModal';
 import PremiumModal from './PremiumModal';
 import { toggleTaskOptionsCollapsed, setTaskOptionsCollapsed } from '../features/userSlice';
@@ -2022,29 +2022,13 @@ useEffect(() => {
                     markedDates={getCalendarMarkedDates()}
                     enableSwipeMonths={true}
                     renderHeader={(date) => {
-                      let dateObj;
-                      if (date) {
-                        if (typeof date.toDate === 'function') {
-                          dateObj = dayjs(date.toDate());
-                        } else if (typeof date === 'string') {
-                          dateObj = dayjs(date);
-                        } else if (date instanceof Date) {
-                          dateObj = dayjs(date);
-                        } else {
-                          dateObj = dayjs(activeCalendarDate);
-                        }
-                      } else {
-                        dateObj = dayjs(activeCalendarDate);
-                      }
-                      if (!dateObj.isValid() || dateObj.year() < 2000 || dateObj.year() > 2100) {
-                        dateObj = dayjs(activeCalendarDate);
-                      }
+                      const dateObj = parseCalendarHeaderDate(date, activeCalendarDate);
                       const monthStr = dateObj.format('MMMM YYYY');
                       return (
                         <TouchableOpacity
                           accessible={true}
                           accessibilityRole="button"
-                          accessibilityLabel={`Select year`}
+                          accessibilityLabel={`Select month and year`}
                           style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: cardBgNested }}
                           onPress={() => setYearPickerVisible(true)}
                         >
@@ -2112,6 +2096,13 @@ useEffect(() => {
               ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
               : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
           ).year()}
+          currentMonth={dayjs(
+            datePickerType === 'due' 
+              ? (selectedDate || dayjs().format('YYYY-MM-DD'))
+              : datePickerType === 'repeatStart'
+              ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+              : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+          ).month()}
           onSelectYear={(year) => {
             if (datePickerType === 'due') {
               const newDate = dayjs(selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
@@ -2130,6 +2121,27 @@ useEffect(() => {
               }
             } else if (datePickerType === 'repeatEnd') {
               const newDate = dayjs(repeatEndDate || repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
+              setRepeatEndDate(newDate);
+            }
+          }}
+          onSelectMonthYear={(year, month) => {
+            if (datePickerType === 'due') {
+              const newDate = dayjs(selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
+              setSelectedDate(newDate);
+              if (!repeatStartDate) {
+                setRepeatStartDate(newDate);
+              }
+              if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
+                setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
+              }
+            } else if (datePickerType === 'repeatStart') {
+              const newDate = dayjs(repeatStartDate || selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
+              setRepeatStartDate(newDate);
+              if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
+                setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
+              }
+            } else if (datePickerType === 'repeatEnd') {
+              const newDate = dayjs(repeatEndDate || repeatStartDate || selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
               setRepeatEndDate(newDate);
             }
           }}
