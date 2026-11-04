@@ -375,6 +375,60 @@ describe('Expenses & Bills Tracker', () => {
     assert.strictEqual(upcoming.length, 1);
     assert.strictEqual(paid.length, 1);
   });
+
+  test('Option B: computes This Month ($40) vs All Scheduled ($520) for recurring bills', () => {
+    const currentMonth = dayjs().format('YYYY-MM');
+    const todayStr = dayjs().format('YYYY-MM-DD');
+
+    // 13 recurring occurrences of midas $40
+    const recurringMidasBills = [];
+    for (let i = 0; i < 13; i++) {
+      recurringMidasBills.push({
+        id: `midas_${i}`,
+        taskname: 'midas $40',
+        itemPrice: 40,
+        completionDate: dayjs().add(i, 'month').format('YYYY-MM-DD'),
+        completed: false
+      });
+    }
+
+    const computeExpensesOptionB = (bills, periodFilter) => {
+      let allTotal = 0;
+      let allPaid = 0;
+      let monthlyTotal = 0;
+      let monthlyPaid = 0;
+
+      bills.forEach(t => {
+        const amt = t.itemPrice || 0;
+        allTotal += amt;
+        if (t.completed) allPaid += amt;
+
+        const dateStr = t.completionDate;
+        const isCurrentMonth = dateStr ? dateStr.startsWith(currentMonth) : true;
+        const isOverdueUnpaid = dateStr && dateStr < todayStr && !t.completed;
+
+        if (isCurrentMonth || isOverdueUnpaid) {
+          monthlyTotal += amt;
+          if (t.completed) monthlyPaid += amt;
+        }
+      });
+
+      const isMonthlyView = periodFilter === 'month';
+      const displayTotal = isMonthlyView ? monthlyTotal : allTotal;
+      const displayPaid = isMonthlyView ? monthlyPaid : allPaid;
+      const displayRemaining = Math.max(0, displayTotal - displayPaid);
+
+      return { displayTotal, displayPaid, displayRemaining, monthlyTotal, allTotal };
+    };
+
+    const monthlyView = computeExpensesOptionB(recurringMidasBills, 'month');
+    assert.strictEqual(monthlyView.displayTotal, 40.00, 'This Month view must show $40 for current month');
+    assert.strictEqual(monthlyView.displayRemaining, 40.00);
+
+    const allView = computeExpensesOptionB(recurringMidasBills, 'all');
+    assert.strictEqual(allView.displayTotal, 520.00, 'All Scheduled view must show $520 for all 13 occurrences');
+    assert.strictEqual(allView.displayRemaining, 520.00);
+  });
 });
 
 // ==============================================================================
@@ -644,7 +698,7 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     'Average Rating'
   ];
 
-  test('all 10 languages exist, have valid JSON, and have exactly 833 keys each', () => {
+  test('all 10 languages exist, have valid JSON, and have exactly 837 keys each', () => {
     const loaded = {};
     for (const lang of languages) {
       const p = path.join(localesDir, `${lang}.json`);
@@ -654,14 +708,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 833, `English locale must contain 833 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 837, `English locale must contain 837 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        833,
-        `Language ${lang} has ${count} keys, expected 833 (matching EN)`
+        837,
+        `Language ${lang} has ${count} keys, expected 837 (matching EN)`
       );
     }
   });

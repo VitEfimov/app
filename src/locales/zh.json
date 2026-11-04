@@ -831,5 +831,9 @@
   "Evening": "晚间",
   "Anytime": "随时",
   "Best Streak": "最长连续打卡",
-  "Average Rating": "平均评分"
+  "Average Rating": "平均评分",
+  "This Month": "本月",
+  "All Scheduled": "所有已安排",
+  "This Month's Bills": "本月账单",
+  "All scheduled:": "已安排总额："
 }

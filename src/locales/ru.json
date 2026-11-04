@@ -831,5 +831,9 @@
   "Evening": "Вечер",
   "Anytime": "В любое время",
   "Best Streak": "Лучшая серия",
-  "Average Rating": "Средняя оценка"
+  "Average Rating": "Средняя оценка",
+  "This Month": "Этот месяц",
+  "All Scheduled": "Все запланированные",
+  "This Month's Bills": "Счета за этот месяц",
+  "All scheduled:": "Все запланированные:"
 }

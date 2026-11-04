@@ -226,9 +226,11 @@ export default function BoardScreen({ route, navigation }) {
   const [sortConfig, setSortConfig] = useState({});
   const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
   const [listFilterCategory, setListFilterCategory] = useState('All');
+  const [expensesPeriodFilter, setExpensesPeriodFilter] = useState('month');
 
   useEffect(() => {
     setListFilterCategory('All');
+    setExpensesPeriodFilter('month');
   }, [activeBoardId]);
 
   const getTaskAmount = useCallback((task) => {
@@ -1274,31 +1276,105 @@ export default function BoardScreen({ route, navigation }) {
     }
 
     if (type === 'expenses') {
-      let totalBills = 0;
-      let totalPaid = 0;
+      const currentMonthStr = dayjs().format('YYYY-MM');
+      const todayStr = dayjs().format('YYYY-MM-DD');
+
+      let allTotal = 0;
+      let allPaid = 0;
+      let monthlyTotal = 0;
+      let monthlyPaid = 0;
+
       boardTasks.forEach(t => {
         const amt = getTaskAmount(t);
-        totalBills += amt;
-        if (t.completed) totalPaid += amt;
+        allTotal += amt;
+        if (t.completed) allPaid += amt;
+
+        const dateStr = getTaskDateStr(t);
+        const isCurrentMonth = dateStr ? dateStr.startsWith(currentMonthStr) : true;
+        const isOverdueUnpaid = dateStr && dateStr < todayStr && !t.completed;
+
+        if (isCurrentMonth || isOverdueUnpaid) {
+          monthlyTotal += amt;
+          if (t.completed) monthlyPaid += amt;
+        }
       });
-      const remainingDue = Math.max(0, totalBills - totalPaid);
+
+      const isMonthlyView = expensesPeriodFilter === 'month';
+      const displayTotal = isMonthlyView ? monthlyTotal : allTotal;
+      const displayPaid = isMonthlyView ? monthlyPaid : allPaid;
+      const displayRemaining = Math.max(0, displayTotal - displayPaid);
+      const titleLabel = isMonthlyView
+        ? (t("This Month's Bills") || 'This Month')
+        : (t('Total Bills') || 'Total Bills');
 
       return (
         <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          {/* Period Toggle Switcher: This Month vs All Scheduled */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
+            <TouchableOpacity
+              onPress={() => setExpensesPeriodFilter('month')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 14,
+                backgroundColor: isMonthlyView ? '#EF4444' : (colors.background || '#F3F4F6'),
+                borderWidth: 1,
+                borderColor: isMonthlyView ? '#EF4444' : (colors.borderColor || '#E5E7EB')
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: isMonthlyView ? '700' : '500', color: isMonthlyView ? '#FFFFFF' : colors.textPrimary }}>
+                📅 {t('This Month') || 'This Month'} (${monthlyTotal.toFixed(2)})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setExpensesPeriodFilter('all')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 14,
+                backgroundColor: !isMonthlyView ? '#EF4444' : (colors.background || '#F3F4F6'),
+                borderWidth: 1,
+                borderColor: !isMonthlyView ? '#EF4444' : (colors.borderColor || '#E5E7EB')
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: !isMonthlyView ? '700' : '500', color: !isMonthlyView ? '#FFFFFF' : colors.textPrimary }}>
+                📊 {t('All Scheduled') || 'All Scheduled'} (${allTotal.toFixed(2)})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Total Bills') || 'Total Bills'}</Text>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 }}>${totalBills.toFixed(2)}</Text>
+              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{titleLabel}</Text>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 }}>${displayTotal.toFixed(2)}</Text>
             </View>
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Paid') || 'Paid'}</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10B981', marginTop: 2 }}>${totalPaid.toFixed(2)}</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10B981', marginTop: 2 }}>${displayPaid.toFixed(2)}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Remaining Due') || 'Remaining Due'}</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginTop: 2 }}>${remainingDue.toFixed(2)}</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginTop: 2 }}>${displayRemaining.toFixed(2)}</Text>
             </View>
           </View>
+
+          {isMonthlyView && allTotal > monthlyTotal && (
+            <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.borderColor || '#E5E7EB', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                {t('All scheduled:') || 'All scheduled:'} ${allTotal.toFixed(2)}
+              </Text>
+              <TouchableOpacity onPress={() => setExpensesPeriodFilter('all')}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#EF4444' }}>
+                  {t('View all') || 'View all'} →
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       );
     }

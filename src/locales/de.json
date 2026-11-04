@@ -831,5 +831,9 @@
   "Evening": "Abend",
   "Anytime": "Jederzeit",
   "Best Streak": "Beste Serie",
-  "Average Rating": "Durchschnittsbewertung"
+  "Average Rating": "Durchschnittsbewertung",
+  "This Month": "Diesen Monat",
+  "All Scheduled": "Alle geplanten",
+  "This Month's Bills": "Rechnungen diesen Monat",
+  "All scheduled:": "Gesamt geplant:"
 }
