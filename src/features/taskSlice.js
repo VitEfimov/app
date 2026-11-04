@@ -255,13 +255,13 @@ const taskSlice = createSlice({
         },
         deleteTaskSync(state, action) {
              const { taskId } = action.payload;
-             state.tasks = state.tasks.filter(t => t.id !== taskId);
+             state.tasks = state.tasks.filter(t => (t.id || t._id) !== taskId);
         },
         deleteMultipleTasksSync(state, action) {
              const { taskIds } = action.payload || {};
              if (!Array.isArray(taskIds) || taskIds.length === 0) return;
              const idSet = new Set(taskIds.map(String));
-             state.tasks = state.tasks.filter(t => t && !idSet.has(String(t.id)));
+             state.tasks = state.tasks.filter(t => t && !idSet.has(String(t.id || t._id)));
         },
         purgeOrphanedTasksSync(state, action) {
             const boards = action.payload || [];
@@ -293,7 +293,7 @@ const taskSlice = createSlice({
         },
         updateTaskSync(state, action) {
             const { taskId, name, priority, completed, description, completionDate, time, subtasks } = action.payload;
-            const task = state.tasks.find(task => task.id === taskId);
+            const task = state.tasks.find(task => (task.id || task._id) === taskId);
             if (task) {
                 task.taskname = name !== undefined ? name : task.taskname;
                 task.priority = priority !== undefined ? priority : task.priority;
@@ -678,14 +678,16 @@ export const addTask = (payload) => async (dispatch, getState) => {
     if (payload?.task) {
         const hasReminder = payload.task.reminder && payload.task.reminder !== 'None';
         const isKeepAllDay = !!payload.task.keepNotificationAllDay;
-        if ((hasReminder || isKeepAllDay) && payload.task.completionDate && !payload.task.completed) {
+        const isAlarm = !!payload.task.isAlarm;
+        const effectiveTaskId = payload.task.id || payload.task._id;
+        if ((hasReminder || isKeepAllDay || isAlarm) && payload.task.completionDate && !payload.task.completed) {
             scheduleTaskReminder(
                 payload.task.taskname,
                 payload.task.reminder,
                 payload.task.completionDate,
                 payload.task.time,
-                payload.task.id,
-                !!payload.task.isAlarm,
+                effectiveTaskId,
+                isAlarm,
                 themeState,
                 {
                     isNagMode: payload.task.isNagMode,
@@ -695,7 +697,7 @@ export const addTask = (payload) => async (dispatch, getState) => {
             )
                 .then(notifIds => {
                     if (notifIds && notifIds.length > 0) {
-                        dispatch(updateTaskSync({ taskId: payload.task.id, notificationId: notifIds }));
+                        dispatch(updateTaskSync({ taskId: effectiveTaskId, notificationId: notifIds }));
                         persistTasksToStorage(getState().taskReducer.tasks, getState);
                     }
                 })
@@ -755,7 +757,9 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
                 if (scheduledCount >= 50) break; // Guard against OS alarm quota exhaustion
                 const hasReminder = task.reminder && task.reminder !== 'None';
                 const isKeepAllDay = !!task.keepNotificationAllDay;
-                if (!hasReminder && !isKeepAllDay) continue;
+                const isAlarm = !!task.isAlarm;
+                const effectiveTaskId = task.id || task._id;
+                if (!hasReminder && !isKeepAllDay && !isAlarm) continue;
                 if (dayjs(task.completionDate).isAfter(horizon)) continue;
 
                 try {
@@ -764,8 +768,8 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
                         task.reminder,
                         task.completionDate,
                         task.time,
-                        task.id,
-                        !!task.isAlarm,
+                        effectiveTaskId,
+                        isAlarm,
                         themeState,
                         {
                             isNagMode: task.isNagMode,
@@ -774,7 +778,7 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
                         }
                     );
                     if (notifIds && notifIds.length > 0) {
-                        notifUpdates.push({ taskId: task.id, notificationId: notifIds });
+                        notifUpdates.push({ taskId: effectiveTaskId, notificationId: notifIds });
                         scheduledCount++;
                     }
                 } catch (e) {}
@@ -817,7 +821,7 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
 export const deleteTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     const taskId = payload?.taskId || (typeof payload === 'string' ? payload : null);
-    const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id) === String(taskId)) : null;
+    const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id || t._id) === String(taskId)) : null;
 
     // Immediately record tombstone if linked to calendar to prevent AppState resurrection
     if (existingTask?.calendarEventId) {
@@ -838,10 +842,10 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
             try {
                 // Verify if the user tapped Undo during the 5s toast window
                 const currentTasks = getState().taskReducer.tasks;
-                const isRestored = currentTasks.some(t => t && String(t.id) === String(taskId));
+                const isRestored = currentTasks.some(t => t && String(t.id || t._id) === String(taskId));
                 if (!isRestored) {
                     if (existingTask) {
-                        await cancelNotification(existingTask.notificationId, existingTask.id);
+                        await cancelNotification(existingTask.notificationId, existingTask.id || existingTask._id);
                         if (existingTask.calendarEventId) {
                             await removeTaskFromCalendarAsync(existingTask.calendarEventId);
                         }
@@ -942,26 +946,28 @@ export const purgeOrphanedTasksThunk = (boards) => async (dispatch, getState) =>
 export const updateTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     const taskId = payload?.taskId;
-    const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id) === String(taskId)) : null;
+    const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id || t._id) === String(taskId)) : null;
 
     dispatch(updateTaskSync(payload));
-    const updatedTask = taskId ? getState().taskReducer.tasks.find(t => t && String(t.id) === String(taskId)) : null;
+    const updatedTask = taskId ? getState().taskReducer.tasks.find(t => t && String(t.id || t._id) === String(taskId)) : null;
 
     if (updatedTask) {
+        const effectiveId = updatedTask.id || updatedTask._id;
         if (updatedTask.completed) {
-            await cancelNotification(updatedTask.notificationId, updatedTask.id);
+            await cancelNotification(updatedTask.notificationId, effectiveId);
         } else if (existingTask && existingTask.completed && !updatedTask.completed) {
             const hasReminder = updatedTask.reminder && updatedTask.reminder !== 'None';
             const isKeepAllDay = !!updatedTask.keepNotificationAllDay;
-            if (hasReminder || isKeepAllDay) {
+            const isAlarm = !!updatedTask.isAlarm;
+            if (hasReminder || isKeepAllDay || isAlarm) {
                 try {
                     const notifIds = await scheduleTaskReminder(
                         updatedTask.taskname,
                         updatedTask.reminder,
                         updatedTask.completionDate,
                         updatedTask.time,
-                        updatedTask.id,
-                        !!updatedTask.isAlarm,
+                        effectiveId,
+                        isAlarm,
                         state.themeReducer,
                         {
                             isNagMode: updatedTask.isNagMode,
@@ -970,7 +976,7 @@ export const updateTask = (payload) => async (dispatch, getState) => {
                         }
                     );
                     if (notifIds && notifIds.length > 0) {
-                        dispatch(updateTaskSync({ taskId: updatedTask.id, notificationId: notifIds }));
+                        dispatch(updateTaskSync({ taskId: effectiveId, notificationId: notifIds }));
                     }
                 } catch (e) {}
             }

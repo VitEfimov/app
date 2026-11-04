@@ -96,6 +96,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
         val taskName = intent.getStringExtra("taskName") ?: "Task"
         val channelId = intent.getStringExtra("channelId") ?: "task_alarm_channel"
         val presentationStyle = intent.getStringExtra("presentationStyle") ?: "fullscreen"
+        val soundName = intent.getStringExtra("soundName")
 
         // Stop continuous alarm sound playback and release focus
         AlarmAudioManager.stopAlarmSound(context)
@@ -127,6 +128,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
                 putExtra("requestCode", notificationId)
                 putExtra("presentationStyle", presentationStyle)
                 putExtra("keepNotificationAllDay", keepAllDay)
+                putExtra("soundName", soundName)
             }
             
             val pendingIntent = PendingIntent.getBroadcast(

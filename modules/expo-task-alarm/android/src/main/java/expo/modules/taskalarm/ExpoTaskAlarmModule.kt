@@ -15,6 +15,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
 import androidx.core.content.FileProvider
+import androidx.core.app.NotificationManagerCompat
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -136,34 +137,53 @@ class ExpoTaskAlarmModule : Module() {
       return@AsyncFunction false
     }
 
-    AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, channelId: String, presentationStyle: String?, keepNotificationAllDay: Boolean? ->
+    AsyncFunction("scheduleExactAlarm") { taskId: String, taskName: String, triggerTimeMillis: Long, soundOrChannel: String?, presentationStyle: String?, keepNotificationAllDay: Boolean?, explicitChannelId: String? ->
       val context = appContext.reactContext ?: return@AsyncFunction false
       
-      val targetChannelId = if (!channelId.isNullOrEmpty()) channelId else "task_alarm_channel"
+      val resolvedChannelId: String
+      val resolvedSoundName: String?
+
+      if (!explicitChannelId.isNullOrEmpty()) {
+          resolvedSoundName = soundOrChannel
+          resolvedChannelId = explicitChannelId
+      } else if (!soundOrChannel.isNullOrEmpty() && (soundOrChannel.startsWith("task_") || soundOrChannel.contains("channel") || soundOrChannel.contains("_vib"))) {
+          resolvedChannelId = soundOrChannel
+          // If channelId is like task_alarm_alarm_02_vib1_v17, extract sound basename
+          val match = Regex("""task_alarm_(.+)_vib[01]_""").find(soundOrChannel)
+          resolvedSoundName = match?.groupValues?.get(1) ?: "alarm_02"
+      } else {
+          resolvedSoundName = soundOrChannel
+          resolvedChannelId = "task_alarm_channel"
+      }
+
       val style = presentationStyle ?: "fullscreen"
 
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
           val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-          
-          // 1. Ensure high priority channel exists for popup mode
-          if (notificationManager.getNotificationChannel(targetChannelId) == null) {
-              val channel = NotificationChannel(targetChannelId, "Task Alarms", NotificationManager.IMPORTANCE_HIGH).apply {
-                  description = "Channel for task alarms"
+          val baseChannel = notificationManager.getNotificationChannel(resolvedChannelId)
+          val shouldVibrate = baseChannel?.shouldVibrate() ?: true
+          val vibrationPattern = baseChannel?.vibrationPattern
+
+          // 1. Dedicated silent popup banner channel (IMPORTANCE_HIGH for heads-up, but setSound(null, null) to eliminate double sounding)
+          val popupChannelId = "${resolvedChannelId}_popup_v3"
+          if (notificationManager.getNotificationChannel(popupChannelId) == null) {
+              val popupChannel = NotificationChannel(popupChannelId, "Task Alarm (Popup Banner)", NotificationManager.IMPORTANCE_HIGH).apply {
+                  description = "Heads-up banner for task alarms"
+                  setSound(null, null)
+                  enableVibration(shouldVibrate)
+                  if (vibrationPattern != null) this.vibrationPattern = vibrationPattern
               }
-              notificationManager.createNotificationChannel(channel)
+              notificationManager.createNotificationChannel(popupChannel)
           }
 
-          // 2. Default importance channel for full-screen mode to prevent popup banner over the full screen activity
-          val fsChannelId = "${targetChannelId}_fs"
+          // 2. Dedicated silent full-screen channel (IMPORTANCE_DEFAULT, setSound(null, null) to eliminate double sounding)
+          val fsChannelId = "${resolvedChannelId}_fs_v3"
           if (notificationManager.getNotificationChannel(fsChannelId) == null) {
-              val existing = notificationManager.getNotificationChannel(targetChannelId)
-              val fsChannel = NotificationChannel(fsChannelId, "Task Full Screen Alarms", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                  description = "Channel for full screen alarms without heads-up popup banner"
-                  if (existing != null) {
-                      setSound(existing.sound, existing.audioAttributes)
-                      enableVibration(existing.shouldVibrate())
-                      vibrationPattern = existing.vibrationPattern
-                  }
+              val fsChannel = NotificationChannel(fsChannelId, "Task Alarm (Full Screen)", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                  description = "Full screen task alarm notification"
+                  setSound(null, null)
+                  enableVibration(shouldVibrate)
+                  if (vibrationPattern != null) this.vibrationPattern = vibrationPattern
               }
               notificationManager.createNotificationChannel(fsChannel)
           }
@@ -176,7 +196,8 @@ class ExpoTaskAlarmModule : Module() {
       val receiverIntent = Intent(context, TaskAlarmReceiver::class.java).apply {
           putExtra("taskId", taskId)
           putExtra("taskName", taskName)
-          putExtra("channelId", targetChannelId)
+          putExtra("channelId", resolvedChannelId)
+          putExtra("soundName", resolvedSoundName)
           putExtra("requestCode", requestCode)
           putExtra("presentationStyle", style)
           putExtra("keepNotificationAllDay", keepNotificationAllDay ?: false)
@@ -371,6 +392,12 @@ class ExpoTaskAlarmModule : Module() {
       
       alarmManager.cancel(pendingIntent)
       pendingIntent.cancel()
+      try {
+          NotificationManagerCompat.from(context).cancel(requestCode)
+          AlarmAudioManager.stopAlarmSound(context)
+      } catch (e: Exception) {
+          e.printStackTrace()
+      }
       return@AsyncFunction true
     }
 

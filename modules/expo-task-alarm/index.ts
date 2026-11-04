@@ -9,7 +9,8 @@ export async function scheduleExactAlarm(
   triggerTimeMillis: number,
   soundName: string,
   presentationStyle?: string,
-  keepNotificationAllDay?: boolean
+  keepNotificationAllDay?: boolean,
+  channelId?: string
 ): Promise<boolean> {
   if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.scheduleExactAlarm !== 'function') return false;
   try {
@@ -19,7 +20,8 @@ export async function scheduleExactAlarm(
       triggerTimeMillis,
       soundName,
       presentationStyle || 'fullscreen',
-      !!keepNotificationAllDay
+      !!keepNotificationAllDay,
+      channelId || ''
     );
   } catch (e) {
     console.warn('scheduleExactAlarm failed:', e);

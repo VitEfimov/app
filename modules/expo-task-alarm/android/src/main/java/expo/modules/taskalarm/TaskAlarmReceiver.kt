@@ -25,7 +25,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val isLocked = keyguardManager?.isKeyguardLocked ?: false
 
         val isFullScreenMode = (presentationStyle == "fullscreen") || (presentationStyle == "adaptive" && (!isInteractive || isLocked))
-        val activeChannelId = if (isFullScreenMode) "${channelId}_fs" else channelId
+        val activeChannelId = if (isFullScreenMode) "${channelId}_fs_v3" else "${channelId}_popup_v3"
         val isCar = CarUtils.isConnectedToCar(context)
 
         // Wake intent
@@ -72,6 +72,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             putExtra("channelId", channelId)
             putExtra("presentationStyle", presentationStyle)
             putExtra("keepNotificationAllDay", keepNotificationAllDay)
+            putExtra("soundName", soundName)
         }
         val snoozePendingIntent = PendingIntent.getBroadcast(context, requestCode + 2000, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
@@ -84,6 +85,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             .setContentIntent(fullScreenPendingIntent)
             .setOngoing(true)
             .setAutoCancel(false)
+            .setSound(null)
             .addAction(0, "Snooze", snoozePendingIntent)
             .addAction(0, "Stop", stopPendingIntent)
 
@@ -100,7 +102,8 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             notificationBuilder.setSound(null)
             notificationBuilder.setVibrate(null)
         } else {
-            notificationBuilder.setDefaults(NotificationCompat.DEFAULT_LIGHTS)
+            notificationBuilder.setSound(null)
+            notificationBuilder.setDefaults(0)
             // In popup mode, start looping audio directly
             if (!isFullScreenMode) {
                 AlarmAudioManager.startAlarmSound(context, soundName)

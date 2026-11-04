@@ -563,7 +563,7 @@ useEffect(() => {
 
   const handleUpdate = (updates) => {
     // Only used for immediate local updates like priority or subtask check
-    dispatch(updateTask({ taskId: task.id, ...updates }));
+    dispatch(updateTask({ taskId: task.id || task._id, ...updates }));
   };
 
   const hasUnsavedChanges = () => {
@@ -635,22 +635,22 @@ useEffect(() => {
     if (isAlarmChanged) updates.isAlarm = isAlarm;
     if (keepNotificationAllDayChanged) updates.keepNotificationAllDay = keepNotificationAllDay;
 
+    const effectiveTaskId = task.id || task._id;
     if (timeChanged || dateChanged || reminderChanged || isAlarmChanged || keepNotificationAllDayChanged || nameChanged) {
       updates.reminder = reminder;
       updates.isNagMode = reminder === 'Nag Mode (Every 10 min)';
       updates.escalationLevel = reminder === 'Escalating Reminder' ? 'active' : 'none';
       updates.keepNotificationAllDay = keepNotificationAllDay;
-      // Schedule new notifications
-      if (task.notificationId) {
-        await cancelNotification(task.notificationId, task.id);
-        updates.notificationId = null;
-      }
+      // Schedule new notifications: always cancel existing alarm/reminder first
+      await cancelNotification(task.notificationId, effectiveTaskId);
+      updates.notificationId = null;
+
       const notifIds = await scheduleTaskReminder(
         taskName,
         reminder,
         selectedDate || dayjs().format('YYYY-MM-DD'),
         selectedTime,
-        task.id,
+        effectiveTaskId,
         isAlarm,
         themeState,
         {
@@ -765,7 +765,7 @@ useEffect(() => {
     }
 
     if (Object.keys(updates).length > 0) {
-      dispatch(updateTask({ taskId: task.id, ...updates }));
+      dispatch(updateTask({ taskId: task.id || task._id, ...updates }));
     }
 
     onClose();
@@ -1194,13 +1194,13 @@ useEffect(() => {
         isDestructive: true,
         secondaryIsDestructive: true,
         onConfirm: () => {
-          dispatch(deleteTask({ taskId: task.id }));
+          dispatch(deleteTask({ taskId: task.id || task._id }));
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
           onClose();
         },
         secondaryConfirmText: t('All recurring tasks'),
         onSecondaryConfirm: () => {
-          dispatch(deleteTask({ taskId: task.id }));
+          dispatch(deleteTask({ taskId: task.id || task._id }));
           if (task.recurringSeriesId) {
             dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId }));
           }
@@ -1216,7 +1216,7 @@ useEffect(() => {
         confirmText: t('Delete'),
         isDestructive: true,
         onConfirm: () => {
-          dispatch(deleteTask({ taskId: task.id }));
+          dispatch(deleteTask({ taskId: task.id || task._id }));
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
           onClose();
         }

@@ -116,6 +116,7 @@ class AlarmActivity : Activity() {
                 putExtra("requestCode", requestCode)
                 putExtra("presentationStyle", intent.getStringExtra("presentationStyle") ?: "fullscreen")
                 putExtra("keepNotificationAllDay", keepAllDay)
+                putExtra("soundName", soundName)
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 this,

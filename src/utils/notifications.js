@@ -849,12 +849,13 @@ export async function scheduleExactTaskReminder(
         taskId,
         taskName,
         targetDate.valueOf(),
-        channelId,
+        sound,
         alarmPresentationStyle,
-        advancedOptions?.keepNotificationAllDay
+        advancedOptions?.keepNotificationAllDay,
+        channelId
       );
       if (success) {
-        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, channelId, taskName, alarmPresentationStyle, isCar });
+        DevLogger.success(`Successfully scheduled exact native ALARM`, { taskId, channelId, sound, taskName, alarmPresentationStyle, isCar });
         return `native_alarm_${taskId}`;
       }
     }

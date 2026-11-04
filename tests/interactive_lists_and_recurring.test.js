@@ -762,3 +762,64 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
   });
 });
 
+// ==============================================================================
+// 9. TASK ALARM SINGLE-SOUND INTEGRITY & RESCHEDULING ENGINE
+// ==============================================================================
+describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
+  test('native alarm channels configure setSound(null, null) to eliminate double sounding', () => {
+    const ktModulePath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
+    const ktContent = fs.readFileSync(ktModulePath, 'utf8');
+
+    // Verify popup channel is defined and has setSound(null, null)
+    assert.match(ktContent, /popupChannelId\s*=\s*"\$\{resolvedChannelId\}_popup_v3"/, 'Must define isolated popup channel');
+    assert.match(ktContent, /popupChannel[\s\S]*?setSound\(null,\s*null\)/, 'Popup channel must be silent');
+
+    // Verify full-screen channel is defined and has setSound(null, null)
+    assert.match(ktContent, /fsChannelId\s*=\s*"\$\{resolvedChannelId\}_fs_v3"/, 'Must define isolated full-screen channel');
+    assert.match(ktContent, /fsChannel[\s\S]*?setSound\(null,\s*null\)/, 'Full-screen channel must be silent');
+  });
+
+  test('receiverIntent explicitly forwards soundName to AlarmActivity and AlarmAudioManager', () => {
+    const ktModulePath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
+    const ktContent = fs.readFileSync(ktModulePath, 'utf8');
+
+    assert.ok(ktContent.includes('putExtra("soundName", resolvedSoundName)'), 'ExpoTaskAlarmModule must pass resolvedSoundName in intent');
+
+    const receiverPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/TaskAlarmReceiver.kt');
+    const receiverContent = fs.readFileSync(receiverPath, 'utf8');
+
+    assert.ok(receiverContent.includes('.setSound(null)'), 'NotificationBuilder must explicitly setSound(null)');
+    assert.ok(receiverContent.includes('notificationBuilder.setDefaults(0)'), 'NotificationBuilder must not use DEFAULT_SOUND');
+    assert.ok(receiverContent.includes('putExtra("soundName", soundName)'), 'AlarmActivity must receive soundName');
+  });
+
+  test('TS wrapper and notifications.js pass sound and channelId to scheduleExactAlarm', () => {
+    const tsPath = path.resolve('modules/expo-task-alarm/index.ts');
+    const tsContent = fs.readFileSync(tsPath, 'utf8');
+
+    assert.match(tsContent, /channelId\?:?\s*string/, 'TS signature must accept optional channelId');
+    assert.match(tsContent, /channelId\s*\|\|\s*''/, 'TS module must forward channelId');
+
+    const notifPath = path.resolve('src/utils/notifications.js');
+    const notifContent = fs.readFileSync(notifPath, 'utf8');
+
+    assert.match(notifContent, /scheduleExactAlarm\([\s\S]*?sound[\s\S]*?channelId[\s\S]*?\)/, 'notifications.js must forward soundName and channelId');
+  });
+
+  test('TaskDetailsModal and taskSlice normalize taskId using task.id || task._id', () => {
+    const modalPath = path.resolve('src/components/TaskDetailsModal.js');
+    const modalContent = fs.readFileSync(modalPath, 'utf8');
+
+    assert.match(modalContent, /const effectiveTaskId = task\.id \|\| task\._id;/, 'TaskDetailsModal must normalize effectiveTaskId');
+    assert.match(modalContent, /await cancelNotification\(task\.notificationId, effectiveTaskId\);/, 'Rescheduling must cancel previous notifications first');
+
+    const slicePath = path.resolve('src/features/taskSlice.js');
+    const sliceContent = fs.readFileSync(slicePath, 'utf8');
+
+    assert.match(sliceContent, /\(t\.id \|\| t\._id\) !== taskId/, 'deleteTaskSync must check both t.id and t._id');
+    assert.match(sliceContent, /const effectiveTaskId = payload\.task\.id \|\| payload\.task\._id;/, 'addTask must resolve effectiveTaskId');
+    assert.match(sliceContent, /hasReminder \|\| isKeepAllDay \|\| isAlarm/, 'addTask must schedule alarm even when reminder is None');
+  });
+});
+
+
