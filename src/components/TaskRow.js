@@ -171,17 +171,22 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
 
   const isRepeatingTask = !!(task?.recurringSeriesId || task?.isRecurring || (task?.repeatConfig && task?.repeatConfig?.preset && task?.repeatConfig?.preset !== 'None') || (task?.repeatFrequency && task?.repeatFrequency !== 'None'));
 
-  const currentBoard = boards.find(b => b && (b.id === (task?.boardId || task?.board_id) || (b._id && b._id === (task?.boardId || task?.board_id))));
+  const currentBoard = useMemo(() => {
+    if (!task || !boards || boards.length === 0) return null;
+    const bId = task.boardId || task.board_id;
+    return boards.find(b => b && (b.id === bId || b._id === bId));
+  }, [boards, task?.boardId, task?.board_id]);
   const boardType = currentBoard?.type || 'standard';
 
   const getTaskAmount = useCallback((t) => {
+    if (!t) return 0;
     if (t?.itemPrice !== undefined && t?.itemPrice !== null && !isNaN(Number(t.itemPrice))) {
       return Number(t.itemPrice);
     }
     if (t?.amount !== undefined && t?.amount !== null && !isNaN(Number(t.amount))) {
       return Number(t.amount);
     }
-    const name = t?.taskname || t?.name || '';
+    const name = String(t?.taskname || t?.name || '');
     const match = name.match(/\$(\d+(?:\.\d{1,2})?)/);
     if (match) {
       return parseFloat(match[1]);

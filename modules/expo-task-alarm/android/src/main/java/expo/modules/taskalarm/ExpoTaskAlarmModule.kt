@@ -1,6 +1,7 @@
 package expo.modules.taskalarm
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -39,6 +40,64 @@ class ExpoTaskAlarmModule : Module() {
       val context = appContext.reactContext ?: return@Function false
       val prefs = context.getSharedPreferences("taskflow_theme", Context.MODE_PRIVATE)
       prefs.edit().putString("themeMode", mode).apply()
+      return@Function true
+    }
+
+    Function("getSystemMemoryMetrics") {
+      val context = appContext.reactContext
+      val result = HashMap<String, Any>()
+      val runtime = Runtime.getRuntime()
+      val usedHeapMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+      val totalHeapMb = runtime.totalMemory() / (1024 * 1024)
+      val maxHeapMb = runtime.maxMemory() / (1024 * 1024)
+
+      result["usedHeapMb"] = usedHeapMb.toDouble()
+      result["totalHeapMb"] = totalHeapMb.toDouble()
+      result["maxHeapMb"] = maxHeapMb.toDouble()
+
+      if (context != null) {
+        val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        if (actManager != null) {
+          val memInfo = ActivityManager.MemoryInfo()
+          actManager.getMemoryInfo(memInfo)
+          result["availMemMb"] = (memInfo.availMem / (1024 * 1024)).toDouble()
+          result["totalMemMb"] = (memInfo.totalMem / (1024 * 1024)).toDouble()
+          result["lowMemory"] = memInfo.lowMemory
+          result["thresholdMb"] = (memInfo.threshold / (1024 * 1024)).toDouble()
+        }
+      }
+      return@Function result
+    }
+
+    Function("getNativeCrashLogs") {
+      val context = appContext.reactContext ?: return@Function "[]"
+      val prefs = context.getSharedPreferences("taskflow_native_crashes", Context.MODE_PRIVATE)
+      return@Function prefs.getString("logs", "[]") ?: "[]"
+    }
+
+    Function("clearNativeCrashLogs") {
+      val context = appContext.reactContext ?: return@Function false
+      val prefs = context.getSharedPreferences("taskflow_native_crashes", Context.MODE_PRIVATE)
+      prefs.edit().remove("logs").apply()
+      return@Function true
+    }
+
+    Function("initNativeCrashHandler") {
+      val context = appContext.reactContext ?: return@Function false
+      val oldHandler = Thread.getDefaultUncaughtExceptionHandler()
+      Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        try {
+          val prefs = context.getSharedPreferences("taskflow_native_crashes", Context.MODE_PRIVATE)
+          val existing = prefs.getString("logs", "[]") ?: "[]"
+          val stackTrace = Log.getStackTraceString(throwable)
+          val entry = "{\"timestamp\":\"${System.currentTimeMillis()}\",\"thread\":\"${thread.name}\",\"message\":\"${throwable.message ?: "Native Exception"}\",\"stack\":\"${stackTrace.replace("\"", "\\\"").replace("\n", "\\n")}\"}"
+          val updated = if (existing == "[]") "[$entry]" else existing.replace("]", ",$entry]")
+          prefs.edit().putString("logs", updated).commit()
+        } catch (e: Exception) {
+          // ignore
+        }
+        oldHandler?.uncaughtException(thread, throwable)
+      }
       return@Function true
     }
 

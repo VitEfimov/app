@@ -466,6 +466,20 @@ describe('Expenses & Bills Tracker', () => {
     assert.strictEqual(allView.displayTotal, 520.00, 'All Scheduled view must show $520 for all 13 occurrences');
     assert.strictEqual(allView.displayRemaining, 520.00);
   });
+
+  test('expenses title label hides (display: none) when viewport width < 300px', () => {
+    const getTitleLabelStyle = (windowWidth) => ({
+      fontSize: 10,
+      textTransform: 'uppercase',
+      fontWeight: '600',
+      display: windowWidth < 300 ? 'none' : 'flex',
+    });
+
+    assert.strictEqual(getTitleLabelStyle(280).display, 'none');
+    assert.strictEqual(getTitleLabelStyle(299).display, 'none');
+    assert.strictEqual(getTitleLabelStyle(300).display, 'flex');
+    assert.strictEqual(getTitleLabelStyle(375).display, 'flex');
+  });
 });
 
 // ==============================================================================
@@ -985,6 +999,168 @@ describe('Dual Month & Year Selector with Hot Taps Engine', () => {
     assert.strictEqual(parsed.month(), 0);
   });
 });
+
+// ==============================================================================
+// 12. LARGE SECTION CRASH PREVENTION, FLASHLIST INTEGRITY & HARDWARE DIAGNOSTICS
+// ==============================================================================
+describe('Large Section Crash Prevention, FlashList Integrity & Hardware Diagnostics', () => {
+  test('BoardScreen bypasses LayoutAnimation on Android and large lists to prevent SIGSEGV', () => {
+    const boardPath = path.resolve('src/screens/BoardScreen.js');
+    const content = fs.readFileSync(boardPath, 'utf8');
+
+    assert.match(content, /isLargeList/, 'Must detect large list conditions in toggleSection');
+    assert.match(content, /Platform\.OS\s*!==\s*['"]android['"]/, 'Must not trigger native LayoutAnimation on Android FlashList');
+  });
+
+  test('BoardScreen FlashList configures unique indexed keyExtractor and removeClippedSubviews', () => {
+    const boardPath = path.resolve('src/screens/BoardScreen.js');
+    const content = fs.readFileSync(boardPath, 'utf8');
+
+    assert.match(content, /keyExtractor=\{\(item,\s*index\)/, 'keyExtractor must accept index parameter');
+    assert.match(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'Must enable subview detachment on Android');
+    assert.match(content, /drawDistance=\{Platform\.OS === 'web' \? 400 : 250\}/, 'Must use conservative drawDistance on mobile');
+    assert.match(content, /ListHeaderComponent=\{renderListSummaryBar\}/, 'Must wire summary bar into ListHeaderComponent to scroll with tasks');
+  });
+
+  test('ExpoTaskAlarmModule and index.ts expose getSystemMemoryMetrics and native crash capture', () => {
+    const ktPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
+    const ktContent = fs.readFileSync(ktPath, 'utf8');
+
+    assert.match(ktContent, /Function\("getSystemMemoryMetrics"\)/, 'Must define getSystemMemoryMetrics in Kotlin');
+    assert.match(ktContent, /Function\("getNativeCrashLogs"\)/, 'Must define getNativeCrashLogs in Kotlin');
+    assert.match(ktContent, /Function\("initNativeCrashHandler"\)/, 'Must define initNativeCrashHandler in Kotlin');
+
+    const tsPath = path.resolve('modules/expo-task-alarm/index.ts');
+    const tsContent = fs.readFileSync(tsPath, 'utf8');
+
+    assert.match(tsContent, /export function getSystemMemoryMetrics/, 'Must export getSystemMemoryMetrics');
+    assert.match(tsContent, /export function getNativeCrashLogs/, 'Must export getNativeCrashLogs');
+    assert.match(tsContent, /export function initNativeCrashHandler/, 'Must export initNativeCrashHandler');
+  });
+
+  test('DevLogsScreen renders Hardware Health & Resource Monitor with RAM spent and processor stats', () => {
+    const devPath = path.resolve('src/screens/DevLogsScreen.js');
+    const content = fs.readFileSync(devPath, 'utf8');
+
+    assert.match(content, /Hardware Health & Resource Monitor/, 'Must contain Hardware Health monitor card');
+    assert.match(content, /RAM Spent \(App Heap\):/, 'Must display RAM Spent metric');
+    assert.match(content, /Device RAM Available:/, 'Must display Device RAM Available metric');
+    assert.match(content, /Processor Responsiveness:/, 'Must display Processor Responsiveness / FPS metric');
+    assert.match(content, /FlashList Crash Guard:/, 'Must display Crash Guard status');
+  });
+});
+
+// ==============================================================================
+// 13. HARDWARE PEAK GUARD & AUTOMATED MEMORY HOOKS
+// ==============================================================================
+describe('Hardware Peak Guard & Automated Memory Hooks', () => {
+  const guardMod = loadTranspiledModule(path.resolve('src/utils/memoryPressureGuard.js'), {
+    './logger': { DevLogger: { warn: () => {}, error: () => {}, info: () => {}, log: () => {} } },
+    'react-native': { Platform: { OS: 'android' } },
+    'react': { useState: (init) => [init, () => {}], useEffect: () => {}, useRef: (v) => ({ current: v }), useCallback: (fn) => fn }
+  });
+  const { HARDWARE_THRESHOLDS, evaluateHardwareHealth, MemoryPressureGuard } = guardMod;
+
+  test('HARDWARE_THRESHOLDS defines precise memory, latency, and section limits', () => {
+    assert.strictEqual(HARDWARE_THRESHOLDS.HEAP_WARNING_PERCENT, 75, 'Heap warning threshold must be 75%');
+    assert.strictEqual(HARDWARE_THRESHOLDS.HEAP_CRITICAL_PERCENT, 85, 'Heap critical peak threshold must be 85%');
+    assert.strictEqual(HARDWARE_THRESHOLDS.AVAIL_MEM_WARNING_MB, 350, 'Device RAM warning threshold must be 350MB');
+    assert.strictEqual(HARDWARE_THRESHOLDS.AVAIL_MEM_CRITICAL_MB, 180, 'Device RAM critical peak threshold must be 180MB');
+    assert.strictEqual(HARDWARE_THRESHOLDS.EVENT_LOOP_LAG_WARNING_MS, 60, 'Event loop lag warning must be 60ms');
+    assert.strictEqual(HARDWARE_THRESHOLDS.EVENT_LOOP_LAG_CRITICAL_MS, 150, 'Event loop lag critical must be 150ms');
+    assert.strictEqual(HARDWARE_THRESHOLDS.SECTION_DENSITY_CRITICAL, 100, 'Section density critical limit must be 100');
+  });
+
+  test('evaluateHardwareHealth accurately classifies HEALTHY, WARNING, and CRITICAL_PEAK', () => {
+    // 1. Healthy state
+    const healthy = evaluateHardwareHealth({
+      usedHeapMb: 60,
+      totalHeapMb: 100,
+      maxHeapMb: 256,
+      availMemMb: 1500,
+      totalMemMb: 4096,
+      lowMemory: false,
+      eventLoopLagMs: 5,
+      fps: 60,
+    });
+    assert.strictEqual(healthy.level, 'HEALTHY');
+    assert.strictEqual(healthy.isPeak, false);
+    assert.strictEqual(healthy.isWarning, false);
+    assert.strictEqual(healthy.reasons.length, 0);
+
+    // 2. Warning state (Heap at 78% of maxHeapMb)
+    const warningHeap = evaluateHardwareHealth({
+      usedHeapMb: 200,
+      totalHeapMb: 220,
+      maxHeapMb: 256,
+      availMemMb: 1200,
+      totalMemMb: 4096,
+      lowMemory: false,
+      eventLoopLagMs: 10,
+      fps: 55,
+    });
+    assert.strictEqual(warningHeap.level, 'WARNING');
+    assert.strictEqual(warningHeap.isWarning, true);
+    assert.strictEqual(warningHeap.isPeak, false);
+    assert.ok(warningHeap.reasons.some(r => r.includes('78%')));
+
+    // 3. Critical Peak state (Heap at 90% or lowMemory true)
+    const criticalHeap = evaluateHardwareHealth({
+      usedHeapMb: 232,
+      totalHeapMb: 240,
+      maxHeapMb: 256,
+      availMemMb: 120,
+      totalMemMb: 4096,
+      lowMemory: true,
+      eventLoopLagMs: 180,
+      fps: 12,
+    });
+    assert.strictEqual(criticalHeap.level, 'CRITICAL_PEAK');
+    assert.strictEqual(criticalHeap.isPeak, true);
+    assert.ok(criticalHeap.reasons.length >= 2, 'Should detect multiple peak threshold violations');
+  });
+
+  test('MemoryPressureGuard registers, executes, and unregisters cleanup hooks', () => {
+    let hookExecuted = false;
+    let receivedMetrics = null;
+
+    const unregister = MemoryPressureGuard.registerCleanupHook('test_subsystem', (metrics) => {
+      hookExecuted = true;
+      receivedMetrics = metrics;
+    });
+
+    const result = MemoryPressureGuard.runEmergencyCleanup('TEST_PEAK_EMERGENCY');
+    assert.strictEqual(hookExecuted, true, 'Registered hook must be executed on emergency cleanup');
+    assert.ok(receivedMetrics !== null, 'Hook must receive current metrics snapshot');
+    assert.ok(result.hooksExecuted >= 1, 'Freed count should reflect executed hooks');
+
+    // Unregister and ensure hook is not called again
+    hookExecuted = false;
+    unregister();
+    MemoryPressureGuard.runEmergencyCleanup('TEST_AFTER_UNREGISTER');
+    assert.strictEqual(hookExecuted, false, 'Unregistered hook must NOT be executed');
+  });
+
+  test('BoardScreen registers cleanup hook to close modals and cancel editing during memory peak', () => {
+    const boardPath = path.resolve('src/screens/BoardScreen.js');
+    const content = fs.readFileSync(boardPath, 'utf8');
+
+    assert.match(content, /MemoryPressureGuard\.registerCleanupHook\('BoardScreen'/, 'BoardScreen must register a named cleanup hook');
+    assert.match(content, /closeOpenSwipeableRow\?\.\(\)/, 'Cleanup hook must close open swipeables');
+    assert.match(content, /cancelAllInlineEditing\?\.\(\)/, 'Cleanup hook must cancel inline editing');
+  });
+
+  test('DevLogsScreen wires useMemoryPressureGuard and displays threshold cheatsheet and manual emergency flush', () => {
+    const devPath = path.resolve('src/screens/DevLogsScreen.js');
+    const content = fs.readFileSync(devPath, 'utf8');
+
+    assert.match(content, /useMemoryPressureGuard/, 'DevLogsScreen must import and use useMemoryPressureGuard');
+    assert.match(content, /CRITICAL HARDWARE NUMBERS & THRESHOLDS/, 'DevLogsScreen must render hardware threshold reference guide');
+    assert.match(content, /Run Emergency RAM Flush & GC/, 'DevLogsScreen must provide manual emergency flush trigger');
+  });
+});
+
+
 
 
 

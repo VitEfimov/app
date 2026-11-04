@@ -30,6 +30,7 @@ import { updateTask, processAutoManageTasks, addMultipleTasks, deleteMultipleTas
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CryptoStorage } from '../utils/cryptoStorage';
 import { ChaosTestHelper } from '../utils/chaosTestHelper';
+import { useMemoryPressureGuard, MemoryPressureGuard, HARDWARE_THRESHOLDS } from '../utils/memoryPressureGuard';
 import * as Notifications from 'expo-notifications';
 import dayjs from 'dayjs';
 import { navigationRef } from '../navigation/AppNavigator';
@@ -41,6 +42,7 @@ import {
   openBatteryOptimizationSettings,
   openOverlaySettings,
   isCarConnected,
+  getSystemMemoryMetrics,
 } from '../../modules/expo-task-alarm';
 
 const IconRefresh = ({ color }) => (
@@ -91,6 +93,24 @@ export default function DevLogsScreen({ navigation }) {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [crashLogs, setCrashLogs] = useState([]);
   const [expandedCrashId, setExpandedCrashId] = useState(null);
+
+  const {
+    status: memoryGuardStatus,
+    isPeak: isMemoryPeak,
+    isWarning: isMemoryWarning,
+    heapSaturationPercent,
+    reasons: memoryGuardReasons,
+    metrics: hardwareMetrics,
+    peakHistory,
+    triggerEmergencyCleanup,
+  } = useMemoryPressureGuard({
+    intervalMs: 1500,
+    autoMitigateOnPeak: true,
+  });
+
+  const refreshHardwareMetrics = () => {
+    MemoryPressureGuard.checkMemoryPressure();
+  };
 
   useEffect(() => {
     const unsubscribe = DevLogger.subscribe((newLogs) => {
@@ -1360,6 +1380,183 @@ export default function DevLogsScreen({ navigation }) {
                 })}
               </View>
             )}
+
+            {/* Hardware Health & Resource Monitor */}
+            <View style={[
+              styles.sectionCard,
+              {
+                backgroundColor: colors.bgCard,
+                borderColor: isMemoryPeak ? '#f44336' : isMemoryWarning ? '#faad14' : (colors.borderColor || '#E5E5EA'),
+                borderWidth: (isMemoryPeak || isMemoryWarning) ? 1.5 : 1,
+                marginTop: 14,
+              }
+            ]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={[styles.sectionTitle, { color: isMemoryPeak ? '#f44336' : colors.textPrimary, marginBottom: 0 }]}>
+                  🖥️ Hardware Health & Resource Monitor (Peak Guard)
+                </Text>
+                <View style={[
+                  styles.statusBadge, 
+                  { 
+                    backgroundColor: isMemoryPeak 
+                      ? 'rgba(244,67,54,0.15)' 
+                      : isMemoryWarning 
+                      ? 'rgba(250,173,20,0.15)' 
+                      : 'rgba(76,175,80,0.15)' 
+                  }
+                ]}>
+                  <Text style={{ 
+                    fontSize: 11, 
+                    fontWeight: '700', 
+                    color: isMemoryPeak ? '#f44336' : isMemoryWarning ? '#faad14' : '#4CAF50' 
+                  }}>
+                    {isMemoryPeak ? '⚠️ CRITICAL PEAK' : isMemoryWarning ? '⚡ APPROACHING PEAK' : '✅ RESOURCES OPTIMAL'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 10, lineHeight: 18 }}>
+                Live Android ART runtime heap, device memory pressure, and event loop latency metrics. Automatically detects and mitigates resource spikes before Android OS terminates the process.
+              </Text>
+
+              {/* Peak Warning Banner */}
+              {memoryGuardReasons && memoryGuardReasons.length > 0 && (
+                <View style={{ 
+                  backgroundColor: isMemoryPeak ? 'rgba(244,67,54,0.12)' : 'rgba(250,173,20,0.12)', 
+                  borderWidth: 1, 
+                  borderColor: isMemoryPeak ? '#f44336' : '#faad14', 
+                  borderRadius: 8, 
+                  padding: 10, 
+                  marginBottom: 12 
+                }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isMemoryPeak ? '#f44336' : '#faad14', marginBottom: 4 }}>
+                    {isMemoryPeak ? '🚨 System Approaching Maximum Hardware Peak:' : '⚡ Hardware Threshold Warning:'}
+                  </Text>
+                  {memoryGuardReasons.map((reason, idx) => (
+                    <Text key={idx} style={{ fontSize: 11, color: colors.textPrimary, marginLeft: 6, marginVertical: 1 }}>
+                      • {reason}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Resource Metrics Grid */}
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', padding: 12, borderRadius: 10, marginBottom: 12, gap: 10 }}>
+                {/* 1. RAM / Heap with visual bar */}
+                <View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary }}>RAM Spent (App Heap):</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: isMemoryPeak ? '#f44336' : isMemoryWarning ? '#faad14' : colors.textPrimary }}>
+                      {hardwareMetrics.usedHeapMb} MB / {hardwareMetrics.maxHeapMb} MB max ({heapSaturationPercent}%)
+                    </Text>
+                  </View>
+                  <View style={{ height: 6, width: '100%', backgroundColor: isDark ? '#333' : '#e0e0e0', borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ 
+                      height: '100%', 
+                      width: `${Math.min(100, Math.max(5, heapSaturationPercent))}%`, 
+                      backgroundColor: heapSaturationPercent >= 85 ? '#f44336' : heapSaturationPercent >= 75 ? '#faad14' : '#52c41a', 
+                      borderRadius: 3 
+                    }} />
+                  </View>
+                </View>
+
+                {/* 2. Total Device RAM */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>Device RAM Available:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: hardwareMetrics.lowMemory || hardwareMetrics.availMemMb < 350 ? '#faad14' : colors.textPrimary }}>
+                    {hardwareMetrics.availMemMb} MB free / {hardwareMetrics.totalMemMb} MB total {hardwareMetrics.lowMemory ? '⚠️ Low' : ''}
+                  </Text>
+                </View>
+
+                {/* 3. Processor / Event Loop */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>Processor Responsiveness:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: hardwareMetrics.eventLoopLagMs < 25 ? '#52c41a' : hardwareMetrics.eventLoopLagMs < 70 ? '#faad14' : '#ff4d4f' }}>
+                    {hardwareMetrics.fps} FPS ({hardwareMetrics.eventLoopLagMs}ms latency)
+                  </Text>
+                </View>
+
+                {/* 4. Large Section Density */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>Missed Section Density:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: taskStats.missed > 50 ? '#faad14' : colors.textPrimary }}>
+                    {taskStats.missed} tasks (Overdue)
+                  </Text>
+                </View>
+
+                {/* 5. Crash Guard Status */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>FlashList Crash Guard:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#52c41a' }}>
+                    🛡️ Active (LayoutAnimation bypassed & Peak Guard)
+                  </Text>
+                </View>
+              </View>
+
+              {/* Hardware Numbers Reference Card */}
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 }}>
+                  📊 CRITICAL HARDWARE NUMBERS & THRESHOLDS:
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16 }}>
+                  • <Text style={{ fontWeight: '600', color: colors.textPrimary }}>App Heap Saturation:</Text> Warning at <Text style={{ color: '#faad14' }}>{HARDWARE_THRESHOLDS.HEAP_WARNING_PERCENT}%</Text> | Critical Peak at <Text style={{ color: '#f44336' }}>{HARDWARE_THRESHOLDS.HEAP_CRITICAL_PERCENT}%</Text> (Fatal OutOfMemoryError)
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16 }}>
+                  • <Text style={{ fontWeight: '600', color: colors.textPrimary }}>Device Free RAM:</Text> Warning under <Text style={{ color: '#faad14' }}>{HARDWARE_THRESHOLDS.AVAIL_MEM_WARNING_MB}MB</Text> | Critical Peak under <Text style={{ color: '#f44336' }}>{HARDWARE_THRESHOLDS.AVAIL_MEM_CRITICAL_MB}MB</Text> (Linux OOM killer)
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16 }}>
+                  • <Text style={{ fontWeight: '600', color: colors.textPrimary }}>Event Loop Latency:</Text> Warning over <Text style={{ color: '#faad14' }}>{HARDWARE_THRESHOLDS.EVENT_LOOP_LAG_WARNING_MS}ms</Text> | Critical Peak over <Text style={{ color: '#f44336' }}>{HARDWARE_THRESHOLDS.EVENT_LOOP_LAG_CRITICAL_MS}ms</Text> (ANR dialog)
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16 }}>
+                  • <Text style={{ fontWeight: '600', color: colors.textPrimary }}>Section Density:</Text> Warning over <Text style={{ color: '#faad14' }}>{HARDWARE_THRESHOLDS.SECTION_DENSITY_WARNING}</Text> items | Critical Peak over <Text style={{ color: '#f44336' }}>{HARDWARE_THRESHOLDS.SECTION_DENSITY_CRITICAL}</Text> items (Recycling overload)
+                </Text>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={{ gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.btnLarge, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    const result = triggerEmergencyCleanup('DevLogsScreen Manual Trigger');
+                    Alert.alert(
+                      '🛡️ Emergency Cleanup Executed',
+                      `Executed ${result.hooksExecuted} cleanup hooks and forced GC in ${result.durationMs}ms.\nHeap: ${hardwareMetrics.usedHeapMb}MB / ${hardwareMetrics.maxHeapMb}MB.`
+                    );
+                  }}
+                >
+                  <Text style={styles.btnLargeText}>🛡️ Run Emergency RAM Flush & GC (Peak Guard)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btnLarge, { backgroundColor: colors.surfaceContainerHigh || '#E5E5EA' }]}
+                  onPress={() => {
+                    refreshHardwareMetrics();
+                    Alert.alert('Memory Refreshed', 'Hardware memory metrics and event loop timers sampled.');
+                  }}
+                >
+                  <Text style={[styles.btnLargeText, { color: colors.textPrimary }]}>Refresh Hardware Diagnostics</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Peak Events History */}
+              {peakHistory && peakHistory.length > 0 && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 }}>
+                    RECENT PEAK MITIGATION EVENTS ({peakHistory.length}):
+                  </Text>
+                  {peakHistory.slice(0, 3).map((item) => (
+                    <View key={item.id} style={{ padding: 6, borderRadius: 6, backgroundColor: isDark ? '#1a1a24' : '#f0f0f5', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 10, color: colors.textPrimary, fontWeight: '600' }}>
+                        ⚡ {item.reason} — {item.durationMs}ms ({item.hooksExecuted} hooks executed)
+                      </Text>
+                      <Text style={{ fontSize: 9, color: colors.textSecondary }}>
+                        {item.timestamp} | Heap: {item.metricsSnapshot?.usedHeapMb}MB
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
 
             {/* Chaos & Stress Testing Harness */}
             <View style={[

@@ -34,10 +34,23 @@ import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
 import { A11yHelper } from '../utils/a11yHelper';
 import { ResponsiveHelper } from '../utils/responsiveHelper';
 import { SecurityLockHelper } from '../utils/securityLockHelper';
+import { MemoryPressureGuard } from '../utils/memoryPressureGuard';
 
 let RNShare;
 if (Platform.OS !== 'web') {
   RNShare = require('react-native-share').default;
+}
+
+// Responsive Web CSS for ultra-narrow screens (< 300px)
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  try {
+    if (!document.getElementById('responsive-expenses-css')) {
+      const style = document.createElement('style');
+      style.id = 'responsive-expenses-css';
+      style.textContent = `@media (max-width: 300px) { #expenses-title-label { display: none !important; } }`;
+      document.head.appendChild(style);
+    }
+  } catch (e) {}
 }
 
 dayjs.extend(isSameOrBefore);
@@ -302,6 +315,16 @@ export default function BoardScreen({ route, navigation }) {
   }, []);
 
   useEffect(() => {
+    const unregisterGuard = MemoryPressureGuard.registerCleanupHook('BoardScreen', (metrics) => {
+      closeOpenSwipeableRow?.();
+      cancelAllInlineEditing?.();
+      setQuickMenuVisible(false);
+      setSectionOptionsConfig({ isVisible: false, section: null });
+    });
+    return unregisterGuard;
+  }, []);
+
+  useEffect(() => {
     if (route?.params?.editTaskId) {
       const t = tasks.find(tsk => tsk.id === route.params.editTaskId);
       if (t) {
@@ -323,13 +346,17 @@ export default function BoardScreen({ route, navigation }) {
   }, [boardIdsKey, dispatch]);
 
   const toggleSection = useCallback((sectionId) => {
-    try {
-      if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
-        UIManager.setLayoutAnimationEnabledExperimental(true);
+    // FlashList + Android native LayoutAnimation on large datasets (> 15 items) causes native SIGSEGV/crash
+    const isLargeList = (tasks && tasks.length > 30);
+    if (!isLargeList && Platform.OS !== 'android') {
+      try {
+        if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+          UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      } catch (e) {
+        // Safe fallback on layout mutations
       }
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    } catch (e) {
-      // Safe fallback on massive layout mutations
     }
     setCollapsedSections(prev => {
       const willCollapse = !prev.includes(sectionId);
@@ -338,13 +365,17 @@ export default function BoardScreen({ route, navigation }) {
       currentSessionCollapsedSections = next;
       return next;
     });
-  }, []);
+  }, [tasks]);
 
   const toggleTaskSelection = useCallback((taskId) => {
-    if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
+    if (Platform.OS !== 'android') {
+      try {
+        if (Platform.OS !== 'web' && UIManager.setLayoutAnimationEnabledExperimental) {
+          UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      } catch (e) {}
     }
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectionMode(prev => {
       const isSelected = prev.selectedTaskIds.includes(taskId);
       return {
@@ -693,7 +724,8 @@ export default function BoardScreen({ route, navigation }) {
     const actualCompletedCount = completedTasks.length > 0 ? completedTasks.length : completedCount;
 
     if (['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeBoard?.type)) {
-      let listUncompleted = todoTasks.filter(t => !missedTasks.some(m => (m.id || m._id) === (t.id || t._id)));
+      const missedIdSet = new Set(missedTasks.map(m => m.id || m._id));
+      let listUncompleted = todoTasks.filter(t => !missedIdSet.has(t.id || t._id));
       if (['packing', 'habits', 'media'].includes(activeBoard?.type) && listFilterCategory !== 'All') {
         listUncompleted = listUncompleted.filter(t => {
           if (activeBoard?.type === 'packing') return (t.itemCategory || 'Carry-On') === listFilterCategory;
@@ -1192,7 +1224,10 @@ export default function BoardScreen({ route, navigation }) {
     themeIsDark: isDark,
     themeBg: colors.bgMain,
     themeText: colors.textPrimary,
-  }), [activeBoardId, activeAddSectionId, tasks.length, boardTasks, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary]);
+    expensesPeriodFilter,
+    listFilterCategory,
+    isNarrow: windowWidth < 300,
+  }), [activeBoardId, activeAddSectionId, tasks.length, boardTasks, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary, expensesPeriodFilter, listFilterCategory, windowWidth]);
 
   const isAnyModalOpen = isDetailsVisible || 
     isQuickMenuVisible || 
@@ -1232,28 +1267,32 @@ export default function BoardScreen({ route, navigation }) {
       const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
       return (
-        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <View>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Grand Total') || 'Grand Total'}</Text>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 }}>${grandTotal.toFixed(2)}</Text>
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          {/* Top Row: Grand Total & Cart summary */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary }}>${grandTotal.toFixed(2)}</Text>
+              <Text style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Grand Total') || 'Grand Total'}</Text>
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('In Cart') || 'In Cart'}</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10B981', marginTop: 2 }}>${inCartSpent.toFixed(2)}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Remaining') || 'Remaining'}</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#F59E0B', marginTop: 2 }}>${remaining.toFixed(2)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                {t('In Cart') || 'In Cart'}: <Text style={{ fontWeight: '700', color: '#10B981' }}>${inCartSpent.toFixed(2)}</Text>
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>•</Text>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                {t('Remaining') || 'Due'}: <Text style={{ fontWeight: '700', color: '#F59E0B' }}>${remaining.toFixed(2)}</Text>
+              </Text>
             </View>
           </View>
 
-          <View style={{ height: 6, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#10B981', borderRadius: 3 }} />
+          {/* Progress Bar */}
+          <View style={{ height: 4, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
+            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#10B981', borderRadius: 2 }} />
           </View>
 
+          {/* Sub Row: Items count and Reset */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+            <Text style={{ fontSize: 10, color: colors.textSecondary }}>
               {completedCount}/{totalCount} {t('In Cart') || 'In Cart'} ({progressPercent}%)
             </Text>
             {completedCount > 0 && (
@@ -1265,7 +1304,7 @@ export default function BoardScreen({ route, navigation }) {
                 }}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary }}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary }}>
                   {t('Uncheck All') || 'Uncheck All'}
                 </Text>
               </TouchableOpacity>
@@ -1308,73 +1347,96 @@ export default function BoardScreen({ route, navigation }) {
         : (t('Total Bills') || 'Total Bills');
 
       return (
-        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
-          {/* Period Toggle Switcher: This Month vs All Scheduled */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
-            <TouchableOpacity
-              onPress={() => setExpensesPeriodFilter('month')}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 12,
-                paddingVertical: 5,
-                borderRadius: 14,
-                backgroundColor: isMonthlyView ? '#EF4444' : (colors.background || '#F3F4F6'),
-                borderWidth: 1,
-                borderColor: isMonthlyView ? '#EF4444' : (colors.borderColor || '#E5E7EB')
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: isMonthlyView ? '700' : '500', color: isMonthlyView ? '#FFFFFF' : colors.textPrimary }}>
-                📅 {t('This Month') || 'This Month'} (${monthlyTotal.toFixed(2)})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setExpensesPeriodFilter('all')}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 12,
-                paddingVertical: 5,
-                borderRadius: 14,
-                backgroundColor: !isMonthlyView ? '#EF4444' : (colors.background || '#F3F4F6'),
-                borderWidth: 1,
-                borderColor: !isMonthlyView ? '#EF4444' : (colors.borderColor || '#E5E7EB')
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: !isMonthlyView ? '700' : '500', color: !isMonthlyView ? '#FFFFFF' : colors.textPrimary }}>
-                📊 {t('All Scheduled') || 'All Scheduled'} (${allTotal.toFixed(2)})
-              </Text>
-            </TouchableOpacity>
-          </View>
-
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          {/* Top Row: Amount & Label on Left, Sleek Compact Segmented Toggle on Right */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{titleLabel}</Text>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 }}>${displayTotal.toFixed(2)}</Text>
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Paid') || 'Paid'}</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10B981', marginTop: 2 }}>${displayPaid.toFixed(2)}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Remaining Due') || 'Remaining Due'}</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginTop: 2 }}>${displayRemaining.toFixed(2)}</Text>
-            </View>
-          </View>
-
-          {isMonthlyView && allTotal > monthlyTotal && (
-            <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.borderColor || '#E5E7EB', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                {t('All scheduled:') || 'All scheduled:'} ${allTotal.toFixed(2)}
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+              <Text style={{ fontSize: 19, fontWeight: 'bold', color: colors.textPrimary }}>${displayTotal.toFixed(2)}</Text>
+              <Text 
+                nativeID="expenses-title-label"
+                style={{ 
+                  fontSize: 10, 
+                  color: colors.textSecondary, 
+                  textTransform: 'uppercase', 
+                  fontWeight: '600',
+                  display: windowWidth < 300 ? 'none' : 'flex',
+                }}
+              >
+                {titleLabel}
               </Text>
-              <TouchableOpacity onPress={() => setExpensesPeriodFilter('all')}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: '#EF4444' }}>
-                  {t('View all') || 'View all'} →
+            </View>
+
+            {/* Compact Segmented Switcher */}
+            <View style={{
+              flexDirection: 'row',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+              borderRadius: 8,
+              padding: 2,
+            }}>
+              <TouchableOpacity
+                onPress={() => setExpensesPeriodFilter('month')}
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  backgroundColor: isMonthlyView ? '#EF4444' : 'transparent',
+                }}
+              >
+                <Text style={{
+                  fontSize: 11,
+                  fontWeight: isMonthlyView ? '700' : '500',
+                  color: isMonthlyView ? '#FFFFFF' : colors.textSecondary,
+                }}>
+                  {t('Month') || 'Month'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setExpensesPeriodFilter('all')}
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  backgroundColor: !isMonthlyView ? '#EF4444' : 'transparent',
+                }}
+              >
+                <Text style={{
+                  fontSize: 11,
+                  fontWeight: !isMonthlyView ? '700' : '500',
+                  color: !isMonthlyView ? '#FFFFFF' : colors.textSecondary,
+                }}>
+                  {t('All') || 'All'}
                 </Text>
               </TouchableOpacity>
             </View>
-          )}
+          </View>
+
+          {/* Sub Row: Paid & Due Chips */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 5, paddingTop: 5, borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                {t('Paid') || 'Paid'}: <Text style={{ fontWeight: '700', color: '#10B981' }}>${displayPaid.toFixed(2)}</Text>
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>•</Text>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                {t('Remaining Due') || 'Due'}: <Text style={{ fontWeight: '700', color: '#EF4444' }}>${displayRemaining.toFixed(2)}</Text>
+              </Text>
+            </View>
+
+            {isMonthlyView && allTotal > monthlyTotal ? (
+              <TouchableOpacity onPress={() => setExpensesPeriodFilter('all')}>
+                <Text style={{ fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline' }}>
+                  {t('All scheduled:') || 'All:'} ${allTotal.toFixed(2)} →
+                </Text>
+              </TouchableOpacity>
+            ) : !isMonthlyView && monthlyTotal > 0 ? (
+              <TouchableOpacity onPress={() => setExpensesPeriodFilter('month')}>
+                <Text style={{ fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline' }}>
+                  {t('This month:') || 'Month:'} ${monthlyTotal.toFixed(2)} →
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
       );
     }
@@ -1384,9 +1446,9 @@ export default function BoardScreen({ route, navigation }) {
       const categories = ['All', 'Carry-On', 'Checked Bag', 'Backpack', 'Essentials'];
 
       return (
-        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textPrimary }}>
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>
               🧳 {t('Packed') || 'Packed'}: {completedCount}/{totalCount} ({progressPercent}%)
             </Text>
             {completedCount > 0 && (
@@ -1398,18 +1460,18 @@ export default function BoardScreen({ route, navigation }) {
                 }}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary }}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary }}>
                   {t('Reset for Next Trip') || 'Reset for Next Trip'}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
 
-          <View style={{ height: 6, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
-            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#3B82F6', borderRadius: 3 }} />
+          <View style={{ height: 4, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
+            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#3B82F6', borderRadius: 2 }} />
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 5 }}>
             {categories.map((cat) => {
               const isSelected = listFilterCategory === cat;
               return (
@@ -1417,15 +1479,15 @@ export default function BoardScreen({ route, navigation }) {
                   key={cat}
                   onPress={() => setListFilterCategory(cat)}
                   style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 12,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 10,
                     backgroundColor: isSelected ? '#3B82F6' : (colors.background || '#F3F4F6'),
                     borderWidth: 1,
                     borderColor: isSelected ? '#3B82F6' : (colors.borderColor || '#E5E7EB')
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
                     {t(cat) || cat}
                   </Text>
                 </TouchableOpacity>
@@ -1442,23 +1504,23 @@ export default function BoardScreen({ route, navigation }) {
       const bestStreak = boardTasks.reduce((max, t) => Math.max(max, Number(t.habitStreak) || 0), 0);
 
       return (
-        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textPrimary }}>
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>
               ⚡ {t("Today's Habits") || 'Habits'}: {completedCount}/{totalCount} ({progressPercent}%)
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-              <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#D97706' }}>
+              <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
                 🔥 {t('Best Streak') || 'Best Streak'}: {bestStreak} {t('days') || 'd'}
               </Text>
             </View>
           </View>
 
-          <View style={{ height: 6, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
-            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#F59E0B', borderRadius: 3 }} />
+          <View style={{ height: 4, width: '100%', backgroundColor: colors.borderColor || '#E5E7EB', borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
+            <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#F59E0B', borderRadius: 2 }} />
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 5 }}>
             {timesOfDay.map((tod) => {
               const isSelected = listFilterCategory === tod;
               return (
@@ -1466,15 +1528,15 @@ export default function BoardScreen({ route, navigation }) {
                   key={tod}
                   onPress={() => setListFilterCategory(tod)}
                   style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 12,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 10,
                     backgroundColor: isSelected ? '#F59E0B' : (colors.background || '#F3F4F6'),
                     borderWidth: 1,
                     borderColor: isSelected ? '#F59E0B' : (colors.borderColor || '#E5E7EB')
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
                     {t(tod) || tod}
                   </Text>
                 </TouchableOpacity>
@@ -1494,25 +1556,24 @@ export default function BoardScreen({ route, navigation }) {
       const mediaTypes = ['All', 'Books', 'Movies/TV', 'Courses'];
 
       return (
-        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 10, marginBottom: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <View>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Watchlist & Reading') || 'Media'}</Text>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 }}>{totalCount} {t('Items') || 'items'}</Text>
+        <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary }}>{totalCount}</Text>
+              <Text style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Watchlist & Reading') || 'Media'}</Text>
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('In Progress') || 'In Progress'}</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#8B5CF6', marginTop: 2 }}>{inProgressCount}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Average Rating') || 'Avg Rating'}</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#F59E0B', marginTop: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                {t('In Progress') || 'In Progress'}: <Text style={{ fontWeight: '700', color: '#8B5CF6' }}>{inProgressCount}</Text>
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.textSecondary }}>•</Text>
+              <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#F59E0B' }}>
                 {avgRating ? `⭐ ${avgRating}` : '—'}
               </Text>
             </View>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 5 }}>
             {mediaTypes.map((mt) => {
               const isSelected = listFilterCategory === mt;
               return (
@@ -1520,15 +1581,15 @@ export default function BoardScreen({ route, navigation }) {
                   key={mt}
                   onPress={() => setListFilterCategory(mt)}
                   style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 12,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 10,
                     backgroundColor: isSelected ? '#8B5CF6' : (colors.background || '#F3F4F6'),
                     borderWidth: 1,
                     borderColor: isSelected ? '#8B5CF6' : (colors.borderColor || '#E5E7EB')
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
                     {t(mt) || mt}
                   </Text>
                 </TouchableOpacity>
@@ -1555,13 +1616,13 @@ export default function BoardScreen({ route, navigation }) {
         >
       
         {/* Screen Header matching new design */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
           <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={{ fontSize: 28, fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary, marginBottom: 2 }}>
+            <Text style={{ fontSize: 24, fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary }}>
               {t('Tasks') || 'Tasks'}
-            </Text>
-            <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-              {activeBoard ? (activeBoard.name === 'Main' ? (t('Focus on what matters most.') || 'Focus on what matters most.') : activeBoard.name) : (t('Focus on what matters most.') || 'Focus on what matters most.')}
+              {activeBoard && activeBoard.name !== 'Main' && (
+                <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textSecondary }}>  • {activeBoard.name}</Text>
+              )}
             </Text>
           </View>
 
@@ -1570,7 +1631,7 @@ export default function BoardScreen({ route, navigation }) {
               accessible={true} 
               accessibilityRole="button" 
               accessibilityLabel="Toggle theme"
-              style={{ width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
+              style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
               onPress={handleToggleTheme}
             >
               {renderThemeIcon()}
@@ -1581,17 +1642,17 @@ export default function BoardScreen({ route, navigation }) {
               accessible={true} 
               accessibilityRole="button" 
               accessibilityLabel="Add new board"
-              style={{ width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
+              style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center' }}
               onPress={handleAddBoard}
             >
-              <Text style={{ fontSize: 22, color: colors.textPrimary, fontWeight: '400' }}>+</Text>
+              <Text style={{ fontSize: 20, color: colors.textPrimary, fontWeight: '400' }}>+</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Board Pills Horizontal Scroll */}
-        <View style={{ marginBottom: 12 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+        <View style={{ marginBottom: 6 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 6 }}>
             {boards.map(board => {
               const isSelected = activeBoardId === board.id;
               const boardColor = getBoardColor(board, boards);
@@ -1610,9 +1671,9 @@ export default function BoardScreen({ route, navigation }) {
                     {
                       flexDirection: 'row',
                       alignItems: 'center',
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 18,
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      borderRadius: 16,
                       borderWidth: 1.5,
                       borderColor: isSelected ? (boardColor || colors.primary) : (colors.borderColor || '#E5E5EA'),
                       backgroundColor: isSelected 
@@ -1627,10 +1688,10 @@ export default function BoardScreen({ route, navigation }) {
                     handleBoardOptions(board);
                   }}
                 >
-                  <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: boardColor, marginRight: 6 }} />
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: boardColor, marginRight: 5 }} />
                   <Text style={[
                     { 
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: isSelected ? '700' : '500',
                       color: isSelected ? colors.textPrimary : colors.textSecondary 
                     }
@@ -1640,14 +1701,14 @@ export default function BoardScreen({ route, navigation }) {
                   {count > 0 && (
                     <View style={{
                       backgroundColor: `${boardColor}25`,
-                      borderRadius: 10,
-                      paddingHorizontal: 6,
-                      paddingVertical: 1,
-                      marginLeft: 6
+                      borderRadius: 8,
+                      paddingHorizontal: 5,
+                      paddingVertical: 0.5,
+                      marginLeft: 5
                     }}>
                       <Text style={{
                         color: boardColor,
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: 'bold'
                       }}>{count}</Text>
                     </View>
@@ -1658,18 +1719,17 @@ export default function BoardScreen({ route, navigation }) {
           </ScrollView>
         </View>
 
-      {renderListSummaryBar()}
-
       <FlashList
         key={activeBoardId}
         data={flattenedData}
         extraData={flashListExtraData}
-        keyExtractor={(item) => {
+        ListHeaderComponent={renderListSummaryBar}
+        keyExtractor={(item, index) => {
           if (item?.type === 'task') {
-            const taskId = item.task?.id || item.task?._id || 'unknown';
-            return `task_${taskId}_${item.section?.id || 'sec'}`;
+            const taskId = item.task?.id || item.task?._id || `task_${index}`;
+            return `task_${taskId}_${item.section?.id || 'sec'}_${index}`;
           }
-          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
+          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}_${index}`;
         }}
         getItemType={(item) => item.type}
         renderItem={renderItem}
@@ -1678,9 +1738,9 @@ export default function BoardScreen({ route, navigation }) {
         stickyHeaderIndices={undefined}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={closeOpenSwipeableRow}
-        estimatedItemSize={65}
-        drawDistance={Platform.OS === 'web' ? 400 : 350}
-        removeClippedSubviews={false}
+        estimatedItemSize={70}
+        drawDistance={Platform.OS === 'web' ? 400 : 250}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
 
       <TaskDetailsModal 

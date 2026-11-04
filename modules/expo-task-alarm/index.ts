@@ -47,6 +47,45 @@ export function setSavedThemeMode(mode: string): boolean {
   }
 }
 
+export function getSystemMemoryMetrics(): Record<string, any> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getSystemMemoryMetrics !== 'function') return {};
+  try {
+    return ExpoTaskAlarm.getSystemMemoryMetrics() || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+export function getNativeCrashLogs(): any[] {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getNativeCrashLogs !== 'function') return [];
+  try {
+    const raw = ExpoTaskAlarm.getNativeCrashLogs();
+    if (typeof raw === 'string') return JSON.parse(raw);
+    if (Array.isArray(raw)) return raw;
+    return [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function clearNativeCrashLogs(): boolean {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.clearNativeCrashLogs !== 'function') return false;
+  try {
+    return ExpoTaskAlarm.clearNativeCrashLogs();
+  } catch (e) {
+    return false;
+  }
+}
+
+export function initNativeCrashHandler(): boolean {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.initNativeCrashHandler !== 'function') return false;
+  try {
+    return ExpoTaskAlarm.initNativeCrashHandler();
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function isCarConnected(): Promise<boolean> {
   if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.isCarConnected !== 'function') return false;
   try {

@@ -19,6 +19,41 @@ export const CrashLogger = {
     } catch (e) {
       console.warn('[CrashLogger] Failed to load stored crashes:', e);
     }
+
+    // Check for native uncaught crashes from Android runtime
+    try {
+      const alarmMod = require('../../modules/expo-task-alarm');
+      if (alarmMod) {
+        if (typeof alarmMod.initNativeCrashHandler === 'function') {
+          alarmMod.initNativeCrashHandler();
+        }
+        if (typeof alarmMod.getNativeCrashLogs === 'function') {
+          const nativeLogs = alarmMod.getNativeCrashLogs();
+          if (Array.isArray(nativeLogs) && nativeLogs.length > 0) {
+            nativeLogs.forEach(entry => {
+              memoryCrashLogs.unshift({
+                id: `native_${entry.timestamp || Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                timestamp: entry.timestamp ? new Date(Number(entry.timestamp)).toISOString() : new Date().toISOString(),
+                screenName: 'Native Android Exception',
+                message: entry.message || 'Fatal Android Native Crash',
+                stack: entry.stack || null,
+                componentStack: `Thread: ${entry.thread || 'main'}`,
+                platform: `${Platform.OS} (Native ART Crash)`,
+                context: 'Captured by Android UncaughtExceptionHandler',
+              });
+            });
+            if (typeof alarmMod.clearNativeCrashLogs === 'function') {
+              alarmMod.clearNativeCrashLogs();
+            }
+            if (memoryCrashLogs.length > MAX_CRASH_LOGS) {
+              memoryCrashLogs = memoryCrashLogs.slice(0, MAX_CRASH_LOGS);
+            }
+            AsyncStorage.setItem(STORAGE_KEY_CRASH_LOGS, JSON.stringify(memoryCrashLogs)).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {}
+
     isInitialized = true;
     return memoryCrashLogs;
   },
