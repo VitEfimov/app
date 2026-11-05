@@ -2,7 +2,6 @@ package expo.modules.taskalarm
 
 import android.app.UiModeManager
 import android.content.Context
-import android.content.IntentFilter
 import android.content.res.Configuration
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -11,8 +10,34 @@ import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 
 object CarUtils {
+    fun isAndroidAutoMuteEnabled(context: Context): Boolean {
+        return try {
+            val prefs = context.getSharedPreferences("taskflow_theme", Context.MODE_PRIVATE)
+            prefs.getBoolean("androidAutoEnabled", true)
+        } catch (e: Exception) {
+            true
+        }
+    }
+
+    fun setAndroidAutoMuteEnabled(context: Context, enabled: Boolean) {
+        try {
+            val prefs = context.getSharedPreferences("taskflow_theme", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("androidAutoEnabled", enabled).apply()
+        } catch (e: Exception) {}
+    }
+
+    fun shouldMuteForCar(context: Context): Boolean {
+        if (!isAndroidAutoMuteEnabled(context)) {
+            return false
+        }
+        return isConnectedToCar(context)
+    }
+
     fun isConnectedToCar(context: Context): Boolean {
         // 1. Check TaskFlowCarService static flag
         try {
@@ -32,18 +57,6 @@ object CarUtils {
             }
         } catch (ignored: Throwable) {}
 
-        // 3. Check Google Play Services Android Auto Projection Status
-        try {
-            val filter = IntentFilter("com.google.android.gms.car.PROJECTION_STATUS")
-            val stickyIntent = context.registerReceiver(null, filter)
-            if (stickyIntent != null) {
-                val status = stickyIntent.getIntExtra("status", 0)
-                if (status != 0) {
-                    return true
-                }
-            }
-        } catch (ignored: Throwable) {}
-
         return false
     }
 }
@@ -51,6 +64,8 @@ object CarUtils {
 object AlarmAudioManager {
     private var focusRequest: AudioFocusRequest? = null
     private var mediaPlayer: MediaPlayer? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var duckReleaseRunnable: Runnable? = null
 
     fun getSoundUri(context: Context, soundName: String?): Uri {
         if (!soundName.isNullOrEmpty()) {
@@ -67,17 +82,33 @@ object AlarmAudioManager {
         return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
     }
 
+    @Synchronized
+    fun isPlaying(): Boolean {
+        return try {
+            mediaPlayer?.isPlaying == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     /**
-     * Start continuous looping alarm sound with USAGE_ALARM stream.
+     * Start continuous looping alarm sound with USAGE_ALARM stream and duck background media
+     * (Amazon Music, YouTube, Spotify, etc.).
      */
     @Synchronized
     fun startAlarmSound(context: Context, soundName: String? = null) {
+        duckReleaseRunnable?.let { mainHandler.removeCallbacks(it) }
+        duckReleaseRunnable = null
         requestAlarmFocus(context)
         try {
             stopAlarmSound(context, retainFocus = true)
-            val uri = getSoundUri(context, soundName)
+            val appCtx = context.applicationContext ?: context
+            val uri = getSoundUri(appCtx, soundName)
             val player = MediaPlayer().apply {
-                setDataSource(context, uri)
+                setDataSource(appCtx, uri)
+                try {
+                    setWakeMode(appCtx, PowerManager.PARTIAL_WAKE_LOCK)
+                } catch (ignored: Exception) {}
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     setAudioAttributes(
                         AudioAttributes.Builder()
@@ -100,7 +131,8 @@ object AlarmAudioManager {
     }
 
     /**
-     * Stop continuous alarm audio playback and release player.
+     * Stop continuous alarm audio playback and release player + audio focus so
+     * Amazon Music / YouTube restore to 100% volume.
      */
     @Synchronized
     fun stopAlarmSound(context: Context, retainFocus: Boolean = false) {
@@ -123,13 +155,14 @@ object AlarmAudioManager {
     }
 
     /**
-     * Request transient audio focus for urgent alarm.
+     * Request AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK so background media apps
+     * (Amazon Music, YouTube, Spotify) lower their volume ("duck") while alarm/notification sounds.
      */
     fun requestAlarmFocus(context: Context) {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                     .setAudioAttributes(
                         AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_ALARM)
@@ -137,13 +170,17 @@ object AlarmAudioManager {
                             .build()
                     )
                     .setAcceptsDelayedFocusGain(false)
-                    .setWillPauseWhenDucked(true)
+                    .setWillPauseWhenDucked(false)
                     .build()
                 focusRequest = request
                 audioManager.requestAudioFocus(request)
             } else {
                 @Suppress("DEPRECATION")
-                audioManager.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                audioManager.requestAudioFocus(
+                    null,
+                    AudioManager.STREAM_ALARM,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+                )
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -151,7 +188,24 @@ object AlarmAudioManager {
     }
 
     /**
-     * Release alarm audio focus so background media / audio can resume.
+     * Temporarily duck background media (Amazon Music, YouTube) for a short notification chime.
+     */
+    fun duckAudioTemporarily(context: Context, durationMs: Long = 3500L) {
+        if (isPlaying()) return
+        duckReleaseRunnable?.let { mainHandler.removeCallbacks(it) }
+        requestAlarmFocus(context)
+        val appCtx = context.applicationContext ?: context
+        val runnable = Runnable {
+            if (!isPlaying()) {
+                abandonAlarmFocus(appCtx)
+            }
+        }
+        duckReleaseRunnable = runnable
+        mainHandler.postDelayed(runnable, durationMs)
+    }
+
+    /**
+     * Release alarm audio focus so background media / audio can resume full volume.
      */
     fun abandonAlarmFocus(context: Context) {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return

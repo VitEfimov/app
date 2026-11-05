@@ -8,9 +8,10 @@ const loadThemeFromLocalStorage = () => "light";
 const loadShowWeatherFromLocalStorage = () => false;
 const loadIsGuestFromLocalStorage = () => {
     if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem('isGuest') === 'true';
+        const val = window.localStorage.getItem('isGuest');
+        if (val !== null) return val === 'true';
     }
-    return false;
+    return true;
 };
 const loadTaskOptionsCollapsedFromLocalStorage = () => {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -226,11 +227,11 @@ const userSlice = createSlice({
         logout: (state) => {
             state.isAuthenticated = false;
             state.userEmail = null;
-            state.isGuest = false;
+            state.isGuest = true;
             state.boards = loadBoardsFromLocalStorage();
             state.activeBoardId = 'main';
             state.dashboardFilterType = 'all';
-            AsyncStorage.removeItem('isGuest');
+            AsyncStorage.setItem('isGuest', 'true');
             AsyncStorage.removeItem('rememberedUser');
         },
         continueAsGuest: (state) => {
@@ -288,7 +289,9 @@ const userSlice = createSlice({
             })
             .addCase(checkAuth.rejected, (state) => {
                 state.loading = false;
-                // If not guest, stay unauthenticated
+                if (!state.isAuthenticated) {
+                    state.isGuest = true;
+                }
             })
             .addCase(loginUser.pending, (state) => { state.loading = true; state.error = null; })
             .addCase(loginUser.fulfilled, (state, action) => {
@@ -346,7 +349,7 @@ const userSlice = createSlice({
             .addCase(logoutUser.fulfilled, (state) => {
                 state.isAuthenticated = false;
                 state.userEmail = null;
-                state.isGuest = false;
+                state.isGuest = true;
                 state.boards = loadBoardsFromLocalStorage();
                 state.activeBoardId = 'main';
             })

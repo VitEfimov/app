@@ -20,6 +20,7 @@ export default function LoginScreen() {
   const { t } = useTranslation();
 
   useEffect(() => {
+    dispatch(continueAsGuest());
     const loadRememberedUser = async () => {
       try {
         const stored = await AsyncStorage.getItem('rememberedUser');
@@ -33,7 +34,7 @@ export default function LoginScreen() {
       }
     };
     loadRememberedUser();
-  }, []);
+  }, [dispatch]);
 
   const handleSubmit = () => {
     setValidationError('');
@@ -55,6 +56,7 @@ export default function LoginScreen() {
 
   const styles = StyleSheet.create({
     container: {
+      display: 'none',
       flex: 1,
       backgroundColor: colors.bgMain,
       justifyContent: 'center',

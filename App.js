@@ -174,16 +174,16 @@ function InitApp() {
   // OWASP MASVS-RESILIENCE-1 & Screen Privacy:
   // Native window FLAG_SECURE prevents screenshots and app switcher snooping.
   // - If user explicitly toggles 'Block screenshots' in Settings -> always protected
-  // - If app is locked with PIN or in background -> protected against OS app switcher exposure
-  // - Otherwise -> allowed, so the user can freely capture screenshots of tasks & lists!
+  // - If app is actively locked with PIN -> protected on PIN screen
+  // - Otherwise -> allowed, so the user can freely capture screenshots when 'Block screenshots' is OFF!
   useEffect(() => {
     const isLocked = !!(appPin && !isUnlocked);
-    if (blockScreenshots || isLocked || isAppBackgrounded) {
+    if (blockScreenshots || isLocked) {
       setScreenSecurityAsync(true);
     } else {
       setScreenSecurityAsync(false);
     }
-  }, [blockScreenshots, appPin, isUnlocked, isAppBackgrounded]);
+  }, [blockScreenshots, appPin, isUnlocked]);
 
   useEffect(() => {
     const isLocked = !!(appPin && !isUnlocked);
@@ -268,22 +268,22 @@ function InitApp() {
         console.log("[InitApp Debug] isGuestVal from storage:", isGuestVal, "rememberedVal:", rememberedVal);
         let authenticatedEmail = null;
 
-        if (isGuestVal === 'true') {
+        if (isGuestVal !== 'true' && rememberedVal) {
+          try {
+            const remUser = JSON.parse(rememberedVal);
+            if (remUser && remUser.rememberMe && remUser.email) {
+              authenticatedEmail = remUser.email;
+              const { hydrateUserState } = require('./src/features/userSlice');
+              dispatch(hydrateUserState({ isAuthenticated: true, userEmail: remUser.email, isGuest: false }));
+            }
+          } catch (e) {
+            console.error("Failed to parse rememberedUser", e);
+          }
+        }
+
+        if (!authenticatedEmail) {
           const { continueAsGuest } = require('./src/features/userSlice');
           dispatch(continueAsGuest());
-        } else {
-          if (rememberedVal) {
-            try {
-              const remUser = JSON.parse(rememberedVal);
-              if (remUser && remUser.rememberMe && remUser.email) {
-                authenticatedEmail = remUser.email;
-                const { hydrateUserState } = require('./src/features/userSlice');
-                dispatch(hydrateUserState({ isAuthenticated: true, userEmail: remUser.email, isGuest: false }));
-              }
-            } catch (e) {
-              console.error("Failed to parse rememberedUser", e);
-            }
-          }
         }
 
         const boardsJson = storageMap.boards;
@@ -334,8 +334,8 @@ function InitApp() {
           console.warn('registerForPushNotificationsAsync init warning:', err);
         });
 
-        // Perform checkAuth if not in guest mode
-        if (isGuestVal !== 'true') {
+        // Perform checkAuth only if a remembered user session exists
+        if (authenticatedEmail) {
           const { checkAuth } = require('./src/features/userSlice');
           const authRes = await dispatch(checkAuth());
           console.log("[InitApp Debug] checkAuth result:", authRes);
@@ -462,6 +462,9 @@ function InitApp() {
     const handleAppStateChange = async (nextAppState) => {
       if (nextAppState === 'active') {
         setIsAppBackgrounded(false);
+        const currentTheme = store.getState().themeReducer;
+        const shouldBlockScreenshots = !!(currentTheme?.blockScreenshots || (currentTheme?.appPin && !isUnlocked));
+        setScreenSecurityAsync(shouldBlockScreenshots);
         const { processAutoManageTasks, performForegroundCalendarSync } = require('./src/features/taskSlice');
         // 1. Silent Foreground Differential Calendar Sync (0-button real-time sync)
         dispatch(performForegroundCalendarSync()).catch(() => {});

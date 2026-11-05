@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 export const navigationRef = createNavigationContainerRef();
 import { useSelector } from 'react-redux';
-import { StatusBar } from 'react-native';
+import { StatusBar, View } from 'react-native';
 
 import BoardScreen from '../screens/BoardScreen';
 import CalendarScreen from '../screens/CalendarScreen';
@@ -86,12 +86,11 @@ export default function AppNavigator() {
         backgroundColor={colors.bgMain} 
         barStyle={isDark ? 'light-content' : 'dark-content'} 
       />
-      {isAuthenticated || isGuest ? (
-        <MainStack />
-      ) : (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Login" component={LoginScreen} />
-        </Stack.Navigator>
+      <MainStack />
+      {!(isAuthenticated || isGuest) && (
+        <View style={{ display: 'none' }}>
+          <LoginScreen />
+        </View>
       )}
     </NavigationContainer>
   );

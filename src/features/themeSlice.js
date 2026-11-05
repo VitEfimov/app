@@ -22,6 +22,16 @@ const setNativeThemeMode = (mode) => {
   return false;
 };
 
+const setNativeAndroidAutoMute = (enabled) => {
+  try {
+    const alarmMod = require('../../modules/expo-task-alarm');
+    if (alarmMod && typeof alarmMod.setSavedAndroidAutoMute === 'function') {
+      return alarmMod.setSavedAndroidAutoMute(!!enabled);
+    }
+  } catch (e) {}
+  return false;
+};
+
 const getSystemScheme = () => {
   try {
     const { Appearance } = require('react-native');
@@ -177,6 +187,9 @@ const themeSlice = createSlice({
         if (typeof window !== 'undefined' && window.localStorage) {
           try { window.localStorage.setItem('app_theme_mode', action.payload.themeMode); } catch (e) {}
         }
+      }
+      if (action.payload?.androidAutoEnabled !== undefined) {
+        try { setNativeAndroidAutoMute(action.payload.androidAutoEnabled); } catch (e) {}
       }
       return { ...state, ...action.payload };
     },
@@ -335,6 +348,7 @@ const themeSlice = createSlice({
     },
     setAndroidAutoEnabled: (state, action) => {
       state.androidAutoEnabled = action.payload;
+      try { setNativeAndroidAutoMute(action.payload); } catch (e) {}
     },
     setDefaultReminderEnabled: (state, action) => {
       state.defaultReminderEnabled = action.payload;

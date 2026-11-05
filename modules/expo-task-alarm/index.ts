@@ -47,6 +47,24 @@ export function setSavedThemeMode(mode: string): boolean {
   }
 }
 
+export function setSavedAndroidAutoMute(enabled: boolean): boolean {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.setSavedAndroidAutoMute !== 'function') return false;
+  try {
+    return ExpoTaskAlarm.setSavedAndroidAutoMute(!!enabled);
+  } catch (e) {
+    return false;
+  }
+}
+
+export function duckAudioForNotification(): boolean {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.duckAudioForNotification !== 'function') return false;
+  try {
+    return ExpoTaskAlarm.duckAudioForNotification();
+  } catch (e) {
+    return false;
+  }
+}
+
 export function getSystemMemoryMetrics(): Record<string, any> {
   if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getSystemMemoryMetrics !== 'function') return {};
   try {

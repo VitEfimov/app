@@ -1125,40 +1125,40 @@ describe('OWASP MASVS Security Standards (Data-at-Rest & Screen Privacy)', () =>
     assert.strictEqual(scheduledWith.sound, 'bell.mp3');
   });
 
-  test('App screen security policy allows screenshots when unlocked and blocks during PIN screen, background or when user enabled blockScreenshots', () => {
-    const computeScreenSecurity = ({ blockScreenshots, appPin, isUnlocked, isAppBackgrounded }) => {
+  test('App screen security policy allows screenshots when unlocked and blockScreenshots is off, and blocks only during PIN screen or when blockScreenshots is enabled', () => {
+    const computeScreenSecurity = ({ blockScreenshots, appPin, isUnlocked }) => {
       const isLocked = !!(appPin && !isUnlocked);
-      return !!(blockScreenshots || isLocked || isAppBackgrounded);
+      return !!(blockScreenshots || isLocked);
     };
 
-    // Case 1: Unlocked, PIN enabled, actively in foreground, blockScreenshots OFF (default)
+    // Case 1: Unlocked, PIN enabled, blockScreenshots OFF (default)
     // -> Screenshots MUST be allowed!
     assert.strictEqual(
-      computeScreenSecurity({ blockScreenshots: false, appPin: '1234', isUnlocked: true, isAppBackgrounded: false }),
+      computeScreenSecurity({ blockScreenshots: false, appPin: '1234', isUnlocked: true }),
       false,
-      'Screenshots must be allowed during normal foreground usage even when App PIN is set'
+      'Screenshots must be allowed during normal usage when Block screenshots is OFF'
     );
 
     // Case 2: App locked with PIN (on PIN screen)
     // -> Screenshots must be blocked to protect PIN
     assert.strictEqual(
-      computeScreenSecurity({ blockScreenshots: false, appPin: '1234', isUnlocked: false, isAppBackgrounded: false }),
+      computeScreenSecurity({ blockScreenshots: false, appPin: '1234', isUnlocked: false }),
       true,
       'Screenshots must be blocked when PIN lock screen is displayed'
     );
 
-    // Case 3: App is backgrounded (in OS task switcher)
-    // -> Screen security must be enabled to prevent OS recents leaks
+    // Case 3: No PIN, blockScreenshots OFF
+    // -> Screenshots must be allowed even if OS screenshot overlay triggers inactive/background state
     assert.strictEqual(
-      computeScreenSecurity({ blockScreenshots: false, appPin: '1234', isUnlocked: true, isAppBackgrounded: true }),
-      true,
-      'Screen security must be active in app switcher'
+      computeScreenSecurity({ blockScreenshots: false, appPin: null, isUnlocked: false }),
+      false,
+      'Screenshots must not be blocked when Block screenshots is OFF'
     );
 
     // Case 4: User explicitly enabled "Block screenshots" in Settings
     // -> Always blocked even when unlocked
     assert.strictEqual(
-      computeScreenSecurity({ blockScreenshots: true, appPin: '1234', isUnlocked: true, isAppBackgrounded: false }),
+      computeScreenSecurity({ blockScreenshots: true, appPin: '1234', isUnlocked: true }),
       true,
       'Screenshots must be blocked when user enables Block screenshots setting'
     );

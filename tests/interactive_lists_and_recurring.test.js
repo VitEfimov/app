@@ -843,7 +843,7 @@ describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
     assert.match(ktContent, /NotificationChannel\(resolvedChannelId,\s*"Task alarms",\s*NotificationManager\.IMPORTANCE_HIGH\)/, 'Alarm channel must be IMPORTANCE_HIGH');
   });
 
-  test('receiverIntent and TaskAlarmReceiver configure insistent looping and full-screen intent without duplicate audio streams', () => {
+  test('receiverIntent and TaskAlarmReceiver configure single-stream audio with AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK over Amazon Music and YouTube', () => {
     const ktModulePath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
     const ktContent = fs.readFileSync(ktModulePath, 'utf8');
 
@@ -852,14 +852,24 @@ describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
     const receiverPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/TaskAlarmReceiver.kt');
     const receiverContent = fs.readFileSync(receiverPath, 'utf8');
 
-    assert.ok(receiverContent.includes('notification.flags = notification.flags or Notification.FLAG_INSISTENT'), 'Must configure FLAG_INSISTENT for continuous looping');
+    assert.ok(receiverContent.includes('AlarmAudioManager.startAlarmSound(context, soundName)'), 'TaskAlarmReceiver must start AlarmAudioManager for both popup and fullscreen');
+    assert.ok(receiverContent.includes('CarUtils.shouldMuteForCar(context)'), 'TaskAlarmReceiver must respect Mute on Android Auto toggle');
     assert.ok(receiverContent.includes('.setPriority(NotificationCompat.PRIORITY_MAX)'), 'NotificationBuilder must use PRIORITY_MAX');
-    assert.ok(receiverContent.includes('notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)'), 'Must attach setFullScreenIntent');
-    assert.ok(receiverContent.includes('putExtra("soundName", soundName)'), 'AlarmActivity must receive soundName');
+    assert.ok(receiverContent.includes('notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)'), 'Must attach setFullScreenIntent when locked');
+    assert.ok(receiverContent.includes('.setDeleteIntent(stopPendingIntent)'), 'Must stop alarm sound if popup banner is swiped away');
+
+    const audioManagerPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/AlarmAudioManager.kt');
+    const audioManagerContent = fs.readFileSync(audioManagerPath, 'utf8');
+    assert.ok(audioManagerContent.includes('AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK'), 'Must request AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK to make Amazon Music / YouTube quieter');
 
     const activityPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/AlarmActivity.kt');
     const activityContent = fs.readFileSync(activityPath, 'utf8');
-    assert.ok(!activityContent.includes('AlarmAudioManager.startAlarmSound(this, soundName)'), 'AlarmActivity must not spawn duplicate sound stream');
+    assert.ok(activityContent.includes('AlarmAudioManager.requestAlarmFocus(this)'), 'AlarmActivity must hold AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK without spawning a duplicate audio stream');
+    assert.ok(activityContent.includes('if (isFinishing)'), 'AlarmActivity.onDestroy must only stop alarm sound when isFinishing is true');
+
+    const notifPath = path.resolve('src/utils/notifications.js');
+    const notifContent = fs.readFileSync(notifPath, 'utf8');
+    assert.ok(notifContent.includes('return `task_${base}_${soundName}_${vib}_v17`;'), 'getChannelId must keep the working v17 channel suffix');
   });
 
   test('TS wrapper and notifications.js pass sound and channelId to scheduleExactAlarm', () => {
@@ -1205,13 +1215,29 @@ describe('Hardware Peak Guard & Automated Memory Hooks', () => {
     const receiverContent = fs.readFileSync(receiverPath, 'utf8');
 
     assert.match(receiverContent, /val isFullScreenMode = !isInteractive \|\| isLocked/, 'Must only enter full screen mode when screen is off or keyguard is locked');
-    assert.match(receiverContent, /val activeChannelId = if \(isCar\) "task_car_silent_channel_v1" else channelId/, 'Must post directly to the configured sound channelId');
+    assert.match(receiverContent, /val isCar = CarUtils\.shouldMuteForCar\(context\)/, 'Must check shouldMuteForCar which respects Mute on Android Auto setting');
     assert.match(receiverContent, /if \(isFullScreenMode\) \{\s*notificationBuilder\.setFullScreenIntent/s, 'Must only attach setFullScreenIntent when phone is locked');
-    assert.match(receiverContent, /Notification\.FLAG_INSISTENT/, 'Must set FLAG_INSISTENT so alarm audio plays when minimized or closed');
+    assert.match(receiverContent, /AlarmAudioManager\.startAlarmSound\(context, soundName\)/, 'Must start alarm audio and duck media in both popup and fullscreen modes');
 
     const modulePath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
     const moduleContent = fs.readFileSync(modulePath, 'utf8');
     assert.match(moduleContent, /deleteNotificationChannel/, 'Must purge legacy silent _fs_v / _popup_v channels');
+    assert.match(moduleContent, /OnActivityEntersForeground/, 'Must re-sync FLAG_SECURE on foreground resume so screenshots are never stuck blocked');
+  });
+
+  test('LoginScreen is hidden (display: none) and app opens automatically without registration', () => {
+    const loginPath = path.resolve('src/screens/LoginScreen.js');
+    const loginContent = fs.readFileSync(loginPath, 'utf8');
+    assert.match(loginContent, /display:\s*['"]none['"]/, 'LoginScreen container must have display: none');
+    assert.match(loginContent, /dispatch\(continueAsGuest\(\)\)/, 'LoginScreen must automatically continue as guest');
+
+    const navPath = path.resolve('src/navigation/AppNavigator.js');
+    const navContent = fs.readFileSync(navPath, 'utf8');
+    assert.match(navContent, /<MainStack\s*\/>/, 'AppNavigator must render MainStack directly');
+
+    const userSlicePath = path.resolve('src/features/userSlice.js');
+    const userSliceContent = fs.readFileSync(userSlicePath, 'utf8');
+    assert.match(userSliceContent, /const loadIsGuestFromLocalStorage = \(\) => \{[\s\S]*?return true;/, 'userSlice must default isGuest to true');
   });
 });
 

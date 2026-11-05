@@ -39,6 +39,9 @@ yarn-error.*
 /ios
 /android
 /task
+modules/**/android/build/
+modules/**/android/.gradle/
+modules/**/ios/build/
 
 # Playwright
 test-results/

@@ -48,8 +48,11 @@ class AlarmActivity : Activity() {
         val isCar = intent.getBooleanExtra("isCar", false)
         val soundName = intent.getStringExtra("soundName")
 
-        // Alarm audio is continuously played by the insistent system notification
-        // so no second audio stream is started here, eliminating double-sounding.
+        // Ensure audio focus (AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) is held while AlarmActivity is displayed;
+        // audio itself is played by the v17 notification channel (or AlarmAudioManager fallback) to avoid double-sounding.
+        if (!isCar) {
+            AlarmAudioManager.requestAlarmFocus(this)
+        }
 
         val titleId = resources.getIdentifier("alarm_title", "id", packageName)
         val nameId = resources.getIdentifier("alarm_task_name", "id", packageName)
@@ -151,7 +154,9 @@ class AlarmActivity : Activity() {
     }
 
     override fun onDestroy() {
-        AlarmAudioManager.stopAlarmSound(this)
+        if (isFinishing) {
+            AlarmAudioManager.stopAlarmSound(this)
+        }
         super.onDestroy()
     }
 }

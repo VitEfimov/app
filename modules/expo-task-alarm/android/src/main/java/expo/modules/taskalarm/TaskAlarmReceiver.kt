@@ -39,7 +39,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
 
         // Locked screen (or screen off) -> full screen; active/unlocked phone -> popup banner
         val isFullScreenMode = !isInteractive || isLocked
-        val isCar = CarUtils.isConnectedToCar(context)
+        val isCar = CarUtils.shouldMuteForCar(context)
         val activeChannelId = if (isCar) "task_car_silent_channel_v1" else channelId
 
         // Wake intent
@@ -91,10 +91,12 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val snoozePendingIntent = PendingIntent.getBroadcast(context, requestCode + 2000, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val soundUri = if (isCar) null else AlarmAudioManager.getSoundUri(context, soundName)
+        var channelHasSound = false
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            if (nm != null && nm.getNotificationChannel(activeChannelId) == null) {
+            val existingChannel = nm?.getNotificationChannel(activeChannelId)
+            if (nm != null && existingChannel == null) {
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -116,6 +118,9 @@ class TaskAlarmReceiver : BroadcastReceiver() {
                     lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 }
                 nm.createNotificationChannel(fallbackChannel)
+                channelHasSound = !isCar && soundUri != null
+            } else if (existingChannel != null) {
+                channelHasSound = existingChannel.sound != null
             }
         }
 
@@ -126,6 +131,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(fullScreenPendingIntent)
+            .setDeleteIntent(stopPendingIntent)
             .setOngoing(true)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -147,9 +153,13 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val notification = notificationBuilder.build()
 
         if (!isCar) {
-            // Native Android insistent looping on the system USAGE_ALARM stream.
-            // Guarantees reliable playback while app is closed/minimized and prevents double sounding.
+            // Request AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK on USAGE_ALARM so Amazon Music / YouTube lower their volume
+            AlarmAudioManager.requestAlarmFocus(context)
+            // Loop the v17 channel's alarm sound on USAGE_ALARM; only start MediaPlayer fallback if the channel had no sound
             notification.flags = notification.flags or Notification.FLAG_INSISTENT
+            if (!channelHasSound) {
+                AlarmAudioManager.startAlarmSound(context, soundName)
+            }
         }
 
         try {

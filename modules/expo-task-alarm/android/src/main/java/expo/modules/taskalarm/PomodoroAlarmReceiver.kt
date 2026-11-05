@@ -51,6 +51,10 @@ class PomodoroAlarmReceiver : BroadcastReceiver() {
             
         notification.flags = notification.flags or android.app.Notification.FLAG_INSISTENT
 
+        if (!CarUtils.shouldMuteForCar(context)) {
+            AlarmAudioManager.duckAudioTemporarily(context, 4000L)
+        }
+
         try {
             NotificationManagerCompat.from(context).notify(requestCode, notification)
         } catch (e: SecurityException) {

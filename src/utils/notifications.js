@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, ToastAndroid } from 'react-native';
-import { scheduleExactAlarm, cancelAlarm, schedulePomodoroAlarm, cancelPomodoroAlarm, isCarConnected } from '../../modules/expo-task-alarm';
+import { scheduleExactAlarm, cancelAlarm, schedulePomodoroAlarm, cancelPomodoroAlarm, isCarConnected, setSavedAndroidAutoMute, duckAudioForNotification } from '../../modules/expo-task-alarm';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import { DevLogger } from './logger';
@@ -57,7 +57,7 @@ export function getChannelId(
   const soundName = getSoundBasename(sound, isAlarm);
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
 
-  return `task_${base}_${soundName}_${vib}_v18`;
+  return `task_${base}_${soundName}_${vib}_v17`;
 }
 
 export function getCalendarChannelId(
@@ -837,6 +837,11 @@ export async function scheduleExactTaskReminder(
     // Ensure channels exist before scheduling
     await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
 
+    // Sync "Mute on Android Auto" preference to native SharedPreferences so TaskAlarmReceiver respects it
+    if (Platform.OS === 'android' && typeof setSavedAndroidAutoMute === 'function') {
+      setSavedAndroidAutoMute(themeState.androidAutoEnabled !== false);
+    }
+
     const isCar = (Platform.OS === 'android' && themeState.androidAutoEnabled !== false)
       ? await isCarConnected()
       : false;
@@ -1477,6 +1482,12 @@ export function attachNotificationDiagnostics() {
   const receivedSubscription =
     Notifications.addNotificationReceivedListener(
       notification => {
+        if (Platform.OS === 'android' && typeof duckAudioForNotification === 'function') {
+          const isPersistentSilent = !!(notification?.request?.content?.data?.keepNotificationAllDay);
+          if (!isPersistentSilent) {
+            try { duckAudioForNotification(); } catch (e) {}
+          }
+        }
         DevLogger.success(
           'Notification received by application',
           {

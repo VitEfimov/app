@@ -29,6 +29,7 @@ import java.util.HashMap
 class ExpoTaskAlarmModule : Module() {
   private var photoPromise: Promise? = null
   private var tempPhotoPath: String? = null
+  private var screenSecurityEnabled: Boolean = false
   override fun definition() = ModuleDefinition {
     Name("ExpoTaskAlarm")
 
@@ -42,6 +43,25 @@ class ExpoTaskAlarmModule : Module() {
       val context = appContext.reactContext ?: return@Function false
       val prefs = context.getSharedPreferences("taskflow_theme", Context.MODE_PRIVATE)
       prefs.edit().putString("themeMode", mode).apply()
+      return@Function true
+    }
+
+    Function("setSavedAndroidAutoMute") { enabled: Boolean ->
+      val context = appContext.reactContext ?: return@Function false
+      CarUtils.setAndroidAutoMuteEnabled(context, enabled)
+      return@Function true
+    }
+
+    Function("getSavedAndroidAutoMute") {
+      val context = appContext.reactContext ?: return@Function true
+      return@Function CarUtils.isAndroidAutoMuteEnabled(context)
+    }
+
+    Function("duckAudioForNotification") {
+      val context = appContext.reactContext ?: return@Function false
+      if (!CarUtils.shouldMuteForCar(context)) {
+        AlarmAudioManager.duckAudioTemporarily(context, 3500L)
+      }
       return@Function true
     }
 
@@ -273,10 +293,10 @@ class ExpoTaskAlarmModule : Module() {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
           val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-          // Purge legacy split channels (*_fs_v* and *_popup_v*) that had null sound
+          // Purge legacy split channels (*_fs_v*, *_popup_v*, *_alarm_ui_v*, *_v18) so only clean v17 channels remain
           try {
               for (ch in notificationManager.notificationChannels) {
-                  if (ch.id.contains("_fs_v") || ch.id.contains("_popup_v")) {
+                  if (ch.id.contains("_fs_v") || ch.id.contains("_popup_v") || ch.id.contains("_alarm_ui_v") || ch.id.endsWith("_v18")) {
                       notificationManager.deleteNotificationChannel(ch.id)
                   }
               }
@@ -611,7 +631,8 @@ class ExpoTaskAlarmModule : Module() {
     }
 
     AsyncFunction("setScreenSecurityAsync") { enabled: Boolean ->
-      val activity = appContext.currentActivity ?: return@AsyncFunction false
+      screenSecurityEnabled = enabled
+      val activity = appContext.currentActivity ?: return@AsyncFunction true
       activity.runOnUiThread {
         try {
           if (enabled) {
@@ -627,9 +648,22 @@ class ExpoTaskAlarmModule : Module() {
     }
 
     AsyncFunction("isScreenSecurityEnabled") {
-      val activity = appContext.currentActivity ?: return@AsyncFunction false
+      val activity = appContext.currentActivity ?: return@AsyncFunction screenSecurityEnabled
       val flags = activity.window.attributes.flags
       return@AsyncFunction (flags and WindowManager.LayoutParams.FLAG_SECURE) != 0
+    }
+
+    OnActivityEntersForeground {
+      val activity = appContext.currentActivity ?: return@OnActivityEntersForeground
+      activity.runOnUiThread {
+        try {
+          if (screenSecurityEnabled) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+          } else {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+          }
+        } catch (e: Exception) {}
+      }
     }
 
     OnActivityResult { _, payload ->
