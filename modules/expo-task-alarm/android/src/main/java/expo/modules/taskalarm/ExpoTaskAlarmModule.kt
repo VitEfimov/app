@@ -236,26 +236,36 @@ class ExpoTaskAlarmModule : Module() {
           val shouldVibrate = baseChannel?.shouldVibrate() ?: true
           val vibrationPattern = baseChannel?.vibrationPattern
 
-          // 1. Dedicated silent popup banner channel (IMPORTANCE_HIGH for heads-up, but setSound(null, null) to eliminate double sounding)
-          val popupChannelId = "${resolvedChannelId}_popup_v3"
+          val soundUri = AlarmAudioManager.getSoundUri(context, resolvedSoundName)
+          val audioAttributes = AudioAttributes.Builder()
+              .setUsage(AudioAttributes.USAGE_ALARM)
+              .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+              .build()
+
+          // 1. Dedicated popup banner channel (IMPORTANCE_HIGH for heads-up, with USAGE_ALARM sound)
+          val popupChannelId = "${resolvedChannelId}_popup_v5"
           if (notificationManager.getNotificationChannel(popupChannelId) == null) {
               val popupChannel = NotificationChannel(popupChannelId, "Task Alarm (Popup Banner)", NotificationManager.IMPORTANCE_HIGH).apply {
                   description = "Heads-up banner for task alarms"
-                  setSound(null, null)
+                  setSound(soundUri, audioAttributes)
                   enableVibration(shouldVibrate)
                   if (vibrationPattern != null) this.vibrationPattern = vibrationPattern
+                  setBypassDnd(true)
+                  lockscreenVisibility = Notification.VISIBILITY_PUBLIC
               }
               notificationManager.createNotificationChannel(popupChannel)
           }
 
-          // 2. Dedicated silent full-screen channel (IMPORTANCE_DEFAULT, setSound(null, null) to eliminate double sounding)
-          val fsChannelId = "${resolvedChannelId}_fs_v3"
+          // 2. Dedicated full-screen channel (IMPORTANCE_HIGH required for lockscreen full-screen intents, with USAGE_ALARM sound)
+          val fsChannelId = "${resolvedChannelId}_fs_v5"
           if (notificationManager.getNotificationChannel(fsChannelId) == null) {
-              val fsChannel = NotificationChannel(fsChannelId, "Task Alarm (Full Screen)", NotificationManager.IMPORTANCE_DEFAULT).apply {
+              val fsChannel = NotificationChannel(fsChannelId, "Task Alarm (Full Screen)", NotificationManager.IMPORTANCE_HIGH).apply {
                   description = "Full screen task alarm notification"
-                  setSound(null, null)
+                  setSound(soundUri, audioAttributes)
                   enableVibration(shouldVibrate)
                   if (vibrationPattern != null) this.vibrationPattern = vibrationPattern
+                  setBypassDnd(true)
+                  lockscreenVisibility = Notification.VISIBILITY_PUBLIC
               }
               notificationManager.createNotificationChannel(fsChannel)
           }

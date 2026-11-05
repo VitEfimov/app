@@ -1482,12 +1482,12 @@ export default function BoardScreen({ route, navigation }) {
                     paddingHorizontal: 8,
                     paddingVertical: 3,
                     borderRadius: 10,
-                    backgroundColor: isSelected ? '#3B82F6' : (colors.background || '#F3F4F6'),
+                    backgroundColor: isSelected ? '#3B82F6' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
                     borderWidth: 1,
-                    borderColor: isSelected ? '#3B82F6' : (colors.borderColor || '#E5E7EB')
+                    borderColor: isSelected ? '#3B82F6' : (isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'))
                   }}
                 >
-                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : (isDark ? '#E5E7EB' : colors.textPrimary) }}>
                     {t(cat) || cat}
                   </Text>
                 </TouchableOpacity>
@@ -1531,12 +1531,12 @@ export default function BoardScreen({ route, navigation }) {
                     paddingHorizontal: 8,
                     paddingVertical: 3,
                     borderRadius: 10,
-                    backgroundColor: isSelected ? '#F59E0B' : (colors.background || '#F3F4F6'),
+                    backgroundColor: isSelected ? '#F59E0B' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
                     borderWidth: 1,
-                    borderColor: isSelected ? '#F59E0B' : (colors.borderColor || '#E5E7EB')
+                    borderColor: isSelected ? '#F59E0B' : (isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'))
                   }}
                 >
-                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : (isDark ? '#E5E7EB' : colors.textPrimary) }}>
                     {t(tod) || tod}
                   </Text>
                 </TouchableOpacity>
@@ -1584,12 +1584,12 @@ export default function BoardScreen({ route, navigation }) {
                     paddingHorizontal: 8,
                     paddingVertical: 3,
                     borderRadius: 10,
-                    backgroundColor: isSelected ? '#8B5CF6' : (colors.background || '#F3F4F6'),
+                    backgroundColor: isSelected ? '#8B5CF6' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
                     borderWidth: 1,
-                    borderColor: isSelected ? '#8B5CF6' : (colors.borderColor || '#E5E7EB')
+                    borderColor: isSelected ? '#8B5CF6' : (isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'))
                   }}
                 >
-                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                  <Text style={{ fontSize: 10, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? '#FFFFFF' : (isDark ? '#E5E7EB' : colors.textPrimary) }}>
                     {t(mt) || mt}
                   </Text>
                 </TouchableOpacity>

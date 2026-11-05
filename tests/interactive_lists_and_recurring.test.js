@@ -598,6 +598,21 @@ describe('Daily Habit Tracker', () => {
     assert.strictEqual(bestStreak, 21);
   });
 
+  test('filter pills use high-contrast dark surface and readable text in dark mode', () => {
+    const getPillStyle = (isSelected, isDark) => ({
+      backgroundColor: isSelected ? '#F59E0B' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
+      textColor: isSelected ? '#FFFFFF' : (isDark ? '#E5E7EB' : '#1A1A24'),
+    });
+
+    const unselectedDark = getPillStyle(false, true);
+    assert.strictEqual(unselectedDark.backgroundColor, 'rgba(255,255,255,0.08)');
+    assert.strictEqual(unselectedDark.textColor, '#E5E7EB');
+
+    const selectedDark = getPillStyle(true, true);
+    assert.strictEqual(selectedDark.backgroundColor, '#F59E0B');
+    assert.strictEqual(selectedDark.textColor, '#FFFFFF');
+  });
+
   test('correctly infers time of day from task.time and filters morning habits', () => {
     const getHabitTimeCategory = (task) => {
       if (!task) return 'Anytime';
@@ -817,20 +832,21 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
 // 9. TASK ALARM SINGLE-SOUND INTEGRITY & RESCHEDULING ENGINE
 // ==============================================================================
 describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
-  test('native alarm channels configure setSound(null, null) to eliminate double sounding', () => {
+  test('native alarm channels configure USAGE_ALARM, IMPORTANCE_HIGH and soundUri for background lockscreen delivery', () => {
     const ktModulePath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
     const ktContent = fs.readFileSync(ktModulePath, 'utf8');
 
-    // Verify popup channel is defined and has setSound(null, null)
-    assert.match(ktContent, /popupChannelId\s*=\s*"\$\{resolvedChannelId\}_popup_v3"/, 'Must define isolated popup channel');
-    assert.match(ktContent, /popupChannel[\s\S]*?setSound\(null,\s*null\)/, 'Popup channel must be silent');
+    // Verify popup channel is defined and has IMPORTANCE_HIGH with USAGE_ALARM
+    assert.match(ktContent, /popupChannelId\s*=\s*"\$\{resolvedChannelId\}_popup_v5"/, 'Must define isolated popup channel');
+    assert.match(ktContent, /popupChannel[\s\S]*?setSound\(soundUri,\s*audioAttributes\)/, 'Popup channel must use alarm audio attributes');
 
-    // Verify full-screen channel is defined and has setSound(null, null)
-    assert.match(ktContent, /fsChannelId\s*=\s*"\$\{resolvedChannelId\}_fs_v3"/, 'Must define isolated full-screen channel');
-    assert.match(ktContent, /fsChannel[\s\S]*?setSound\(null,\s*null\)/, 'Full-screen channel must be silent');
+    // Verify full-screen channel is defined with IMPORTANCE_HIGH (required for full-screen lockscreen intent)
+    assert.match(ktContent, /fsChannelId\s*=\s*"\$\{resolvedChannelId\}_fs_v5"/, 'Must define isolated full-screen channel');
+    assert.match(ktContent, /fsChannel[\s\S]*?setSound\(soundUri,\s*audioAttributes\)/, 'Full-screen channel must have soundUri');
+    assert.match(ktContent, /NotificationChannel\(fsChannelId,\s*"Task Alarm \(Full Screen\)",\s*NotificationManager\.IMPORTANCE_HIGH\)/, 'Full-screen channel must be IMPORTANCE_HIGH for lockscreen intents');
   });
 
-  test('receiverIntent explicitly forwards soundName to AlarmActivity and AlarmAudioManager', () => {
+  test('receiverIntent and TaskAlarmReceiver configure insistent looping and full-screen intent without duplicate audio streams', () => {
     const ktModulePath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
     const ktContent = fs.readFileSync(ktModulePath, 'utf8');
 
@@ -839,9 +855,14 @@ describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
     const receiverPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/TaskAlarmReceiver.kt');
     const receiverContent = fs.readFileSync(receiverPath, 'utf8');
 
-    assert.ok(receiverContent.includes('.setSound(null)'), 'NotificationBuilder must explicitly setSound(null)');
-    assert.ok(receiverContent.includes('notificationBuilder.setDefaults(0)'), 'NotificationBuilder must not use DEFAULT_SOUND');
+    assert.ok(receiverContent.includes('notification.flags = notification.flags or Notification.FLAG_INSISTENT'), 'Must configure FLAG_INSISTENT for continuous looping');
+    assert.ok(receiverContent.includes('.setPriority(NotificationCompat.PRIORITY_MAX)'), 'NotificationBuilder must use PRIORITY_MAX');
+    assert.ok(receiverContent.includes('notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)'), 'Must attach setFullScreenIntent');
     assert.ok(receiverContent.includes('putExtra("soundName", soundName)'), 'AlarmActivity must receive soundName');
+
+    const activityPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/AlarmActivity.kt');
+    const activityContent = fs.readFileSync(activityPath, 'utf8');
+    assert.ok(!activityContent.includes('AlarmAudioManager.startAlarmSound(this, soundName)'), 'AlarmActivity must not spawn duplicate sound stream');
   });
 
   test('TS wrapper and notifications.js pass sound and channelId to scheduleExactAlarm', () => {

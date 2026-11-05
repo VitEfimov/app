@@ -1873,14 +1873,15 @@ useEffect(() => {
           animationType="fade"
           onRequestClose={() => setAttachmentOptionsVisible(false)}
         >
-          <TouchableOpacity
-            activeOpacity={1}
-            style={styles.calendarOverlay}
-            onPress={() => setAttachmentOptionsVisible(false)}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={t('Close overlay') || 'Close overlay'}
-          >
+          <View style={styles.calendarOverlay}>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={StyleSheet.absoluteFill}
+              onPress={() => setAttachmentOptionsVisible(false)}
+              accessible={true}
+              accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
+              accessibilityLabel={t('Close overlay') || 'Close overlay'}
+            />
             <View
               style={[
                 styles.calendarContainer,
@@ -1890,6 +1891,7 @@ useEffect(() => {
                   width: '90%',
                   padding: 18,
                   borderRadius: 20,
+                  zIndex: 1,
                 }
               ]}
             >
@@ -1997,7 +1999,7 @@ useEffect(() => {
                 </Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
         </RNModal>
 
 

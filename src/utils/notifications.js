@@ -57,7 +57,7 @@ export function getChannelId(
   const soundName = getSoundBasename(sound, isAlarm);
   const vib = vibrationEnabled ? 'vib1' : 'vib0';
 
-  return `task_${base}_${soundName}_${vib}_v17`;
+  return `task_${base}_${soundName}_${vib}_v18`;
 }
 
 export function getCalendarChannelId(
@@ -870,7 +870,7 @@ export async function scheduleExactTaskReminder(
           ? `${taskName} is due now`
           : taskName,
 
-        ...(Platform.OS !== 'android' && { sound: activeSound }),
+        sound: isCar ? null : (activeSound || 'default'),
 
         priority:
           Notifications.AndroidNotificationPriority.MAX,

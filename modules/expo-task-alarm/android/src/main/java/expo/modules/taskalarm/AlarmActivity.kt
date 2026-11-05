@@ -48,9 +48,8 @@ class AlarmActivity : Activity() {
         val isCar = intent.getBooleanExtra("isCar", false)
         val soundName = intent.getStringExtra("soundName")
 
-        if (!isCar) {
-            AlarmAudioManager.startAlarmSound(this, soundName)
-        }
+        // Alarm audio is continuously played by the insistent system notification
+        // so no second audio stream is started here, eliminating double-sounding.
 
         val titleId = resources.getIdentifier("alarm_title", "id", packageName)
         val nameId = resources.getIdentifier("alarm_task_name", "id", packageName)

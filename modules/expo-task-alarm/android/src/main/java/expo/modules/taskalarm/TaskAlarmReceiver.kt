@@ -1,6 +1,7 @@
 package expo.modules.taskalarm
 
 import android.app.KeyguardManager
+import android.app.Notification
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -19,13 +20,21 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val keepNotificationAllDay = intent.getBooleanExtra("keepNotificationAllDay", false)
         val soundName = intent.getStringExtra("soundName")
 
-        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val wakeLock = powerManager?.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            "expo:taskalarm:receiver"
+        )
+        try {
+            wakeLock?.acquire(10000)
+        } catch (e: Exception) {}
+
+        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
         val isInteractive = powerManager?.isInteractive ?: false
         val isLocked = keyguardManager?.isKeyguardLocked ?: false
 
         val isFullScreenMode = (presentationStyle == "fullscreen") || (presentationStyle == "adaptive" && (!isInteractive || isLocked))
-        val activeChannelId = if (isFullScreenMode) "${channelId}_fs_v3" else "${channelId}_popup_v3"
+        val activeChannelId = if (isFullScreenMode) "${channelId}_fs_v5" else "${channelId}_popup_v5"
         val isCar = CarUtils.isConnectedToCar(context)
 
         // Wake intent
@@ -76,6 +85,8 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         }
         val snoozePendingIntent = PendingIntent.getBroadcast(context, requestCode + 2000, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
+        val soundUri = if (isCar) null else AlarmAudioManager.getSoundUri(context, soundName)
+
         val notificationBuilder = NotificationCompat.Builder(context, activeChannelId)
             .setSmallIcon(iconResId)
             .setContentTitle("Task Alarm")
@@ -85,32 +96,29 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             .setContentIntent(fullScreenPendingIntent)
             .setOngoing(true)
             .setAutoCancel(false)
-            .setSound(null)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .addAction(0, "Snooze", snoozePendingIntent)
             .addAction(0, "Stop", stopPendingIntent)
-
-        if (isFullScreenMode) {
-            notificationBuilder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            if (!isInteractive || isLocked) {
-                notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
-            }
-        } else {
-            notificationBuilder.setPriority(NotificationCompat.PRIORITY_MAX)
-        }
 
         if (isCar) {
             notificationBuilder.setSound(null)
             notificationBuilder.setVibrate(null)
         } else {
-            notificationBuilder.setSound(null)
-            notificationBuilder.setDefaults(0)
-            // In popup mode, start looping audio directly
-            if (!isFullScreenMode) {
-                AlarmAudioManager.startAlarmSound(context, soundName)
-            }
+            notificationBuilder.setSound(soundUri)
+            notificationBuilder.setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
+        }
+
+        if (isFullScreenMode) {
+            notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
         }
 
         val notification = notificationBuilder.build()
+
+        if (!isCar) {
+            // Native Android insistent looping on the system USAGE_ALARM stream.
+            // Guarantees reliable playback while app is closed/minimized and prevents double sounding.
+            notification.flags = notification.flags or Notification.FLAG_INSISTENT
+        }
 
         try {
             NotificationManagerCompat.from(context).notify(requestCode, notification)

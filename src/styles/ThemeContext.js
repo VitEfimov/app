@@ -99,6 +99,8 @@ export const ThemeProvider = ({ children }) => {
       colors.onErrorContainer = hexFromArgb(scheme.onErrorContainer);
     }
 
+    colors.background = colors.bgMain;
+
     return {
       colors,
       isDark,

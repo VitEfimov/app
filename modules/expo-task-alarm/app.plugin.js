@@ -62,6 +62,7 @@ module.exports = function withTaskAlarm(config) {
           'android:name': 'expo.modules.taskalarm.AlarmActivity',
           'android:exported': 'false',
           'android:showOnLockScreen': 'true',
+          'android:showWhenLocked': 'true',
           'android:showForAllUsers': 'true',
           'android:turnScreenOn': 'true',
           'android:theme': '@android:style/Theme.DeviceDefault.Light.NoActionBar',
