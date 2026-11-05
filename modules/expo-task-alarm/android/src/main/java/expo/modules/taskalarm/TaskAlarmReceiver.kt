@@ -105,7 +105,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             notificationBuilder.setVibrate(null)
         } else {
             notificationBuilder.setSound(soundUri)
-            notificationBuilder.setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
+            notificationBuilder.setDefaults(Notification.DEFAULT_VIBRATE or Notification.DEFAULT_LIGHTS)
         }
 
         if (isFullScreenMode) {
