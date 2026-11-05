@@ -148,7 +148,6 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   const taskNameWrap = useSelector(state => state.themeReducer?.taskNameWrap || 'nowrap');
   const fontSizeSetting = useSelector(state => state.themeReducer?.fontSize || 'normal');
   const boards = useSelector(state => state.userReducer?.boards ?? EMPTY_BOARDS);
-  const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
   const titleFontSize = fontSizeSetting === 'small' ? 13 : fontSizeSetting === 'big' ? 18 : 15;
 
@@ -501,7 +500,20 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   };
 
   const rawDueDate = task.completionDate || task.dateString || task.dueDate || task.date;
-  const isDueDateValid = !!(rawDueDate && dayjs(rawDueDate).isValid());
+  const dueDateInfo = useMemo(() => {
+    if (!rawDueDate) return { isValid: false, isDifferentYear: false, yearStr: '', shortDateStr: '' };
+    const parsed = dayjs(rawDueDate);
+    if (!parsed.isValid()) return { isValid: false, isDifferentYear: false, yearStr: '', shortDateStr: '' };
+    const currentYear = new Date().getFullYear();
+    const yr = parsed.year();
+    return {
+      isValid: true,
+      isDifferentYear: yr !== currentYear,
+      yearStr: String(yr),
+      shortDateStr: parsed.format('MMM D'),
+    };
+  }, [rawDueDate]);
+  const isDueDateValid = dueDateInfo.isValid;
   const priorityColor = getPriorityColor(task.priority);
   const hasNotes = (task.description?.text && task.description.text.trim() !== '') || (task.description?.img && task.description.img.trim() !== '') || (task.description?.attachments && task.description.attachments.length > 0);
   const subtasks = task.subtasks || [];
@@ -820,9 +832,9 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
             </View>
           ) : null}
 
-          {isDueDateValid && dayjs(rawDueDate).year() !== dayjs().year() ? (
+          {isDueDateValid && dueDateInfo.isDifferentYear ? (
             <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>
-              {dayjs(rawDueDate).format('YYYY')}
+              {dueDateInfo.yearStr}
             </Text>
           ) : null}
         </View>
@@ -846,10 +858,10 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
           }}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
-          accessibilityLabel={`${t('Due') || 'Due'}: ${dayjs(rawDueDate).format('MMM D')}`}
+          accessibilityLabel={`${t('Due') || 'Due'}: ${dueDateInfo.shortDateStr}`}
         >
           <Text style={[styles.date, { color: colors.textPrimary }]}>
-            {dayjs(rawDueDate).format('MMM D')}
+            {dueDateInfo.shortDateStr}
           </Text>
         </TouchableOpacity>
       ) : null}

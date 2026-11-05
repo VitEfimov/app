@@ -278,6 +278,10 @@ export default function BoardScreen({ route, navigation }) {
   }, []);
 
   const allSectionIds = ['missed', 'today', 'tomorrow', 'on-this-week', 'on-next-week', 'later', 'completed'];
+  const INITIAL_SECTION_PAGE_SIZE = 30;
+  const SECTION_PAGE_INCREMENT = 40;
+
+  const [sectionVisibleCounts, setSectionVisibleCounts] = useState({});
 
   const [collapsedSections, setCollapsedSections] = useState(() => {
     if (route?.params?.sectionId) {
@@ -315,11 +319,11 @@ export default function BoardScreen({ route, navigation }) {
   }, []);
 
   useEffect(() => {
-    const unregisterGuard = MemoryPressureGuard.registerCleanupHook('BoardScreen', (metrics) => {
+    const unregisterGuard = MemoryPressureGuard.registerCleanupHook('BoardScreen', () => {
       closeOpenSwipeableRow?.();
       cancelAllInlineEditing?.();
-      setQuickMenuVisible(false);
-      setSectionOptionsConfig({ isVisible: false, section: null });
+      setQuickMenuVisible(prev => (prev ? false : prev));
+      setSectionOptionsConfig(prev => (prev.isVisible ? { isVisible: false, section: null } : prev));
     });
     return unregisterGuard;
   }, []);
@@ -361,6 +365,14 @@ export default function BoardScreen({ route, navigation }) {
     setCollapsedSections(prev => {
       const willCollapse = !prev.includes(sectionId);
       A11yHelper.announce(willCollapse ? `${sectionId} section collapsed` : `${sectionId} section expanded`);
+      if (willCollapse) {
+        setSectionVisibleCounts(counts => {
+          if (!counts[sectionId]) return counts;
+          const nextCounts = { ...counts };
+          delete nextCounts[sectionId];
+          return nextCounts;
+        });
+      }
       const next = prev.includes(sectionId) ? prev.filter(id => id !== sectionId) : [...prev, sectionId];
       currentSessionCollapsedSections = next;
       return next;
@@ -637,6 +649,8 @@ export default function BoardScreen({ route, navigation }) {
     return hiddenIds;
   }, [boardTasks, showRecurringTasksOnBoard, activeBoard, isRepeatingTask]);
 
+  const isCompletedCollapsed = collapsedSections.includes('completed');
+
   const { todayTasks, tomorrowTasks, thisWeekTasks, nextWeekTasks, laterTasks, missedTasks, completedTasks, completedCount, todoTasks, upcomingBirthdayTasks, needToBuyTasks } = useMemo(() => {
     const thresholds = getDateThresholds();
 
@@ -692,8 +706,6 @@ export default function BoardScreen({ route, navigation }) {
       return [...arr].sort((a, b) => compareTasks(a, b, sortBy)).map(item => item.task);
     };
 
-    const isCompletedCollapsed = collapsedSections.includes('completed');
-
     const sortedToday = sortBucket(buckets.today, 'today');
     const sortedTomorrow = sortBucket(buckets.tomorrow, 'tomorrow');
     const sortedThisWeek = sortBucket(buckets['on-this-week'], 'on-this-week');
@@ -717,7 +729,7 @@ export default function BoardScreen({ route, navigation }) {
       upcomingBirthdayTasks: sortedTodo,
       needToBuyTasks: sortedTodo
     };
-  }, [boardTasks, sortConfig, hiddenRecurringTaskIds, collapsedSections]);
+  }, [boardTasks, sortConfig, hiddenRecurringTaskIds, isCompletedCollapsed]);
 
   const sections = useMemo(() => {
     const isCompletedCollapsed = collapsedSections.includes('completed');
@@ -817,18 +829,37 @@ export default function BoardScreen({ route, navigation }) {
   const flattenedData = useMemo(() => {
     const result = [];
     sections.forEach(section => {
-      result.push({ type: 'header', section });
+      result.push({ type: 'header', section, uniqueKey: `header_${section.id}` });
       if (section.data && section.data.length > 0) {
-        section.data.forEach(task => {
-          result.push({ type: 'task', task, section });
+        const visibleLimit = sectionVisibleCounts[section.id] || INITIAL_SECTION_PAGE_SIZE;
+        const visibleTasks = section.data.length > visibleLimit
+          ? section.data.slice(0, visibleLimit)
+          : section.data;
+        const seenTaskIds = new Map();
+        visibleTasks.forEach((task, idx) => {
+          const rawId = task?.id || task?._id || `idx_${idx}`;
+          const baseKey = `task_${rawId}_${section.id}`;
+          const count = seenTaskIds.get(baseKey) || 0;
+          seenTaskIds.set(baseKey, count + 1);
+          const uniqueKey = count === 0 ? baseKey : `${baseKey}_dup_${count}`;
+          result.push({ type: 'task', task, section, uniqueKey });
         });
+        if (section.data.length > visibleLimit) {
+          result.push({
+            type: 'show_more',
+            section,
+            remainingCount: section.data.length - visibleLimit,
+            totalCount: section.data.length,
+            uniqueKey: `show_more_${section.id}`,
+          });
+        }
       }
       if (section.id !== 'completed' && section.id !== 'missed' && !collapsedSections.includes(section.id)) {
-        result.push({ type: 'footer', section });
+        result.push({ type: 'footer', section, uniqueKey: `footer_${section.id}` });
       }
     });
     return result;
-  }, [sections]);
+  }, [sections, sectionVisibleCounts, collapsedSections]);
 
   const allHiddenRecurringTaskIds = useMemo(() => {
     if (showRecurringTasksOnBoard) return new Set();
@@ -1185,9 +1216,84 @@ export default function BoardScreen({ route, navigation }) {
     );
   }, [activeAddSectionId]);
 
+  const renderShowMoreRow = useCallback((item) => {
+    const sectionId = item.section?.id;
+    const remaining = item.remainingCount || 0;
+    const nextBatch = Math.min(remaining, SECTION_PAGE_INCREMENT);
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          width: '95%',
+          alignSelf: 'center',
+          borderBottomWidth: 1,
+          borderBottomColor: colors.borderColor,
+        }}
+      >
+        <TouchableOpacity
+          testID={`show_more_btn_${sectionId}`}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel={`Show ${nextBatch} more tasks in ${item.section?.title}`}
+          onPress={() => {
+            setSectionVisibleCounts(prev => ({
+              ...prev,
+              [sectionId]: (prev[sectionId] || INITIAL_SECTION_PAGE_SIZE) + SECTION_PAGE_INCREMENT,
+            }));
+          }}
+          style={{
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            borderRadius: 14,
+            backgroundColor: colors.bgCard,
+            borderWidth: 1,
+            borderColor: colors.primary,
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>
+            {`${t('Show more') || 'Show more'} (+${nextBatch} / ${remaining} ${t('left') || 'left'})`}
+          </Text>
+        </TouchableOpacity>
+
+        {remaining > SECTION_PAGE_INCREMENT && (
+          <TouchableOpacity
+            testID={`show_all_btn_${sectionId}`}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`Show all ${item.totalCount} tasks in ${item.section?.title}`}
+            onPress={() => {
+              setSectionVisibleCounts(prev => ({
+                ...prev,
+                [sectionId]: item.totalCount,
+              }));
+            }}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 14,
+              backgroundColor: colors.bgCard,
+              borderWidth: 1,
+              borderColor: colors.borderColor,
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '500', color: colors.textSecondary }}>
+              {`${t('Show all') || 'Show all'} (${item.totalCount})`}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }, [colors.bgCard, colors.borderColor, colors.primary, colors.textSecondary, t]);
+
   const renderItem = useCallback(({ item }) => {
     if (item.type === 'header') return renderSectionHeader({ section: item.section });
     if (item.type === 'footer') return renderSectionFooter({ section: item.section });
+    if (item.type === 'show_more') return renderShowMoreRow(item);
     if (item.type === 'task') {
       const task = item.task;
       const section = item.section;
@@ -1208,7 +1314,7 @@ export default function BoardScreen({ route, navigation }) {
       );
     }
     return null;
-  }, [renderSectionHeader, renderSectionFooter, activeBoard?.type, selectionMode.isActive, selectedTaskIdsSet, handleToggleSelectTask, handleSnoozePress, handleQuickMenuPress, handleTaskPress]);
+  }, [renderSectionHeader, renderSectionFooter, renderShowMoreRow, activeBoard?.type, selectionMode.isActive, selectedTaskIdsSet, handleToggleSelectTask, handleSnoozePress, handleQuickMenuPress, handleTaskPress]);
 
   const flashListExtraData = useMemo(() => ({
     activeBoardId,
@@ -1725,11 +1831,12 @@ export default function BoardScreen({ route, navigation }) {
         extraData={flashListExtraData}
         ListHeaderComponent={renderListSummaryBar}
         keyExtractor={(item, index) => {
+          if (item?.uniqueKey) return item.uniqueKey;
           if (item?.type === 'task') {
             const taskId = item.task?.id || item.task?._id || `task_${index}`;
-            return `task_${taskId}_${item.section?.id || 'sec'}_${index}`;
+            return `task_${taskId}_${item.section?.id || 'sec'}`;
           }
-          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}_${index}`;
+          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
         }}
         getItemType={(item) => item.type}
         renderItem={renderItem}
@@ -1740,7 +1847,7 @@ export default function BoardScreen({ route, navigation }) {
         onScrollBeginDrag={closeOpenSwipeableRow}
         estimatedItemSize={70}
         drawDistance={Platform.OS === 'web' ? 400 : 250}
-        removeClippedSubviews={Platform.OS === 'android'}
+        disableAutoLayout={true}
       />
 
       <TaskDetailsModal 

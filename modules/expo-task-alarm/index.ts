@@ -19,7 +19,7 @@ export async function scheduleExactAlarm(
       taskName,
       triggerTimeMillis,
       soundName,
-      presentationStyle || 'fullscreen',
+      presentationStyle || 'adaptive',
       !!keepNotificationAllDay,
       channelId || ''
     );

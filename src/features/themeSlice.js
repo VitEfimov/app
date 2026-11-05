@@ -130,7 +130,7 @@ const initialState = {
   summaryReminderTime: loaded?.summaryReminderTime || '09:00',
   
   // Notification Settings
-  alarmPresentationStyle: loaded?.alarmPresentationStyle || 'fullscreen', // 'fullscreen', 'popup', 'adaptive'
+  alarmPresentationStyle: loaded?.alarmPresentationStyle || 'adaptive',
   alarmSound: loaded?.alarmSound || 'bass_alarm.mp3',
   notificationSound: loaded?.notificationSound || 'notification.wav',
   vibrationEnabled: loaded?.vibrationEnabled !== undefined ? loaded.vibrationEnabled : true,

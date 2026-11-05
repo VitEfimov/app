@@ -49,7 +49,9 @@ const stateListeners = new Set();
 let peakHistory = [];
 const MAX_HISTORY = 30;
 let lastPeakAlertTimestamp = 0;
+let lastAutoCleanupTimestamp = 0;
 const PEAK_ALERT_COOLDOWN_MS = 10000; // prevent alert spamming within 10s
+const AUTO_CLEANUP_COOLDOWN_MS = 5000; // prevent duplicate back-to-back auto cleanups
 
 /**
  * Reads memory metrics from native Android module or JS runtime fallback.
@@ -76,7 +78,10 @@ function sampleRawMetrics() {
   const now = Date.now();
   const delta = now - lastLoopTimestamp;
   lastLoopTimestamp = now;
-  const lag = Math.max(0, delta - (heartbeatIntervalMs || 1000));
+  const interval = heartbeatIntervalMs || 2000;
+  // Ignore huge timer jumps (> 15s) caused by OS background sleep/doze resume (e.g. 60195ms)
+  const isBackgroundSleepJump = delta > Math.max(15000, interval * 6);
+  const lag = isBackgroundSleepJump ? 0 : Math.max(0, delta - interval);
   const estFps = Math.max(10, Math.min(60, Math.round(1000 / (16.6 + lag))));
 
   currentMetrics = {
@@ -179,6 +184,8 @@ export const MemoryPressureGuard = {
    */
   clearHistory: () => {
     peakHistory = [];
+    lastPeakAlertTimestamp = 0;
+    lastAutoCleanupTimestamp = 0;
     MemoryPressureGuard._notifyListeners();
   },
 
@@ -217,6 +224,13 @@ export const MemoryPressureGuard = {
    */
   runEmergencyCleanup: (reason = 'MANUAL_TRIGGER') => {
     const start = Date.now();
+    const isAutoTrigger = reason === 'CRITICAL_PEAK_AUTOCLEANUP' || reason === 'HOOK_AUTO_PEAK_MITIGATION';
+    if (isAutoTrigger && start - lastAutoCleanupTimestamp < AUTO_CLEANUP_COOLDOWN_MS && peakHistory.length > 0) {
+      return peakHistory[0];
+    }
+    if (isAutoTrigger) {
+      lastAutoCleanupTimestamp = start;
+    }
     let hooksExecuted = 0;
 
     cleanupHooks.forEach((cb, key) => {

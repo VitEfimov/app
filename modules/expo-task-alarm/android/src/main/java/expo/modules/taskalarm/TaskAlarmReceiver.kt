@@ -2,10 +2,14 @@ package expo.modules.taskalarm
 
 import android.app.KeyguardManager
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -33,9 +37,10 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val isInteractive = powerManager?.isInteractive ?: false
         val isLocked = keyguardManager?.isKeyguardLocked ?: false
 
-        val isFullScreenMode = (presentationStyle == "fullscreen") || (presentationStyle == "adaptive" && (!isInteractive || isLocked))
-        val activeChannelId = if (isFullScreenMode) "${channelId}_fs_v5" else "${channelId}_popup_v5"
+        // Locked screen (or screen off) -> full screen; active/unlocked phone -> popup banner
+        val isFullScreenMode = !isInteractive || isLocked
         val isCar = CarUtils.isConnectedToCar(context)
+        val activeChannelId = if (isCar) "task_car_silent_channel_v1" else channelId
 
         // Wake intent
         val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
@@ -86,6 +91,33 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         val snoozePendingIntent = PendingIntent.getBroadcast(context, requestCode + 2000, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val soundUri = if (isCar) null else AlarmAudioManager.getSoundUri(context, soundName)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            if (nm != null && nm.getNotificationChannel(activeChannelId) == null) {
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+                val fallbackChannel = NotificationChannel(
+                    activeChannelId,
+                    if (isCar) "Car / Driving notifications" else "Task alarms",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = if (isCar) "Silent notifications when connected to Car" else "Urgent task alarms with sound and vibration"
+                    if (isCar) {
+                        setSound(null, null)
+                        enableVibration(false)
+                    } else {
+                        setSound(soundUri, audioAttributes)
+                        enableVibration(!activeChannelId.contains("_vib0_"))
+                        setBypassDnd(true)
+                    }
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+                nm.createNotificationChannel(fallbackChannel)
+            }
+        }
 
         val notificationBuilder = NotificationCompat.Builder(context, activeChannelId)
             .setSmallIcon(iconResId)

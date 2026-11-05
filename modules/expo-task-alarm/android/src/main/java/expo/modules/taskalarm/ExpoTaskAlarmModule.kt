@@ -86,6 +86,44 @@ class ExpoTaskAlarmModule : Module() {
 
     Function("initNativeCrashHandler") {
       val context = appContext.reactContext ?: return@Function false
+
+      // Also inspect Android 11+ ApplicationExitInfo for native C++ SIGSEGV/SIGABRT/ANR/OOM crashes
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        try {
+          val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+          val exitList = actManager?.getHistoricalProcessExitReasons(null, 0, 5)
+          if (!exitList.isNullOrEmpty()) {
+            val prefs = context.getSharedPreferences("taskflow_native_crashes", Context.MODE_PRIVATE)
+            val lastSeenExitTime = prefs.getLong("last_exit_timestamp", 0L)
+            var maxSeenTime = lastSeenExitTime
+            var existing = prefs.getString("logs", "[]") ?: "[]"
+
+            for (exitInfo in exitList) {
+              val reason = exitInfo.reason
+              val isCrashExit = reason == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE ||
+                  reason == android.app.ApplicationExitInfo.REASON_ANR ||
+                  reason == android.app.ApplicationExitInfo.REASON_LOW_MEMORY ||
+                  reason == android.app.ApplicationExitInfo.REASON_CRASH
+              if (isCrashExit && exitInfo.timestamp > lastSeenExitTime) {
+                if (exitInfo.timestamp > maxSeenTime) maxSeenTime = exitInfo.timestamp
+                val reasonName = when (reason) {
+                  android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "NATIVE_CPP_CRASH (SIGSEGV/SIGABRT)"
+                  android.app.ApplicationExitInfo.REASON_ANR -> "ANR (Application Not Responding)"
+                  android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY (OOM Kill)"
+                  else -> "JVM_CRASH"
+                }
+                val desc = (exitInfo.description ?: reasonName).replace("\"", "\\\"").replace("\n", "\\n")
+                val entry = "{\"timestamp\":\"${exitInfo.timestamp}\",\"thread\":\"os_exit_monitor\",\"message\":\"$reasonName: $desc\",\"stack\":\"Status=${exitInfo.status}, Importance=${exitInfo.importance}, PSS=${exitInfo.pss}KB, RSS=${exitInfo.rss}KB\"}"
+                existing = if (existing == "[]") "[$entry]" else existing.replace("]", ",$entry]")
+              }
+            }
+            if (maxSeenTime > lastSeenExitTime) {
+              prefs.edit().putString("logs", existing).putLong("last_exit_timestamp", maxSeenTime).apply()
+            }
+          }
+        } catch (e: Exception) {}
+      }
+
       val oldHandler = Thread.getDefaultUncaughtExceptionHandler()
       Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         try {
@@ -230,46 +268,34 @@ class ExpoTaskAlarmModule : Module() {
           resolvedChannelId = "task_alarm_channel"
       }
 
-      val style = presentationStyle ?: "fullscreen"
+      val style = presentationStyle ?: "adaptive"
 
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
           val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-          val baseChannel = notificationManager.getNotificationChannel(resolvedChannelId)
-          val shouldVibrate = baseChannel?.shouldVibrate() ?: true
-          val vibrationPattern = baseChannel?.vibrationPattern
 
-          val soundUri = AlarmAudioManager.getSoundUri(context, resolvedSoundName)
-          val audioAttributes = AudioAttributes.Builder()
-              .setUsage(AudioAttributes.USAGE_ALARM)
-              .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-              .build()
+          // Purge legacy split channels (*_fs_v* and *_popup_v*) that had null sound
+          try {
+              for (ch in notificationManager.notificationChannels) {
+                  if (ch.id.contains("_fs_v") || ch.id.contains("_popup_v")) {
+                      notificationManager.deleteNotificationChannel(ch.id)
+                  }
+              }
+          } catch (e: Exception) {}
 
-          // 1. Dedicated popup banner channel (IMPORTANCE_HIGH for heads-up, with USAGE_ALARM sound)
-          val popupChannelId = "${resolvedChannelId}_popup_v5"
-          if (notificationManager.getNotificationChannel(popupChannelId) == null) {
-              val popupChannel = NotificationChannel(popupChannelId, "Task Alarm (Popup Banner)", NotificationManager.IMPORTANCE_HIGH).apply {
-                  description = "Heads-up banner for task alarms"
+          if (notificationManager.getNotificationChannel(resolvedChannelId) == null) {
+              val soundUri = AlarmAudioManager.getSoundUri(context, resolvedSoundName)
+              val audioAttributes = AudioAttributes.Builder()
+                  .setUsage(AudioAttributes.USAGE_ALARM)
+                  .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                  .build()
+              val alarmChannel = NotificationChannel(resolvedChannelId, "Task alarms", NotificationManager.IMPORTANCE_HIGH).apply {
+                  description = "Urgent task alarms with sound and vibration"
                   setSound(soundUri, audioAttributes)
-                  enableVibration(shouldVibrate)
-                  if (vibrationPattern != null) this.vibrationPattern = vibrationPattern
+                  enableVibration(!resolvedChannelId.contains("_vib0_"))
                   setBypassDnd(true)
                   lockscreenVisibility = Notification.VISIBILITY_PUBLIC
               }
-              notificationManager.createNotificationChannel(popupChannel)
-          }
-
-          // 2. Dedicated full-screen channel (IMPORTANCE_HIGH required for lockscreen full-screen intents, with USAGE_ALARM sound)
-          val fsChannelId = "${resolvedChannelId}_fs_v5"
-          if (notificationManager.getNotificationChannel(fsChannelId) == null) {
-              val fsChannel = NotificationChannel(fsChannelId, "Task Alarm (Full Screen)", NotificationManager.IMPORTANCE_HIGH).apply {
-                  description = "Full screen task alarm notification"
-                  setSound(soundUri, audioAttributes)
-                  enableVibration(shouldVibrate)
-                  if (vibrationPattern != null) this.vibrationPattern = vibrationPattern
-                  setBypassDnd(true)
-                  lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-              }
-              notificationManager.createNotificationChannel(fsChannel)
+              notificationManager.createNotificationChannel(alarmChannel)
           }
       }
 

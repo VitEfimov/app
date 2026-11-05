@@ -974,15 +974,15 @@ export default function DevLogsScreen({ navigation }) {
                 </View>
               </View>
 
-              {/* Active Alarm Presentation Style */}
+              {/* Alarm Display Mode */}
               <View style={styles.infoRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.infoKey, { color: colors.textPrimary }]}>Alarm Display Mode</Text>
-                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Current presentation configuration</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>Locked screen: Full Screen • Other: Popup banner</Text>
                 </View>
                 <View style={[styles.tag, { backgroundColor: 'rgba(98, 70, 234, 0.15)' }]}>
                   <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary }}>
-                    {themeState.alarmPresentationStyle || 'fullscreen'}
+                    Adaptive
                   </Text>
                 </View>
               </View>

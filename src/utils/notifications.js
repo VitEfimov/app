@@ -822,7 +822,7 @@ export async function scheduleExactTaskReminder(
   const notificationSound = themeState.notificationSound || 'default';
   const alarmSound = themeState.alarmSound || 'default';
   const vibrationEnabled = themeState.vibrationEnabled !== false;
-  const alarmPresentationStyle = themeState.alarmPresentationStyle || 'fullscreen';
+  const alarmPresentationStyle = themeState.alarmPresentationStyle || 'adaptive';
 
   const isCalendar = !!(advancedOptions?.isCalendar || advancedOptions?.channelType === 'calendar' || advancedOptions?.syncedFromCalendar);
   const channelId = isCalendar

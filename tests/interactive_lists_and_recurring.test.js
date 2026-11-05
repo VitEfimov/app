@@ -836,14 +836,11 @@ describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
     const ktModulePath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
     const ktContent = fs.readFileSync(ktModulePath, 'utf8');
 
-    // Verify popup channel is defined and has IMPORTANCE_HIGH with USAGE_ALARM
-    assert.match(ktContent, /popupChannelId\s*=\s*"\$\{resolvedChannelId\}_popup_v5"/, 'Must define isolated popup channel');
-    assert.match(ktContent, /popupChannel[\s\S]*?setSound\(soundUri,\s*audioAttributes\)/, 'Popup channel must use alarm audio attributes');
-
-    // Verify full-screen channel is defined with IMPORTANCE_HIGH (required for full-screen lockscreen intent)
-    assert.match(ktContent, /fsChannelId\s*=\s*"\$\{resolvedChannelId\}_fs_v5"/, 'Must define isolated full-screen channel');
-    assert.match(ktContent, /fsChannel[\s\S]*?setSound\(soundUri,\s*audioAttributes\)/, 'Full-screen channel must have soundUri');
-    assert.match(ktContent, /NotificationChannel\(fsChannelId,\s*"Task Alarm \(Full Screen\)",\s*NotificationManager\.IMPORTANCE_HIGH\)/, 'Full-screen channel must be IMPORTANCE_HIGH for lockscreen intents');
+    // Verify legacy silent _fs_v / _popup_v channels are deleted and resolvedChannelId has USAGE_ALARM & IMPORTANCE_HIGH
+    assert.match(ktContent, /deleteNotificationChannel\(ch\.id\)/, 'Must purge legacy silent _fs_v / _popup_v channels');
+    assert.match(ktContent, /AudioAttributes\.USAGE_ALARM/, 'Alarm channel must use USAGE_ALARM audio attributes');
+    assert.match(ktContent, /setSound\(soundUri,\s*audioAttributes\)/, 'Alarm channel must configure soundUri with audioAttributes');
+    assert.match(ktContent, /NotificationChannel\(resolvedChannelId,\s*"Task alarms",\s*NotificationManager\.IMPORTANCE_HIGH\)/, 'Alarm channel must be IMPORTANCE_HIGH');
   });
 
   test('receiverIntent and TaskAlarmReceiver configure insistent looping and full-screen intent without duplicate audio streams', () => {
@@ -876,6 +873,18 @@ describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
     const notifContent = fs.readFileSync(notifPath, 'utf8');
 
     assert.match(notifContent, /scheduleExactAlarm\([\s\S]*?sound[\s\S]*?channelId[\s\S]*?\)/, 'notifications.js must forward soundName and channelId');
+  });
+
+  test('alarms default to full screen when locked and popup banner for other without display style picker', () => {
+    const receiverPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/TaskAlarmReceiver.kt');
+    const receiverContent = fs.readFileSync(receiverPath, 'utf8');
+
+    assert.ok(receiverContent.includes('val isFullScreenMode = !isInteractive || isLocked'), 'Must use lockscreen/interactive check for full screen vs popup');
+
+    const settingsPath = path.resolve('src/screens/SettingsScreen.js');
+    const settingsContent = fs.readFileSync(settingsPath, 'utf8');
+    assert.strictEqual(settingsContent.includes('Alarm display style'), false, 'SettingsScreen must not render Alarm display style picker');
+    assert.strictEqual(settingsContent.includes('isAlarmStylePickerOpen'), false, 'isAlarmStylePickerOpen state must be removed');
   });
 
   test('TaskDetailsModal and taskSlice normalize taskId using task.id || task._id', () => {
@@ -1033,12 +1042,13 @@ describe('Large Section Crash Prevention, FlashList Integrity & Hardware Diagnos
     assert.match(content, /Platform\.OS\s*!==\s*['"]android['"]/, 'Must not trigger native LayoutAnimation on Android FlashList');
   });
 
-  test('BoardScreen FlashList configures unique indexed keyExtractor and removeClippedSubviews', () => {
+  test('BoardScreen FlashList configures stable uniqueKey keyExtractor and disableAutoLayout', () => {
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
     assert.match(content, /keyExtractor=\{\(item,\s*index\)/, 'keyExtractor must accept index parameter');
-    assert.match(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'Must enable subview detachment on Android');
+    assert.match(content, /if \(item\?\.uniqueKey\) return item\.uniqueKey;/, 'Must use stable uniqueKey to prevent key shift on section expand');
+    assert.match(content, /disableAutoLayout=\{true\}/, 'Must disable AutoLayoutView on single-column list to prevent Android native crash');
     assert.match(content, /drawDistance=\{Platform\.OS === 'web' \? 400 : 250\}/, 'Must use conservative drawDistance on mobile');
     assert.match(content, /ListHeaderComponent=\{renderListSummaryBar\}/, 'Must wire summary bar into ListHeaderComponent to scroll with tasks');
   });
@@ -1178,6 +1188,30 @@ describe('Hardware Peak Guard & Automated Memory Hooks', () => {
     assert.match(content, /useMemoryPressureGuard/, 'DevLogsScreen must import and use useMemoryPressureGuard');
     assert.match(content, /CRITICAL HARDWARE NUMBERS & THRESHOLDS/, 'DevLogsScreen must render hardware threshold reference guide');
     assert.match(content, /Run Emergency RAM Flush & GC/, 'DevLogsScreen must provide manual emergency flush trigger');
+  });
+
+  test('BoardScreen protects large section expansion (e.g. 111 missed tasks) via progressive batching, stable keys, and disableAutoLayout', () => {
+    const boardPath = path.resolve('src/screens/BoardScreen.js');
+    const content = fs.readFileSync(boardPath, 'utf8');
+
+    assert.match(content, /INITIAL_SECTION_PAGE_SIZE/, 'BoardScreen must batch initial visible rows per section');
+    assert.match(content, /type:\s*'show_more'/, 'BoardScreen must render a show_more pagination row when section exceeds page size');
+    assert.match(content, /disableAutoLayout=\{true\}/, 'BoardScreen FlashList must disable AutoLayoutView to prevent Android native dispatchDraw crash');
+    assert.doesNotMatch(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'BoardScreen FlashList must not combine removeClippedSubviews with FlashList');
+  });
+
+  test('TaskAlarmReceiver uses full screen only when phone is locked and popup with sound when phone is active', () => {
+    const receiverPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/TaskAlarmReceiver.kt');
+    const receiverContent = fs.readFileSync(receiverPath, 'utf8');
+
+    assert.match(receiverContent, /val isFullScreenMode = !isInteractive \|\| isLocked/, 'Must only enter full screen mode when screen is off or keyguard is locked');
+    assert.match(receiverContent, /val activeChannelId = if \(isCar\) "task_car_silent_channel_v1" else channelId/, 'Must post directly to the configured sound channelId');
+    assert.match(receiverContent, /if \(isFullScreenMode\) \{\s*notificationBuilder\.setFullScreenIntent/s, 'Must only attach setFullScreenIntent when phone is locked');
+    assert.match(receiverContent, /Notification\.FLAG_INSISTENT/, 'Must set FLAG_INSISTENT so alarm audio plays when minimized or closed');
+
+    const modulePath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
+    const moduleContent = fs.readFileSync(modulePath, 'utf8');
+    assert.match(moduleContent, /deleteNotificationChannel/, 'Must purge legacy silent _fs_v / _popup_v channels');
   });
 });
 
