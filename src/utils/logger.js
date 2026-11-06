@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FastStorage } from './fastStorage';
 
 let logs = [];
 const listeners = new Set();
@@ -53,7 +53,7 @@ const persistLogsToStorage = () => {
   saveLogsTimeout = setTimeout(async () => {
     try {
       const sliceToPersist = logs.slice(0, MAX_PERSISTED_LOGS);
-      await AsyncStorage.setItem(STORAGE_KEY_DEV_LOGS, JSON.stringify(sliceToPersist));
+      await FastStorage.setItem(STORAGE_KEY_DEV_LOGS, JSON.stringify(sliceToPersist));
     } catch (e) {
       // Avoid recursive logging on storage failure
     }
@@ -64,7 +64,7 @@ export const DevLogger = {
   init: async () => {
     if (isInitialized) return logs;
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY_DEV_LOGS);
+      const stored = await FastStorage.getItem(STORAGE_KEY_DEV_LOGS, { migratePlainOnHit: true });
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -114,7 +114,7 @@ export const DevLogger = {
     logs = [];
     if (saveLogsTimeout) clearTimeout(saveLogsTimeout);
     try {
-      await AsyncStorage.removeItem(STORAGE_KEY_DEV_LOGS);
+      await FastStorage.removeItem(STORAGE_KEY_DEV_LOGS);
     } catch (e) {}
     listeners.forEach(listener => listener([]));
   },

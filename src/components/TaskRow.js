@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, Keyboard, Platform, Dimensions } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Keyboard, Platform, Dimensions } from 'react-native';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSequence, withSpring } from 'react-native-reanimated';
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
 import ConfirmModal from './ConfirmModal';
+import ReanimatedSwipeRow from './ReanimatedSwipeRow';
+import { useTaskRowConfig } from './TaskRowConfigContext';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
 import dayjs from 'dayjs';
@@ -129,6 +131,89 @@ const SYSTEM_USES_24H = (() => {
   }
 })();
 
+// Bounded O(1) caches shared across rows & BoardScreen to avoid per-frame regex & dayjs allocations
+const PRICE_PARSE_CACHE = new Map();
+const DUE_DATE_CACHE = new Map();
+const TIME_DISPLAY_CACHE = new Map();
+
+export function getCachedTaskAmount(t) {
+  if (!t) return 0;
+  if (t.itemPrice !== undefined && t.itemPrice !== null && !isNaN(Number(t.itemPrice))) {
+    return Number(t.itemPrice);
+  }
+  if (t.amount !== undefined && t.amount !== null && !isNaN(Number(t.amount))) {
+    return Number(t.amount);
+  }
+  const name = String(t.taskname || t.name || '');
+  if (!name || !name.includes('$')) return 0;
+  const cached = PRICE_PARSE_CACHE.get(name);
+  if (cached !== undefined) return cached;
+  const match = name.match(/\$(\d+(?:\.\d{1,2})?)/);
+  const parsed = match ? (parseFloat(match[1]) || 0) : 0;
+  if (PRICE_PARSE_CACHE.size > 1000) PRICE_PARSE_CACHE.clear();
+  PRICE_PARSE_CACHE.set(name, parsed);
+  return parsed;
+}
+
+const INVALID_DUE_DATE_INFO = Object.freeze({
+  isValid: false,
+  isDifferentYear: false,
+  yearStr: '',
+  shortDateStr: '',
+});
+
+function getCachedDueDateInfo(rawDueDate) {
+  if (!rawDueDate) return INVALID_DUE_DATE_INFO;
+  const currentYear = new Date().getFullYear();
+  const cacheKey = `${currentYear}_${rawDueDate}`;
+  const cached = DUE_DATE_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const parsed = dayjs(rawDueDate);
+  if (!parsed.isValid()) {
+    if (DUE_DATE_CACHE.size > 500) DUE_DATE_CACHE.clear();
+    DUE_DATE_CACHE.set(cacheKey, INVALID_DUE_DATE_INFO);
+    return INVALID_DUE_DATE_INFO;
+  }
+  const yr = parsed.year();
+  const info = {
+    isValid: true,
+    isDifferentYear: yr !== currentYear,
+    yearStr: String(yr),
+    shortDateStr: parsed.format('MMM D'),
+  };
+  if (DUE_DATE_CACHE.size > 500) DUE_DATE_CACHE.clear();
+  DUE_DATE_CACHE.set(cacheKey, info);
+  return info;
+}
+
+function getCachedDisplayTime(timeStr) {
+  if (!timeStr || timeStr === '--:--') return '--:--';
+  const cacheKey = `${SYSTEM_USES_24H ? '24' : '12'}_${timeStr}`;
+  const cached = TIME_DISPLAY_CACHE.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  try {
+    const [h, m] = timeStr.split(':');
+    if (!h || !m || isNaN(h) || isNaN(m)) return timeStr;
+    let hour = parseInt(h, 10);
+    let ampm = '';
+    if (!SYSTEM_USES_24H) {
+      ampm = hour >= 12 ? ' PM' : ' AM';
+      if (hour > 12) hour -= 12;
+      if (hour === 0) hour = 12;
+    } else {
+      hour = hour.toString().padStart(2, '0');
+    }
+    const formatted = `${hour}:${m.padStart(2, '0')}${ampm}`;
+    if (TIME_DISPLAY_CACHE.size > 300) TIME_DISPLAY_CACHE.clear();
+    TIME_DISPLAY_CACHE.set(cacheKey, formatted);
+    return formatted;
+  } catch {
+    return timeStr;
+  }
+}
+
 let activeOpenSwipeable = null;
 export const closeOpenSwipeableRow = () => {
   if (activeOpenSwipeable) {
@@ -139,26 +224,57 @@ export const closeOpenSwipeableRow = () => {
   }
 };
 
-const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
+function areTaskRowPropsEqual(prev, next) {
+  return (
+    prev.task === next.task &&
+    prev.sectionId === next.sectionId &&
+    prev.isSelectionMode === next.isSelectionMode &&
+    prev.isSelected === next.isSelected &&
+    prev.hideDate === next.hideDate &&
+    prev.hideBoardBadge === next.hideBoardBadge &&
+    prev.hideUnderline === next.hideUnderline &&
+    prev.disableInlineEdit === next.disableInlineEdit &&
+    prev.boardTypeProp === next.boardTypeProp &&
+    prev.testIDPrefix === next.testIDPrefix &&
+    prev.onPress === next.onPress &&
+    prev.onLongPress === next.onLongPress &&
+    prev.onToggleSelect === next.onToggleSelect &&
+    prev.onPressSnooze === next.onPressSnooze &&
+    prev.onPressMore === next.onPressMore
+  );
+}
+
+const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, boardTypeProp, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  const taskNameWrap = useSelector(state => state.themeReducer?.taskNameWrap || 'nowrap');
-  const fontSizeSetting = useSelector(state => state.themeReducer?.fontSize || 'normal');
-  const boards = useSelector(state => state.userReducer?.boards ?? EMPTY_BOARDS);
+  // Read shared preferences & O(1) board maps from single top-level context (0 per-row Redux subscriptions)
+  const { taskNameWrap, fontSizeSetting, boards, boardsByIdMap, boardColorsMap } = useTaskRowConfig();
 
   const titleFontSize = fontSizeSetting === 'small' ? 13 : fontSizeSetting === 'big' ? 18 : 15;
 
   const taskTitleText = task?.taskname || task?.name || '';
+  const taskIdKey = task?.id || task?._id;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(taskTitleText);
   const [cursorSelection, setCursorSelection] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const kebabOpacity = useRef(new Animated.Value(1)).current;
   const swipeableRef = useRef(null);
+  const checkboxScale = useSharedValue(1);
+  const checkboxAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkboxScale.value }],
+  }));
+
+  // Reset inline editing cleanly if virtualized list recycles this component for another task
+  const prevTaskIdRef = useRef(taskIdKey);
+  if (prevTaskIdRef.current !== taskIdKey) {
+    prevTaskIdRef.current = taskIdKey;
+    if (isEditing) {
+      setIsEditing(false);
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -171,30 +287,18 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   const isRepeatingTask = !!(task?.recurringSeriesId || task?.isRecurring || (task?.repeatConfig && task?.repeatConfig?.preset && task?.repeatConfig?.preset !== 'None') || (task?.repeatFrequency && task?.repeatFrequency !== 'None'));
 
   const currentBoard = useMemo(() => {
-    if (!task || !boards || boards.length === 0) return null;
+    if (boardTypeProp) return null;
+    if (!task) return null;
     const bId = task.boardId || task.board_id;
-    return boards.find(b => b && (b.id === bId || b._id === bId));
-  }, [boards, task?.boardId, task?.board_id]);
-  const boardType = currentBoard?.type || 'standard';
-
-  const getTaskAmount = useCallback((t) => {
-    if (!t) return 0;
-    if (t?.itemPrice !== undefined && t?.itemPrice !== null && !isNaN(Number(t.itemPrice))) {
-      return Number(t.itemPrice);
-    }
-    if (t?.amount !== undefined && t?.amount !== null && !isNaN(Number(t.amount))) {
-      return Number(t.amount);
-    }
-    const name = String(t?.taskname || t?.name || '');
-    const match = name.match(/\$(\d+(?:\.\d{1,2})?)/);
-    if (match) {
-      return parseFloat(match[1]);
-    }
-    return 0;
-  }, []);
+    if (!bId) return null;
+    const fastHit = boardsByIdMap?.get(String(bId));
+    if (fastHit) return fastHit;
+    return boards?.find?.(b => b && (b.id === bId || b._id === bId)) || null;
+  }, [boardTypeProp, boardsByIdMap, boards, task?.boardId, task?.board_id]);
+  const boardType = boardTypeProp || currentBoard?.type || 'standard';
 
   const itemQty = task?.itemQuantity !== undefined && !isNaN(Number(task.itemQuantity)) ? Math.max(1, Number(task.itemQuantity)) : 1;
-  const unitPrice = getTaskAmount(task);
+  const unitPrice = getCachedTaskAmount(task);
   const itemTotal = unitPrice > 0 ? (itemQty * unitPrice).toFixed(2) : null;
 
   const [confirmConfig, setConfirmConfig] = useState({
@@ -211,15 +315,19 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   });
 
   const closeSwipeable = useCallback(() => {
-    Animated.timing(kebabOpacity, { toValue: 1, duration: 80, useNativeDriver: true }).start();
     if (swipeableRef.current) {
       swipeableRef.current.close();
     }
-  }, [kebabOpacity]);
+  }, []);
 
   const handleToggleComplete = useCallback(() => {
     if (!task) return;
     const newCompletedState = !task.completed;
+    // UI-thread 60/120 FPS tactile pop animation on checkbox
+    checkboxScale.value = withSequence(
+      withSpring(1.22, { damping: 12, stiffness: 380 }),
+      withSpring(1, { damping: 14, stiffness: 280 })
+    );
     const habitUpdates = boardType === 'habits' ? (
       newCompletedState ? {
         habitStreak: (task.habitStreak || 0) + 1,
@@ -318,84 +426,67 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   const screenWidth = Dimensions.get('window').width;
   // Trigger completion reliably at horizontal median (~35%-40% of screen width, max 160px)
   const middleCompleteThreshold = Math.min(160, Math.round(screenWidth * 0.38));
+  const rightActionsWidth = onPressMore ? 144 : 106;
 
-  const renderLeftActions = useCallback((progress, dragX) => {
-    if (!dragX || typeof dragX.interpolate !== 'function') return null;
-    const scale = dragX.interpolate({
-      inputRange: [0, middleCompleteThreshold * 0.5, middleCompleteThreshold],
-      outputRange: [0.75, 1, 1.1],
-      extrapolate: 'clamp',
-    });
-    const opacity = dragX.interpolate({
-      inputRange: [0, 20, 50],
-      outputRange: [0, 0.4, 1],
-      extrapolate: 'clamp',
-    });
-    const transX = dragX.interpolate({
-      inputRange: [0, middleCompleteThreshold],
-      outputRange: [-24, 0],
-      extrapolate: 'clamp',
-    });
+  const renderLeftDrawer = useCallback((animStyle) => {
     return (
       <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]}>
-        <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, { opacity, transform: [{ scale }, { translateX: transX }] }]}>
+        <Reanimated.View style={[{ flexDirection: 'row', alignItems: 'center' }, animStyle]}>
           <View style={styles.leftActionIconWrapper}>
             <SwipeIconComplete color={colors.primary} />
           </View>
           <Text style={[styles.actionText, { color: colors.primary, marginLeft: 8 }]}>{t('Complete')}</Text>
-        </Animated.View>
+        </Reanimated.View>
       </View>
     );
-  }, [colors.surfaceContainer, colors.borderColor, colors.primary, t, middleCompleteThreshold, hideUnderline]);
+  }, [colors.surfaceContainer, colors.borderColor, colors.primary, t, hideUnderline]);
 
-  const renderRightActions = useCallback((progress, dragX) => {
-    if (!dragX || typeof dragX.interpolate !== 'function') return null;
-    const scale = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [1, 0],
-      extrapolate: 'clamp',
-    });
+  const renderRightDrawer = useCallback((animStyle) => {
     return (
-      <View style={[styles.rightActionContainer, { borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]}>
-        <TouchableOpacity
-          style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]}
-          onPress={handleSwipeSnooze}
-          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('Snooze task') || 'Snooze task'}
-          accessibilityHint={t('Opens menu to postpone or reschedule task') || 'Opens menu to postpone or reschedule task'}
-        >
-          <Animated.View style={{ transform: [{ scale }] }}>
-            <SwipeIconSnooze color={colors.textPrimary} />
-          </Animated.View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainerHigh }]}
-          onPress={handleSwipeDelete}
-          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('Delete task') || 'Delete task'}
-          accessibilityHint={t('Permanently deletes this task') || 'Permanently deletes this task'}
-        >
-          <Animated.View style={{ transform: [{ scale }] }}>
-            <SwipeIconDelete color="#f44336" />
-          </Animated.View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.rightActionKebabBtn, { backgroundColor: colors.surfaceContainer }]}
-          onPress={handleSwipeMore}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('Task options') || 'Task options'}
-          accessibilityHint={t('Opens actions menu') || 'Opens actions menu'}
-        >
-          <Animated.View style={{ transform: [{ scale }] }}>
-            <IconDotsVertical color={colors.textSecondary} size={18} />
-          </Animated.View>
-        </TouchableOpacity>
+      <View style={[styles.rightActionOverlay]}>
+        <View style={[styles.rightActionContainer, { borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]}>
+          <TouchableOpacity
+            style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]}
+            onPress={handleSwipeSnooze}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('Snooze task') || 'Snooze task'}
+            accessibilityHint={t('Opens menu to postpone or reschedule task') || 'Opens menu to postpone or reschedule task'}
+          >
+            <Reanimated.View style={animStyle}>
+              <SwipeIconSnooze color={colors.textPrimary} />
+            </Reanimated.View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainerHigh }]}
+            onPress={handleSwipeDelete}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('Delete task') || 'Delete task'}
+            accessibilityHint={t('Permanently deletes this task') || 'Permanently deletes this task'}
+          >
+            <Reanimated.View style={animStyle}>
+              <SwipeIconDelete color="#f44336" />
+            </Reanimated.View>
+          </TouchableOpacity>
+          {onPressMore ? (
+            <TouchableOpacity
+              style={[styles.rightActionKebabBtn, { backgroundColor: colors.surfaceContainer }]}
+              onPress={handleSwipeMore}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('Task options') || 'Task options'}
+              accessibilityHint={t('Opens actions menu') || 'Opens actions menu'}
+            >
+              <Reanimated.View style={animStyle}>
+                <IconDotsVertical color={colors.textSecondary} size={18} />
+              </Reanimated.View>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     );
-  }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.borderColor, colors.textPrimary, colors.textSecondary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore, hideUnderline]);
+  }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.borderColor, colors.textPrimary, colors.textSecondary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore, onPressMore, hideUnderline, t]);
 
   const isCompletedSection = sectionId === 'completed' || !!task?.completed;
 
@@ -464,32 +555,6 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
     }));
   }, [getEffectiveHabitCategory, task.id, task._id, dispatch]);
 
-  const formatDisplayTime = (timeStr) => {
-    if (!timeStr || timeStr === '--:--') return '--:--';
-    try {
-      const [h, m] = timeStr.split(':');
-      if (!h || !m || isNaN(h) || isNaN(m)) return timeStr;
-      
-      const is24Hour = SYSTEM_USES_24H;
-      let hour = parseInt(h, 10);
-      let ampm = '';
-      
-      if (!is24Hour) {
-        ampm = hour >= 12 ? ' PM' : ' AM';
-        if (hour > 12) hour -= 12;
-        if (hour === 0) hour = 12;
-      } else {
-        hour = hour.toString().padStart(2, '0');
-      }
-      
-      return `${hour}:${m.padStart(2, '0')}${ampm}`;
-    } catch {
-      return timeStr;
-    }
-  };
-
-
-
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case 'high': return '#B3261E';
@@ -500,31 +565,19 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   };
 
   const rawDueDate = task.completionDate || task.dateString || task.dueDate || task.date;
-  const dueDateInfo = useMemo(() => {
-    if (!rawDueDate) return { isValid: false, isDifferentYear: false, yearStr: '', shortDateStr: '' };
-    const parsed = dayjs(rawDueDate);
-    if (!parsed.isValid()) return { isValid: false, isDifferentYear: false, yearStr: '', shortDateStr: '' };
-    const currentYear = new Date().getFullYear();
-    const yr = parsed.year();
-    return {
-      isValid: true,
-      isDifferentYear: yr !== currentYear,
-      yearStr: String(yr),
-      shortDateStr: parsed.format('MMM D'),
-    };
-  }, [rawDueDate]);
+  const dueDateInfo = getCachedDueDateInfo(rawDueDate);
   const isDueDateValid = dueDateInfo.isValid;
   const priorityColor = getPriorityColor(task.priority);
   const hasNotes = (task.description?.text && task.description.text.trim() !== '') || (task.description?.img && task.description.img.trim() !== '') || (task.description?.attachments && task.description.attachments.length > 0);
   const subtasks = task.subtasks || [];
   const totalSubtasksCount = subtasks.length;
-  const completedSubtasksCount = subtasks.filter(s => s.completed).length;
+  const completedSubtasksCount = totalSubtasksCount > 0 ? subtasks.filter(s => s.completed).length : 0;
   const hasSubtasks = totalSubtasksCount > 0;
 
   const taskBoardId = task.boardId || 'main';
-  const taskBoard = !hideBoardBadge ? boards.find(b => b.id === taskBoardId) : null;
+  const taskBoard = !hideBoardBadge ? (boardsByIdMap?.get(String(taskBoardId)) || boards?.find?.(b => b.id === taskBoardId)) : null;
   const boardName = !hideBoardBadge ? (taskBoard ? (taskBoard.name === 'Main' ? t('Main') : taskBoard.name) : (taskBoardId === 'main' ? t('Main') : 'Board')) : '';
-  const boardColor = !hideBoardBadge ? getBoardColor(taskBoardId, boards) : null;
+  const boardColor = !hideBoardBadge ? (boardColorsMap?.get(String(taskBoardId)) || getBoardColor(taskBoardId, boards)) : null;
 
   const handleLongPress = useCallback(() => {
     closeOpenSwipeableRow();
@@ -551,8 +604,6 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         },
         hideUnderline && { borderBottomWidth: 0 }
       ]}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onLongPress={handleLongPress}
       onPress={() => {
         closeOpenSwipeableRow();
@@ -594,11 +645,13 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         }}
         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
       >
-        {isSelectionMode ? (
-          isSelected ? <IconCheckSquare color={colors.primary} /> : <IconSquare color={colors.textSecondary} />
-        ) : (
-          task.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />
-        )}
+        <Reanimated.View style={checkboxAnimStyle}>
+          {isSelectionMode ? (
+            isSelected ? <IconCheckSquare color={colors.primary} /> : <IconSquare color={colors.textSecondary} />
+          ) : (
+            task.completed ? <IconCheckCircle color={colors.primary} /> : <IconCircle color={colors.textSecondary} />
+          )}
+        </Reanimated.View>
       </TouchableOpacity>
       {/* Region 3: Content */}
       <View style={styles.content}>
@@ -674,7 +727,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
                 <IconClock color={colors.textSecondary} size={13} />
               )}
               <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                {formatDisplayTime(task.time)}
+                {getCachedDisplayTime(task.time)}
               </Text>
             </View>
           ) : (task.reminder && task.reminder !== 'None') ? (
@@ -894,45 +947,32 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
 
   return (
     <>
-      <Swipeable
+      <ReanimatedSwipeRow
         ref={swipeableRef}
-        renderLeftActions={renderLeftActions}
-        renderRightActions={renderRightActions}
-        onSwipeableLeftOpen={handleSwipeComplete}
-        onSwipeableWillOpen={(direction) => {
+        itemKey={taskIdKey}
+        enabled={!isSelectionMode && !isEditing}
+        leftThreshold={middleCompleteThreshold}
+        rightActionsWidth={rightActionsWidth}
+        rightThreshold={40}
+        renderLeftDrawer={renderLeftDrawer}
+        renderRightDrawer={renderRightDrawer}
+        onSwipeLeftOpen={handleSwipeComplete}
+        onWillOpen={() => {
           if (activeOpenSwipeable && activeOpenSwipeable !== swipeableRef.current) {
             try {
               activeOpenSwipeable.close();
             } catch (e) {}
           }
           activeOpenSwipeable = swipeableRef.current;
-          if (direction === 'right') {
-            Animated.timing(kebabOpacity, { toValue: 0, duration: 80, useNativeDriver: true }).start();
-          }
         }}
-        onSwipeableOpen={() => {
-          if (activeOpenSwipeable && activeOpenSwipeable !== swipeableRef.current) {
-            try {
-              activeOpenSwipeable.close();
-            } catch (e) {}
-          }
-          activeOpenSwipeable = swipeableRef.current;
-        }}
-        onSwipeableWillClose={() => {
-          Animated.timing(kebabOpacity, { toValue: 1, duration: 80, useNativeDriver: true }).start();
-        }}
-        onSwipeableClose={() => {
+        onClose={() => {
           if (activeOpenSwipeable === swipeableRef.current) {
             activeOpenSwipeable = null;
           }
-          Animated.timing(kebabOpacity, { toValue: 1, duration: 50, useNativeDriver: true }).start();
         }}
-        friction={1}
-        leftThreshold={middleCompleteThreshold}
-        rightThreshold={40}
       >
         {taskRowContent}
-      </Swipeable>
+      </ReanimatedSwipeRow>
       {confirmConfig.isVisible && (
         <ConfirmModal
           isVisible={confirmConfig.isVisible}
@@ -950,7 +990,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       )}
     </>
   );
-});
+}, areTaskRowPropsEqual);
 
 export default TaskRow;
 
@@ -1042,9 +1082,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   leftAction: {
-    flex: 1,
-    justifyContent: 'center',
-    marginLeft: '2.5%',
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginHorizontal: '2.5%',
     paddingLeft: 20,
     borderBottomWidth: 1,
     overflow: 'hidden',
@@ -1058,6 +1100,12 @@ const styles = StyleSheet.create({
   actionText: {
     fontWeight: '600',
     fontSize: 16,
+  },
+  rightActionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
   },
   rightActionContainer: {
     flexDirection: 'row',

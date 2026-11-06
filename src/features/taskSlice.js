@@ -128,10 +128,8 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
 
                 const mergedTasks = sortTasksChronologically(purgeOrphanedTasks(mergeTasks(unsyncedTasks, remoteTasks), boards));
                 const serializedMerged = JSON.stringify(mergedTasks);
-                await CryptoStorage.setItem(taskKey, serializedMerged);
-                if (taskKey !== 'tasks') {
-                    await CryptoStorage.setItem('tasks', serializedMerged);
-                }
+                const keysToWrite = taskKey !== 'tasks' ? [taskKey, 'tasks'] : [taskKey];
+                await CryptoStorage.setItemMultiKeys(keysToWrite, serializedMerged);
                 return mergedTasks;
             }
         } catch (err) {
@@ -141,10 +139,8 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
 
     const sortedLocal = sortTasksChronologically(localTasks);
     const serializedLocal = JSON.stringify(sortedLocal);
-    await CryptoStorage.setItem(taskKey, serializedLocal);
-    if (taskKey !== 'tasks' && Platform.OS !== 'web') {
-        await CryptoStorage.setItem('tasks', serializedLocal);
-    }
+    const localKeysToWrite = (taskKey !== 'tasks' && Platform.OS !== 'web') ? [taskKey, 'tasks'] : [taskKey];
+    await CryptoStorage.setItemMultiKeys(localKeysToWrite, serializedLocal);
     return sortedLocal;
 });
 
@@ -595,6 +591,7 @@ export const { hydrateTaskState, addTaskSync, addMultipleTasksSync, deleteTaskSy
 
 let saveStorageTimeout = null;
 let lastTasksToSave = null;
+let lastPersistedJsonByKey = new Map();
 let syncAutomationsTimeout = null;
 
 export const persistTasksToStorage = (tasks, getState) => {
@@ -610,15 +607,17 @@ export const persistTasksToStorage = (tasks, getState) => {
                     key = getTaskStorageKey(getState());
                 }
                 const serialized = JSON.stringify(lastTasksToSave);
-                await CryptoStorage.setItem(key, serialized);
-                if (key !== 'tasks' && Platform.OS !== 'web') {
-                    await CryptoStorage.setItem('tasks', serialized);
+                if (lastPersistedJsonByKey.get(key) === serialized) {
+                    return;
                 }
+                const keysToSave = (key !== 'tasks' && Platform.OS !== 'web') ? [key, 'tasks'] : [key];
+                await CryptoStorage.setItemMultiKeys(keysToSave, serialized);
+                keysToSave.forEach(k => lastPersistedJsonByKey.set(k, serialized));
             }
         } catch (e) {
-            console.error('Error saving tasks to AsyncStorage:', e);
+            console.error('Error saving tasks to storage:', e);
         }
-    }, 350);
+    }, 300);
 };
 
 export const flushPendingTaskSaves = async (getState) => {
@@ -631,10 +630,12 @@ export const flushPendingTaskSaves = async (getState) => {
         if (tasks) {
             const key = getState ? getTaskStorageKey(getState()) : 'tasks';
             const serialized = JSON.stringify(tasks);
-            await CryptoStorage.setItem(key, serialized);
-            if (key !== 'tasks') {
-                await CryptoStorage.setItem('tasks', serialized);
+            if (lastPersistedJsonByKey.get(key) === serialized) {
+                return;
             }
+            const keysToSave = key !== 'tasks' ? [key, 'tasks'] : [key];
+            await CryptoStorage.setItemMultiKeys(keysToSave, serialized);
+            keysToSave.forEach(k => lastPersistedJsonByKey.set(k, serialized));
         }
     } catch (e) {
         console.error('Error flushing tasks to storage:', e);

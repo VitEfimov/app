@@ -40,6 +40,7 @@ import { HapticHelper } from './src/utils/hapticHelper';
 import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
 import { ToastProvider } from './src/styles/ToastContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { TaskRowConfigProvider } from './src/components/TaskRowConfigContext';
 
 // WCAG 1.4.4: Configure global font scaling upper bound to prevent UI clipping
 A11yHelper.configureGlobalFontScaling(1.5);
@@ -545,7 +546,7 @@ function InitApp() {
         if (!task) {
           const { getTaskStorageKey } = require('./src/features/taskSlice');
           const taskKey = getTaskStorageKey(state);
-          const tasksJson = await AsyncStorage.getItem(taskKey) || await AsyncStorage.getItem('tasks') || await AsyncStorage.getItem('tasks_guest');
+          const tasksJson = await CryptoStorage.getItem(taskKey) || await CryptoStorage.getItem('tasks') || await CryptoStorage.getItem('tasks_guest');
           if (tasksJson) {
             try {
               const parsedTasks = JSON.parse(tasksJson);
@@ -708,7 +709,9 @@ export default function App() {
             <RootWrapper>
               <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
                 <SafeAreaProvider>
-                  <InitApp />
+                  <TaskRowConfigProvider>
+                    <InitApp />
+                  </TaskRowConfigProvider>
                 </SafeAreaProvider>
               </GestureHandlerRootView>
             </RootWrapper>

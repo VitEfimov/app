@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { LegendList } from '@legendapp/list/react-native';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
-import TaskRow, { closeOpenSwipeableRow, cancelAllInlineEditing } from '../components/TaskRow';
+import TaskRow, { closeOpenSwipeableRow, cancelAllInlineEditing, getCachedTaskAmount } from '../components/TaskRow';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
 import SnoozeModal from '../components/SnoozeModal';
@@ -246,19 +246,7 @@ export default function BoardScreen({ route, navigation }) {
     setExpensesPeriodFilter('month');
   }, [activeBoardId]);
 
-  const getTaskAmount = useCallback((task) => {
-    if (!task) return 0;
-    if (task.itemPrice !== undefined && task.itemPrice !== null && !isNaN(Number(task.itemPrice))) {
-      return Number(task.itemPrice);
-    }
-    const title = task.taskname || task.name || '';
-    const match = title.match(/\$(\d+(?:\.\d{1,2})?)/);
-    if (match) {
-      const parsed = parseFloat(match[1]);
-      return isNaN(parsed) ? 0 : parsed;
-    }
-    return 0;
-  }, []);
+  const getTaskAmount = getCachedTaskAmount;
 
   const getHabitTimeCategory = useCallback((task) => {
     if (!task) return 'Anytime';
@@ -1297,11 +1285,13 @@ export default function BoardScreen({ route, navigation }) {
     if (item.type === 'task') {
       const task = item.task;
       const section = item.section;
-      const isListBoard = ['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeBoard?.type);
+      const activeType = activeBoard?.type || 'standard';
+      const isListBoard = ['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeType);
       return (
         <TaskRow 
           task={task} 
           sectionId={section.id}
+          boardTypeProp={activeType}
           hideDate={isListBoard}
           hideBoardBadge={true}
           isSelectionMode={selectionMode.isActive}
@@ -1348,7 +1338,7 @@ export default function BoardScreen({ route, navigation }) {
     isMoveBoardVisible || 
     isGoogleDrawerOpen;
 
-  const renderListSummaryBar = () => {
+  const renderListSummaryBar = useCallback(() => {
     const type = activeBoard?.type;
     if (!['grocery', 'shopping', 'expenses', 'packing', 'habits', 'media'].includes(type)) {
       return null;
@@ -1707,7 +1697,7 @@ export default function BoardScreen({ route, navigation }) {
     }
 
     return null;
-  };
+  }, [activeBoard?.type, boardTasks, colors.bgCard, colors.borderColor, colors.primary, colors.textPrimary, colors.textSecondary, dispatch, expensesPeriodFilter, getTaskAmount, isDark, listFilterCategory, showToast, t, windowWidth]);
 
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
@@ -1825,8 +1815,8 @@ export default function BoardScreen({ route, navigation }) {
           </ScrollView>
         </View>
 
-      <FlashList
-        key={activeBoardId}
+      <LegendList
+        dataKey={activeBoardId}
         data={flattenedData}
         extraData={flashListExtraData}
         ListHeaderComponent={renderListSummaryBar}
@@ -1839,13 +1829,15 @@ export default function BoardScreen({ route, navigation }) {
           return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
         }}
         getItemType={(item) => item.type}
+        recycleItems={true}
+        maintainVisibleContentPosition={false}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={undefined}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={closeOpenSwipeableRow}
-        estimatedItemSize={70}
+        estimatedItemSize={66}
         drawDistance={Platform.OS === 'web' ? 400 : 250}
         disableAutoLayout={true}
       />

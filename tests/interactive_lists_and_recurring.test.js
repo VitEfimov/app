@@ -1256,6 +1256,124 @@ describe('Hardware Peak Guard & Automated Memory Hooks', () => {
   });
 });
 
+// ==============================================================================
+// 14. MODERN PERFORMANCE ARCHITECTURE: MMKV JSI, LEGENDLIST & UI-THREAD GESTURES
+// ==============================================================================
+describe('Modern Performance Architecture: MMKV JSI, LegendList & UI-Thread Gestures', () => {
+  test('FastStorage & CryptoStorage leverage native MMKV JSI with transparent AsyncStorage migration and tamper safety', async () => {
+    const legacyAsyncStore = {};
+    const mmkvBacking = new Map();
+
+    class MockMMKV {
+      constructor({ id, encryptionKey } = {}) {
+        this.id = id || 'default';
+        this.encryptionKey = encryptionKey || null;
+        if (!mmkvBacking.has(this.id)) mmkvBacking.set(this.id, new Map());
+        this.map = mmkvBacking.get(this.id);
+      }
+      getString(k) {
+        return this.map.has(k) ? this.map.get(k) : undefined;
+      }
+      set(k, v) {
+        this.map.set(k, String(v));
+      }
+      delete(k) {
+        this.map.delete(k);
+      }
+      clearAll() {
+        this.map.clear();
+      }
+    }
+
+    const mockAsyncStorage = {
+      setItem: async (k, v) => { legacyAsyncStore[k] = String(v); },
+      getItem: async (k) => (legacyAsyncStore[k] !== undefined ? legacyAsyncStore[k] : null),
+      multiGet: async (keys) => keys.map(k => [k, legacyAsyncStore[k] !== undefined ? legacyAsyncStore[k] : null]),
+      removeItem: async (k) => { delete legacyAsyncStore[k]; },
+      clear: async () => { Object.keys(legacyAsyncStore).forEach(k => delete legacyAsyncStore[k]); },
+    };
+
+    // 1. Seed a legacy encrypted payload in AsyncStorage before enabling MMKV
+    global.__TEST_ENABLE_MMKV__ = false;
+    const legacyCryptoMod = loadTranspiledModule(path.resolve('src/utils/cryptoStorage.js'), {
+      '@react-native-async-storage/async-storage': mockAsyncStorage,
+    });
+    legacyCryptoMod.CryptoStorage._resetKeyForTesting();
+    const legacyTasks = [{ id: 'legacy_mmkv_1', taskname: 'Migrate me seamlessly' }];
+    await legacyCryptoMod.CryptoStorage.setItem('tasks_guest', JSON.stringify(legacyTasks));
+    assert.ok(legacyAsyncStore['tasks_guest'].includes('__enc__'), 'Legacy AsyncStorage must hold AES envelope');
+
+    // 2. Enable native JSI MMKV and verify transparent auto-migration + native encrypted vault
+    global.__TEST_ENABLE_MMKV__ = true;
+    try {
+      const mmkvCryptoMod = loadTranspiledModule(path.resolve('src/utils/cryptoStorage.js'), {
+        '@react-native-async-storage/async-storage': mockAsyncStorage,
+        'react-native-mmkv': { MMKV: MockMMKV },
+      });
+      const { CryptoStorage } = mmkvCryptoMod;
+      CryptoStorage._resetKeyForTesting();
+
+      assert.strictEqual(CryptoStorage.isNativeMMKVActive(), true, 'Native MMKV must be active when JSI is available');
+
+      // First getItem transparently decrypts from AsyncStorage and migrates into MMKV secure vault
+      const migratedJson = await CryptoStorage.getItem('tasks_guest');
+      assert.deepStrictEqual(JSON.parse(migratedJson), legacyTasks);
+
+      const secureVault = mmkvBacking.get('taskcalendar-secure-v1');
+      assert.ok(secureVault && secureVault.has('tasks_guest'), 'Legacy tasks_guest must be auto-migrated into MMKV secure store');
+
+      // setItemMultiKeys writes multiple keys synchronously into MMKV
+      const updatedTasks = [{ id: 'fast_1', taskname: 'Zero-bridge C++ MMKV write' }];
+      await CryptoStorage.setItemMultiKeys(['tasks_guest', 'tasks'], JSON.stringify(updatedTasks));
+      assert.deepStrictEqual(JSON.parse(await CryptoStorage.getItem('tasks_guest')), updatedTasks);
+      assert.deepStrictEqual(JSON.parse(await CryptoStorage.getItem('tasks')), updatedTasks);
+
+      // Tamper canary in AsyncStorage is still caught and rejected safely
+      legacyAsyncStore['@chaos_tamper_canary'] = JSON.stringify({
+        __enc__: true,
+        v: 1,
+        iv: '0102030405060708090a0b0c0d0e0f10',
+        ct: 'deadbeefcafebabe',
+        mac: 'badc0ffee0000000000000000000000000000000000000000000000000000000',
+      });
+      const tamperedRes = await CryptoStorage.getItem('@chaos_tamper_canary');
+      assert.strictEqual(tamperedRes, null, 'Tampered ciphertext must still return null when MMKV is active');
+    } finally {
+      delete global.__TEST_ENABLE_MMKV__;
+    }
+  });
+
+  test('BoardScreen upgrades virtualized list to @legendapp/list LegendList with recycling and pooled dataKey', () => {
+    const boardPath = path.resolve('src/screens/BoardScreen.js');
+    const content = fs.readFileSync(boardPath, 'utf8');
+
+    assert.match(content, /import\s*\{\s*LegendList\s*\}\s*from\s*['"]@legendapp\/list\/react-native['"]/, 'BoardScreen must import LegendList from @legendapp/list/react-native');
+    assert.match(content, /<LegendList/, 'BoardScreen must render LegendList');
+    assert.match(content, /dataKey=\{activeBoardId\}/, 'BoardScreen must pass dataKey={activeBoardId} to pool views across board switches without unmounting ScrollView');
+    assert.match(content, /recycleItems=\{true\}/, 'BoardScreen must enable view recycling');
+    assert.match(content, /boardTypeProp=\{activeType\}/, 'BoardScreen must pass boardTypeProp directly to TaskRow');
+  });
+
+  test('TaskRow eliminates per-row Redux useSelector hooks, uses UI-thread ReanimatedSwipeRow, and caches parsed prices', () => {
+    const taskRowPath = path.resolve('src/components/TaskRow.js');
+    const content = fs.readFileSync(taskRowPath, 'utf8');
+
+    assert.doesNotMatch(content, /useSelector\(/, 'TaskRow must have zero per-row Redux useSelector subscriptions');
+    assert.match(content, /useTaskRowConfig\(\)/, 'TaskRow must consume shared TaskRowConfigContext');
+    assert.match(content, /<ReanimatedSwipeRow/, 'TaskRow must use UI-thread ReanimatedSwipeRow instead of legacy JS Swipeable');
+    assert.match(content, /areTaskRowPropsEqual/, 'TaskRow must use custom O(1) React.memo comparator');
+
+    const swipePath = path.resolve('src/components/ReanimatedSwipeRow.js');
+    const swipeContent = fs.readFileSync(swipePath, 'utf8');
+    assert.match(swipeContent, /Gesture\.Pan\(\)/, 'ReanimatedSwipeRow must use RNGH v2 Gesture.Pan worklets');
+    assert.match(swipeContent, /actionsMounted/, 'ReanimatedSwipeRow must lazily mount background drawers only when swiped');
+
+    const appPath = path.resolve('App.js');
+    const appContent = fs.readFileSync(appPath, 'utf8');
+    assert.match(appContent, /<TaskRowConfigProvider>/, 'App.js must wrap InitApp in TaskRowConfigProvider');
+  });
+});
+
 
 
 

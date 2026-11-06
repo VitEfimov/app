@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FastStorage } from './fastStorage';
 import { Platform } from 'react-native';
 
 const STORAGE_KEY_CRASH_LOGS = '@system_crash_logs';
@@ -28,14 +28,14 @@ export const CrashLogger = {
   init: async () => {
     if (isInitialized) return memoryCrashLogs;
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY_CRASH_LOGS);
+      const stored = await FastStorage.getItem(STORAGE_KEY_CRASH_LOGS, { migratePlainOnHit: true });
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
           const filtered = parsed.filter(entry => !isBackgroundCacheEviction(entry));
           memoryCrashLogs = filtered;
           if (filtered.length !== parsed.length) {
-            AsyncStorage.setItem(STORAGE_KEY_CRASH_LOGS, JSON.stringify(filtered)).catch(() => {});
+            FastStorage.setItem(STORAGE_KEY_CRASH_LOGS, JSON.stringify(filtered)).catch(() => {});
           }
         }
       }
@@ -72,7 +72,7 @@ export const CrashLogger = {
             if (memoryCrashLogs.length > MAX_CRASH_LOGS) {
               memoryCrashLogs = memoryCrashLogs.slice(0, MAX_CRASH_LOGS);
             }
-            AsyncStorage.setItem(STORAGE_KEY_CRASH_LOGS, JSON.stringify(memoryCrashLogs)).catch(() => {});
+            FastStorage.setItem(STORAGE_KEY_CRASH_LOGS, JSON.stringify(memoryCrashLogs)).catch(() => {});
           }
         }
       }
@@ -107,7 +107,7 @@ export const CrashLogger = {
         memoryCrashLogs = memoryCrashLogs.slice(0, MAX_CRASH_LOGS);
       }
 
-      await AsyncStorage.setItem(STORAGE_KEY_CRASH_LOGS, JSON.stringify(memoryCrashLogs));
+      await FastStorage.setItem(STORAGE_KEY_CRASH_LOGS, JSON.stringify(memoryCrashLogs));
       listeners.forEach(fn => fn([...memoryCrashLogs]));
       return crashEntry;
     } catch (e) {
@@ -123,7 +123,7 @@ export const CrashLogger = {
   clearCrashLogs: async () => {
     memoryCrashLogs = [];
     try {
-      await AsyncStorage.removeItem(STORAGE_KEY_CRASH_LOGS);
+      await FastStorage.removeItem(STORAGE_KEY_CRASH_LOGS);
     } catch (e) {
       console.warn('[CrashLogger] Failed to clear storage:', e);
     }
