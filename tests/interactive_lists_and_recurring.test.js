@@ -1344,16 +1344,30 @@ describe('Modern Performance Architecture: MMKV JSI, LegendList & UI-Thread Gest
     }
   });
 
-  test('BoardScreen uses Hybrid Native ScrollView (<= 150 rows) + high-window Flexbox FlatList (> 150 rows) with memoized InlineAddTask', () => {
+  test('Expo SDK 52 + New Architecture (Fabric) + FlashList v2 + Hybrid Web/Legacy Scroll Engine are configured cleanly', () => {
+    const appJson = JSON.parse(fs.readFileSync(path.resolve('app.json'), 'utf8'));
+    assert.strictEqual(appJson.expo.newArchEnabled, true, 'app.json must enable newArchEnabled: true for Fabric');
+
+    const pkgJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+    assert.match(pkgJson.dependencies.expo, /52\./, 'package.json must target Expo SDK 52');
+    assert.match(pkgJson.dependencies['react-native'], /0\.76\./, 'package.json must target React Native 0.76');
+    assert.match(pkgJson.dependencies['@shopify/flash-list'], /\^2\./, 'package.json must use FlashList v2 for Fabric');
+    assert.match(pkgJson.dependencies['react-native-mmkv'], /\^3\./, 'package.json must use MMKV v3 TurboModule for New Architecture');
+
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
-    assert.match(content, /const NATIVE_SCROLL_ROW_LIMIT = 150;/, 'BoardScreen must use native ScrollView up to 150 visible rows');
-    assert.match(content, /useNativeScroll \?/, 'BoardScreen must switch between native ScrollView and high-window FlatList');
-    assert.match(content, /requestAnimationFrame\(/, 'BoardScreen must progressively mount native ScrollView items per animation frame');
+    assert.match(content, /require\(['"]@shopify\/flash-list['"]\)\.FlashList/, 'BoardScreen must load FlashList v2 on Native Fabric');
+    assert.match(content, /<FabricFlashList/, 'BoardScreen must render FabricFlashList when Fabric is active');
+    assert.match(content, /drawDistance=\{1500\}/, 'FabricFlashList must buffer 1500px ahead/behind viewport');
+    assert.match(content, /maintainVisibleContentPosition=\{\{\s*disabled:\s*true\s*\}\}/, 'FabricFlashList must use FlashList v2 maintainVisibleContentPosition object syntax');
+    assert.match(content, /const NATIVE_SCROLL_ROW_LIMIT = 150;/, 'BoardScreen must preserve progressive ScrollView fallback for Web / legacy clients');
     assert.match(content, /windowSize=\{21\}/, 'BoardScreen FlatList fallback must use windowSize={21}');
-    assert.match(content, /removeClippedSubviews=\{false\}/, 'BoardScreen must keep removeClippedSubviews={false} for zero blanking');
     assert.match(content, /boardTypeProp=\{activeType\}/, 'BoardScreen must pass boardTypeProp directly to TaskRow');
+
+    const fastStorageContent = fs.readFileSync(path.resolve('src/utils/fastStorage.js'), 'utf8');
+    assert.match(fastStorageContent, /nativeFabricUIManager/, 'FastStorage must detect Fabric JSI in Bridgeless mode');
+    assert.match(fastStorageContent, /RN\$Bridgeless/, 'FastStorage must detect RN 0.76 Bridgeless runtime');
 
     const inlineAddPath = path.resolve('src/components/InlineAddTask.js');
     const inlineAddContent = fs.readFileSync(inlineAddPath, 'utf8');

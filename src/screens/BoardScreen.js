@@ -40,6 +40,23 @@ if (Platform.OS !== 'web') {
   RNShare = require('react-native-share').default;
 }
 
+// Resolve @shopify/flash-list v2 when running on React Native New Architecture (Fabric).
+// On Web or inside a pre-rebuild legacy binary, cleanly falls back to DOM-clean ScrollView / FlatList.
+let FabricFlashList = null;
+const isNativeFabricActive =
+  Platform.OS !== 'web' &&
+  typeof global !== 'undefined' &&
+  (Boolean(global.nativeFabricUIManager) ||
+    Boolean(global.__turboModuleProxy) ||
+    global.RN$Bridgeless === true);
+if (isNativeFabricActive) {
+  try {
+    FabricFlashList = require('@shopify/flash-list').FlashList;
+  } catch (e) {
+    FabricFlashList = null;
+  }
+}
+
 // Responsive Web CSS for ultra-narrow screens (< 300px)
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   try {
@@ -1332,6 +1349,7 @@ export default function BoardScreen({ route, navigation }) {
     isNarrow: windowWidth < 300,
   }), [activeBoardId, activeAddSectionId, tasks.length, boardTasks, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary, expensesPeriodFilter, listFilterCategory, windowWidth]);
 
+  const flashListRef = useRef(null);
   const nativeScrollRef = useRef(null);
   const flatListRef = useRef(null);
   const prevScrolledBoardRef = useRef(activeBoardId);
@@ -1340,7 +1358,8 @@ export default function BoardScreen({ route, navigation }) {
     limit: PROGRESSIVE_INITIAL_BATCH,
   }));
 
-  const useNativeScroll = flattenedData.length <= NATIVE_SCROLL_ROW_LIMIT;
+  const useFabricFlashList = Boolean(FabricFlashList);
+  const useNativeScroll = !useFabricFlashList && flattenedData.length <= NATIVE_SCROLL_ROW_LIMIT;
   const effectiveProgressiveLimit =
     progressiveRenderState.boardId === activeBoardId
       ? progressiveRenderState.limit
@@ -1350,6 +1369,7 @@ export default function BoardScreen({ route, navigation }) {
     if (prevScrolledBoardRef.current !== activeBoardId) {
       prevScrolledBoardRef.current = activeBoardId;
       try {
+        flashListRef.current?.scrollToOffset?.({ offset: 0, animated: false });
         nativeScrollRef.current?.scrollTo?.({ y: 0, animated: false });
         flatListRef.current?.scrollToOffset?.({ offset: 0, animated: false });
       } catch (e) {}
@@ -1899,7 +1919,23 @@ export default function BoardScreen({ route, navigation }) {
           </ScrollView>
         </View>
 
-      {useNativeScroll ? (
+      {useFabricFlashList ? (
+        <FabricFlashList
+          ref={flashListRef}
+          data={flattenedData}
+          extraData={flashListExtraData}
+          ListHeaderComponent={renderListSummaryBar}
+          keyExtractor={(item, index) => extractBoardItemKey(item, index)}
+          getItemType={(item) => item.type}
+          renderItem={renderItem}
+          drawDistance={1500}
+          maintainVisibleContentPosition={{ disabled: true }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={closeOpenSwipeableRow}
+        />
+      ) : useNativeScroll ? (
         <ScrollView
           ref={nativeScrollRef}
           style={{ flex: 1 }}
