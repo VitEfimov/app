@@ -1239,6 +1239,21 @@ describe('Hardware Peak Guard & Automated Memory Hooks', () => {
     const userSliceContent = fs.readFileSync(userSlicePath, 'utf8');
     assert.match(userSliceContent, /const loadIsGuestFromLocalStorage = \(\) => \{[\s\S]*?return true;/, 'userSlice must default isGuest to true');
   });
+
+  test('CrashLogger and ExpoTaskAlarmModule ignore normal background OS cache eviction (Importance > 200) and DevLogsScreen memoizes payload metrics', () => {
+    const crashPath = path.resolve('src/utils/crashLogger.js');
+    const crashContent = fs.readFileSync(crashPath, 'utf8');
+    assert.match(crashContent, /isBackgroundCacheEviction/, 'CrashLogger must filter out background OS cache evictions (Importance > 200)');
+
+    const ktPath = path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/ExpoTaskAlarmModule.kt');
+    const ktContent = fs.readFileSync(ktPath, 'utf8');
+    assert.match(ktContent, /IMPORTANCE_VISIBLE/, 'ExpoTaskAlarmModule must only treat REASON_LOW_MEMORY as a crash when process was foreground/visible');
+
+    const devPath = path.resolve('src/screens/DevLogsScreen.js');
+    const devContent = fs.readFileSync(devPath, 'utf8');
+    assert.match(devContent, /const payloadMetrics = useMemo/, 'DevLogsScreen must memoize payloadMetrics');
+    assert.match(devContent, /filteredTasks\.slice\(0,\s*visibleTaskLimit\)/, 'DevLogsScreen must paginate task cards to avoid main-thread mount lag');
+  });
 });
 
 

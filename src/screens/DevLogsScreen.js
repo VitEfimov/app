@@ -93,6 +93,7 @@ export default function DevLogsScreen({ navigation }) {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [crashLogs, setCrashLogs] = useState([]);
   const [expandedCrashId, setExpandedCrashId] = useState(null);
+  const [visibleTaskLimit, setVisibleTaskLimit] = useState(30);
 
   const {
     status: memoryGuardStatus,
@@ -104,9 +105,13 @@ export default function DevLogsScreen({ navigation }) {
     peakHistory,
     triggerEmergencyCleanup,
   } = useMemoryPressureGuard({
-    intervalMs: 1500,
+    intervalMs: 2500,
     autoMitigateOnPeak: true,
+    enabled: activeTab === 'crashes' || activeTab === 'bottlenecks',
   });
+
+  const payloadMetrics = useMemo(() => ChaosTestHelper.getPayloadMetrics(tasks), [tasks]);
+  const chaosTaskCount = useMemo(() => tasks.filter(ChaosTestHelper.isChaosTask).length, [tasks]);
 
   const refreshHardwareMetrics = () => {
     MemoryPressureGuard.checkMemoryPressure();
@@ -697,7 +702,8 @@ export default function DevLogsScreen({ navigation }) {
                 No tasks match filter.
               </Text>
             ) : (
-              filteredTasks.map((t) => {
+              <>
+              {filteredTasks.slice(0, visibleTaskLimit).map((t) => {
                 const isExpanded = expandedTaskId === t.id;
                 const isMissed = isTaskMissed(t);
                 return (
@@ -823,7 +829,18 @@ export default function DevLogsScreen({ navigation }) {
                     )}
                   </View>
                 );
-              })
+              })}
+              {filteredTasks.length > visibleTaskLimit && (
+                <TouchableOpacity
+                  style={[styles.btnLarge, { backgroundColor: colors.surfaceContainerHigh || '#E5E5EA', marginTop: 8, marginBottom: 16 }]}
+                  onPress={() => setVisibleTaskLimit((prev) => prev + 40)}
+                >
+                  <Text style={[styles.btnLargeText, { color: colors.textPrimary }]}>
+                    Show More Tasks ({filteredTasks.length - visibleTaskLimit} remaining)
+                  </Text>
+                </TouchableOpacity>
+              )}
+              </>
             )}
           </ScrollView>
         )}
@@ -1392,12 +1409,13 @@ export default function DevLogsScreen({ navigation }) {
               }
             ]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={[styles.sectionTitle, { color: isMemoryPeak ? '#f44336' : colors.textPrimary, marginBottom: 0 }]}>
+                <Text style={[styles.sectionTitle, { color: isMemoryPeak ? '#f44336' : colors.textPrimary, marginBottom: 0, flex: 1, marginRight: 8 }]}>
                   🖥️ Hardware Health & Resource Monitor (Peak Guard)
                 </Text>
                 <View style={[
                   styles.statusBadge, 
                   { 
+                    flexShrink: 0,
                     backgroundColor: isMemoryPeak 
                       ? 'rgba(244,67,54,0.15)' 
                       : isMemoryWarning 
@@ -1569,10 +1587,10 @@ export default function DevLogsScreen({ navigation }) {
               }
             ]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
+                <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginBottom: 0, flex: 1, marginRight: 8 }]}>
                   ⚡ Chaos & Stress Testing Harness
                 </Text>
-                <View style={[styles.statusBadge, { backgroundColor: 'rgba(98, 70, 234, 0.15)' }]}>
+                <View style={[styles.statusBadge, { backgroundColor: 'rgba(98, 70, 234, 0.15)', flexShrink: 0 }]}>
                   <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
                     FAULT INJECTION
                   </Text>
@@ -1586,11 +1604,11 @@ export default function DevLogsScreen({ navigation }) {
               {/* Memory / Payload Stats */}
               <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', padding: 10, borderRadius: 8, marginBottom: 12 }}>
                 <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 4 }}>
-                  Current Task Payload: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{ChaosTestHelper.getPayloadMetrics(tasks).formattedSize}</Text>
+                  Current Task Payload: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{payloadMetrics.formattedSize}</Text>
                 </Text>
                 <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                  Active Chaos Tasks in State: <Text style={{ fontWeight: '700', color: tasks.filter(ChaosTestHelper.isChaosTask).length > 0 ? '#ffaa00' : '#52c41a' }}>
-                    {tasks.filter(ChaosTestHelper.isChaosTask).length} items
+                  Active Chaos Tasks in State: <Text style={{ fontWeight: '700', color: chaosTaskCount > 0 ? '#ffaa00' : '#52c41a' }}>
+                    {chaosTaskCount} items
                   </Text>
                 </Text>
               </View>
@@ -1613,12 +1631,12 @@ export default function DevLogsScreen({ navigation }) {
                 </TouchableOpacity>
 
                 {/* 3. Purge Chaos Data */}
-                {tasks.some(ChaosTestHelper.isChaosTask) && (
+                {chaosTaskCount > 0 && (
                   <TouchableOpacity
                     style={[styles.btnLarge, { backgroundColor: '#ff4d4f' }]}
                     onPress={handlePurgeChaosTasks}
                   >
-                    <Text style={styles.btnLargeText}>Purge All Chaos Test Data ({tasks.filter(ChaosTestHelper.isChaosTask).length})</Text>
+                    <Text style={styles.btnLargeText}>Purge All Chaos Test Data ({chaosTaskCount})</Text>
                   </TouchableOpacity>
                 )}
               </View>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import { DevLogger } from './logger';
 
 /**
@@ -44,14 +44,33 @@ let currentMetrics = {
 
 let lastLoopTimestamp = Date.now();
 let heartbeatTimer = null;
+let consecutiveLagSamples = 0;
+let isAppInBackground = false;
+let appStateSubscription = null;
 const cleanupHooks = new Map();
 const stateListeners = new Set();
 let peakHistory = [];
 const MAX_HISTORY = 30;
 let lastPeakAlertTimestamp = 0;
 let lastAutoCleanupTimestamp = 0;
-const PEAK_ALERT_COOLDOWN_MS = 10000; // prevent alert spamming within 10s
-const AUTO_CLEANUP_COOLDOWN_MS = 5000; // prevent duplicate back-to-back auto cleanups
+const PEAK_ALERT_COOLDOWN_MS = 15000; // prevent alert spamming within 15s
+const AUTO_CLEANUP_COOLDOWN_MS = 15000; // prevent duplicate back-to-back auto cleanups
+
+function ensureAppStateListener() {
+  if (appStateSubscription || !AppState || typeof AppState.addEventListener !== 'function') return;
+  try {
+    appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        isAppInBackground = false;
+        lastLoopTimestamp = Date.now();
+        consecutiveLagSamples = 0;
+      } else if (nextState === 'background' || nextState === 'inactive') {
+        isAppInBackground = true;
+        consecutiveLagSamples = 0;
+      }
+    });
+  } catch (e) {}
+}
 
 /**
  * Reads memory metrics from native Android module or JS runtime fallback.
@@ -79,9 +98,21 @@ function sampleRawMetrics() {
   const delta = now - lastLoopTimestamp;
   lastLoopTimestamp = now;
   const interval = heartbeatIntervalMs || 2000;
-  // Ignore huge timer jumps (> 15s) caused by OS background sleep/doze resume (e.g. 60195ms)
-  const isBackgroundSleepJump = delta > Math.max(15000, interval * 6);
-  const lag = isBackgroundSleepJump ? 0 : Math.max(0, delta - interval);
+  // Ignore timer jumps caused by OS background sleep/doze resume (e.g. 60195ms or 103774ms)
+  const isBackgroundSleepJump = isAppInBackground || delta > Math.max(8000, interval * 4);
+  const rawLag = isBackgroundSleepJump ? 0 : Math.max(0, delta - interval);
+
+  // Require 2 consecutive elevated lag samples before reporting critical lag so a single-frame
+  // screen mount or AsyncStorage read does not trigger a false-positive CRITICAL_PEAK loop.
+  let lag = 0;
+  if (rawLag >= HARDWARE_THRESHOLDS.EVENT_LOOP_LAG_WARNING_MS) {
+    consecutiveLagSamples++;
+    lag = consecutiveLagSamples >= 2 ? rawLag : Math.min(rawLag, HARDWARE_THRESHOLDS.EVENT_LOOP_LAG_WARNING_MS - 1);
+  } else {
+    consecutiveLagSamples = 0;
+    lag = rawLag;
+  }
+
   const estFps = Math.max(10, Math.min(60, Math.round(1000 / (16.6 + lag))));
 
   currentMetrics = {
@@ -291,6 +322,11 @@ export const MemoryPressureGuard = {
 
     if (evaluation.isPeak) {
       const now = Date.now();
+      const isMemoryElevated =
+        evaluation.heapSaturationPercent >= HARDWARE_THRESHOLDS.HEAP_WARNING_PERCENT ||
+        metrics.lowMemory === true ||
+        (metrics.availMemMb > 0 && metrics.availMemMb < HARDWARE_THRESHOLDS.AVAIL_MEM_WARNING_MB);
+
       if (now - lastPeakAlertTimestamp > PEAK_ALERT_COOLDOWN_MS) {
         lastPeakAlertTimestamp = now;
         try {
@@ -299,7 +335,11 @@ export const MemoryPressureGuard = {
             { reasons: evaluation.reasons, metrics }
           );
         } catch (e) {}
-        MemoryPressureGuard.runEmergencyCleanup('CRITICAL_PEAK_AUTOCLEANUP');
+        // Only run RAM emergency cleanup & GC when memory pressure is actually elevated;
+        // running GC and hook cleanups when heap is at 9% only adds extra JS thread work.
+        if (isMemoryElevated) {
+          MemoryPressureGuard.runEmergencyCleanup('CRITICAL_PEAK_AUTOCLEANUP');
+        }
       }
     }
 
@@ -311,12 +351,16 @@ export const MemoryPressureGuard = {
    * Starts periodic heartbeat monitoring.
    */
   startMonitoring: (intervalMs = 2000) => {
+    ensureAppStateListener();
     heartbeatIntervalMs = intervalMs;
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     lastLoopTimestamp = Date.now();
+    consecutiveLagSamples = 0;
     MemoryPressureGuard.checkMemoryPressure();
     heartbeatTimer = setInterval(() => {
-      MemoryPressureGuard.checkMemoryPressure();
+      if (!isAppInBackground) {
+        MemoryPressureGuard.checkMemoryPressure();
+      }
     }, heartbeatIntervalMs);
   },
 
@@ -411,7 +455,11 @@ export function useMemoryPressureGuard({
           if (onPeakReachedRef.current) {
             onPeakReachedRef.current(data.evaluation);
           }
-          if (autoMitigateOnPeak) {
+          const isMemoryElevated =
+            data.evaluation.heapSaturationPercent >= HARDWARE_THRESHOLDS.HEAP_WARNING_PERCENT ||
+            data.metrics?.lowMemory === true ||
+            (data.metrics?.availMemMb > 0 && data.metrics?.availMemMb < HARDWARE_THRESHOLDS.AVAIL_MEM_WARNING_MB);
+          if (autoMitigateOnPeak && isMemoryElevated) {
             MemoryPressureGuard.runEmergencyCleanup('HOOK_AUTO_PEAK_MITIGATION');
           }
         } else if (currentLevel === 'WARNING') {
