@@ -1052,13 +1052,14 @@ describe('Large Section Crash Prevention, FlashList Integrity & Hardware Diagnos
     assert.match(content, /Platform\.OS\s*!==\s*['"]android['"]/, 'Must not trigger native LayoutAnimation on Android FlashList');
   });
 
-  test('BoardScreen FlashList configures stable uniqueKey keyExtractor and disableAutoLayout', () => {
+  test('BoardScreen virtualized list configures stable uniqueKey keyExtractor and clean Web DOM props', () => {
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
     assert.match(content, /keyExtractor=\{\(item,\s*index\)/, 'keyExtractor must accept index parameter');
     assert.match(content, /if \(item\?\.uniqueKey\) return item\.uniqueKey;/, 'Must use stable uniqueKey to prevent key shift on section expand');
-    assert.match(content, /disableAutoLayout=\{true\}/, 'Must disable AutoLayoutView on single-column list to prevent Android native crash');
+    assert.doesNotMatch(content, /disableAutoLayout=/, 'Must not pass FlashList-only disableAutoLayout prop onto LegendList Web DOM div');
+    assert.match(content, /Platform\.OS === 'web' \? \{\} : \{ keyboardShouldPersistTaps: 'handled' \}/, 'Must guard native-only keyboardShouldPersistTaps prop on Web');
     assert.match(content, /drawDistance=\{Platform\.OS === 'web' \? 400 : 250\}/, 'Must use conservative drawDistance on mobile');
     assert.match(content, /ListHeaderComponent=\{renderListSummaryBar\}/, 'Must wire summary bar into ListHeaderComponent to scroll with tasks');
   });
@@ -1200,14 +1201,14 @@ describe('Hardware Peak Guard & Automated Memory Hooks', () => {
     assert.match(content, /Run Emergency RAM Flush & GC/, 'DevLogsScreen must provide manual emergency flush trigger');
   });
 
-  test('BoardScreen protects large section expansion (e.g. 111 missed tasks) via progressive batching, stable keys, and disableAutoLayout', () => {
+  test('BoardScreen protects large section expansion (e.g. 111 missed tasks) via progressive batching, stable keys, and LegendList recycling', () => {
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
     assert.match(content, /INITIAL_SECTION_PAGE_SIZE/, 'BoardScreen must batch initial visible rows per section');
     assert.match(content, /type:\s*'show_more'/, 'BoardScreen must render a show_more pagination row when section exceeds page size');
-    assert.match(content, /disableAutoLayout=\{true\}/, 'BoardScreen FlashList must disable AutoLayoutView to prevent Android native dispatchDraw crash');
-    assert.doesNotMatch(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'BoardScreen FlashList must not combine removeClippedSubviews with FlashList');
+    assert.match(content, /recycleItems=\{true\}/, 'BoardScreen LegendList must recycle row views cleanly without AutoLayoutView crashes');
+    assert.doesNotMatch(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'BoardScreen list must not combine removeClippedSubviews');
   });
 
   test('TaskAlarmReceiver uses full screen only when phone is locked and popup with sound when phone is active', () => {

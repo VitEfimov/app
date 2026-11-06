@@ -1835,11 +1835,10 @@ export default function BoardScreen({ route, navigation }) {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={undefined}
-        keyboardShouldPersistTaps="handled"
+        {...(Platform.OS === 'web' ? {} : { keyboardShouldPersistTaps: 'handled' })}
         onScrollBeginDrag={closeOpenSwipeableRow}
         estimatedItemSize={66}
         drawDistance={Platform.OS === 'web' ? 400 : 250}
-        disableAutoLayout={true}
       />
 
       <TaskDetailsModal 
