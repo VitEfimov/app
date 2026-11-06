@@ -1052,15 +1052,15 @@ describe('Large Section Crash Prevention, FlashList Integrity & Hardware Diagnos
     assert.match(content, /Platform\.OS\s*!==\s*['"]android['"]/, 'Must not trigger native LayoutAnimation on Android FlashList');
   });
 
-  test('BoardScreen virtualized list configures stable uniqueKey keyExtractor and clean Web DOM props', () => {
+  test('BoardScreen hybrid scroll engine configures stable uniqueKey keyExtractor and clean Web DOM props', () => {
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
     assert.match(content, /keyExtractor=\{\(item,\s*index\)/, 'keyExtractor must accept index parameter');
     assert.match(content, /if \(item\?\.uniqueKey\) return item\.uniqueKey;/, 'Must use stable uniqueKey to prevent key shift on section expand');
-    assert.doesNotMatch(content, /disableAutoLayout=/, 'Must not pass FlashList-only disableAutoLayout prop onto LegendList Web DOM div');
+    assert.doesNotMatch(content, /disableAutoLayout=/, 'Must not pass FlashList-only disableAutoLayout prop');
     assert.match(content, /Platform\.OS === 'web' \? \{\} : \{ keyboardShouldPersistTaps: 'handled' \}/, 'Must guard native-only keyboardShouldPersistTaps prop on Web');
-    assert.match(content, /drawDistance=\{Platform\.OS === 'web' \? 400 : 250\}/, 'Must use conservative drawDistance on mobile');
+    assert.match(content, /windowSize=\{21\}/, 'Fallback FlatList must pre-render large windowSize={21} to prevent blanking on fast flings');
     assert.match(content, /ListHeaderComponent=\{renderListSummaryBar\}/, 'Must wire summary bar into ListHeaderComponent to scroll with tasks');
   });
 
@@ -1201,14 +1201,14 @@ describe('Hardware Peak Guard & Automated Memory Hooks', () => {
     assert.match(content, /Run Emergency RAM Flush & GC/, 'DevLogsScreen must provide manual emergency flush trigger');
   });
 
-  test('BoardScreen protects large section expansion (e.g. 111 missed tasks) via progressive batching, stable keys, and LegendList recycling', () => {
+  test('BoardScreen protects large section expansion (e.g. 111 missed tasks) via progressive frame batching and zero-blank hybrid scroll', () => {
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
     assert.match(content, /INITIAL_SECTION_PAGE_SIZE/, 'BoardScreen must batch initial visible rows per section');
     assert.match(content, /type:\s*'show_more'/, 'BoardScreen must render a show_more pagination row when section exceeds page size');
-    assert.match(content, /recycleItems=\{true\}/, 'BoardScreen LegendList must recycle row views cleanly without AutoLayoutView crashes');
-    assert.doesNotMatch(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'BoardScreen list must not combine removeClippedSubviews');
+    assert.match(content, /PROGRESSIVE_FRAME_STEP/, 'BoardScreen must mount native ScrollView rows progressively across animation frames');
+    assert.doesNotMatch(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'BoardScreen list must not detach Android RenderNodes via removeClippedSubviews');
   });
 
   test('TaskAlarmReceiver uses full screen only when phone is locked and popup with sound when phone is active', () => {
@@ -1344,15 +1344,20 @@ describe('Modern Performance Architecture: MMKV JSI, LegendList & UI-Thread Gest
     }
   });
 
-  test('BoardScreen upgrades virtualized list to @legendapp/list LegendList with recycling and pooled dataKey', () => {
+  test('BoardScreen uses Hybrid Native ScrollView (<= 150 rows) + high-window Flexbox FlatList (> 150 rows) with memoized InlineAddTask', () => {
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
-    assert.match(content, /import\s*\{\s*LegendList\s*\}\s*from\s*['"]@legendapp\/list\/react-native['"]/, 'BoardScreen must import LegendList from @legendapp/list/react-native');
-    assert.match(content, /<LegendList/, 'BoardScreen must render LegendList');
-    assert.match(content, /dataKey=\{activeBoardId\}/, 'BoardScreen must pass dataKey={activeBoardId} to pool views across board switches without unmounting ScrollView');
-    assert.match(content, /recycleItems=\{true\}/, 'BoardScreen must enable view recycling');
+    assert.match(content, /const NATIVE_SCROLL_ROW_LIMIT = 150;/, 'BoardScreen must use native ScrollView up to 150 visible rows');
+    assert.match(content, /useNativeScroll \?/, 'BoardScreen must switch between native ScrollView and high-window FlatList');
+    assert.match(content, /requestAnimationFrame\(/, 'BoardScreen must progressively mount native ScrollView items per animation frame');
+    assert.match(content, /windowSize=\{21\}/, 'BoardScreen FlatList fallback must use windowSize={21}');
+    assert.match(content, /removeClippedSubviews=\{false\}/, 'BoardScreen must keep removeClippedSubviews={false} for zero blanking');
     assert.match(content, /boardTypeProp=\{activeType\}/, 'BoardScreen must pass boardTypeProp directly to TaskRow');
+
+    const inlineAddPath = path.resolve('src/components/InlineAddTask.js');
+    const inlineAddContent = fs.readFileSync(inlineAddPath, 'utf8');
+    assert.match(inlineAddContent, /const InlineAddTask = React\.memo\(/, 'InlineAddTask must be wrapped in React.memo');
   });
 
   test('TaskRow eliminates per-row Redux useSelector hooks, uses UI-thread ReanimatedSwipeRow, and caches parsed prices', () => {

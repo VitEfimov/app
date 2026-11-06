@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard } from 'react-native';
-import { LegendList } from '@legendapp/list/react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard } from 'react-native';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
@@ -158,6 +157,10 @@ const SectionHeader = React.memo(function SectionHeader({
 
 const DEFAULT_COLLAPSED_SECTIONS = ['missed', 'on-this-week', 'on-next-week', 'later', 'completed'];
 let currentSessionCollapsedSections = [...DEFAULT_COLLAPSED_SECTIONS];
+
+const NATIVE_SCROLL_ROW_LIMIT = 150;
+const PROGRESSIVE_INITIAL_BATCH = 32;
+const PROGRESSIVE_FRAME_STEP = 32;
 
 export default function BoardScreen({ route, navigation }) {
   const { width: windowWidth } = useWindowDimensions();
@@ -1187,22 +1190,26 @@ export default function BoardScreen({ route, navigation }) {
     );
   }, [collapsedSections, selectionMode.isActive, getSectionTasks, selectedTaskIdsSet, toggleSection, handleMenuPress, handleToggleSelectSection]);
 
+  const handleInlineAddToggle = useCallback((sectionId, active) => {
+    setActiveAddSectionId(active ? sectionId : null);
+    if (active) setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
+  }, []);
+
+  const handleInlineAddDetails = useCallback((task) => {
+    setSelectedTask(task);
+    setDetailsVisible(true);
+  }, []);
+
   const renderSectionFooter = useCallback(({ section }) => {
     return (
       <InlineAddTask 
         sectionId={section.id} 
         isActive={activeAddSectionId === section.id}
-        onToggle={(active) => {
-          setActiveAddSectionId(active ? section.id : null);
-          if (active) setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
-        }}
-        onAddDetails={(task) => {
-          setSelectedTask(task);
-          setDetailsVisible(true);
-        }}
+        onToggleSection={handleInlineAddToggle}
+        onAddDetails={handleInlineAddDetails}
       />
     );
-  }, [activeAddSectionId]);
+  }, [activeAddSectionId, handleInlineAddToggle, handleInlineAddDetails]);
 
   const renderShowMoreRow = useCallback((item) => {
     const sectionId = item.section?.id;
@@ -1324,6 +1331,83 @@ export default function BoardScreen({ route, navigation }) {
     listFilterCategory,
     isNarrow: windowWidth < 300,
   }), [activeBoardId, activeAddSectionId, tasks.length, boardTasks, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary, expensesPeriodFilter, listFilterCategory, windowWidth]);
+
+  const nativeScrollRef = useRef(null);
+  const flatListRef = useRef(null);
+  const prevScrolledBoardRef = useRef(activeBoardId);
+  const [progressiveRenderState, setProgressiveRenderState] = useState(() => ({
+    boardId: activeBoardId,
+    limit: PROGRESSIVE_INITIAL_BATCH,
+  }));
+
+  const useNativeScroll = flattenedData.length <= NATIVE_SCROLL_ROW_LIMIT;
+  const effectiveProgressiveLimit =
+    progressiveRenderState.boardId === activeBoardId
+      ? progressiveRenderState.limit
+      : PROGRESSIVE_INITIAL_BATCH;
+
+  useEffect(() => {
+    if (prevScrolledBoardRef.current !== activeBoardId) {
+      prevScrolledBoardRef.current = activeBoardId;
+      try {
+        nativeScrollRef.current?.scrollTo?.({ y: 0, animated: false });
+        flatListRef.current?.scrollToOffset?.({ offset: 0, animated: false });
+      } catch (e) {}
+    }
+  }, [activeBoardId]);
+
+  useEffect(() => {
+    if (!useNativeScroll) return;
+
+    if (progressiveRenderState.boardId !== activeBoardId) {
+      const rafId = requestAnimationFrame(() => {
+        setProgressiveRenderState({
+          boardId: activeBoardId,
+          limit: Math.min(
+            Math.max(PROGRESSIVE_INITIAL_BATCH, flattenedData.length),
+            PROGRESSIVE_INITIAL_BATCH + PROGRESSIVE_FRAME_STEP
+          ),
+        });
+      });
+      return () => cancelAnimationFrame(rafId);
+    }
+
+    if (progressiveRenderState.limit < flattenedData.length) {
+      const rafId = requestAnimationFrame(() => {
+        setProgressiveRenderState(prev => ({
+          boardId: activeBoardId,
+          limit: Math.min(flattenedData.length, prev.limit + PROGRESSIVE_FRAME_STEP),
+        }));
+      });
+      return () => cancelAnimationFrame(rafId);
+    }
+
+    if (progressiveRenderState.limit > flattenedData.length + PROGRESSIVE_FRAME_STEP) {
+      setProgressiveRenderState({
+        boardId: activeBoardId,
+        limit: Math.max(PROGRESSIVE_INITIAL_BATCH, flattenedData.length),
+      });
+    }
+  }, [useNativeScroll, activeBoardId, flattenedData.length, progressiveRenderState.boardId, progressiveRenderState.limit]);
+
+  const extractBoardItemKey = useCallback((item, index) => {
+    if (item?.uniqueKey) return item.uniqueKey;
+    if (item?.type === 'task') {
+      const taskId = item.task?.id || item.task?._id || `task_${index}`;
+      return `task_${taskId}_${item.section?.id || 'sec'}`;
+    }
+    return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
+  }, []);
+
+  const visibleNativeItems = useMemo(() => {
+    if (!useNativeScroll) return [];
+    if (effectiveProgressiveLimit >= flattenedData.length) return flattenedData;
+    return flattenedData.slice(0, effectiveProgressiveLimit);
+  }, [useNativeScroll, flattenedData, effectiveProgressiveLimit]);
+
+  const remainingUnmountedCount = useNativeScroll
+    ? Math.max(0, flattenedData.length - visibleNativeItems.length)
+    : 0;
 
   const isAnyModalOpen = isDetailsVisible || 
     isQuickMenuVisible || 
@@ -1815,31 +1899,45 @@ export default function BoardScreen({ route, navigation }) {
           </ScrollView>
         </View>
 
-      <LegendList
-        dataKey={activeBoardId}
-        data={flattenedData}
-        extraData={flashListExtraData}
-        ListHeaderComponent={renderListSummaryBar}
-        keyExtractor={(item, index) => {
-          if (item?.uniqueKey) return item.uniqueKey;
-          if (item?.type === 'task') {
-            const taskId = item.task?.id || item.task?._id || `task_${index}`;
-            return `task_${taskId}_${item.section?.id || 'sec'}`;
-          }
-          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
-        }}
-        getItemType={(item) => item.type}
-        recycleItems={true}
-        maintainVisibleContentPosition={false}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={undefined}
-        {...(Platform.OS === 'web' ? {} : { keyboardShouldPersistTaps: 'handled' })}
-        onScrollBeginDrag={closeOpenSwipeableRow}
-        estimatedItemSize={66}
-        drawDistance={Platform.OS === 'web' ? 400 : 250}
-      />
+      {useNativeScroll ? (
+        <ScrollView
+          ref={nativeScrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          {...(Platform.OS === 'web' ? {} : { keyboardShouldPersistTaps: 'handled' })}
+          onScrollBeginDrag={closeOpenSwipeableRow}
+          removeClippedSubviews={false}
+        >
+          {renderListSummaryBar()}
+          {visibleNativeItems.map((item, index) => (
+            <React.Fragment key={extractBoardItemKey(item, index)}>
+              {renderItem({ item, index })}
+            </React.Fragment>
+          ))}
+          {remainingUnmountedCount > 0 ? (
+            <View style={{ height: remainingUnmountedCount * 62 }} />
+          ) : null}
+        </ScrollView>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={flattenedData}
+          extraData={flashListExtraData}
+          ListHeaderComponent={renderListSummaryBar}
+          keyExtractor={(item, index) => extractBoardItemKey(item, index)}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          {...(Platform.OS === 'web' ? {} : { keyboardShouldPersistTaps: 'handled' })}
+          onScrollBeginDrag={closeOpenSwipeableRow}
+          initialNumToRender={32}
+          maxToRenderPerBatch={24}
+          updateCellsBatchingPeriod={16}
+          windowSize={21}
+          removeClippedSubviews={false}
+        />
+      )}
 
       <TaskDetailsModal 
         task={selectedTask}
