@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import store from './src/store';
 if (typeof window !== 'undefined') window.__store = store;
 import AppNavigator from './src/navigation/AppNavigator';
-import { View, Text, ActivityIndicator, TouchableOpacity, AppState, LogBox, StyleSheet, Animated, Modal } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, AppState, LogBox, StyleSheet, Animated, Modal, Dimensions, StatusBar } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
 
@@ -39,8 +39,37 @@ import { A11yHelper } from './src/utils/a11yHelper';
 import { HapticHelper } from './src/utils/hapticHelper';
 import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
 import { ToastProvider } from './src/styles/ToastContext';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { TaskRowConfigProvider } from './src/components/TaskRowConfigContext';
+
+// Guaranteed non-null initial safe area metrics for React Native 0.76+ Fabric / Bridgeless.
+// Without initialMetrics, SafeAreaProvider renders `null` (blank #141419 screen) until the native
+// RNCSafeAreaProvider fires its first onInsetsChange event, which can stall on Android cold start.
+const SAFE_INITIAL_METRICS = (() => {
+  if (
+    initialWindowMetrics &&
+    initialWindowMetrics.insets != null &&
+    initialWindowMetrics.frame != null &&
+    initialWindowMetrics.frame.height > 0
+  ) {
+    return initialWindowMetrics;
+  }
+  const win = Dimensions.get('window') || {};
+  return {
+    frame: {
+      x: 0,
+      y: 0,
+      width: win.width || 360,
+      height: win.height || 800,
+    },
+    insets: {
+      top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+  };
+})();
 
 // WCAG 1.4.4: Configure global font scaling upper bound to prevent UI clipping
 A11yHelper.configureGlobalFontScaling(1.5);
@@ -129,15 +158,15 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10, color: 'red' }}>Oops! Something went wrong.</Text>
-          <Text style={{ textAlign: 'center', color: '#333', marginBottom: 10 }}>{this.state.error?.toString()}</Text>
-          <Text style={{ fontSize: 10, color: '#666', marginBottom: 20, textAlign: 'left' }}>
-            {this.state.errorInfo?.componentStack || 'No component stack available'}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#141419' }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10, color: '#ff6b6b' }}>Oops! Something went wrong.</Text>
+          <Text style={{ textAlign: 'center', color: '#f1f5f9', marginBottom: 12 }}>{this.state.error?.toString()}</Text>
+          <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 20, textAlign: 'left', maxHeight: 220 }}>
+            {this.state.errorInfo?.componentStack || this.state.error?.stack || 'No component stack available'}
           </Text>
           <TouchableOpacity 
             onPress={() => this.setState({ hasError: false, error: null, errorInfo: null })} 
-            style={{ padding: 12, backgroundColor: '#2196f3', borderRadius: 8 }}
+            style={{ paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#2196f3', borderRadius: 8 }}
           >
             <Text style={{ color: 'white', fontWeight: 'bold' }}>Try Again</Text>
           </TouchableOpacity>
@@ -219,8 +248,26 @@ function InitApp() {
   }, []);
 
   useEffect(() => {
+    const safeJsonParse = (raw, fallback = null) => {
+      if (!raw || typeof raw !== 'string') return fallback;
+      try {
+        return JSON.parse(raw);
+      } catch (err) {
+        console.warn('[InitApp] Malformed JSON in storage:', err);
+        return fallback;
+      }
+    };
+
+    const withTimeout = (promise, ms, fallbackValue) =>
+      Promise.race([
+        promise,
+        new Promise((resolve) => setTimeout(() => resolve(fallbackValue), ms)),
+      ]);
+
     const loadStorage = async () => {
       const startTime = Date.now();
+      let authenticatedEmail = null;
+      let parsedThemeForPush = {};
       try {
         const keys = [
           'customTheme',
@@ -236,13 +283,16 @@ function InitApp() {
           'tasks',
           'tasks_guest'
         ];
-        const entries = await CryptoStorage.multiGet(keys);
-        const storageMap = Object.fromEntries(entries);
+        const entries = await withTimeout(
+          CryptoStorage.multiGet(keys),
+          3500,
+          keys.map((k) => [k, null])
+        );
+        const storageMap = Object.fromEntries(Array.isArray(entries) ? entries : []);
 
-        const theme = storageMap.customTheme;
-        if (theme) {
-          let themeData = JSON.parse(theme);
-          
+        const themeData = safeJsonParse(storageMap.customTheme, null);
+        if (themeData && typeof themeData === 'object') {
+          parsedThemeForPush = themeData;
           if (themeData.randomColorDaily) {
             const today = dayjs().format('YYYY-MM-DD');
             if (themeData.lastRandomColorDate !== today) {
@@ -252,10 +302,9 @@ function InitApp() {
               ];
               themeData.sourceColor = PREDEFINED_COLORS[Math.floor(Math.random() * PREDEFINED_COLORS.length)];
               themeData.lastRandomColorDate = today;
-              await CryptoStorage.setItem('customTheme', JSON.stringify(themeData));
+              CryptoStorage.setItem('customTheme', JSON.stringify(themeData)).catch(() => {});
             }
           }
-          
           dispatch(hydrateThemeState(themeData));
         }
 
@@ -267,18 +316,12 @@ function InitApp() {
         const isGuestVal = storageMap.isGuest;
         const rememberedVal = storageMap.rememberedUser;
         console.log("[InitApp Debug] isGuestVal from storage:", isGuestVal, "rememberedVal:", rememberedVal);
-        let authenticatedEmail = null;
 
         if (isGuestVal !== 'true' && rememberedVal) {
-          try {
-            const remUser = JSON.parse(rememberedVal);
-            if (remUser && remUser.rememberMe && remUser.email) {
-              authenticatedEmail = remUser.email;
-              const { hydrateUserState } = require('./src/features/userSlice');
-              dispatch(hydrateUserState({ isAuthenticated: true, userEmail: remUser.email, isGuest: false }));
-            }
-          } catch (e) {
-            console.error("Failed to parse rememberedUser", e);
+          const remUser = safeJsonParse(rememberedVal, null);
+          if (remUser && remUser.rememberMe && remUser.email) {
+            authenticatedEmail = remUser.email;
+            dispatch(hydrateUserState({ isAuthenticated: true, userEmail: remUser.email, isGuest: false }));
           }
         }
 
@@ -287,80 +330,96 @@ function InitApp() {
           dispatch(continueAsGuest());
         }
 
-        const boardsJson = storageMap.boards;
-        if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
+        const parsedBoards = safeJsonParse(storageMap.boards, null);
+        if (Array.isArray(parsedBoards)) dispatch(hydrateUserState({ boards: parsedBoards }));
 
         const dashboardFilterType = storageMap.dashboardFilterType;
         if (dashboardFilterType) dispatch(hydrateUserState({ dashboardFilterType }));
 
-        const pomodoroJson = storageMap.pomodoro;
-        if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));
+        const parsedPomodoro = safeJsonParse(storageMap.pomodoro, null);
+        if (parsedPomodoro && typeof parsedPomodoro === 'object') dispatch(hydratePomodoroState(parsedPomodoro));
 
         const appLanguage = storageMap.appLanguage;
         if (appLanguage) {
           i18n.changeLanguage(appLanguage);
         }
 
-        const statsJson = storageMap.stats;
-        if (statsJson) dispatch(hydrateStatsState(JSON.parse(statsJson)));
+        const parsedStats = safeJsonParse(storageMap.stats, null);
+        if (parsedStats && typeof parsedStats === 'object') dispatch(hydrateStatsState(parsedStats));
 
-        const entitlementJson = storageMap.entitlement;
-        if (entitlementJson) dispatch(hydrateEntitlementState(JSON.parse(entitlementJson)));
+        const parsedEntitlement = safeJsonParse(storageMap.entitlement, null);
+        if (parsedEntitlement && typeof parsedEntitlement === 'object') dispatch(hydrateEntitlementState(parsedEntitlement));
 
         // Immediately load cached tasks from local storage so Board and Calendar pre-render instantly
         let cachedTasksJson = null;
         if (authenticatedEmail) {
-          cachedTasksJson = await CryptoStorage.getItem(`tasks_${authenticatedEmail.toLowerCase().trim()}`);
+          cachedTasksJson = await withTimeout(
+            CryptoStorage.getItem(`tasks_${authenticatedEmail.toLowerCase().trim()}`),
+            1500,
+            null
+          );
         }
         if (!cachedTasksJson) {
           cachedTasksJson = isGuestVal === 'true' ? storageMap.tasks_guest : (storageMap.tasks || storageMap.tasks_guest);
         }
         if (cachedTasksJson) {
-          try {
-            const parsedCached = JSON.parse(cachedTasksJson);
-            if (Array.isArray(parsedCached) && parsedCached.length > 0) {
-              dispatch(hydrateTaskState(parsedCached));
-            }
-          } catch (parseErr) {
-            console.error("Failed to parse cached tasks", parseErr);
+          const parsedCached = safeJsonParse(cachedTasksJson, null);
+          if (Array.isArray(parsedCached) && parsedCached.length > 0) {
+            dispatch(hydrateTaskState(parsedCached));
           }
         }
-
-        // Signal that state is hydrated — mounts AppNavigator, BoardScreen & CalendarScreen behind the loading screen
-        setIsHydrated(true);
-
-        // Run background tasks registration & push notification setup
-        await registerBackgroundFetchAsync();
-        registerForPushNotificationsAsync(storageMap.customTheme ? JSON.parse(storageMap.customTheme) : {}).catch(err => {
-          console.warn('registerForPushNotificationsAsync init warning:', err);
-        });
-
-        // Perform checkAuth only if a remembered user session exists
-        if (authenticatedEmail) {
-          const { checkAuth } = require('./src/features/userSlice');
-          const authRes = await dispatch(checkAuth());
-          console.log("[InitApp Debug] checkAuth result:", authRes);
-        }
-
-        // Fetch/sync latest tasks with remote DB
-        await dispatch(fetchTasks());
       } catch (e) {
         console.error("Initialization failed", e);
+        DevLogger.error('Initialization hydration error', e?.message || String(e));
+        try {
+          const { continueAsGuest } = require('./src/features/userSlice');
+          dispatch(continueAsGuest());
+        } catch (_) {}
       } finally {
-        // Ensure the loading screen displays for at least a minimum smooth duration (~400ms)
+        // Always mount AppNavigator before dismissing the loading screen so a black void can never occur
+        setIsHydrated(true);
+
+        // Ensure the loading screen displays for at least a minimum smooth duration (~350ms)
         // so background layout can complete cleanly without frame drop
         const elapsed = Date.now() - startTime;
-        const remainingDelay = Math.max(0, 400 - elapsed);
+        const remainingDelay = Math.max(0, 350 - elapsed);
         setTimeout(() => {
           setReady(true);
+          const safetyDismissTimer = setTimeout(() => {
+            setLoadingDismissed(true);
+          }, 350);
           Animated.timing(loadingFadeAnim, {
             toValue: 0,
             duration: 250,
             useNativeDriver: true,
           }).start(() => {
+            clearTimeout(safetyDismissTimer);
             setLoadingDismissed(true);
           });
         }, remainingDelay);
+
+        // Run background fetch registration, notification channels, and remote DB sync asynchronously
+        // without blocking UI mount or holding the splash overlay on slow/offline networks
+        Promise.resolve()
+          .then(() => registerBackgroundFetchAsync())
+          .catch((err) => console.warn('registerBackgroundFetchAsync init warning:', err));
+
+        registerForPushNotificationsAsync(parsedThemeForPush).catch((err) => {
+          console.warn('registerForPushNotificationsAsync init warning:', err);
+        });
+
+        (async () => {
+          try {
+            if (authenticatedEmail) {
+              const { checkAuth } = require('./src/features/userSlice');
+              const authRes = await dispatch(checkAuth());
+              console.log("[InitApp Debug] checkAuth result:", authRes);
+            }
+            await dispatch(fetchTasks());
+          } catch (syncErr) {
+            console.warn('[InitApp] Background remote sync warning:', syncErr);
+          }
+        })();
       }
     };
     loadStorage();
@@ -708,7 +767,7 @@ export default function App() {
           <ToastProvider>
             <RootWrapper>
               <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
-                <SafeAreaProvider>
+                <SafeAreaProvider initialMetrics={SAFE_INITIAL_METRICS}>
                   <TaskRowConfigProvider>
                     <InitApp />
                   </TaskRowConfigProvider>

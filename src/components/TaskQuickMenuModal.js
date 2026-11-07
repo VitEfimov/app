@@ -81,9 +81,13 @@ const IconMoveBackward = ({ color }) => (
 import MoveBoardModal from './MoveBoardModal';
 import ConfirmModal from './ConfirmModal';
 
-let RNShare;
-if (Platform.OS !== 'web') {
-  RNShare = require('react-native-share').default;
+function getRNShare() {
+  if (Platform.OS === 'web' || Platform.OS === 'android') return null;
+  try {
+    return require('react-native-share').default;
+  } catch (e) {
+    return null;
+  }
 }
 
 export default function TaskQuickMenuModal({
@@ -240,12 +244,17 @@ export default function TaskQuickMenuModal({
                   if (Platform.OS === 'android') {
                     await shareTaskAsync(message, urlsToShare);
                   } else {
-                    await RNShare.open({
-                      urls: urlsToShare,
-                      type: '*/*',
-                      title: t('Share Task'),
-                      failOnCancel: false
-                    });
+                    const rnShare = getRNShare();
+                    if (rnShare) {
+                      await rnShare.open({
+                        urls: urlsToShare,
+                        type: '*/*',
+                        title: t('Share Task'),
+                        failOnCancel: false
+                      });
+                    } else {
+                      await Share.share({ message });
+                    }
                   }
                 } catch (err) {
                   if (err.message !== 'User did not share') {

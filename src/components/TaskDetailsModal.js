@@ -10,9 +10,13 @@ import * as Clipboard from 'expo-clipboard';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useDispatch, useSelector } from 'react-redux';
 
-let RNShare;
-if (Platform.OS !== 'web') {
-  RNShare = require('react-native-share').default;
+function getRNShare() {
+  if (Platform.OS === 'web' || Platform.OS === 'android') return null;
+  try {
+    return require('react-native-share').default;
+  } catch (e) {
+    return null;
+  }
 }
 import { updateTask, deleteTask, updateRecurringSeries, deleteRecurringSeries } from '../features/taskSlice';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -530,12 +534,17 @@ useEffect(() => {
                   if (Platform.OS === 'android') {
                     await shareTaskAsync(message, urlsToShare);
                   } else {
-                    await RNShare.open({
-                      urls: urlsToShare,
-                      type: '*/*',
-                      title: t('Share Task'),
-                      failOnCancel: false
-                    });
+                    const rnShare = getRNShare();
+                    if (rnShare) {
+                      await rnShare.open({
+                        urls: urlsToShare,
+                        type: '*/*',
+                        title: t('Share Task'),
+                        failOnCancel: false
+                      });
+                    } else {
+                      await Share.share({ message });
+                    }
                   }
                 } catch (e) {
                   if (e.message !== 'User did not share') {

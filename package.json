@@ -75,6 +75,13 @@
     "test:playwright": "playwright test"
   },
   "private": true,
+  "expo": {
+    "install": {
+      "exclude": [
+        "@shopify/flash-list"
+      ]
+    }
+  },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@wdio/appium-service": "^9.30.0",

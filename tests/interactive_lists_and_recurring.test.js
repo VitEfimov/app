@@ -1357,7 +1357,8 @@ describe('Modern Performance Architecture: MMKV JSI, LegendList & UI-Thread Gest
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
-    assert.match(content, /require\(['"]@shopify\/flash-list['"]\)\.FlashList/, 'BoardScreen must load FlashList v2 on Native Fabric');
+    assert.match(content, /require\(['"]@shopify\/flash-list['"]\)/, 'BoardScreen must load FlashList v2 on Native Fabric');
+    assert.match(content, /flashListPkg\.useLayoutState/, 'BoardScreen must verify FlashList v2 (useLayoutState) before passing v2-only props');
     assert.match(content, /<FabricFlashList/, 'BoardScreen must render FabricFlashList when Fabric is active');
     assert.match(content, /drawDistance=\{1500\}/, 'FabricFlashList must buffer 1500px ahead/behind viewport');
     assert.match(content, /maintainVisibleContentPosition=\{\{\s*disabled:\s*true\s*\}\}/, 'FabricFlashList must use FlashList v2 maintainVisibleContentPosition object syntax');
@@ -1391,6 +1392,34 @@ describe('Modern Performance Architecture: MMKV JSI, LegendList & UI-Thread Gest
     const appPath = path.resolve('App.js');
     const appContent = fs.readFileSync(appPath, 'utf8');
     assert.match(appContent, /<TaskRowConfigProvider>/, 'App.js must wrap InitApp in TaskRowConfigProvider');
+  });
+
+  test('Mobile Android Fabric cold-boot black-screen guards: CI lockfile preservation, SafeArea initialMetrics, non-blocking hydration & lazy TurboModules', () => {
+    const workflowContent = fs.readFileSync(path.resolve('.github/workflows/android-build.yml'), 'utf8');
+    assert.doesNotMatch(workflowContent, /expo install --fix/, 'CI workflow must NOT run expo install --fix which downgrades @shopify/flash-list v2 to v1');
+    assert.doesNotMatch(workflowContent, /gradle-8\.6-all\.zip/, 'CI workflow must NOT downgrade Expo SDK 52 Gradle wrapper to 8.6');
+
+    const pkgJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+    assert.ok(
+      Array.isArray(pkgJson?.expo?.install?.exclude) && pkgJson.expo.install.exclude.includes('@shopify/flash-list'),
+      'package.json must exclude @shopify/flash-list from expo install downgrades'
+    );
+
+    const appContent = fs.readFileSync(path.resolve('App.js'), 'utf8');
+    assert.match(appContent, /<SafeAreaProvider\s+initialMetrics=\{SAFE_INITIAL_METRICS\}>/, 'SafeAreaProvider must receive non-null initialMetrics on RN 0.76 Fabric/Bridgeless');
+    assert.match(appContent, /finally\s*\{[\s\S]*?setIsHydrated\(true\);/, 'InitApp must always setIsHydrated(true) inside finally so loading screen never dismisses into a black void');
+
+    const navContent = fs.readFileSync(path.resolve('src/navigation/AppNavigator.js'), 'utf8');
+    assert.match(navContent, /detachInactiveScreens=\{false\}/, 'BottomTabNavigator must disable detachInactiveScreens on Fabric to prevent blank RNSScreen containers');
+
+    for (const relPath of ['src/screens/BoardScreen.js', 'src/components/TaskDetailsModal.js', 'src/components/TaskQuickMenuModal.js']) {
+      const fileContent = fs.readFileSync(path.resolve(relPath), 'utf8');
+      assert.doesNotMatch(fileContent, /^let RNShare;\s*\n\s*if \(Platform\.OS !== 'web'\)/m, `${relPath} must lazy-load react-native-share instead of eager top-level TurboModule getEnforcing`);
+    }
+
+    const autoPluginContent = fs.readFileSync(path.resolve('withAndroidAuto.js'), 'utf8');
+    assert.match(autoPluginContent, /androidx\.car\.app:app:/, 'withAndroidAuto.js must inject androidx.car.app dependencies during prebuild --clean');
+    assert.match(autoPluginContent, /TaskFlowCarService\.kt/, 'withAndroidAuto.js must generate TaskFlowCarService.kt during prebuild --clean');
   });
 });
 

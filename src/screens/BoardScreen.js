@@ -35,13 +35,18 @@ import { ResponsiveHelper } from '../utils/responsiveHelper';
 import { SecurityLockHelper } from '../utils/securityLockHelper';
 import { MemoryPressureGuard } from '../utils/memoryPressureGuard';
 
-let RNShare;
-if (Platform.OS !== 'web') {
-  RNShare = require('react-native-share').default;
+function getRNShare() {
+  if (Platform.OS === 'web' || Platform.OS === 'android') return null;
+  try {
+    return require('react-native-share').default;
+  } catch (e) {
+    return null;
+  }
 }
 
 // Resolve @shopify/flash-list v2 when running on React Native New Architecture (Fabric).
-// On Web or inside a pre-rebuild legacy binary, cleanly falls back to DOM-clean ScrollView / FlatList.
+// Explicitly verifies v2+ (exports useLayoutState) so a legacy v1 binary/package can never
+// crash native Android ScrollView with v2-only props; falls back cleanly to ScrollView / FlatList.
 let FabricFlashList = null;
 const isNativeFabricActive =
   Platform.OS !== 'web' &&
@@ -51,7 +56,10 @@ const isNativeFabricActive =
     global.RN$Bridgeless === true);
 if (isNativeFabricActive) {
   try {
-    FabricFlashList = require('@shopify/flash-list').FlashList;
+    const flashListPkg = require('@shopify/flash-list');
+    if (flashListPkg && typeof flashListPkg.useLayoutState === 'function') {
+      FabricFlashList = flashListPkg.FlashList;
+    }
   } catch (e) {
     FabricFlashList = null;
   }
@@ -519,7 +527,12 @@ export default function BoardScreen({ route, navigation }) {
         if (Platform.OS === 'android') {
           await shareTaskAsync(`Tasks:\n\n${shareText}`, urlsToShare);
         } else {
-          await RNShare.open({ urls: urlsToShare, type: '*/*', title: 'Share Tasks', failOnCancel: false });
+          const rnShare = getRNShare();
+          if (rnShare) {
+            await rnShare.open({ urls: urlsToShare, type: '*/*', title: 'Share Tasks', failOnCancel: false });
+          } else {
+            await Share.share({ message: `Tasks:\n\n${shareText}` });
+          }
         }
       } else {
         await Share.share({
@@ -1922,6 +1935,7 @@ export default function BoardScreen({ route, navigation }) {
       {useFabricFlashList ? (
         <FabricFlashList
           ref={flashListRef}
+          style={{ flex: 1 }}
           data={flattenedData}
           extraData={flashListExtraData}
           ListHeaderComponent={renderListSummaryBar}
