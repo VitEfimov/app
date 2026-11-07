@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform, useWindowDimensions } from 'react-native';
-import Modal from 'react-native-modal';
+import Modal from './AppModal';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSourceColor, resetTheme, setUserPicture, setThemeMode, setRandomColorDaily } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';

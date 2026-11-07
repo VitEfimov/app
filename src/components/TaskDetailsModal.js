@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions } from 'react-native';
-import Modal from 'react-native-modal';
+import Modal from './AppModal';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -2024,7 +2024,12 @@ useEffect(() => {
         </RNModal>
 
 
-        <RNModal visible={showDatePicker} transparent animationType="fade">
+        <RNModal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
           <View style={styles.calendarOverlay}>
             <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
               {(() => {
@@ -2246,6 +2251,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
+    flex: 1,
+    width: '100%',
     height: '100%',
     maxHeight: '100%',
     borderTopLeftRadius: 0,

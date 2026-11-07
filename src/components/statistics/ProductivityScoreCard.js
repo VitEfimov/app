@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
-import Modal from 'react-native-modal';
+import Modal from '../AppModal';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { selectProductivityScore } from '../../features/statsSelectors';
 

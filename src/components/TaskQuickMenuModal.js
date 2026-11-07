@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
-import Modal from 'react-native-modal';
+import Modal from './AppModal';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
@@ -384,14 +384,14 @@ export default function TaskQuickMenuModal({
         const targetTask = task;
         onClose();
         if (typeof handleEditAction === 'function') {
-          setTimeout(() => handleEditAction(targetTask), 220);
+          setTimeout(() => handleEditAction(targetTask), 80);
         }
       },
     },
     { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
     { label: t('Move Forward'), icon: IconMoveForward, onPress: () => handleMoveTaskDate('forward') },
     { label: t('Move Backward'), icon: IconMoveBackward, onPress: () => handleMoveTaskDate('backward') },
-    { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 220); } },
+    { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 80); } },
     {
       label: t('Snooze'),
       icon: IconSnooze,
@@ -399,7 +399,7 @@ export default function TaskQuickMenuModal({
         const targetTask = task;
         onClose();
         if (typeof handleSnoozeAction === 'function') {
-          setTimeout(() => handleSnoozeAction(targetTask), 220);
+          setTimeout(() => handleSnoozeAction(targetTask), 80);
         }
       },
     },

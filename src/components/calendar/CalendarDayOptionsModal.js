@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import Modal from 'react-native-modal';
+import Modal from '../AppModal';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../styles/ThemeContext';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';

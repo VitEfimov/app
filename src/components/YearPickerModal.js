@@ -6,7 +6,7 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import Modal from 'react-native-modal';
+import Modal from './AppModal';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 

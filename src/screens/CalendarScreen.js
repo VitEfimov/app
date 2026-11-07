@@ -18,7 +18,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import Modal from 'react-native-modal';
+import Modal from '../components/AppModal';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 
 import { useTheme } from '../styles/ThemeContext';
