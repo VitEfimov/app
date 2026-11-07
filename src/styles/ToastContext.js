@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useTheme } from './ThemeContext';
 
 const ToastContext = createContext(null);
@@ -10,6 +11,7 @@ export const useToast = () => {
 
 export const ToastProvider = ({ children }) => {
   const { colors, isDark, mode } = useTheme();
+  const insets = useContext(SafeAreaInsetsContext);
   const [toastConfig, setToastConfig] = useState({
     visible: false,
     message: '',
@@ -75,7 +77,7 @@ export const ToastProvider = ({ children }) => {
     <ToastContext.Provider value={{ showToast, hideToast }}>
       {children}
       {toastConfig.visible && (
-        <View style={styles.toastWrapper} pointerEvents="box-none">
+        <View style={[styles.toastWrapper, { bottom: 30 + (insets?.bottom || 0) }]} pointerEvents="box-none">
           <Animated.View 
             style={[
               styles.container, 

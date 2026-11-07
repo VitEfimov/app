@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useContext } from 'react';
 import './src/i18n';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,7 +39,7 @@ import { A11yHelper } from './src/utils/a11yHelper';
 import { HapticHelper } from './src/utils/hapticHelper';
 import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
 import { ToastProvider } from './src/styles/ToastContext';
-import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaInsetsContext, initialWindowMetrics } from 'react-native-safe-area-context';
 import { TaskRowConfigProvider } from './src/components/TaskRowConfigContext';
 
 // Guaranteed non-null initial safe area metrics for React Native 0.76+ Fabric / Bridgeless.
@@ -182,6 +182,7 @@ import AnimatedLoadingScreen from './src/components/AnimatedLoadingScreen';
 function InitApp() {
   const dispatch = useDispatch();
   const { colors, isDark, mode } = useTheme();
+  const insets = useContext(SafeAreaInsetsContext);
   const [ready, setReady] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadingDismissed, setLoadingDismissed] = useState(false);
@@ -690,7 +691,12 @@ function InitApp() {
     <View style={{ flex: 1 }}>
       {isHydrated && (
         <View 
-          style={{ flex: 1 }}
+          style={{
+            flex: 1,
+            paddingTop: insets?.top || 0,
+            paddingLeft: insets?.left || 0,
+            paddingRight: insets?.right || 0,
+          }}
           {...A11yHelper.getModalFocusTrapProps(isLocked)}
         >
           <AppNavigator />
@@ -764,17 +770,17 @@ export default function App() {
     <ErrorBoundary>
       <Provider store={store}>
         <ThemeProvider>
-          <ToastProvider>
-            <RootWrapper>
-              <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
-                <SafeAreaProvider initialMetrics={SAFE_INITIAL_METRICS}>
+          <SafeAreaProvider initialMetrics={SAFE_INITIAL_METRICS}>
+            <ToastProvider>
+              <RootWrapper>
+                <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
                   <TaskRowConfigProvider>
                     <InitApp />
                   </TaskRowConfigProvider>
-                </SafeAreaProvider>
-              </GestureHandlerRootView>
-            </RootWrapper>
-          </ToastProvider>
+                </GestureHandlerRootView>
+              </RootWrapper>
+            </ToastProvider>
+          </SafeAreaProvider>
         </ThemeProvider>
       </Provider>
     </ErrorBoundary>
