@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useState, useCallback, useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle, useState, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -97,58 +97,75 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     };
   }, [translateX, isOpenShared]);
 
-  const panGesture = Gesture.Pan()
-    .enabled(enabled)
-    .activeOffsetX([-12, 12])
-    .failOffsetY([-12, 12])
-    .onStart(() => {
-      startX.value = translateX.value;
-      if (!actionsMountedShared.value) {
-        actionsMountedShared.value = true;
-        runOnJS(ensureMounted)();
-      }
-    })
-    .onUpdate((event) => {
-      const rawNext = startX.value + event.translationX;
-      if (rawNext > 0) {
-        // Elastic resistance past completion threshold
-        const maxRight = leftThreshold * 1.35;
-        translateX.value = rawNext > maxRight ? maxRight + (rawNext - maxRight) * 0.2 : rawNext;
-      } else {
-        // Elastic resistance past right action buttons width
-        const maxLeft = -rightActionsWidth;
-        translateX.value = rawNext < maxLeft ? maxLeft + (rawNext - maxLeft) * 0.22 : rawNext;
-      }
-    })
-    .onEnd((event) => {
-      const currentX = translateX.value;
-      const vx = event.velocityX;
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(enabled)
+        .activeOffsetX([-12, 12])
+        .failOffsetY([-12, 12])
+        .onStart(() => {
+          startX.value = translateX.value;
+          if (!actionsMountedShared.value) {
+            actionsMountedShared.value = true;
+            runOnJS(ensureMounted)();
+          }
+        })
+        .onUpdate((event) => {
+          const rawNext = startX.value + event.translationX;
+          if (rawNext > 0) {
+            // Elastic resistance past completion threshold
+            const maxRight = leftThreshold * 1.35;
+            translateX.value = rawNext > maxRight ? maxRight + (rawNext - maxRight) * 0.2 : rawNext;
+          } else {
+            // Elastic resistance past right action buttons width
+            const maxLeft = -rightActionsWidth;
+            translateX.value = rawNext < maxLeft ? maxLeft + (rawNext - maxLeft) * 0.22 : rawNext;
+          }
+        })
+        .onEnd((event) => {
+          const currentX = translateX.value;
+          const vx = event.velocityX;
 
-      // 1. Swiped right past completion threshold -> trigger complete & snap back cleanly
-      if (currentX >= leftThreshold || (currentX > leftThreshold * 0.55 && vx > 650)) {
-        isOpenShared.value = false;
-        translateX.value = withSpring(0, SPRING_CONFIG);
-        runOnJS(notifyLeftComplete)();
-        return;
-      }
+          // 1. Swiped right past completion threshold -> trigger complete & snap back cleanly
+          if (currentX >= leftThreshold || (currentX > leftThreshold * 0.55 && vx > 650)) {
+            isOpenShared.value = false;
+            translateX.value = withSpring(0, SPRING_CONFIG);
+            runOnJS(notifyLeftComplete)();
+            return;
+          }
 
-      // 2. Swiped left past rightThreshold -> snap open to expose Snooze / Delete / More
-      if (currentX < -rightThreshold || (currentX < -18 && vx < -500)) {
-        isOpenShared.value = true;
-        runOnJS(notifyWillOpen)('right');
-        translateX.value = withSpring(-rightActionsWidth, SPRING_CONFIG);
-        return;
-      }
+          // 2. Swiped left past rightThreshold -> snap open to expose Snooze / Delete / More
+          if (currentX < -rightThreshold || (currentX < -18 && vx < -500)) {
+            isOpenShared.value = true;
+            runOnJS(notifyWillOpen)('right');
+            translateX.value = withSpring(-rightActionsWidth, SPRING_CONFIG);
+            return;
+          }
 
-      // 3. Otherwise spring back closed
-      const wasOpen = isOpenShared.value;
-      isOpenShared.value = false;
-      translateX.value = withSpring(0, SPRING_CONFIG, (finished) => {
-        if (finished && wasOpen) {
-          runOnJS(notifyClose)();
-        }
-      });
-    });
+          // 3. Otherwise spring back closed
+          const wasOpen = isOpenShared.value;
+          isOpenShared.value = false;
+          translateX.value = withSpring(0, SPRING_CONFIG, (finished) => {
+            if (finished && wasOpen) {
+              runOnJS(notifyClose)();
+            }
+          });
+        }),
+    [
+      enabled,
+      leftThreshold,
+      rightActionsWidth,
+      rightThreshold,
+      startX,
+      translateX,
+      actionsMountedShared,
+      isOpenShared,
+      ensureMounted,
+      notifyLeftComplete,
+      notifyWillOpen,
+      notifyClose,
+    ]
+  );
 
   const foregroundStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],

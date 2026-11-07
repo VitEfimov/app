@@ -101,6 +101,8 @@ export default function SnoozeModal({
 
   if (!task) return null;
 
+  const resolvedTaskId = task.id || task._id;
+
   const handleSnoozeDate = (mode) => {
     let targetDate = dayjs();
     let targetTime = task.time; // preserve time if possible
@@ -132,7 +134,7 @@ export default function SnoozeModal({
     }
 
     dispatch(updateTask({
-      taskId: task.id,
+      taskId: resolvedTaskId,
       completionDate: targetDate.toISOString(),
       time: targetTime
     }));
@@ -157,7 +159,7 @@ export default function SnoozeModal({
     }
 
     dispatch(updateTask({
-      taskId: task.id,
+      taskId: resolvedTaskId,
       reminder: newReminderStr
     }));
     onClose();
@@ -172,12 +174,12 @@ export default function SnoozeModal({
 
     if (action === 'nag') {
       dispatch(updateTask({
-        taskId: task.id,
+        taskId: resolvedTaskId,
         isNagMode: !task.isNagMode
       }));
     } else if (action === 'escalating') {
       dispatch(updateTask({
-        taskId: task.id,
+        taskId: resolvedTaskId,
         escalationLevel: 'active'
       }));
     }

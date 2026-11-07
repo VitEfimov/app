@@ -433,7 +433,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
         keepNotificationAllDay: initialKeepNotificationVal,
       };
     }
-  }, [isVisible, task?.id]);
+  }, [isVisible, task?.id, task?._id]);
 
 
 useEffect(() => {
@@ -601,7 +601,8 @@ useEffect(() => {
   const executeSave = async ({ updateSeries = false } = {}) => {
     const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
     let updates = {};
-    if (taskName !== task.taskname) updates.name = taskName;
+    const prevTaskName = task.taskname ?? task.name ?? '';
+    if (taskName !== prevTaskName) updates.name = taskName;
     
     const initialAttachments = task.description?.attachments || (task.description?.img ? [{ id: 'legacy_img', type: 'image', uri: task.description.img }] : []);
     if (currentNotes !== stripHtml(task.description?.text) || JSON.stringify(attachments) !== JSON.stringify(initialAttachments)) {
@@ -613,8 +614,15 @@ useEffect(() => {
       };
     }
     
-    if (selectedTime !== (task.time || '')) updates.time = selectedTime;
-    if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
+    const prevTimeNormalized = task.time || '';
+    const nextTimeNormalized = selectedTime || '';
+    const rawPrevDate = task.completionDate || task.dateString || task.dueDate || task.date || '';
+    const prevDateNormalized = (typeof rawPrevDate === 'string' && rawPrevDate.includes('T'))
+      ? rawPrevDate.split('T')[0]
+      : (rawPrevDate ? dayjs(rawPrevDate).format('YYYY-MM-DD') : '');
+
+    if (nextTimeNormalized !== prevTimeNormalized) updates.time = selectedTime;
+    if (selectedDate !== prevDateNormalized) updates.completionDate = selectedDate;
     if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
     if (selectedBoardId !== (task.boardId || 'main')) updates.boardId = selectedBoardId;
     
@@ -623,8 +631,8 @@ useEffect(() => {
 
     const initialConfig = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
     const repeatConfigChanged = JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig);
-    const dateChanged = selectedDate !== (task.completionDate || '');
-    const repeatStartDateChanged = repeatStartDate !== (task.repeatStartDate || task.completionDate || '');
+    const dateChanged = selectedDate !== prevDateNormalized;
+    const repeatStartDateChanged = repeatStartDate !== (task.repeatStartDate || prevDateNormalized || '');
     const repeatEndDateChanged = repeatEndDate !== (task.repeatEndDate || '');
 
     if (repeatConfigChanged) {
@@ -632,14 +640,14 @@ useEffect(() => {
       updates.repeatFrequency = repeatConfig.preset; // backwards compatibility
     }
     
-    if (repeatStartDateChanged || effectiveStartDate !== (task.repeatStartDate || '')) updates.repeatStartDate = effectiveStartDate;
-    if (repeatEndDateChanged || effectiveEndDate !== (task.repeatEndDate || '')) updates.repeatEndDate = effectiveEndDate;
+    if (repeatStartDateChanged || (repeatConfig.preset !== 'None' && effectiveStartDate !== (task.repeatStartDate || ''))) updates.repeatStartDate = effectiveStartDate;
+    if (repeatEndDateChanged || (repeatConfig.preset !== 'None' && effectiveEndDate !== (task.repeatEndDate || ''))) updates.repeatEndDate = effectiveEndDate;
     
-    const timeChanged = selectedTime !== (task.time || '');
+    const timeChanged = nextTimeNormalized !== prevTimeNormalized;
     const reminderChanged = reminder !== (task.reminder || 'None');
     const isAlarmChanged = isAlarm !== (task.isAlarm || false);
     const keepNotificationAllDayChanged = keepNotificationAllDay !== (task.keepNotificationAllDay || false);
-    const nameChanged = taskName !== task.taskname;
+    const nameChanged = taskName !== prevTaskName;
 
     if (isAlarmChanged) updates.isAlarm = isAlarm;
     if (keepNotificationAllDayChanged) updates.keepNotificationAllDay = keepNotificationAllDay;
@@ -650,25 +658,29 @@ useEffect(() => {
       updates.isNagMode = reminder === 'Nag Mode (Every 10 min)';
       updates.escalationLevel = reminder === 'Escalating Reminder' ? 'active' : 'none';
       updates.keepNotificationAllDay = keepNotificationAllDay;
-      // Schedule new notifications: always cancel existing alarm/reminder first
-      await cancelNotification(task.notificationId, effectiveTaskId);
-      updates.notificationId = null;
+      try {
+        // Schedule new notifications: always cancel existing alarm/reminder first
+        await cancelNotification(task.notificationId, effectiveTaskId);
+        updates.notificationId = null;
 
-      const notifIds = await scheduleTaskReminder(
-        taskName,
-        reminder,
-        selectedDate || dayjs().format('YYYY-MM-DD'),
-        selectedTime,
-        effectiveTaskId,
-        isAlarm,
-        themeState,
-        {
-          isNagMode: updates.isNagMode,
-          escalationLevel: updates.escalationLevel,
-          keepNotificationAllDay: keepNotificationAllDay
-        }
-      );
-      if (notifIds && notifIds.length > 0) updates.notificationId = notifIds;
+        const notifIds = await scheduleTaskReminder(
+          taskName,
+          reminder,
+          selectedDate || dayjs().format('YYYY-MM-DD'),
+          selectedTime,
+          effectiveTaskId,
+          isAlarm,
+          themeState,
+          {
+            isNagMode: updates.isNagMode,
+            escalationLevel: updates.escalationLevel,
+            keepNotificationAllDay: keepNotificationAllDay
+          }
+        );
+        if (notifIds && notifIds.length > 0) updates.notificationId = notifIds;
+      } catch (notifErr) {
+        console.warn('[TaskDetailsModal] Notification update failed, continuing task save:', notifErr);
+      }
     }
     
     if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) {
@@ -704,7 +716,7 @@ useEffect(() => {
       // If user chose to update all upcoming tasks in this series:
       if (repeatConfig.preset === 'None') {
         // Stop repeat: delete future instances
-        dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: task.completionDate, excludeTaskId: task.id }));
+        dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId, fromDate: task.completionDate, excludeTaskId: effectiveTaskId }));
         updates.recurringSeriesId = null;
         updates.isRecurring = false;
         updates.repeatConfig = { preset: 'None' };
@@ -720,7 +732,7 @@ useEffect(() => {
         dispatch(deleteRecurringSeries({
           seriesId: task.recurringSeriesId,
           fromDate: earliestDate.toISOString(),
-          excludeTaskId: task.id
+          excludeTaskId: effectiveTaskId
         }));
 
         generateRepeatingTasks(
