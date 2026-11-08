@@ -374,12 +374,40 @@ export default function TaskQuickMenuModal({
   const handleSnoozeAction = onPressSnooze || onSnooze;
 
   const actionItems = [
-    { label: t('Edit'), icon: IconEdit, onPress: () => { onClose(); if (typeof handleEditAction === 'function') handleEditAction(task); } },
+    {
+      label: t('Edit'),
+      icon: IconEdit,
+      onPress: () => {
+        const targetTask = task;
+        onClose();
+        if (typeof handleEditAction === 'function') {
+          if (Platform.OS === 'web') {
+            handleEditAction(targetTask);
+          } else {
+            setTimeout(() => handleEditAction(targetTask), 320);
+          }
+        }
+      },
+    },
     { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
     { label: t('Move Forward'), icon: IconMoveForward, onPress: () => handleMoveTaskDate('forward') },
     { label: t('Move Backward'), icon: IconMoveBackward, onPress: () => handleMoveTaskDate('backward') },
     { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 300); } },
-    { label: t('Snooze'), icon: IconSnooze, onPress: () => { onClose(); if (typeof handleSnoozeAction === 'function') handleSnoozeAction(task); } },
+    {
+      label: t('Snooze'),
+      icon: IconSnooze,
+      onPress: () => {
+        const targetTask = task;
+        onClose();
+        if (typeof handleSnoozeAction === 'function') {
+          if (Platform.OS === 'web') {
+            handleSnoozeAction(targetTask);
+          } else {
+            setTimeout(() => handleSnoozeAction(targetTask), 320);
+          }
+        }
+      },
+    },
     { label: t('Duplicate'), icon: IconDuplicate, onPress: handleDuplicate },
     { label: t('Share'), icon: IconShare, onPress: handleShare },
     { label: t('Delete'), icon: IconDelete, onPress: handleDelete, danger: true },
@@ -393,6 +421,7 @@ export default function TaskQuickMenuModal({
       swipeDirection={['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
+      onBackButtonPress={onClose}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>

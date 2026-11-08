@@ -64,6 +64,7 @@
     "wavefile": "^11.0.0"
   },
   "scripts": {
+    "postinstall": "patch-package",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

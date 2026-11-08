@@ -1446,6 +1446,17 @@ describe('Modern Performance Architecture: MMKV JSI, LegendList & UI-Thread Gest
     const toastContent = fs.readFileSync(path.resolve('src/styles/ToastContext.js'), 'utf8');
     assert.match(toastContent, /bottom:\s*30\s*\+\s*\(insets\?\.bottom\s*\|\|\s*0\)/, 'ToastProvider must offset bottom toast above system navigation bar');
   });
+
+  test('TaskDetailsModal uses native RNModal with flex: 1 + SafeAreaInsetsContext and TaskQuickMenuModal sequences dialog dismissal on Fabric', () => {
+    const detailsContent = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+    assert.doesNotMatch(detailsContent, /import\s+Modal\s+from\s+['"]react-native-modal['"]/, 'TaskDetailsModal must not use react-native-modal animatable wrapper on Fabric');
+    assert.match(detailsContent, /<RNModal[\s\S]*?testID="task_details_modal"[\s\S]*?visible=\{Boolean\(isVisible\)\}[\s\S]*?transparent=\{false\}[\s\S]*?animationType="slide"[\s\S]*?statusBarTranslucent=\{true\}[\s\S]*?onRequestClose=\{handleClose\}/, 'TaskDetailsModal must render native full-screen RNModal');
+    assert.match(detailsContent, /SafeAreaInsetsContext/, 'TaskDetailsModal must apply SafeAreaInsetsContext top/bottom insets');
+    assert.match(detailsContent, /modalContent:\s*\{[\s\S]*?flex:\s*1,[\s\S]*?width:\s*'100%'/, 'TaskDetailsModal modalContent must define flex: 1 and width: 100%');
+
+    const quickMenuContent = fs.readFileSync(path.resolve('src/components/TaskQuickMenuModal.js'), 'utf8');
+    assert.match(quickMenuContent, /setTimeout\(\(\)\s*=>\s*handleEditAction\(targetTask\),\s*320\)/, 'TaskQuickMenuModal must wait for quick menu exit animation before opening TaskDetailsModal on native');
+  });
 });
 
 

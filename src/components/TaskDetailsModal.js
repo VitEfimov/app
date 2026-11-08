@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions } from 'react-native';
-import Modal from 'react-native-modal';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -199,10 +199,13 @@ const IconChevronDown = ({ color, isCollapsed }) => (
 
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
+  const insets = useContext(SafeAreaInsetsContext);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isCompact = windowHeight < 820;
   const isVeryCompact = windowHeight < 700;
   const isWideScreen = windowWidth >= 768;
+  const topInset = insets?.top || (Platform.OS === 'ios' ? (isCompact ? 34 : 42) : 0);
+  const bottomInset = insets?.bottom || 0;
   const dispatch = useDispatch();
   const themeState = useSelector(state => state.themeReducer);
   const boards = useSelector(state => state.userReducer.boards || []);
@@ -1242,20 +1245,19 @@ useEffect(() => {
   };
 
   return (
-    <Modal 
+    <RNModal 
       testID="task_details_modal"
-      isVisible={isVisible} 
-      onSwipeComplete={handleClose}
-      swipeDirection={scrollOffset > 0 ? undefined : ['down']}
-      onBackdropPress={handleClose}
-      onBackButtonPress={handleClose}
-      propagateSwipe={true}
-      scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
-      scrollOffset={scrollOffset}
-      scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
-      style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
+      visible={Boolean(isVisible)} 
+      transparent={false}
+      animationType="slide"
+      statusBarTranslucent={true}
+      onRequestClose={handleClose}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard, paddingTop: Platform.OS === 'ios' ? (isCompact ? 34 : 42) : (isVeryCompact ? 6 : 10) }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, width: '100%', backgroundColor: colors.bgCard }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+      <View style={[styles.modalContent, { backgroundColor: colors.bgCard, paddingTop: topInset + (isVeryCompact ? 6 : 10) }]}>
           <View style={[styles.dragHandleContainer, { paddingBottom: isVeryCompact ? 2 : 4 }]}>
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
@@ -1315,7 +1317,7 @@ useEffect(() => {
               {
                 paddingHorizontal: isWideScreen ? 32 : 20,
                 paddingTop: 2,
-                paddingBottom: isVeryCompact ? 6 : 12,
+                paddingBottom: (isVeryCompact ? 6 : 12) + bottomInset,
                 maxWidth: isWideScreen ? 680 : '100%',
                 width: '100%',
                 alignSelf: 'center',
@@ -1876,6 +1878,7 @@ useEffect(() => {
           featureName={premiumFeatureName}
         />
 
+        {isAttachmentOptionsVisible && (
         <RNModal
           visible={isAttachmentOptionsVisible}
           transparent
@@ -2010,9 +2013,11 @@ useEffect(() => {
             </View>
           </View>
         </RNModal>
+        )}
 
 
-        <RNModal visible={showDatePicker} transparent animationType="fade">
+        {showDatePicker && (
+        <RNModal visible={showDatePicker} transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
           <View style={styles.calendarOverlay}>
             <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
               {(() => {
@@ -2096,6 +2101,7 @@ useEffect(() => {
             </View>
           </View>
         </RNModal>
+        )}
 
         <YearPickerModal
           isVisible={isYearPickerVisible}
@@ -2223,7 +2229,8 @@ useEffect(() => {
         onClose={() => setIsCustomReminderModalVisible(false)}
         onSave={handleCustomReminderSave}
       />
-    </Modal>
+      </KeyboardAvoidingView>
+    </RNModal>
   );
 }
 
@@ -2234,6 +2241,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
+    flex: 1,
+    width: '100%',
     height: '100%',
     maxHeight: '100%',
     borderTopLeftRadius: 0,
@@ -2269,7 +2278,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   body: {
-    flexGrow: 1,
+    flex: 1,
+    width: '100%',
   },
   bodyContent: {
     padding: 20,
