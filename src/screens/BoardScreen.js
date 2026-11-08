@@ -1993,16 +1993,19 @@ export default function BoardScreen({ route, navigation }) {
           removeClippedSubviews={false}
         />
       )}
+      </View>
 
-      <TaskDetailsModal 
-        task={selectedTask}
-        isVisible={isDetailsVisible}
-        onClose={() => {
-          cancelAllInlineEditing();
-          try { Keyboard?.dismiss?.(); } catch (e) {}
-          setDetailsVisible(false);
-        }}
-      />
+      {selectedTask && (
+        <TaskDetailsModal 
+          task={selectedTask}
+          isVisible={isDetailsVisible}
+          onClose={() => {
+            cancelAllInlineEditing();
+            try { Keyboard?.dismiss?.(); } catch (e) {}
+            setDetailsVisible(false);
+          }}
+        />
+      )}
 
       <PromptModal
         isVisible={promptConfig.isVisible}
@@ -2351,7 +2354,6 @@ export default function BoardScreen({ route, navigation }) {
         </View>
       )}
 
-      </View>
       <ConfirmModal
         isVisible={confirmConfig.isVisible}
         title={confirmConfig.title}

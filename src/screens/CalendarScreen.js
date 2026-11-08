@@ -947,11 +947,13 @@ export default function CalendarScreen({ navigation, route }) {
       )}
 
       {/* Task Details Modal */}
-      <TaskDetailsModal
-        task={selectedTask}
-        isVisible={isDetailsVisible}
-        onClose={() => setDetailsVisible(false)}
-      />
+      {selectedTask && (
+        <TaskDetailsModal
+          task={selectedTask}
+          isVisible={isDetailsVisible}
+          onClose={() => setDetailsVisible(false)}
+        />
+      )}
 
       {/* Task Quick Menu Modal */}
       <TaskQuickMenuModal
