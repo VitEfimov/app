@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share, Modal as RNModal } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
@@ -80,6 +79,7 @@ const IconMoveBackward = ({ color }) => (
 
 import MoveBoardModal from './MoveBoardModal';
 import ConfirmModal from './ConfirmModal';
+import { TaskEditDiagnostics } from '../utils/taskEditDiagnostics';
 
 function getRNShare() {
   if (Platform.OS === 'web' || Platform.OS === 'android') return null;
@@ -379,11 +379,18 @@ export default function TaskQuickMenuModal({
       icon: IconEdit,
       onPress: () => {
         const targetTask = task;
+        TaskEditDiagnostics.record('QUICK_MENU_EDIT_TAP', {
+          taskId: targetTask?.id || targetTask?._id,
+          name: targetTask?.taskname || targetTask?.name,
+          hasHandleEditAction: typeof handleEditAction === 'function',
+        });
         onClose();
         if (typeof handleEditAction === 'function') {
           if (Platform.OS === 'web') {
+            TaskEditDiagnostics.record('QUICK_MENU_DISPATCH_EDIT_IMMEDIATE', { taskId: targetTask?.id || targetTask?._id });
             handleEditAction(targetTask);
           } else {
+            TaskEditDiagnostics.record('QUICK_MENU_DISPATCH_EDIT_DELAYED_START', { taskId: targetTask?.id || targetTask?._id });
             setTimeout(() => handleEditAction(targetTask), 320);
           }
         }
@@ -415,21 +422,25 @@ export default function TaskQuickMenuModal({
 
   return (
     <>
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      onBackButtonPress={onClose}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="fade"
+      statusBarTranslucent={true}
+      onRequestClose={onClose}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
+      <View style={styles.sheetOverlay}>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={StyleSheet.absoluteFillObject}
+          onPress={onClose}
+        />
+        <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
         <View style={styles.dragHandle} />
         
         <View style={styles.header}>
           <Text style={[styles.taskTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            {task.taskname || task.name || ''}
+            {task?.taskname || task?.name || ''}
           </Text>
         </View>
 
@@ -451,7 +462,8 @@ export default function TaskQuickMenuModal({
           ))}
         </ScrollView>
       </View>
-    </Modal>
+      </View>
+    </RNModal>
     <MoveBoardModal
       isVisible={isMoveBoardVisible}
       onClose={() => setMoveBoardVisible(false)}
@@ -480,6 +492,11 @@ export default function TaskQuickMenuModal({
 }
 
 const styles = StyleSheet.create({
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

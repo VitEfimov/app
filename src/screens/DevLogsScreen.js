@@ -35,6 +35,8 @@ import { useMemoryPressureGuard, MemoryPressureGuard, HARDWARE_THRESHOLDS } from
 import * as Notifications from 'expo-notifications';
 import dayjs from 'dayjs';
 import { navigationRef } from '../navigation/AppNavigator';
+import TaskDetailsModal from '../components/TaskDetailsModal';
+import { TaskEditDiagnostics } from '../utils/taskEditDiagnostics';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming } from '../utils/filters';
 import Svg, { Path } from 'react-native-svg';
 import {
@@ -96,6 +98,9 @@ export default function DevLogsScreen({ navigation }) {
   const [crashLogs, setCrashLogs] = useState([]);
   const [expandedCrashId, setExpandedCrashId] = useState(null);
   const [visibleTaskLimit, setVisibleTaskLimit] = useState(30);
+  const [taskEditEvents, setTaskEditEvents] = useState(() => TaskEditDiagnostics.getHistory());
+  const [testModalTask, setTestModalTask] = useState(null);
+  const [isTestModalVisible, setIsTestModalVisible] = useState(false);
 
   const {
     status: memoryGuardStatus,
@@ -129,6 +134,13 @@ export default function DevLogsScreen({ navigation }) {
   useEffect(() => {
     const unsubscribe = CrashLogger.subscribe((newCrashes) => {
       setCrashLogs(newCrashes);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = TaskEditDiagnostics.subscribe((newEvents) => {
+      setTaskEditEvents(newEvents);
     });
     return unsubscribe;
   }, []);
@@ -666,6 +678,59 @@ export default function DevLogsScreen({ navigation }) {
                 <Text style={[styles.statNum, { color: '#1890ff' }]}>{taskStats.alarms}</Text>
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Alarms</Text>
               </View>
+            </View>
+
+            {/* Live Task Details Modal Diagnostics Card */}
+            <View style={{ backgroundColor: isDark ? '#1a1f2c' : '#f0f4ff', borderColor: colors.primary, borderWidth: 1.5, borderRadius: 12, padding: 14, marginBottom: 15 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.primary }}>
+                  🔬 Task Details Modal Diagnostics
+                </Text>
+                <TouchableOpacity
+                  onPress={() => TaskEditDiagnostics.clear()}
+                  style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: isDark ? '#2a2f3d' : '#e2e8f0', borderRadius: 6 }}
+                >
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }}>
+                Fabric: {typeof global !== 'undefined' && Boolean(global.nativeFabricUIManager) ? 'Active' : 'Disabled'} | Platform: {Platform.OS} | Intercepted: {taskEditEvents.length} events
+              </Text>
+
+              {taskEditEvents.length === 0 ? (
+                <Text style={{ fontSize: 12, color: colors.textSecondary, fontStyle: 'italic', marginBottom: 12 }}>
+                  No edit events captured yet. Tap any task row or edit button in Tasks or Calendar, then return here to inspect the trace.
+                </Text>
+              ) : (
+                <View style={{ backgroundColor: isDark ? '#121620' : '#ffffff', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: colors.borderColor }}>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#52c41a', marginBottom: 4 }}>
+                    Latest: {taskEditEvents[0].type} ({dayjs(taskEditEvents[0].timestamp).format('HH:mm:ss.SSS')})
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.textPrimary, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }} numberOfLines={4}>
+                    {JSON.stringify(taskEditEvents[0].payload, null, 2)}
+                  </Text>
+                  {taskEditEvents.slice(1, 4).map((ev, i) => (
+                    <Text key={ev.id || i} style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>
+                      • {ev.type} @ {dayjs(ev.timestamp).format('HH:mm:ss.SSS')}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={{ backgroundColor: colors.primary, borderRadius: 8, paddingVertical: 10, alignItems: 'center' }}
+                onPress={() => {
+                  const target = tasks.length > 0 ? tasks[0] : { id: 'diag_test_task', taskname: 'Diagnostics Test Task', completionDate: dayjs().format('YYYY-MM-DD'), priority: 'high', subtasks: [] };
+                  TaskEditDiagnostics.record('DEVLOGS_TRIGGER_MODAL_TEST', { taskId: target.id, taskname: target.taskname });
+                  setTestModalTask(target);
+                  setIsTestModalVisible(true);
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>
+                  🧪 Test Open Task Details Modal Now
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Search & Filter */}
@@ -1704,6 +1769,14 @@ export default function DevLogsScreen({ navigation }) {
           </View>
         )}
       </View>
+
+      {testModalTask && (
+        <TaskDetailsModal
+          task={testModalTask}
+          isVisible={isTestModalVisible}
+          onClose={() => setIsTestModalVisible(false)}
+        />
+      )}
     </View>
   );
 }

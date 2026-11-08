@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, Modal as RNModal } from 'react-native';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
@@ -15,6 +15,7 @@ import MoveBoardModal from '../components/MoveBoardModal';
 import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
+import { TaskEditDiagnostics } from '../utils/taskEditDiagnostics';
 import Modal from 'react-native-modal';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard, getDateThresholds, classifyTaskDate, compareTasks, PRIORITY_SCORES } from '../utils/filters';
 import dayjs from 'dayjs';
@@ -548,6 +549,10 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleTaskPress = useCallback((task) => {
+    TaskEditDiagnostics.record('BOARD_SCREEN_HANDLE_TASK_PRESS', {
+      taskId: task?.id || task?._id,
+      name: task?.taskname || task?.name,
+    });
     cancelAllInlineEditing();
     setActiveAddSectionId(null);
     try { Keyboard?.dismiss?.(); } catch (e) {}
@@ -2010,15 +2015,20 @@ export default function BoardScreen({ route, navigation }) {
         maxLength={20}
       />
 
-      <Modal 
-        isVisible={sectionOptionsConfig.isVisible} 
-        onSwipeComplete={() => setSectionOptionsConfig({ isVisible: false, section: null })}
-        swipeDirection={['down']}
-        propagateSwipe={true}
-        onBackdropPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
-        style={{ margin: 0, justifyContent: 'flex-end' }}
+      <RNModal 
+        visible={Boolean(sectionOptionsConfig.isVisible)} 
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent={true}
+        onRequestClose={() => setSectionOptionsConfig({ isVisible: false, section: null })}
       >
-        <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity 
+            activeOpacity={1}
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
+          />
+          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
           <View style={styles.optionsModalDragHandle} />
           <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
             {t('Options for')} {sectionOptionsConfig.section?.title}
@@ -2092,17 +2102,23 @@ export default function BoardScreen({ route, navigation }) {
             </>
           )}
         </View>
-      </Modal>
+        </View>
+      </RNModal>
 
-      <Modal 
-        isVisible={boardOptionsConfig.isVisible} 
-        onSwipeComplete={() => setBoardOptionsConfig({ isVisible: false, board: null })}
-        swipeDirection={['down']}
-        propagateSwipe={true}
-        onBackdropPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
-        style={{ margin: 0, justifyContent: 'flex-end' }}
+      <RNModal 
+        visible={Boolean(boardOptionsConfig.isVisible)} 
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent={true}
+        onRequestClose={() => setBoardOptionsConfig({ isVisible: false, board: null })}
       >
-        <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity 
+            activeOpacity={1}
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
+          />
+          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
           <View style={styles.optionsModalDragHandle} />
           
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
@@ -2299,7 +2315,8 @@ export default function BoardScreen({ route, navigation }) {
             <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
           </TouchableOpacity>
         </View>
-      </Modal>
+        </View>
+      </RNModal>
 
       <AutoManageSettings
         isVisible={boardAutomationModal.isVisible}
@@ -2351,7 +2368,14 @@ export default function BoardScreen({ route, navigation }) {
         task={selectedTask}
         colors={colors}
         isDark={colors.background === '#121212'}
-        onPressEdit={(t) => { setSelectedTask(t); setDetailsVisible(true); }}
+        onPressEdit={(t) => {
+          TaskEditDiagnostics.record('BOARD_SCREEN_ON_PRESS_EDIT', {
+            taskId: t?.id || t?._id,
+            name: t?.taskname || t?.name,
+          });
+          setSelectedTask(t);
+          setDetailsVisible(true);
+        }}
         onPressSnooze={(t) => { setSelectedTask(t); setSnoozeVisible(true); }}
       />
 
@@ -2521,6 +2545,11 @@ const styles = StyleSheet.create({
   ellipsisText: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
   optionsModalContent: {
     padding: 20,

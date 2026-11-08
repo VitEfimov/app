@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { A11yHelper } from '../utils/a11yHelper';
 import { HapticHelper } from '../utils/hapticHelper';
+import { TaskEditDiagnostics } from '../utils/taskEditDiagnostics';
 
 const inlineEditingListeners = new Set();
 
@@ -491,6 +492,12 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   const isCompletedSection = sectionId === 'completed' || !!task?.completed;
 
   const handleTextPress = useCallback(() => {
+    TaskEditDiagnostics.record('TASK_ROW_TEXT_TAP', {
+      taskId: task?.id || task?._id,
+      name: taskTitleText,
+      disableInlineEdit,
+      isSelectionMode,
+    });
     if (isSelectionMode) {
       if (onToggleSelect && task) onToggleSelect(task.id, sectionId);
       return;
@@ -606,6 +613,12 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       ]}
       onLongPress={handleLongPress}
       onPress={() => {
+        TaskEditDiagnostics.record('TASK_ROW_CONTAINER_TAP', {
+          taskId: task?.id || task?._id,
+          name: taskTitleText,
+          isEditing,
+          isSelectionMode,
+        });
         closeOpenSwipeableRow();
         if (isSelectionMode) {
           if (onToggleSelect) onToggleSelect(task.id, sectionId);
@@ -899,6 +912,10 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
           style={styles.metadata}
           onPress={(e) => {
             e?.stopPropagation?.();
+            TaskEditDiagnostics.record('TASK_ROW_DATE_TAP', {
+              taskId: task?.id || task?._id,
+              name: taskTitleText,
+            });
             closeOpenSwipeableRow();
             if (isSelectionMode) {
               if (onToggleSelect) onToggleSelect(task.id, sectionId);

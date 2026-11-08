@@ -39,6 +39,7 @@ import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { SecurityLockHelper } from '../utils/securityLockHelper';
 import { A11yHelper } from '../utils/a11yHelper';
+import { TaskEditDiagnostics } from '../utils/taskEditDiagnostics';
 
 const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style }, ref) => {
   const [text, setText] = useState(initialValue || '');
@@ -274,6 +275,17 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
     });
     return unsubscribe;
   }, [onClose]);
+
+  useEffect(() => {
+    if (isVisible) {
+      TaskEditDiagnostics.record('TASK_DETAILS_MODAL_BECOMING_VISIBLE', {
+        isVisible: Boolean(isVisible),
+        hasTask: Boolean(task),
+        taskId: task?.id || task?._id,
+        taskName: task?.taskname || task?.name,
+      });
+    }
+  }, [isVisible, task?.id, task?._id]);
 
   const cardBg = colors.cardBg || (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)');
   const cardBorder = colors.cardBorder || colors.outlineVariant || colors.borderColor;
@@ -611,7 +623,12 @@ useEffect(() => {
     }
   };
 
-  if (!task) return null;
+  if (!task) {
+    if (isVisible) {
+      TaskEditDiagnostics.record('TASK_DETAILS_MODAL_ABORTED_NULL_TASK', { isVisible });
+    }
+    return null;
+  }
 
   const handleUpdate = (updates) => {
     // Only used for immediate local updates like priority or subtask check
@@ -1293,6 +1310,17 @@ useEffect(() => {
       animationType="slide"
       statusBarTranslucent={true}
       onRequestClose={handleClose}
+      onShow={() => {
+        TaskEditDiagnostics.record('RNMODAL_ON_SHOW', {
+          taskId: task?.id || task?._id,
+          name: task?.taskname || task?.name,
+        });
+      }}
+      onDismiss={() => {
+        TaskEditDiagnostics.record('RNMODAL_ON_DISMISS', {
+          taskId: task?.id || task?._id,
+        });
+      }}
     >
       <KeyboardAvoidingView
         style={{ flex: 1, width: '100%', backgroundColor: colors.bgCard }}

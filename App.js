@@ -768,21 +768,21 @@ function RootWrapper({ children }) {
 export default function App() {
   return (
     <ErrorBoundary>
-      <Provider store={store}>
-        <ThemeProvider>
-          <SafeAreaProvider initialMetrics={SAFE_INITIAL_METRICS}>
-            <ToastProvider>
-              <RootWrapper>
-                <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <Provider store={store}>
+          <ThemeProvider>
+            <SafeAreaProvider initialMetrics={SAFE_INITIAL_METRICS}>
+              <ToastProvider>
+                <RootWrapper>
                   <TaskRowConfigProvider>
                     <InitApp />
                   </TaskRowConfigProvider>
-                </GestureHandlerRootView>
-              </RootWrapper>
-            </ToastProvider>
-          </SafeAreaProvider>
-        </ThemeProvider>
-      </Provider>
+                </RootWrapper>
+              </ToastProvider>
+            </SafeAreaProvider>
+          </ThemeProvider>
+        </Provider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }

@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Modal as RNModal } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../styles/ThemeContext';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
@@ -56,16 +55,20 @@ export default function CalendarDayOptionsModal({
   const iconBg = isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.12)';
 
   return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      onBackButtonPress={onClose}
-      style={styles.modalContainer}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="fade"
+      statusBarTranslucent={true}
+      onRequestClose={onClose}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF') }]}>
+      <View style={styles.sheetOverlay}>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={StyleSheet.absoluteFillObject}
+          onPress={onClose}
+        />
+        <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF') }]}>
         <View style={styles.dragHandleContainer}>
           <View style={[styles.dragHandle, { backgroundColor: colors.borderColor || '#DDD' }]} />
         </View>
@@ -186,11 +189,17 @@ export default function CalendarDayOptionsModal({
           </TouchableOpacity>
         </View>
       </View>
-    </Modal>
+      </View>
+    </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   modalContainer: {
     margin: 0,
     justifyContent: 'flex-end',

@@ -32,6 +32,7 @@ import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import CreateBoardModal from '../components/CreateBoardModal';
 import CalendarDayOptionsModal from '../components/calendar/CalendarDayOptionsModal';
 import YearPickerModal, { parseCalendarHeaderDate } from '../components/YearPickerModal';
+import { TaskEditDiagnostics } from '../utils/taskEditDiagnostics';
 import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks } from '../features/taskSlice';
 import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
@@ -206,6 +207,10 @@ export default function CalendarScreen({ navigation, route }) {
   const [isQuickMenuVisible, setQuickMenuVisible] = useState(false);
 
   const handleTaskPress = useCallback((task) => {
+    TaskEditDiagnostics.record('CALENDAR_SCREEN_HANDLE_TASK_PRESS', {
+      taskId: task?.id || task?._id,
+      name: task?.taskname || task?.name,
+    });
     setSelectedTask(task);
     setDetailsVisible(true);
   }, []);
@@ -954,6 +959,10 @@ export default function CalendarScreen({ navigation, route }) {
         onClose={() => setQuickMenuVisible(false)}
         task={selectedTask}
         onEdit={(task) => {
+          TaskEditDiagnostics.record('CALENDAR_SCREEN_ON_EDIT', {
+            taskId: task?.id || task?._id,
+            name: task?.taskname || task?.name,
+          });
           setSelectedTask(task);
           setDetailsVisible(true);
         }}
