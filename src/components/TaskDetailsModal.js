@@ -197,6 +197,23 @@ const IconChevronDown = ({ color, isCollapsed }) => (
   </Svg>
 );
 
+const normalizeSubtasks = (rawSubtasks) => {
+  if (!Array.isArray(rawSubtasks)) return [];
+  return rawSubtasks.map((st, idx) => {
+    if (typeof st === 'string') {
+      return { id: `st_${idx}_${Date.now()}`, text: st, completed: false };
+    }
+    if (st && typeof st === 'object') {
+      return {
+        id: String(st.id || st._id || `st_${idx}_${Date.now()}`),
+        text: String(st.text || st.title || st.name || ''),
+        completed: Boolean(st.completed || st.done || st.isCompleted),
+      };
+    }
+    return { id: `st_${idx}_${Date.now()}`, text: '', completed: false };
+  });
+};
+
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const insets = useContext(SafeAreaInsetsContext);
@@ -223,7 +240,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const [notes, setNotes] = useState('');
   const [attachments, setAttachments] = useState([]);
-  const [subtasks, setSubtasks] = useState(task ? (task.subtasks || []) : []);
+  const [subtasks, setSubtasks] = useState(() => normalizeSubtasks(task?.subtasks));
   const [priority, setPriority] = useState('none');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerType, setDatePickerType] = useState('due');
@@ -355,11 +372,18 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
 
   useEffect(() => {
     if (isVisible && task) {
-      const initialTaskName = task.taskname || task.name || '';
-      const initialNotesText = stripHtml(task.description?.text) || '';
+      const initialTaskName = String(task.taskname || task.name || '');
+      const initialNotesText = typeof task.description === 'string'
+        ? stripHtml(task.description)
+        : stripHtml(task.description?.text) || '';
       
-      // Backwards compatibility for old base64 img
-      const existingAttachments = task.description?.attachments ? [...task.description.attachments] : [];
+      // Backwards compatibility for old base64 img or different attachment locations
+      let existingAttachments = [];
+      if (Array.isArray(task.description?.attachments)) {
+        existingAttachments = [...task.description.attachments];
+      } else if (Array.isArray(task.attachments)) {
+        existingAttachments = [...task.attachments];
+      }
       if (task.description?.img && existingAttachments.length === 0) {
         existingAttachments.push({
           id: 'legacy_img',
@@ -368,15 +392,31 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           name: 'Attached Image',
           size: 0
         });
+      } else if (task.img && existingAttachments.length === 0) {
+        existingAttachments.push({
+          id: 'legacy_img',
+          type: 'image',
+          uri: task.img,
+          name: 'Attached Image',
+          size: 0
+        });
       }
-      const initialSubtasks = task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : [];
-      const initialPriority = (task.priority || 'none').toLowerCase();
-      const initialBoardId = task.boardId || 'main';
+
+      const initialSubtasks = normalizeSubtasks(task.subtasks);
+      const initialPriority = String(task.priority || 'none').toLowerCase();
+      const initialBoardId = String(task.boardId || task.board || 'main');
       const rawDate = task.completionDate || task.dateString || task.dueDate || task.date || '';
-      const initialDate = (typeof rawDate === 'string' && rawDate.includes('T'))
-        ? rawDate.split('T')[0]
-        : (rawDate ? dayjs(rawDate).format('YYYY-MM-DD') : '');
-      const initialTimeVal = task.time || null;
+      let initialDate = '';
+      if (rawDate) {
+        if (typeof rawDate === 'string' && rawDate.includes('T')) {
+          const parts = rawDate.split('T')[0];
+          initialDate = dayjs(parts).isValid() ? parts : '';
+        } else {
+          const d = dayjs(rawDate);
+          initialDate = d.isValid() ? d.format('YYYY-MM-DD') : '';
+        }
+      }
+      const initialTimeVal = (typeof task.time === 'string' && task.time.trim() !== '') ? task.time : null;
 
       let config = task.repeatConfig || { preset: task.repeatFrequency || (task.repeat === 'yearly' ? 'every_year' : 'None') };
       if (typeof config === 'string') {
@@ -436,7 +476,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
         keepNotificationAllDay: initialKeepNotificationVal,
       };
     }
-  }, [isVisible, task?.id]);
+  }, [isVisible, task?.id, task?._id]);
 
 
 useEffect(() => {
@@ -604,10 +644,11 @@ useEffect(() => {
   const executeSave = async ({ updateSeries = false } = {}) => {
     const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
     let updates = {};
-    if (taskName !== task.taskname) updates.name = taskName;
+    if (taskName !== (task.taskname || task.name || '')) updates.name = taskName;
     
     const initialAttachments = task.description?.attachments || (task.description?.img ? [{ id: 'legacy_img', type: 'image', uri: task.description.img }] : []);
-    if (currentNotes !== stripHtml(task.description?.text) || JSON.stringify(attachments) !== JSON.stringify(initialAttachments)) {
+    const initialNotes = typeof task.description === 'string' ? stripHtml(task.description) : stripHtml(task.description?.text);
+    if (currentNotes !== initialNotes || JSON.stringify(attachments) !== JSON.stringify(initialAttachments)) {
       updates.description = { 
         text: currentNotes, 
         img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', // keep first img for legacy support
@@ -618,7 +659,7 @@ useEffect(() => {
     
     if (selectedTime !== (task.time || '')) updates.time = selectedTime;
     if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
-    if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
+    if (priority !== String(task.priority || 'none').toLowerCase()) updates.priority = priority;
     if (selectedBoardId !== (task.boardId || 'main')) updates.boardId = selectedBoardId;
     
     const effectiveStartDate = selectedDate || repeatStartDate || dayjs().format('YYYY-MM-DD');
@@ -642,7 +683,7 @@ useEffect(() => {
     const reminderChanged = reminder !== (task.reminder || 'None');
     const isAlarmChanged = isAlarm !== (task.isAlarm || false);
     const keepNotificationAllDayChanged = keepNotificationAllDay !== (task.keepNotificationAllDay || false);
-    const nameChanged = taskName !== task.taskname;
+    const nameChanged = taskName !== (task.taskname || task.name || '');
 
     if (isAlarmChanged) updates.isAlarm = isAlarm;
     if (keepNotificationAllDayChanged) updates.keepNotificationAllDay = keepNotificationAllDay;
@@ -1857,26 +1898,30 @@ useEffect(() => {
 
         </View>
 
-        <ConfirmModal
-          isVisible={confirmConfig.isVisible}
-          title={confirmConfig.title}
-          message={confirmConfig.message}
-          confirmText={confirmConfig.confirmText}
-          cancelText={confirmConfig.cancelText || t('Cancel')}
-          hideCancel={confirmConfig.hideCancel}
-          isDestructive={confirmConfig.isDestructive}
-          secondaryIsDestructive={confirmConfig.secondaryIsDestructive}
-          secondaryConfirmText={confirmConfig.secondaryConfirmText}
-          onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
-          onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
-          onConfirm={confirmConfig.onConfirm}
-        />
+        {confirmConfig.isVisible && (
+          <ConfirmModal
+            isVisible={confirmConfig.isVisible}
+            title={confirmConfig.title}
+            message={confirmConfig.message}
+            confirmText={confirmConfig.confirmText}
+            cancelText={confirmConfig.cancelText || t('Cancel')}
+            hideCancel={confirmConfig.hideCancel}
+            isDestructive={confirmConfig.isDestructive}
+            secondaryIsDestructive={confirmConfig.secondaryIsDestructive}
+            secondaryConfirmText={confirmConfig.secondaryConfirmText}
+            onSecondaryConfirm={confirmConfig.onSecondaryConfirm}
+            onCancel={() => setConfirmConfig(prev => ({ ...prev, isVisible: false }))}
+            onConfirm={confirmConfig.onConfirm}
+          />
+        )}
 
-        <PremiumModal
-          isVisible={isPremiumModalVisible}
-          onClose={() => setPremiumModalVisible(false)}
-          featureName={premiumFeatureName}
-        />
+        {isPremiumModalVisible && (
+          <PremiumModal
+            isVisible={isPremiumModalVisible}
+            onClose={() => setPremiumModalVisible(false)}
+            featureName={premiumFeatureName}
+          />
+        )}
 
         {isAttachmentOptionsVisible && (
         <RNModal
@@ -2103,67 +2148,69 @@ useEffect(() => {
         </RNModal>
         )}
 
-        <YearPickerModal
-          isVisible={isYearPickerVisible}
-          onClose={() => setYearPickerVisible(false)}
-          currentYear={dayjs(
-            datePickerType === 'due' 
-              ? (selectedDate || dayjs().format('YYYY-MM-DD'))
-              : datePickerType === 'repeatStart'
-              ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-              : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-          ).year()}
-          currentMonth={dayjs(
-            datePickerType === 'due' 
-              ? (selectedDate || dayjs().format('YYYY-MM-DD'))
-              : datePickerType === 'repeatStart'
-              ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-              : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
-          ).month()}
-          onSelectYear={(year) => {
-            if (datePickerType === 'due') {
-              const newDate = dayjs(selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
-              setSelectedDate(newDate);
-              if (!repeatStartDate) {
+        {isYearPickerVisible && (
+          <YearPickerModal
+            isVisible={isYearPickerVisible}
+            onClose={() => setYearPickerVisible(false)}
+            currentYear={dayjs(
+              datePickerType === 'due' 
+                ? (selectedDate || dayjs().format('YYYY-MM-DD'))
+                : datePickerType === 'repeatStart'
+                ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+                : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+            ).year()}
+            currentMonth={dayjs(
+              datePickerType === 'due' 
+                ? (selectedDate || dayjs().format('YYYY-MM-DD'))
+                : datePickerType === 'repeatStart'
+                ? (repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+                : (repeatEndDate || repeatStartDate || selectedDate || dayjs().format('YYYY-MM-DD'))
+            ).month()}
+            onSelectYear={(year) => {
+              if (datePickerType === 'due') {
+                const newDate = dayjs(selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
+                setSelectedDate(newDate);
+                if (!repeatStartDate) {
+                  setRepeatStartDate(newDate);
+                }
+                if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
+                  setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
+                }
+              } else if (datePickerType === 'repeatStart') {
+                const newDate = dayjs(repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
                 setRepeatStartDate(newDate);
+                if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
+                  setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
+                }
+              } else if (datePickerType === 'repeatEnd') {
+                const newDate = dayjs(repeatEndDate || repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
+                setRepeatEndDate(newDate);
               }
-              if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
-                setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
-              }
-            } else if (datePickerType === 'repeatStart') {
-              const newDate = dayjs(repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
-              setRepeatStartDate(newDate);
-              if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
-                setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
-              }
-            } else if (datePickerType === 'repeatEnd') {
-              const newDate = dayjs(repeatEndDate || repeatStartDate || selectedDate || dayjs()).year(year).format('YYYY-MM-DD');
-              setRepeatEndDate(newDate);
-            }
-          }}
-          onSelectMonthYear={(year, month) => {
-            if (datePickerType === 'due') {
-              const newDate = dayjs(selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
-              setSelectedDate(newDate);
-              if (!repeatStartDate) {
+            }}
+            onSelectMonthYear={(year, month) => {
+              if (datePickerType === 'due') {
+                const newDate = dayjs(selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
+                setSelectedDate(newDate);
+                if (!repeatStartDate) {
+                  setRepeatStartDate(newDate);
+                }
+                if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
+                  setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
+                }
+              } else if (datePickerType === 'repeatStart') {
+                const newDate = dayjs(repeatStartDate || selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
                 setRepeatStartDate(newDate);
+                if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
+                  setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
+                }
+              } else if (datePickerType === 'repeatEnd') {
+                const newDate = dayjs(repeatEndDate || repeatStartDate || selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
+                setRepeatEndDate(newDate);
               }
-              if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
-                setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
-              }
-            } else if (datePickerType === 'repeatStart') {
-              const newDate = dayjs(repeatStartDate || selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
-              setRepeatStartDate(newDate);
-              if (repeatEndDate && !dayjs(repeatEndDate).isAfter(dayjs(newDate))) {
-                setRepeatEndDate(dayjs(newDate).add(1, 'year').format('YYYY-MM-DD'));
-              }
-            } else if (datePickerType === 'repeatEnd') {
-              const newDate = dayjs(repeatEndDate || repeatStartDate || selectedDate || dayjs()).year(year).month(month).format('YYYY-MM-DD');
-              setRepeatEndDate(newDate);
-            }
-          }}
-          colors={colors}
-        />
+            }}
+            colors={colors}
+          />
+        )}
 
         {selectedFullscreenImage && (
           <View style={[StyleSheet.absoluteFillObject, styles.fullscreenImageOverlay, { zIndex: 999999, elevation: 999999 }]}>
@@ -2208,27 +2255,31 @@ useEffect(() => {
             </View>
           </View>
         )}
-      <CustomRepeatModal
-        isVisible={isRepeatModalVisible}
-        onClose={() => setIsRepeatModalVisible(false)}
-        initialConfig={repeatConfig}
-        onSave={(newConfig) => {
-          setRepeatConfig(newConfig);
-          if (newConfig && newConfig.preset && newConfig.preset !== 'None') {
-            const currentStart = selectedDate || repeatStartDate || dayjs().format('YYYY-MM-DD');
-            setRepeatStartDate(currentStart);
-            if (!repeatEndDate || !dayjs(repeatEndDate).isAfter(dayjs(currentStart))) {
-              setRepeatEndDate(dayjs(currentStart).add(1, 'year').format('YYYY-MM-DD'));
+      {isRepeatModalVisible && (
+        <CustomRepeatModal
+          isVisible={isRepeatModalVisible}
+          onClose={() => setIsRepeatModalVisible(false)}
+          initialConfig={repeatConfig}
+          onSave={(newConfig) => {
+            setRepeatConfig(newConfig);
+            if (newConfig && newConfig.preset && newConfig.preset !== 'None') {
+              const currentStart = selectedDate || repeatStartDate || dayjs().format('YYYY-MM-DD');
+              setRepeatStartDate(currentStart);
+              if (!repeatEndDate || !dayjs(repeatEndDate).isAfter(dayjs(currentStart))) {
+                setRepeatEndDate(dayjs(currentStart).add(1, 'year').format('YYYY-MM-DD'));
+              }
             }
-          }
-        }}
-      />
-      <CustomReminderModal
-        isVisible={isCustomReminderModalVisible}
-        initialValue={reminder}
-        onClose={() => setIsCustomReminderModalVisible(false)}
-        onSave={handleCustomReminderSave}
-      />
+          }}
+        />
+      )}
+      {isCustomReminderModalVisible && (
+        <CustomReminderModal
+          isVisible={isCustomReminderModalVisible}
+          initialValue={reminder}
+          onClose={() => setIsCustomReminderModalVisible(false)}
+          onSave={handleCustomReminderSave}
+        />
+      )}
       </KeyboardAvoidingView>
     </RNModal>
   );
@@ -2243,8 +2294,6 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     width: '100%',
-    height: '100%',
-    maxHeight: '100%',
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     overflow: 'hidden',

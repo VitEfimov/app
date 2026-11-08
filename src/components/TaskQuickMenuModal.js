@@ -429,7 +429,7 @@ export default function TaskQuickMenuModal({
         
         <View style={styles.header}>
           <Text style={[styles.taskTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            {task.taskname}
+            {task.taskname || task.name || ''}
           </Text>
         </View>
 
