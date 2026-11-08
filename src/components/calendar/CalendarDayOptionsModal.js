@@ -68,7 +68,7 @@ export default function CalendarDayOptionsModal({
           style={StyleSheet.absoluteFillObject}
           onPress={onClose}
         />
-        <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF') }]}>
+        <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF'), width: '100%', zIndex: 1, elevation: 6 }]}>
         <View style={styles.dragHandleContainer}>
           <View style={[styles.dragHandle, { backgroundColor: colors.borderColor || '#DDD' }]} />
         </View>
@@ -205,9 +205,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
+    width: '100%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    zIndex: 1,
+    elevation: 6,
   },
   dragHandleContainer: {
     alignItems: 'center',

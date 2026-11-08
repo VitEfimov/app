@@ -99,8 +99,8 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
 
   const panGesture = Gesture.Pan()
     .enabled(enabled)
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-35, 35])
+    .activeOffsetX([-8, 8])
+    .failOffsetY([-25, 25])
     .cancelsTouchesInView(false)
     .onStart(() => {
       startX.value = translateX.value;

@@ -435,7 +435,7 @@ export default function TaskQuickMenuModal({
           style={StyleSheet.absoluteFillObject}
           onPress={onClose}
         />
-        <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
+        <View style={[styles.modalContent, { backgroundColor: colors.bgCard, width: '100%', zIndex: 1, elevation: 6 }]}>
         <View style={styles.dragHandle} />
         
         <View style={styles.header}>
@@ -498,12 +498,15 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
+    width: '100%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 15,
     paddingBottom: 30,
     paddingHorizontal: 20,
-    maxHeight: '70%'
+    maxHeight: '70%',
+    zIndex: 1,
+    elevation: 6,
   },
   dragHandle: {
     width: 40,

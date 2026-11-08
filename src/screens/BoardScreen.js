@@ -1336,6 +1336,7 @@ export default function BoardScreen({ route, navigation }) {
           boardTypeProp={activeType}
           hideDate={isListBoard}
           hideBoardBadge={true}
+          disableInlineEdit={true}
           isSelectionMode={selectionMode.isActive}
           isSelected={selectedTaskIdsSet.has(task.id) || selectedTaskIdsSet.has(task._id)}
           onToggleSelect={handleToggleSelectTask}
@@ -1825,8 +1826,8 @@ export default function BoardScreen({ route, navigation }) {
     <ScreenErrorBoundary screenName="BoardScreen">
       <KeyboardAvoidingView 
         style={{ flex: 1, backgroundColor: colors.bgMain }} 
-        behavior="padding"
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <View 
           style={[styles.container, { backgroundColor: colors.bgMain }, ResponsiveHelper.getCenteredContainerStyle(windowWidth, 880)]}
@@ -2031,7 +2032,7 @@ export default function BoardScreen({ route, navigation }) {
             style={StyleSheet.absoluteFillObject}
             onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
           />
-          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: '100%', zIndex: 1, elevation: 6 }]}>
           <View style={styles.optionsModalDragHandle} />
           <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
             {t('Options for')} {sectionOptionsConfig.section?.title}
@@ -2121,7 +2122,7 @@ export default function BoardScreen({ route, navigation }) {
             style={StyleSheet.absoluteFillObject}
             onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
           />
-          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: '100%', zIndex: 1, elevation: 6 }]}>
           <View style={styles.optionsModalDragHandle} />
           
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
@@ -2554,11 +2555,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   optionsModalContent: {
+    width: '100%',
     padding: 20,
     paddingBottom: 40,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     alignItems: 'center',
+    zIndex: 1,
+    elevation: 6,
   },
   optionsModalDragHandle: {
     width: 40,
