@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
-import Modal from './AppModal';
+import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
@@ -111,18 +111,16 @@ export default function TaskQuickMenuModal({
 
   if (!task) return null;
 
-  const resolvedTaskId = task.id || task._id;
-
   const handleComplete = () => {
     const newCompletedState = !task.completed;
-    dispatch(updateTask({ taskId: resolvedTaskId, completed: newCompletedState }));
+    dispatch(updateTask({ taskId: task.id, completed: newCompletedState }));
     onClose();
     
     showToast(
       newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
       t('Undo'),
       () => {
-        dispatch(updateTask({ taskId: resolvedTaskId, completed: !newCompletedState, isUndo: true }));
+        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState, isUndo: true }));
       }
     );
   };
@@ -131,7 +129,6 @@ export default function TaskQuickMenuModal({
 
   const handleDelete = () => {
     const currentTask = task;
-    const currentTaskId = currentTask.id || currentTask._id;
     if (isRepeatingTask) {
       onClose();
       setTimeout(() => {
@@ -144,7 +141,7 @@ export default function TaskQuickMenuModal({
           secondaryIsDestructive: true,
           onConfirm: () => {
             setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-            dispatch(deleteTask({ taskId: currentTaskId }));
+            dispatch(deleteTask({ taskId: currentTask.id }));
             showToast(
               t('Task Deleted'),
               t('Undo'),
@@ -156,7 +153,7 @@ export default function TaskQuickMenuModal({
           secondaryConfirmText: t('All recurring tasks'),
           onSecondaryConfirm: () => {
             setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-            dispatch(deleteTask({ taskId: currentTaskId }));
+            dispatch(deleteTask({ taskId: currentTask.id }));
             if (currentTask.recurringSeriesId) {
               dispatch(deleteRecurringSeries({ seriesId: currentTask.recurringSeriesId }));
             }
@@ -165,7 +162,7 @@ export default function TaskQuickMenuModal({
         });
       }, 300);
     } else {
-      dispatch(deleteTask({ taskId: currentTaskId }));
+      dispatch(deleteTask({ taskId: currentTask.id }));
       onClose();
       
       showToast(
@@ -305,7 +302,7 @@ export default function TaskQuickMenuModal({
 
   const handleSelectBoard = (targetBoardId) => {
     const prevBoardId = task.boardId || 'main';
-    dispatch(updateTask({ taskId: resolvedTaskId, boardId: targetBoardId }));
+    dispatch(updateTask({ taskId: task.id, boardId: targetBoardId }));
     const targetBoard = boards.find(b => b.id === targetBoardId);
     const boardName = targetBoard ? (targetBoard.name === 'Main' ? t('Main') : targetBoard.name) : t('Board');
     
@@ -313,7 +310,7 @@ export default function TaskQuickMenuModal({
       `${t('Moved to')} ${boardName}`,
       t('Undo'),
       () => {
-        dispatch(updateTask({ taskId: resolvedTaskId, boardId: prevBoardId, isUndo: true }));
+        dispatch(updateTask({ taskId: task.id, boardId: prevBoardId, isUndo: true }));
       }
     );
   };
@@ -362,13 +359,13 @@ export default function TaskQuickMenuModal({
     }
 
     const prevDate = task.completionDate;
-    dispatch(updateTask({ taskId: resolvedTaskId, completionDate: newDate }));
+    dispatch(updateTask({ taskId: task.id, completionDate: newDate }));
     onClose();
     showToast(
       direction === 'forward' ? t('Task moved forward') : t('Task moved backward'),
       t('Undo'),
       () => {
-        dispatch(updateTask({ taskId: resolvedTaskId, completionDate: prevDate, isUndo: true }));
+        dispatch(updateTask({ taskId: task.id, completionDate: prevDate, isUndo: true }));
       }
     );
   };
@@ -377,32 +374,12 @@ export default function TaskQuickMenuModal({
   const handleSnoozeAction = onPressSnooze || onSnooze;
 
   const actionItems = [
-    {
-      label: t('Edit'),
-      icon: IconEdit,
-      onPress: () => {
-        const targetTask = task;
-        onClose();
-        if (typeof handleEditAction === 'function') {
-          setTimeout(() => handleEditAction(targetTask), 80);
-        }
-      },
-    },
+    { label: t('Edit'), icon: IconEdit, onPress: () => { onClose(); if (typeof handleEditAction === 'function') handleEditAction(task); } },
     { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
     { label: t('Move Forward'), icon: IconMoveForward, onPress: () => handleMoveTaskDate('forward') },
     { label: t('Move Backward'), icon: IconMoveBackward, onPress: () => handleMoveTaskDate('backward') },
-    { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 80); } },
-    {
-      label: t('Snooze'),
-      icon: IconSnooze,
-      onPress: () => {
-        const targetTask = task;
-        onClose();
-        if (typeof handleSnoozeAction === 'function') {
-          setTimeout(() => handleSnoozeAction(targetTask), 80);
-        }
-      },
-    },
+    { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 300); } },
+    { label: t('Snooze'), icon: IconSnooze, onPress: () => { onClose(); if (typeof handleSnoozeAction === 'function') handleSnoozeAction(task); } },
     { label: t('Duplicate'), icon: IconDuplicate, onPress: handleDuplicate },
     { label: t('Share'), icon: IconShare, onPress: handleShare },
     { label: t('Delete'), icon: IconDelete, onPress: handleDelete, danger: true },

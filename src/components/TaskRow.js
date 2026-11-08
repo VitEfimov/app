@@ -371,7 +371,6 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
 
   const handleSwipeDelete = useCallback(() => {
     if (!task) return;
-    const resolvedTaskId = task.id || task._id;
     closeSwipeable();
     if (isRepeatingTask) {
       setConfirmConfig({
@@ -383,7 +382,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         secondaryIsDestructive: true,
         onConfirm: () => {
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          dispatch(deleteTask({ taskId: resolvedTaskId }));
+          dispatch(deleteTask({ taskId: task.id }));
           showToast(
             t('Task Deleted'),
             t('Undo'),
@@ -395,7 +394,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         secondaryConfirmText: t('All recurring tasks'),
         onSecondaryConfirm: () => {
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          dispatch(deleteTask({ taskId: resolvedTaskId }));
+          dispatch(deleteTask({ taskId: task.id }));
           if (task.recurringSeriesId) {
             dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId }));
           }
@@ -403,7 +402,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         }
       });
     } else {
-      dispatch(deleteTask({ taskId: resolvedTaskId }));
+      dispatch(deleteTask({ taskId: task.id }));
       showToast(
         t('Task Deleted'),
         t('Undo'),
@@ -491,10 +490,9 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
 
   const isCompletedSection = sectionId === 'completed' || !!task?.completed;
 
-  const handleTextPress = useCallback((e) => {
-    e?.stopPropagation?.();
+  const handleTextPress = useCallback(() => {
     if (isSelectionMode) {
-      if (onToggleSelect && task) onToggleSelect(task.id || task._id, sectionId);
+      if (onToggleSelect && task) onToggleSelect(task.id, sectionId);
       return;
     }
     if (disableInlineEdit) {
@@ -509,13 +507,9 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
 
   const submitEdit = useCallback(() => {
     setIsEditing(false);
-    setCursorSelection(undefined);
     Keyboard.dismiss();
-    const trimmed = editName.trim();
-    const currentName = task?.taskname ?? task?.name ?? '';
-    const resolvedTaskId = task?.id || task?._id;
-    if (trimmed !== '' && trimmed !== currentName && resolvedTaskId) {
-      dispatch(updateTask({ taskId: resolvedTaskId, name: editName }));
+    if (editName.trim() !== '' && editName !== task?.taskname) {
+      dispatch(updateTask({ taskId: task.id, name: editName }));
     }
   }, [editName, task, dispatch]);
 
@@ -591,13 +585,12 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       onLongPress(task);
       return;
     }
-    if (onToggleSelect) onToggleSelect(task.id || task._id, sectionId);
+    if (onToggleSelect) onToggleSelect(task.id, sectionId);
   }, [onLongPress, task, onToggleSelect, sectionId]);
 
   const taskRowContent = (
     <TouchableOpacity
       testID={testIDPrefix ? `${testIDPrefix}task_row_${task.taskname || task.name}` : `task_row_${task.taskname || task.name}`}
-      disabled={isEditing}
       accessible={true}
       accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
       accessibilityLabel={A11yHelper.formatTaskAccessibilityLabel(task, { t })}
@@ -615,7 +608,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       onPress={() => {
         closeOpenSwipeableRow();
         if (isSelectionMode) {
-          if (onToggleSelect) onToggleSelect(task.id || task._id, sectionId);
+          if (onToggleSelect) onToggleSelect(task.id, sectionId);
           return;
         }
         if (isEditing) {
@@ -642,11 +635,10 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         }
         accessibilityHint={t('Toggles completion status for {{name}}', { name: task.taskname || task.name }) || `Toggles completion status for ${task.taskname || task.name}`}
         style={styles.checkbox}
-        onPress={(e) => {
-          e?.stopPropagation?.();
+        onPress={() => {
           closeOpenSwipeableRow();
           if (isSelectionMode) {
-            if (onToggleSelect) onToggleSelect(task.id || task._id, sectionId);
+            if (onToggleSelect) onToggleSelect(task.id, sectionId);
           } else {
             handleToggleComplete();
           }
@@ -665,22 +657,31 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       <View style={styles.content}>
         <View style={styles.taskNameBox}>
           {isEditing ? (
-            <View style={{ width: '100%', justifyContent: 'center' }}>
+            <View style={{ position: 'relative', flexShrink: 1, justifyContent: 'center' }}>
+              <Text
+                numberOfLines={taskNameWrap === 'nowrap' ? 1 : 2}
+                style={[
+                  styles.title,
+                  { color: 'transparent', fontSize: titleFontSize, flexShrink: 1 }
+                ]}
+                accessible={false}
+                importantForAccessibility="no"
+              >
+                {editName}
+              </Text>
               <TextInput
                 style={[
                   styles.title,
                   styles.titleInput,
-                  { color: colors.textPrimary, fontSize: titleFontSize, width: '100%' }
+                  { color: colors.textPrimary, fontSize: titleFontSize, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }
                 ]}
                 value={editName}
                 onChangeText={setEditName}
                 onBlur={submitEdit}
                 onSubmitEditing={submitEdit}
                 autoFocus={true}
-                selection={cursorSelection || undefined}
-                onSelectionChange={() => {
-                  if (cursorSelection) setCursorSelection(undefined);
-                }}
+                selection={cursorSelection}
+                onSelectionChange={(e) => setCursorSelection(e.nativeEvent.selection)}
                 multiline={true}
                 blurOnSubmit={true}
                 returnKeyType="done"
@@ -709,7 +710,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
                   task.completed && { textDecorationLine: 'line-through', opacity: 0.5 }
                 ]}
               >
-                {taskTitleText}
+                {task.taskname}
               </Text>
             </TouchableOpacity>
           )}
@@ -900,7 +901,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
             e?.stopPropagation?.();
             closeOpenSwipeableRow();
             if (isSelectionMode) {
-              if (onToggleSelect) onToggleSelect(task.id || task._id, sectionId);
+              if (onToggleSelect) onToggleSelect(task.id, sectionId);
               return;
             }
             if (isEditing) {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Modal from './AppModal';
+import Modal from 'react-native-modal';
 import { useTheme } from '../styles/ThemeContext';
 
 export default function ConfirmModal({ isVisible, title, message, onCancel, onConfirm, confirmText = 'Confirm', cancelText = 'Cancel', isDestructive = false, secondaryIsDestructive = false, hideCancel = false, secondaryConfirmText, onSecondaryConfirm }) {

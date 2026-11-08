@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Modal from './AppModal';
+import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
 import { executePendingCleanup, cancelPendingCleanup } from '../features/taskSlice';
 import { useTheme } from '../styles/ThemeContext';

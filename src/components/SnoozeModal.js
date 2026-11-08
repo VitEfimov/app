@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import Modal from './AppModal';
+import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask } from '../features/taskSlice';
@@ -101,8 +101,6 @@ export default function SnoozeModal({
 
   if (!task) return null;
 
-  const resolvedTaskId = task.id || task._id;
-
   const handleSnoozeDate = (mode) => {
     let targetDate = dayjs();
     let targetTime = task.time; // preserve time if possible
@@ -134,7 +132,7 @@ export default function SnoozeModal({
     }
 
     dispatch(updateTask({
-      taskId: resolvedTaskId,
+      taskId: task.id,
       completionDate: targetDate.toISOString(),
       time: targetTime
     }));
@@ -159,7 +157,7 @@ export default function SnoozeModal({
     }
 
     dispatch(updateTask({
-      taskId: resolvedTaskId,
+      taskId: task.id,
       reminder: newReminderStr
     }));
     onClose();
@@ -174,12 +172,12 @@ export default function SnoozeModal({
 
     if (action === 'nag') {
       dispatch(updateTask({
-        taskId: resolvedTaskId,
+        taskId: task.id,
         isNagMode: !task.isNagMode
       }));
     } else if (action === 'escalating') {
       dispatch(updateTask({
-        taskId: resolvedTaskId,
+        taskId: task.id,
         escalationLevel: 'active'
       }));
     }

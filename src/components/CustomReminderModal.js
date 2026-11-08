@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import Modal from './AppModal';
+import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../styles/ThemeContext';
 

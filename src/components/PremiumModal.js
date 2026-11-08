@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Modal from './AppModal';
+import Modal from 'react-native-modal';
 import { useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { toggleDevPremium } from '../features/entitlementSlice';

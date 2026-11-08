@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, useWindowDimensions } from 'react-native';
-import Modal from './AppModal';
+import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { BOARD_COLORS, BOARD_COLOR_NAMES } from '../utils/boardColors';

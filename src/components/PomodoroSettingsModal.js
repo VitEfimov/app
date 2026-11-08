@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Modal as RNModal } from 'react-native';
-import Modal from './AppModal';
+import Modal from 'react-native-modal';
 import { useDispatch, useSelector } from 'react-redux';
 import { togglePomodoroSettings, updatePomodoroSettings } from '../features/pomodoroSlice';
 import { useTheme } from '../styles/ThemeContext';

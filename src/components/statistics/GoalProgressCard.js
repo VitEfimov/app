@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSelector, useDispatch } from 'react-redux';
-import Modal from '../AppModal';
+import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
 import { addGoal, updateGoal, deleteGoal } from '../../features/statsSlice';
 import { selectWeeklyAnalytics, selectMonthlyAnalytics } from '../../features/statsSelectors';

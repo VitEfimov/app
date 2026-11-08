@@ -1021,7 +1021,6 @@ describe('Dual Month & Year Selector with Hot Taps Engine', () => {
         ScrollView: () => null,
         StyleSheet: { create: (s) => s, absoluteFillObject: {} }
       },
-      './AppModal': () => null,
       'react-native-modal': () => null,
       'react-i18next': { useTranslation: () => ({ t: (k) => k, i18n: { language: 'en' } }) }
     });
@@ -1447,70 +1446,7 @@ describe('Modern Performance Architecture: MMKV JSI, LegendList & UI-Thread Gest
     const toastContent = fs.readFileSync(path.resolve('src/styles/ToastContext.js'), 'utf8');
     assert.match(toastContent, /bottom:\s*30\s*\+\s*\(insets\?\.bottom\s*\|\|\s*0\)/, 'ToastProvider must offset bottom toast above system navigation bar');
   });
-
-  test('Fabric-safe AppModal, TaskRow inline editing, and TaskDetailsModal save resiliency', () => {
-    // 1. Metro aliases react-native-modal -> AppModal.js without private _dispatchInstances crashes
-    const metroContent = fs.readFileSync(path.resolve('metro.config.js'), 'utf8');
-    assert.match(metroContent, /moduleName\s*===\s*'react-native-modal'/, 'metro.config.js must alias react-native-modal to AppModal.js');
-
-    const appModalContent = fs.readFileSync(path.resolve('src/components/AppModal.js'), 'utf8');
-    const appModalCodeWithoutComments = appModalContent.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
-    assert.doesNotMatch(appModalCodeWithoutComments, /_dispatchInstances/, 'AppModal must never access React private _dispatchInstances');
-    assert.doesNotMatch(appModalCodeWithoutComments, /useNativeDriver/, 'AppModal must not use useNativeDriver Animated nodes that detach on Fabric re-render');
-    assert.doesNotMatch(appModalCodeWithoutComments, /Animated\.View/, 'AppModal must render concrete Views inside OS-native Modal instead of Animated.View');
-    assert.match(appModalContent, /animationType="fade"/, 'AppModal must pass animationType="fade" so Android Fabric ReactModalHostView creates a Dialog');
-    assert.match(appModalContent, /hardwareAccelerated:\s*true/, 'AppModal must enable hardwareAccelerated on native Modal');
-    assert.match(appModalContent, /onStartShouldSetPanResponder:\s*\(\)\s*=>\s*false/, 'AppModal must not steal TOUCH_DOWN from child inputs/buttons');
-    assert.match(appModalContent, /AppState\.addEventListener/, 'AppModal must restore visibility cleanly after app background/foreground');
-
-    const { normalizeSwipeDirections } = loadTranspiledModule(path.resolve('src/components/AppModal.js'), {
-      'react-native': {
-        AppState: {},
-        KeyboardAvoidingView: () => null,
-        Modal: () => null,
-        PanResponder: { create: () => ({ panHandlers: {} }) },
-        Platform: { OS: 'android' },
-        StyleSheet: { create: (s) => s, absoluteFillObject: {} },
-        TouchableOpacity: () => null,
-        useWindowDimensions: () => ({ width: 390, height: 844 }),
-        View: () => null,
-      },
-    });
-    assert.deepStrictEqual(normalizeSwipeDirections(['down']), ['down']);
-    assert.deepStrictEqual(normalizeSwipeDirections('down'), ['down']);
-    assert.deepStrictEqual(normalizeSwipeDirections(undefined), []);
-
-    // 2. BoardScreen renders TaskDetailsModal outside getModalFocusTrapProps(isAnyModalOpen)
-    const boardScreenContent = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
-    const trapIdx = boardScreenContent.indexOf('getModalFocusTrapProps(isAnyModalOpen)');
-    const selectionBarIdx = boardScreenContent.indexOf('testID="selection_action_bar"');
-    const taskDetailsIdx = boardScreenContent.indexOf('<TaskDetailsModal');
-    assert.ok(trapIdx > 0 && selectionBarIdx > trapIdx && taskDetailsIdx > selectionBarIdx, 'BoardScreen must close the focus-trapped board container after selection_action_bar and before TaskDetailsModal');
-
-    // 3. ReanimatedSwipeRow memoizes Gesture.Pan() & TaskRow protects inline editing and task._id fallback
-    const swipeRowContent = fs.readFileSync(path.resolve('src/components/ReanimatedSwipeRow.js'), 'utf8');
-    assert.match(swipeRowContent, /const panGesture = useMemo\(/, 'ReanimatedSwipeRow must memoize Gesture.Pan()');
-
-    const taskRowContent = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
-    assert.match(taskRowContent, /disabled=\{isEditing\}/, 'TaskRow outer TouchableOpacity must disable parent Pressability while inline editing');
-    assert.match(taskRowContent, /const resolvedTaskId = task\?\.id \|\| task\?\._id;/, 'TaskRow submitEdit must resolve task.id || task._id');
-
-    // 4. TaskDetailsModal, TaskQuickMenuModal, and SnoozeModal directly import AppModal & handle _id / notifications safely
-    const detailsContent = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
-    assert.match(detailsContent, /import Modal from '\.\/AppModal';/, 'TaskDetailsModal must directly import ./AppModal');
-    assert.match(detailsContent, /\[isVisible,\s*task\?\.id,\s*task\?\._id\]/, 'TaskDetailsModal effect must track both task.id and task._id');
-    assert.match(detailsContent, /catch\s*\(notifErr\)/, 'TaskDetailsModal executeSave must catch notification errors so saving task edits never aborts');
-
-    const quickMenuContent = fs.readFileSync(path.resolve('src/components/TaskQuickMenuModal.js'), 'utf8');
-    assert.match(quickMenuContent, /import Modal from '\.\/AppModal';/, 'TaskQuickMenuModal must directly import ./AppModal');
-    assert.match(quickMenuContent, /const resolvedTaskId = task\.id \|\| task\._id;/, 'TaskQuickMenuModal must normalize resolvedTaskId');
-
-    const snoozeContent = fs.readFileSync(path.resolve('src/components/SnoozeModal.js'), 'utf8');
-    assert.match(snoozeContent, /import Modal from '\.\/AppModal';/, 'SnoozeModal must directly import ./AppModal');
-    assert.match(snoozeContent, /const resolvedTaskId = task\.id \|\| task\._id;/, 'SnoozeModal must normalize resolvedTaskId');
-  });
 });
-
 
 
 

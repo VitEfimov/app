@@ -15,7 +15,7 @@ import MoveBoardModal from '../components/MoveBoardModal';
 import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
-import Modal from '../components/AppModal';
+import Modal from 'react-native-modal';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard, getDateThresholds, classifyTaskDate, compareTasks, PRIORITY_SCORES } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
@@ -1989,34 +1989,6 @@ export default function BoardScreen({ route, navigation }) {
         />
       )}
 
-      {selectionMode.isActive && (
-        <View testID="selection_action_bar" style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
-          <Text testID="selection_count_text" style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
-            <TouchableOpacity testID="action_bar_all" accessible={true} accessibilityRole="button" accessibilityLabel="Select all" onPress={handleSelectAll} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_move" accessible={true} accessibilityRole="button" accessibilityLabel="Move selected" onPress={() => setMoveBoardVisible(true)} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Move')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_share" accessible={true} accessibilityRole="button" accessibilityLabel="Share selected" onPress={handleShareSelected} style={styles.actionBtn}>
-              <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>{t('Share')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_complete" accessible={true} accessibilityRole="button" accessibilityLabel="Complete selected" onPress={handleCompleteSelected} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Complete')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_delete" accessible={true} accessibilityRole="button" accessibilityLabel="Delete selected" onPress={handleDeleteSelected} style={styles.actionBtn}>
-              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Delete')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_cancel" accessible={true} accessibilityRole="button" accessibilityLabel="Cancel selection" onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
-              <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>{t('Cancel')}</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      )}
-
-      </View>
-
       <TaskDetailsModal 
         task={selectedTask}
         isVisible={isDetailsVisible}
@@ -2335,6 +2307,34 @@ export default function BoardScreen({ route, navigation }) {
         boardName={boardAutomationModal.boardName}
         onClose={() => setBoardAutomationModal({ isVisible: false, boardId: null, boardName: '' })}
       />
+
+      {selectionMode.isActive && (
+        <View testID="selection_action_bar" style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
+          <Text testID="selection_count_text" style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
+            <TouchableOpacity testID="action_bar_all" accessible={true} accessibilityRole="button" accessibilityLabel="Select all" onPress={handleSelectAll} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_move" accessible={true} accessibilityRole="button" accessibilityLabel="Move selected" onPress={() => setMoveBoardVisible(true)} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Move')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_share" accessible={true} accessibilityRole="button" accessibilityLabel="Share selected" onPress={handleShareSelected} style={styles.actionBtn}>
+              <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>{t('Share')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_complete" accessible={true} accessibilityRole="button" accessibilityLabel="Complete selected" onPress={handleCompleteSelected} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Complete')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_delete" accessible={true} accessibilityRole="button" accessibilityLabel="Delete selected" onPress={handleDeleteSelected} style={styles.actionBtn}>
+              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Delete')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_cancel" accessible={true} accessibilityRole="button" accessibilityLabel="Cancel selection" onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
+              <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>{t('Cancel')}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+
+      </View>
       <ConfirmModal
         isVisible={confirmConfig.isVisible}
         title={confirmConfig.title}

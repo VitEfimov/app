@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
-import Modal from '../AppModal';
+import Modal from 'react-native-modal';
 import dayjs from 'dayjs';
 import { selectHeatMapData } from '../../features/statsSelectors';
 
