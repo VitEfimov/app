@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, useWindowDimensions } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, useWindowDimensions, Modal as RNModal } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { BOARD_COLORS, BOARD_COLOR_NAMES } from '../utils/boardColors';
@@ -251,23 +250,23 @@ export default function CreateBoardModal({
   };
 
   return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      onBackButtonPress={handleBack}
-      style={styles.modalContainer}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="slide"
+      statusBarTranslucent={true}
+      onRequestClose={handleBack}
     >
-      <View style={[
-        styles.modalContent,
-        {
-          backgroundColor: colors?.bgCard || '#FAF9F6',
-          paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 6 : 12),
-          paddingBottom: Platform.OS === 'ios' ? 16 : (isCompact ? 8 : 12),
-        }
-      ]}>
+      <View style={{ width: windowWidth, height: windowHeight, backgroundColor: colors?.bgCard || '#FAF9F6' }}>
+        <View style={[
+          styles.modalContent,
+          {
+            flex: 1,
+            backgroundColor: colors?.bgCard || '#FAF9F6',
+            paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 6 : 12),
+            paddingBottom: Platform.OS === 'ios' ? 16 : (isCompact ? 8 : 12),
+          }
+        ]}>
         <View style={[styles.dragHandleContainer, isCompact && { paddingVertical: 4 }]}>
           <View style={[styles.dragHandle, { backgroundColor: colors?.borderColor || '#DDD' }]} />
         </View>
@@ -663,8 +662,9 @@ export default function CreateBoardModal({
           initialConfig={repeatConfig}
           colors={colors}
         />
+        </View>
       </View>
-    </Modal>
+    </RNModal>
   );
 }
 

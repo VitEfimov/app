@@ -18,7 +18,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import Modal from 'react-native-modal';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 
 import { useTheme } from '../styles/ThemeContext';
@@ -212,12 +211,16 @@ export default function CalendarScreen({ navigation, route }) {
       name: task?.taskname || task?.name,
     });
     setSelectedTask(task);
-    setDetailsVisible(true);
+    setTimeout(() => {
+      setDetailsVisible(true);
+    }, 60);
   }, []);
 
   const handleQuickMenuPress = useCallback((task) => {
     setSelectedTask(task);
-    setQuickMenuVisible(true);
+    setTimeout(() => {
+      setQuickMenuVisible(true);
+    }, 60);
   }, []);
 
   const handleLongPressTask = useCallback((task) => {
@@ -808,7 +811,7 @@ export default function CalendarScreen({ navigation, route }) {
           accessibilityRole="button"
           accessibilityLabel="Day options"
           style={styles.ellipsisBtn}
-          onPress={() => setIsDayOptionsVisible(true)}
+          onPress={() => setTimeout(() => setIsDayOptionsVisible(true), 60)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={[styles.ellipsisText, { color: colors.textSecondary }]}>⋯</Text>

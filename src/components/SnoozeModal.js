@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal as RNModal, useWindowDimensions, Pressable } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask } from '../features/taskSlice';
+import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 
@@ -94,10 +95,15 @@ export default function SnoozeModal({
 }) {
   const { t } = useTranslation();
   const dispatch = useDispatch();
+  const { colors: themeColors } = useTheme();
+  const activeColors = colors || themeColors || {};
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const autoRescheduleTime = useSelector(state => state.themeReducer.autoRescheduleTime || '09:00');
 
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState('date'); // 'date' or 'reminder'
+
+  console.log('[SnoozeModal] RENDER', { isVisible, hasTask: Boolean(task), taskName: task?.taskname, windowWidth, windowHeight, bgCard: activeColors.bgCard });
 
   if (!task) return null;
 
@@ -199,75 +205,113 @@ export default function SnoozeModal({
   ];
 
   return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
-        <View style={styles.dragHandle} />
-        
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>{t('Snooze')}</Text>
-          <Text style={[styles.taskTitle, { color: colors.textSecondary }]} numberOfLines={1}>
-            {task.taskname}
-          </Text>
-        </View>
-
-        <View style={styles.tabs}>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'date' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-            onPress={() => setActiveTab('date')}
-          >
-            <Text style={[styles.tabText, { color: activeTab === 'date' ? colors.primary : colors.textSecondary }]}>
-              {t('Reschedule Date')}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={[styles.sheetOverlay, { width: windowWidth, height: windowHeight }]}>
+          <Pressable 
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]} 
+            onPress={onClose} 
+          />
+          <View style={[styles.modalContent, { backgroundColor: activeColors.bgCard || '#FFFFFF', width: windowWidth }]}>
+          <View style={styles.dragHandle} />
+          
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: activeColors.textPrimary }]}>{t('Snooze')}</Text>
+            <Text style={[styles.taskTitle, { color: activeColors.textSecondary }]} numberOfLines={1}>
+              {task.taskname}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'reminder' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-            onPress={() => setActiveTab('reminder')}
+          </View>
+
+          <View style={styles.tabs}>
+            <TouchableOpacity 
+              testID="snooze_tab_date"
+              style={[styles.tab, activeTab === 'date' && { borderBottomColor: activeColors.primary, borderBottomWidth: 2 }]}
+              onPress={() => {
+                console.log('[SnoozeModal] TAB DATE TAPPED');
+                setActiveTab('date');
+              }}
+            >
+              <Text style={[styles.tabText, { color: activeTab === 'date' ? activeColors.primary : activeColors.textSecondary }]}>
+                {t('Reschedule Date')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              testID="snooze_tab_reminder"
+              style={[styles.tab, activeTab === 'reminder' && { borderBottomColor: activeColors.primary, borderBottomWidth: 2 }]}
+              onPress={() => {
+                console.log('[SnoozeModal] TAB REMINDER TAPPED');
+                setActiveTab('reminder');
+              }}
+            >
+              <Text style={[styles.tabText, { color: activeTab === 'reminder' ? activeColors.primary : activeColors.textSecondary }]}>
+                {t('Adjust Reminder')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            style={[styles.optionsList, { maxHeight: Math.round(windowHeight * 0.6) }]} 
+            contentContainerStyle={{ paddingBottom: 20 }} 
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={[styles.tabText, { color: activeTab === 'reminder' ? colors.primary : colors.textSecondary }]}>
-              {t('Adjust Reminder')}
-            </Text>
-          </TouchableOpacity>
+            {activeTab === 'date' && dateOptions.map((opt, i) => {
+              const IconComp = opt.icon;
+              return (
+                <TouchableOpacity 
+                  key={i} 
+                  testID={`snooze_option_${opt.mode}`}
+                  style={[styles.optionRow, { borderBottomColor: activeColors.borderColor }]} 
+                  onPress={() => {
+                    console.log('[SnoozeModal] OPTION TAPPED', opt.mode);
+                    handleSnoozeDate(opt.mode);
+                  }}
+                >
+                  <View style={styles.actionIconContainer}>
+                    <IconComp color={activeColors.textPrimary} />
+                  </View>
+                  <Text style={[styles.optionLabel, { color: activeColors.textPrimary }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            {activeTab === 'reminder' && reminderOptions.map((opt, i) => {
+              const IconComp = opt.icon;
+              return (
+                <TouchableOpacity key={i} style={[styles.optionRow, { borderBottomColor: activeColors.borderColor }]} onPress={() => handleSnoozeReminder(opt.mode)}>
+                  <View style={styles.actionIconContainer}>
+                    <IconComp color={activeColors.textPrimary} />
+                  </View>
+                  <Text style={[styles.optionLabel, { color: activeColors.textPrimary }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
-
-        <ScrollView style={styles.optionsList}>
-          {activeTab === 'date' && dateOptions.map((opt, i) => (
-            <TouchableOpacity key={i} style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handleSnoozeDate(opt.mode)}>
-              <View style={styles.actionIconContainer}>
-                <opt.icon color={colors.textPrimary} />
-              </View>
-              <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
-
-          {activeTab === 'reminder' && reminderOptions.map((opt, i) => (
-            <TouchableOpacity key={i} style={[styles.optionRow, { borderBottomColor: colors.borderColor }]} onPress={() => handleSnoozeReminder(opt.mode)}>
-              <View style={styles.actionIconContainer}>
-                <opt.icon color={colors.textPrimary} />
-              </View>
-              <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
       </View>
-    </Modal>
+      </GestureHandlerRootView>
+    </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
+  sheetOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   modalContent: {
+    width: '100%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 15,
-    paddingBottom: 30,
+    paddingBottom: 35,
     paddingHorizontal: 20,
-    maxHeight: '80%'
+    zIndex: 2,
+    elevation: 10,
   },
   dragHandle: {
     width: 40,

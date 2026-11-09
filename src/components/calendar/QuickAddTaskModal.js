@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Switch, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Switch, ScrollView, Platform, KeyboardAvoidingView, Modal as RNModal, useWindowDimensions } from 'react-native';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
@@ -24,6 +23,7 @@ export default function QuickAddTaskModal({
   const { t } = useTranslation();
   const { showToast } = useToast();
   const dispatch = useDispatch();
+  const { height: windowHeight } = useWindowDimensions();
   const [taskName, setTaskName] = useState('');
   const [selectedDate, setSelectedDate] = useState(initialDate || dayjs().format('YYYY-MM-DD'));
   const [isAllDay, setIsAllDay] = useState(initialHour === undefined);
@@ -141,20 +141,22 @@ export default function QuickAddTaskModal({
   };
 
   return (
-    <Modal
-      isVisible={isVisible}
-      onBackdropPress={onClose}
-      onBackButtonPress={onClose}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      style={styles.modal}
-      avoidKeyboard={true}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
     >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-        style={[styles.modalContent, { backgroundColor: colors.bgCard }]}
-      >
+      <View style={styles.sheetOverlay}>
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+          style={[styles.modalContent, { backgroundColor: colors.bgCard, maxHeight: Math.round(windowHeight * 0.85) }]}
+        >
         {/* Header Drag Handle */}
         <View style={styles.dragHandleContainer}>
           <View style={[styles.dragHandle, { backgroundColor: colors.borderColor }]} />
@@ -342,21 +344,25 @@ export default function QuickAddTaskModal({
             </Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+        </KeyboardAvoidingView>
+      </View>
+    </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
-  modal: {
-    margin: 0,
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
+    width: '100%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 8,
-    maxHeight: '85%',
+    zIndex: 2,
+    elevation: 10,
   },
   dragHandleContainer: {
     alignItems: 'center',

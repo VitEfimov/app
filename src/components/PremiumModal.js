@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, TouchableOpacity, StyleSheet, Modal as RNModal } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { toggleDevPremium } from '../features/entitlementSlice';
@@ -19,51 +18,61 @@ export default function PremiumModal({ isVisible, onClose, featureName }) {
   const name = featureName ? t(featureName) : t('Premium');
 
   return (
-    <Modal
-      isVisible={isVisible}
-      animationIn="fadeInUp"
-      animationOut="fadeOutDown"
-      backdropOpacity={0.6}
-      onBackdropPress={onClose}
-      style={styles.modal}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
     >
-      <View style={[styles.container, { backgroundColor: colors.bgCard || '#fff', borderColor: colors.borderColor || 'transparent' }]}>
-        <View style={styles.crownContainer}>
-          <Text style={styles.crownEmoji}>👑</Text>
-        </View>
-        <Text style={[styles.badgeText, { color: colors.primary || '#6750A4' }]}>{t('PRO FEATURE') || 'PRO FEATURE'}</Text>
-        <Text style={[styles.title, { color: colors.textPrimary || '#000' }]}>
-          {name}
-        </Text>
-        <Text style={[styles.description, { color: colors.textSecondary || '#666' }]}>
-          {featureName && (featureName.includes('Calendar') || featureName.includes('Sync'))
-            ? (t('Seamlessly synchronize all your tasks with due dates and times across Google Calendar, Apple Calendar, and device calendars in real time.') || 'Seamlessly synchronize all your tasks with due dates and times across Google Calendar, Apple Calendar, and device calendars in real time.')
-            : t('Understand your work patterns with monthly and yearly trends, productivity scores, activity heat maps, streaks, records, goals, and personalized insights.')}
-        </Text>
-
-        <TouchableOpacity 
-          style={[styles.upgradeBtn, { backgroundColor: colors.primary || '#6750A4' }]}
-          onPress={handleUpgrade}
-        >
-          <Text style={styles.upgradeBtnText}>{t('Upgrade to Pro (Dev Mode)')}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.closeBtn}
+      <View style={styles.overlay}>
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
           onPress={onClose}
-        >
-          <Text style={[styles.closeBtnText, { color: colors.textSecondary || '#666' }]}>{t('Not now')}</Text>
-        </TouchableOpacity>
+        />
+        <View style={[styles.container, { backgroundColor: colors.bgCard || '#fff', borderColor: colors.borderColor || 'transparent' }]}>
+          <View style={styles.crownContainer}>
+            <Text style={styles.crownEmoji}>👑</Text>
+          </View>
+          <Text style={[styles.badgeText, { color: colors.primary || '#6750A4' }]}>{t('PRO FEATURE') || 'PRO FEATURE'}</Text>
+          <Text style={[styles.title, { color: colors.textPrimary || '#000' }]}>
+            {name}
+          </Text>
+          <Text style={[styles.description, { color: colors.textSecondary || '#666' }]}>
+            {featureName && (featureName.includes('Calendar') || featureName.includes('Sync'))
+              ? (t('Seamlessly synchronize all your tasks with due dates and times across Google Calendar, Apple Calendar, and device calendars in real time.') || 'Seamlessly synchronize all your tasks with due dates and times across Google Calendar, Apple Calendar, and device calendars in real time.')
+              : t('Understand your work patterns with monthly and yearly trends, productivity scores, activity heat maps, streaks, records, goals, and personalized insights.')}
+          </Text>
+
+          <TouchableOpacity 
+            style={[styles.upgradeBtn, { backgroundColor: colors.primary || '#6750A4' }]}
+            onPress={handleUpgrade}
+          >
+            <Text style={styles.upgradeBtnText}>{t('Upgrade to Pro (Dev Mode)')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.closeBtn}
+            onPress={onClose}
+          >
+            <Text style={[styles.closeBtnText, { color: colors.textSecondary || '#666' }]}>{t('Not now')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </Modal>
+    </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
-  modal: {
-    margin: 20,
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
   },
   container: {
     width: '100%',
@@ -72,7 +81,8 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    elevation: 5,
+    elevation: 10,
+    zIndex: 2,
   },
   crownContainer: {
     width: 60,
@@ -125,4 +135,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

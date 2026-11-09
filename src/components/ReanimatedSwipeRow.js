@@ -154,8 +154,8 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     });
 
   const tapGesture = Gesture.Tap()
-    .maxDuration(350)
-    .maxDistance(12)
+    .maxDuration(500)
+    .maxDistance(25)
     .onEnd(() => {
       if (onPress) {
         runOnJS(onPress)();
@@ -164,6 +164,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
 
   const longPressGesture = Gesture.LongPress()
     .minDuration(500)
+    .maxDistance(25)
     .onEnd(() => {
       if (onLongPress) {
         runOnJS(onLongPress)();

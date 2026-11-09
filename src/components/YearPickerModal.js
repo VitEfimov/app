@@ -5,8 +5,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Modal as RNModal,
+  useWindowDimensions,
 } from 'react-native';
-import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 
@@ -53,6 +54,7 @@ export function YearPickerModal({
   maxYear = 2040,
 }) {
   const { t, i18n } = useTranslation();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const [selectedYear, setSelectedYear] = useState(
     () => Number(currentYear) || dayjs().year()
@@ -169,27 +171,31 @@ export function YearPickerModal({
   };
 
   return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      onBackButtonPress={onClose}
-      style={styles.modal}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
     >
-      <View
-        style={[
-          styles.content,
-          {
-            backgroundColor: isContrast
-              ? '#000000'
-              : (colors.bgCard || '#1e1e1e'),
-            borderColor: isContrast ? '#FFFFFF' : 'transparent',
-            borderWidth: isContrast ? 2 : 0,
-          },
-        ]}
-      >
+      <View style={[styles.sheetOverlay, { width: windowWidth, height: windowHeight }]}>
+        <TouchableOpacity
+          style={{ flex: 1, width: windowWidth }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View
+          style={[
+            styles.content,
+            {
+              backgroundColor: isContrast
+                ? '#000000'
+                : (colors.bgCard || '#1e1e1e'),
+              borderColor: isContrast ? '#FFFFFF' : 'transparent',
+              borderWidth: isContrast ? 2 : 0,
+              width: windowWidth,
+            },
+          ]}
+        >
         {/* Drag Handle */}
         <View style={styles.dragHandleContainer}>
           <View
@@ -648,7 +654,8 @@ export function YearPickerModal({
           </TouchableOpacity>
         </View>
       </View>
-    </Modal>
+      </View>
+    </RNModal>
   );
 }
 
@@ -656,17 +663,19 @@ export { YearPickerModal as MonthYearPickerModal };
 export default YearPickerModal;
 
 const styles = StyleSheet.create({
-  modal: {
-    margin: 0,
+  sheetOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   content: {
+    width: '100%',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 24,
-    maxHeight: 640,
+    zIndex: 2,
+    elevation: 10,
   },
   dragHandleContainer: {
     alignItems: 'center',

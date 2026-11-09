@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share, Modal as RNModal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share, Modal as RNModal, useWindowDimensions, Pressable } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
@@ -101,6 +102,8 @@ export default function TaskQuickMenuModal({
   onMoveForward,
   onMoveBackward,
 }) {
+  console.log('[TaskQuickMenuModal] RENDER', { isVisible: Boolean(isVisible), hasTask: Boolean(task), taskName: task?.taskname || task?.name });
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
@@ -396,7 +399,7 @@ export default function TaskQuickMenuModal({
         }
       },
     },
-    { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
+    { label: task?.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
     { label: t('Move Forward'), icon: IconMoveForward, onPress: () => handleMoveTaskDate('forward') },
     { label: t('Move Backward'), icon: IconMoveBackward, onPress: () => handleMoveTaskDate('backward') },
     { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 300); } },
@@ -420,49 +423,58 @@ export default function TaskQuickMenuModal({
     { label: t('Delete'), icon: IconDelete, onPress: handleDelete, danger: true },
   ];
 
+  console.log('[TaskQuickMenuModal] JSX Rendered', { isVisible: Boolean(isVisible), windowHeight, count: actionItems.length });
+
   return (
     <>
     <RNModal
       visible={Boolean(isVisible)}
       transparent={true}
       animationType="fade"
-      statusBarTranslucent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.sheetOverlay}>
-        <TouchableOpacity
-          activeOpacity={1}
-          style={{ flex: 1, width: '100%' }}
-          onPress={onClose}
-        />
-        <View style={[styles.modalContent, { backgroundColor: colors.bgCard, width: '100%' }]}>
-        <View style={styles.dragHandle} />
-        
-        <View style={styles.header}>
-          <Text style={[styles.taskTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            {task?.taskname || task?.name || ''}
-          </Text>
-        </View>
-
-        <ScrollView style={styles.actionList}>
-          {actionItems.map((item, index) => (
-            <TouchableOpacity 
-              key={index} 
-              testID={`quick_menu_action_${item.label.toLowerCase().replace(/\s+/g, '_')}`}
-              style={[styles.actionRow, { borderBottomColor: colors.borderColor }]} 
-              onPress={item.onPress}
-            >
-              <View style={styles.actionIconContainer}>
-                <item.icon color={item.danger ? '#f44336' : colors.textPrimary} />
-              </View>
-              <Text style={[styles.actionLabel, { color: item.danger ? '#f44336' : colors.textPrimary }]}>
-                {item.label}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={[styles.sheetOverlay, { width: windowWidth, height: windowHeight }]}>
+          <Pressable
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
+            onPress={onClose}
+          />
+          <View style={[styles.modalContent, { backgroundColor: colors.bgCard || '#FFFFFF', width: windowWidth }]}>
+            <View style={styles.dragHandle} />
+            
+            <View style={styles.header}>
+              <Text style={[styles.taskTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                {task?.taskname || task?.name || ''}
               </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-      </View>
+            </View>
+
+            <ScrollView 
+              style={{ maxHeight: Math.round(windowHeight * 0.6) }}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {actionItems.map((item, index) => {
+                const IconComp = item.icon;
+                return (
+                  <TouchableOpacity 
+                    key={index} 
+                    testID={`quick_menu_action_${item.label.toLowerCase().replace(/\s+/g, '_')}`}
+                    style={[styles.actionRow, { borderBottomColor: colors.borderColor }]} 
+                    onPress={item.onPress}
+                  >
+                    <View style={styles.actionIconContainer}>
+                      {IconComp && <IconComp color={item.danger ? '#f44336' : colors.textPrimary} />}
+                    </View>
+                    <Text style={[styles.actionLabel, { color: item.danger ? '#f44336' : colors.textPrimary }]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </GestureHandlerRootView>
     </RNModal>
     <MoveBoardModal
       isVisible={isMoveBoardVisible}
@@ -493,7 +505,6 @@ export default function TaskQuickMenuModal({
 
 const styles = StyleSheet.create({
   sheetOverlay: {
-    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
@@ -502,11 +513,13 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 15,
-    paddingBottom: 30,
+    paddingBottom: 35,
     paddingHorizontal: 20,
-    maxHeight: '70%',
-    zIndex: 1,
-    elevation: 6,
+    zIndex: 2,
+    elevation: 10,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   dragHandle: {
     width: 40,
@@ -530,6 +543,7 @@ const styles = StyleSheet.create({
     width: '100%'
   },
   actionRow: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 15,

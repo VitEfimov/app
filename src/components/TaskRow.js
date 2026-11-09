@@ -415,13 +415,23 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   }, [closeSwipeable, dispatch, task, isRepeatingTask, showToast, t]);
 
   const handleSwipeSnooze = useCallback(() => {
+    console.log('[handleSwipeSnooze] CALLED', task?.taskname || task?.name);
     closeSwipeable();
-    if (onPressSnooze && task) onPressSnooze(task);
+    if (onPressSnooze && task) {
+      setTimeout(() => {
+        onPressSnooze(task);
+      }, 100);
+    }
   }, [closeSwipeable, onPressSnooze, task]);
 
   const handleSwipeMore = useCallback(() => {
+    console.log('[handleSwipeMore] CALLED', task?.taskname || task?.name);
     closeSwipeable();
-    if (onPressMore && task) onPressMore(task);
+    if (onPressMore && task) {
+      setTimeout(() => {
+        onPressMore(task);
+      }, 100);
+    }
   }, [closeSwipeable, onPressMore, task]);
 
   const screenWidth = Dimensions.get('window').width;

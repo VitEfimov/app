@@ -216,6 +216,7 @@ const normalizeSubtasks = (rawSubtasks) => {
 };
 
 export default function TaskDetailsModal({ task, isVisible, onClose }) {
+  console.log('[TaskDetailsModal] RENDER', { isVisible, taskId: task?.id, taskName: task?.taskname });
   const { colors, isDark } = useTheme();
   const insets = useContext(SafeAreaInsetsContext);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -1322,10 +1323,11 @@ useEffect(() => {
         });
       }}
     >
-      <KeyboardAvoidingView
-        style={{ flex: 1, width: '100%', backgroundColor: colors.bgCard }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={{ width: windowWidth, height: windowHeight, backgroundColor: colors.bgCard }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, width: '100%', backgroundColor: colors.bgCard }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
       <View style={[styles.modalContent, { backgroundColor: colors.bgCard, paddingTop: topInset + (isVeryCompact ? 6 : 10) }]}>
           <View style={[styles.dragHandleContainer, { paddingBottom: isVeryCompact ? 2 : 4 }]}>
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
@@ -2308,7 +2310,8 @@ useEffect(() => {
           onSave={handleCustomReminderSave}
         />
       )}
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </RNModal>
   );
 }

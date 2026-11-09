@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Modal as RNModal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Modal as RNModal, useWindowDimensions, Pressable } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../styles/ThemeContext';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
@@ -48,6 +49,7 @@ export default function CalendarDayOptionsModal({
   onSelectTasks,
   onDeleteAll,
 }) {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
 
@@ -59,16 +61,15 @@ export default function CalendarDayOptionsModal({
       visible={Boolean(isVisible)}
       transparent={true}
       animationType="fade"
-      statusBarTranslucent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.sheetOverlay}>
-        <TouchableOpacity
-          activeOpacity={1}
-          style={{ flex: 1, width: '100%' }}
-          onPress={onClose}
-        />
-        <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF'), width: '100%' }]}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={[styles.sheetOverlay, { width: windowWidth, height: windowHeight }]}>
+          <Pressable
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
+            onPress={onClose}
+          />
+          <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF'), width: windowWidth }]}>
         <View style={styles.dragHandleContainer}>
           <View style={[styles.dragHandle, { backgroundColor: colors.borderColor || '#DDD' }]} />
         </View>
@@ -190,13 +191,13 @@ export default function CalendarDayOptionsModal({
         </View>
       </View>
       </View>
+      </GestureHandlerRootView>
     </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
   sheetOverlay: {
-    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
@@ -208,9 +209,9 @@ const styles = StyleSheet.create({
     width: '100%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    zIndex: 1,
-    elevation: 6,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    zIndex: 2,
+    elevation: 10,
   },
   dragHandleContainer: {
     alignItems: 'center',

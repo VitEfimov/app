@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, Modal as RNModal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, Modal as RNModal, Pressable } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
@@ -16,7 +17,6 @@ import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
 import { TaskEditDiagnostics } from '../utils/taskEditDiagnostics';
-import Modal from 'react-native-modal';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard, getDateThresholds, classifyTaskDate, compareTasks, PRIORITY_SCORES } from '../utils/filters';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
@@ -172,7 +172,11 @@ const SectionHeader = React.memo(function SectionHeader({
           testID={`section_menu_${section.id}`}
           accessible={true} accessibilityRole="button" accessibilityLabel={`Options for ${section.title} section`}
           style={styles.ellipsisBtn} 
-          onPress={() => onMenuPress(section)}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          onPress={() => {
+            console.log('[SectionMenu] TAPPED', section?.id, section?.title);
+            onMenuPress(section);
+          }}
         >
           <IconMoreHorizontal color={colors.textSecondary} />
         </TouchableOpacity>
@@ -189,7 +193,7 @@ const PROGRESSIVE_INITIAL_BATCH = 32;
 const PROGRESSIVE_FRAME_STEP = 32;
 
 export default function BoardScreen({ route, navigation }) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeAddSectionId, setActiveAddSectionId] = useState(null);
   
@@ -324,6 +328,22 @@ export default function BoardScreen({ route, navigation }) {
   );
 
   // Security & Privacy Shield: Immediately dismiss all modals and inline editing when device locks
+  useEffect(() => {
+    console.log('[ModalStates]', {
+      isDetailsVisible,
+      isQuickMenuVisible,
+      isSnoozeVisible,
+      isPremiumModalVisible,
+      isCreateBoardVisible,
+      prompt: promptConfig.isVisible,
+      confirm: confirmConfig.isVisible,
+      sectionOptions: sectionOptionsConfig.isVisible,
+      boardOptions: boardOptionsConfig.isVisible,
+      boardAuto: boardAutomationModal.isVisible,
+      isMoveBoardVisible,
+      isGoogleDrawerOpen
+    });
+  }, [isDetailsVisible, isQuickMenuVisible, isSnoozeVisible, isPremiumModalVisible, isCreateBoardVisible, promptConfig.isVisible, confirmConfig.isVisible, sectionOptionsConfig.isVisible, boardOptionsConfig.isVisible, boardAutomationModal.isVisible, isMoveBoardVisible, isGoogleDrawerOpen]);
   useEffect(() => {
     const unsubscribe = SecurityLockHelper.subscribeLock(() => {
       setDetailsVisible(false);
@@ -549,6 +569,7 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleTaskPress = useCallback((task) => {
+    console.log('[handleTaskPress] CALLED', task?.id, task?.taskname || task?.name);
     TaskEditDiagnostics.record('BOARD_SCREEN_HANDLE_TASK_PRESS', {
       taskId: task?.id || task?._id,
       name: task?.taskname || task?.name,
@@ -557,7 +578,9 @@ export default function BoardScreen({ route, navigation }) {
     setActiveAddSectionId(null);
     try { Keyboard?.dismiss?.(); } catch (e) {}
     setSelectedTask(task);
-    setDetailsVisible(true);
+    setTimeout(() => {
+      setDetailsVisible(true);
+    }, 60);
   }, []);
 
   const handleSnoozePress = useCallback((task) => {
@@ -565,7 +588,9 @@ export default function BoardScreen({ route, navigation }) {
     setActiveAddSectionId(null);
     try { Keyboard?.dismiss?.(); } catch (e) {}
     setSelectedTask(task);
-    setSnoozeVisible(true);
+    setTimeout(() => {
+      setSnoozeVisible(true);
+    }, 60);
   }, []);
 
   const handleQuickMenuPress = useCallback((task) => {
@@ -573,7 +598,9 @@ export default function BoardScreen({ route, navigation }) {
     setActiveAddSectionId(null);
     try { Keyboard?.dismiss?.(); } catch (e) {}
     setSelectedTask(task);
-    setQuickMenuVisible(true);
+    setTimeout(() => {
+      setQuickMenuVisible(true);
+    }, 60);
   }, []);
 
   const handleToggleSelectTask = useCallback((taskId, sectionId) => {
@@ -1124,7 +1151,10 @@ export default function BoardScreen({ route, navigation }) {
   };
 
   const handleMenuPress = useCallback((section) => {
-    setSectionOptionsConfig({ isVisible: true, section });
+    console.log('[handleMenuPress] RECEIVED', section?.id, section?.title);
+    setTimeout(() => {
+      setSectionOptionsConfig({ isVisible: true, section });
+    }, 60);
   }, []);
 
   const handleAddBoard = () => {
@@ -2023,20 +2053,19 @@ export default function BoardScreen({ route, navigation }) {
         visible={Boolean(sectionOptionsConfig.isVisible)} 
         transparent={true}
         animationType="fade"
-        statusBarTranslucent={true}
         onRequestClose={() => setSectionOptionsConfig({ isVisible: false, section: null })}
       >
-        <View style={styles.sheetOverlay}>
-          <TouchableOpacity 
-            activeOpacity={1}
-            style={{ flex: 1, width: '100%' }}
-            onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
-          />
-          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: '100%' }]}>
-          <View style={styles.optionsModalDragHandle} />
-          <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
-            {t('Options for')} {sectionOptionsConfig.section?.title}
-          </Text>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <View style={[styles.sheetOverlay, { width: windowWidth, height: windowHeight }]}>
+            <Pressable 
+              style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
+              onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
+            />
+            <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: windowWidth }]}>
+            <View style={styles.optionsModalDragHandle} />
+            <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
+              {t('Options for')} {sectionOptionsConfig.section?.title}
+            </Text>
           
           {(['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeBoard?.type)) ? (
             <>
@@ -2107,22 +2136,22 @@ export default function BoardScreen({ route, navigation }) {
           )}
         </View>
         </View>
+        </GestureHandlerRootView>
       </RNModal>
 
       <RNModal 
         visible={Boolean(boardOptionsConfig.isVisible)} 
         transparent={true}
         animationType="fade"
-        statusBarTranslucent={true}
         onRequestClose={() => setBoardOptionsConfig({ isVisible: false, board: null })}
       >
-        <View style={styles.sheetOverlay}>
-          <TouchableOpacity 
-            activeOpacity={1}
-            style={{ flex: 1, width: '100%' }}
-            onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
-          />
-          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: '100%' }]}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <View style={[styles.sheetOverlay, { width: windowWidth, height: windowHeight }]}>
+            <Pressable 
+              style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
+              onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
+            />
+            <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: windowWidth }]}>
           <View style={styles.optionsModalDragHandle} />
           
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
@@ -2320,6 +2349,7 @@ export default function BoardScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
         </View>
+        </GestureHandlerRootView>
       </RNModal>
 
       <AutoManageSettings
@@ -2550,7 +2580,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   sheetOverlay: {
-    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
@@ -2561,8 +2590,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     alignItems: 'center',
-    zIndex: 1,
-    elevation: 6,
+    zIndex: 2,
+    elevation: 10,
   },
   optionsModalDragHandle: {
     width: 40,

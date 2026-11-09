@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, Platform, useWindowDimensions, Modal as RNModal } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../styles/ThemeContext';
@@ -175,25 +174,21 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
   ];
 
   return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={scrollOffset > 0 ? undefined : ['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      onBackButtonPress={onClose}
-      scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
-      scrollOffset={scrollOffset}
-      scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
-      style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
     >
-      <View style={[
-        styles.modalContent,
-        {
-          backgroundColor: colors.bgCard,
-          paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 8 : 16),
-        }
-      ]}>
+      <View style={{ width: windowWidth, height: windowHeight, backgroundColor: colors.bgCard }}>
+        <View style={[
+          styles.modalContent,
+          {
+            flex: 1,
+            backgroundColor: colors.bgCard,
+            paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 8 : 16),
+          }
+        ]}>
         <View style={[styles.dragHandleContainer, isCompact && { paddingBottom: 6 }]}>
           <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
         </View>
@@ -424,15 +419,16 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
             }}
           />
         )}
+        </View>
       </View>
-    </Modal>
+    </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
   modalContent: {
-    height: '100%',
-    maxHeight: '100%',
+    flex: 1,
+    width: '100%',
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     paddingTop: Platform.OS === 'ios' ? 44 : 16,

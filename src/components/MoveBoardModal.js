@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import Modal from 'react-native-modal';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal as RNModal, useWindowDimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
 
@@ -26,73 +25,92 @@ export default function MoveBoardModal({
   colors
 }) {
   const { t } = useTranslation();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const allBoards = boards.length > 0 ? boards : [{ id: 'main', name: 'Main' }];
 
   return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+    <RNModal
+      visible={Boolean(isVisible)}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
-        <View style={styles.dragHandle} />
+      <View style={[styles.sheetOverlay, { width: windowWidth, height: windowHeight }]}>
+        <TouchableOpacity
+          style={{ flex: 1, width: windowWidth }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={[styles.modalContent, { backgroundColor: colors.bgCard || '#FFFFFF', width: windowWidth }]}>
+          <View style={styles.dragHandle} />
 
-        <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>
-            {taskCount > 1
-              ? `${t('Move')} ${taskCount} ${t('Tasks to Board')}`
-              : t('Move Task to Board')}
-          </Text>
+          <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>
+              {taskCount > 1
+                ? `${t('Move')} ${taskCount} ${t('Tasks to Board')}`
+                : t('Move Task to Board')}
+            </Text>
+          </View>
+
+          <ScrollView 
+            style={{ maxHeight: Math.round(windowHeight * 0.5) }}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {allBoards.map((b) => {
+              const isSelected = (currentBoardId || 'main') === b.id;
+              const displayName = b.name === 'Main' ? t('Main') : b.name;
+
+              return (
+                <TouchableOpacity
+                  key={b.id}
+                  testID={`move_board_option_${b.id}`}
+                  style={[styles.boardRow, { borderBottomColor: colors.borderColor }]}
+                  onPress={() => {
+                    onSelectBoard(b.id);
+                    onClose();
+                  }}
+                >
+                  <View style={styles.leftContainer}>
+                    <IconFolder color={isSelected ? colors.primary : colors.textSecondary} />
+                    <Text
+                      style={[
+                        styles.boardName,
+                        { color: isSelected ? colors.primary : colors.textPrimary, fontWeight: isSelected ? 'bold' : '500' }
+                      ]}
+                    >
+                      {displayName}
+                    </Text>
+                  </View>
+                  {isSelected && <IconCheck color={colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
-
-        <ScrollView style={styles.boardList}>
-          {allBoards.map((b) => {
-            const isSelected = (currentBoardId || 'main') === b.id;
-            const displayName = b.name === 'Main' ? t('Main') : b.name;
-
-            return (
-              <TouchableOpacity
-                key={b.id}
-                testID={`move_board_option_${b.id}`}
-                style={[styles.boardRow, { borderBottomColor: colors.borderColor }]}
-                onPress={() => {
-                  onSelectBoard(b.id);
-                  onClose();
-                }}
-              >
-                <View style={styles.leftContainer}>
-                  <IconFolder color={isSelected ? colors.primary : colors.textSecondary} />
-                  <Text
-                    style={[
-                      styles.boardName,
-                      { color: isSelected ? colors.primary : colors.textPrimary, fontWeight: isSelected ? 'bold' : '500' }
-                    ]}
-                  >
-                    {displayName}
-                  </Text>
-                </View>
-                {isSelected && <IconCheck color={colors.primary} />}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
-    </Modal>
+    </RNModal>
   );
 }
 
 const styles = StyleSheet.create({
+  sheetOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   modalContent: {
+    width: '100%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 15,
-    paddingBottom: 30,
+    paddingBottom: 35,
     paddingHorizontal: 20,
-    maxHeight: '65%'
+    zIndex: 2,
+    elevation: 10,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   dragHandle: {
     width: 40,
@@ -111,9 +129,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center'
-  },
-  boardList: {
-    width: '100%'
   },
   boardRow: {
     flexDirection: 'row',
