@@ -39,6 +39,8 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     renderLeftDrawer,
     renderRightDrawer,
     enabled = true,
+    onPress,
+    onLongPress,
   },
   ref
 ) {
@@ -99,8 +101,8 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
 
   const panGesture = Gesture.Pan()
     .enabled(enabled)
-    .activeOffsetX([-8, 8])
-    .failOffsetY([-25, 25])
+    .activeOffsetX([-12, 12])
+    .failOffsetY([-45, 45])
     .cancelsTouchesInView(false)
     .onStart(() => {
       startX.value = translateX.value;
@@ -151,6 +153,27 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
       });
     });
 
+  const tapGesture = Gesture.Tap()
+    .maxDuration(350)
+    .maxDistance(12)
+    .onEnd(() => {
+      if (onPress) {
+        runOnJS(onPress)();
+      }
+    });
+
+  const longPressGesture = Gesture.LongPress()
+    .minDuration(500)
+    .onEnd(() => {
+      if (onLongPress) {
+        runOnJS(onLongPress)();
+      }
+    });
+
+  const composedGesture = onLongPress
+    ? Gesture.Simultaneous(panGesture, Gesture.Exclusive(longPressGesture, tapGesture))
+    : (onPress ? Gesture.Simultaneous(panGesture, tapGesture) : panGesture);
+
   const foregroundStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }));
@@ -187,7 +210,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
           {renderRightDrawer ? renderRightDrawer(rightDrawerAnimStyle) : null}
         </View>
       )}
-      <GestureDetector gesture={panGesture}>
+      <GestureDetector gesture={composedGesture}>
         <Animated.View style={foregroundStyle}>{children}</Animated.View>
       </GestureDetector>
     </View>

@@ -432,10 +432,10 @@ export default function TaskQuickMenuModal({
       <View style={styles.sheetOverlay}>
         <TouchableOpacity
           activeOpacity={1}
-          style={StyleSheet.absoluteFillObject}
+          style={{ flex: 1, width: '100%' }}
           onPress={onClose}
         />
-        <View style={[styles.modalContent, { backgroundColor: colors.bgCard, width: '100%', zIndex: 1, elevation: 6 }]}>
+        <View style={[styles.modalContent, { backgroundColor: colors.bgCard, width: '100%' }]}>
         <View style={styles.dragHandle} />
         
         <View style={styles.header}>

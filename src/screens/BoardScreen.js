@@ -2029,10 +2029,10 @@ export default function BoardScreen({ route, navigation }) {
         <View style={styles.sheetOverlay}>
           <TouchableOpacity 
             activeOpacity={1}
-            style={StyleSheet.absoluteFillObject}
+            style={{ flex: 1, width: '100%' }}
             onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
           />
-          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: '100%', zIndex: 1, elevation: 6 }]}>
+          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: '100%' }]}>
           <View style={styles.optionsModalDragHandle} />
           <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
             {t('Options for')} {sectionOptionsConfig.section?.title}
@@ -2119,10 +2119,10 @@ export default function BoardScreen({ route, navigation }) {
         <View style={styles.sheetOverlay}>
           <TouchableOpacity 
             activeOpacity={1}
-            style={StyleSheet.absoluteFillObject}
+            style={{ flex: 1, width: '100%' }}
             onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
           />
-          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: '100%', zIndex: 1, elevation: 6 }]}>
+          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, width: '100%' }]}>
           <View style={styles.optionsModalDragHandle} />
           
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>

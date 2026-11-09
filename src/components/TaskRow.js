@@ -974,6 +974,24 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
         renderLeftDrawer={renderLeftDrawer}
         renderRightDrawer={renderRightDrawer}
         onSwipeLeftOpen={handleSwipeComplete}
+        onPress={() => {
+          TaskEditDiagnostics.record('TASK_ROW_CONTAINER_TAP', {
+            taskId: task?.id || task?._id,
+            name: taskTitleText,
+            isEditing,
+            isSelectionMode,
+          });
+          closeOpenSwipeableRow();
+          if (isSelectionMode) {
+            if (onToggleSelect) onToggleSelect(task.id, sectionId);
+            return;
+          }
+          if (isEditing) {
+            submitEdit();
+          }
+          if (onPress) onPress(task);
+        }}
+        onLongPress={handleLongPress}
         onWillOpen={() => {
           if (activeOpenSwipeable && activeOpenSwipeable !== swipeableRef.current) {
             try {

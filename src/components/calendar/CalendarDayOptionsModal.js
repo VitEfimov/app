@@ -65,10 +65,10 @@ export default function CalendarDayOptionsModal({
       <View style={styles.sheetOverlay}>
         <TouchableOpacity
           activeOpacity={1}
-          style={StyleSheet.absoluteFillObject}
+          style={{ flex: 1, width: '100%' }}
           onPress={onClose}
         />
-        <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF'), width: '100%', zIndex: 1, elevation: 6 }]}>
+        <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF'), width: '100%' }]}>
         <View style={styles.dragHandleContainer}>
           <View style={[styles.dragHandle, { backgroundColor: colors.borderColor || '#DDD' }]} />
         </View>
