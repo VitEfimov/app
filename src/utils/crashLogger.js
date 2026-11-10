@@ -8,13 +8,36 @@ let memoryCrashLogs = [];
 const listeners = new Set();
 let isInitialized = false;
 
+/**
+ * Normal OS background process eviction (REASON_LOW_MEMORY with Importance > 200, e.g. Importance=400 CACHED)
+ * is routine Android OS cache reclamation when the app is minimized/closed, not an application crash.
+ */
+export function isBackgroundCacheEviction(entry) {
+  if (!entry) return false;
+  const msg = String(entry.message || '');
+  const stack = String(entry.stack || '');
+  if (!msg.includes('LOW_MEMORY')) return false;
+  const match = stack.match(/Importance=(\d+)/);
+  if (match && Number(match[1]) > 200) {
+    return true;
+  }
+  return false;
+}
+
 export const CrashLogger = {
   init: async () => {
     if (isInitialized) return memoryCrashLogs;
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY_CRASH_LOGS);
       if (stored) {
-        memoryCrashLogs = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter(entry => !isBackgroundCacheEviction(entry));
+          memoryCrashLogs = filtered;
+          if (filtered.length !== parsed.length) {
+            AsyncStorage.setItem(STORAGE_KEY_CRASH_LOGS, JSON.stringify(filtered)).catch(() => {});
+          }
+        }
       }
     } catch (e) {
       console.warn('[CrashLogger] Failed to load stored crashes:', e);
@@ -28,9 +51,10 @@ export const CrashLogger = {
           alarmMod.initNativeCrashHandler();
         }
         if (typeof alarmMod.getNativeCrashLogs === 'function') {
-          const nativeLogs = alarmMod.getNativeCrashLogs();
+          const rawNative = alarmMod.getNativeCrashLogs();
+          const nativeLogs = typeof rawNative === 'string' ? JSON.parse(rawNative) : rawNative;
           if (Array.isArray(nativeLogs) && nativeLogs.length > 0) {
-            nativeLogs.forEach(entry => {
+            nativeLogs.filter(entry => !isBackgroundCacheEviction(entry)).forEach(entry => {
               memoryCrashLogs.unshift({
                 id: `native_${entry.timestamp || Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
                 timestamp: entry.timestamp ? new Date(Number(entry.timestamp)).toISOString() : new Date().toISOString(),

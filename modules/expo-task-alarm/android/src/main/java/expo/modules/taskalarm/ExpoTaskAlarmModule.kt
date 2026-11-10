@@ -120,10 +120,11 @@ class ExpoTaskAlarmModule : Module() {
 
             for (exitInfo in exitList) {
               val reason = exitInfo.reason
+              val isForegroundOrVisible = exitInfo.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
               val isCrashExit = reason == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE ||
                   reason == android.app.ApplicationExitInfo.REASON_ANR ||
-                  reason == android.app.ApplicationExitInfo.REASON_LOW_MEMORY ||
-                  reason == android.app.ApplicationExitInfo.REASON_CRASH
+                  reason == android.app.ApplicationExitInfo.REASON_CRASH ||
+                  (reason == android.app.ApplicationExitInfo.REASON_LOW_MEMORY && isForegroundOrVisible)
               if (isCrashExit && exitInfo.timestamp > lastSeenExitTime) {
                 if (exitInfo.timestamp > maxSeenTime) maxSeenTime = exitInfo.timestamp
                 val reasonName = when (reason) {
