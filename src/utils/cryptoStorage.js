@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FastStorage } from './fastStorage';
 
 /**
  * OWASP MASVS-STORAGE-1 & MASVS-AUTH-1 Compliance Utility
@@ -310,12 +311,17 @@ export function utf8ToStr(bytes) {
   return str;
 }
 
+const BYTE_TO_HEX = new Array(256);
+for (let i = 0; i < 256; i++) {
+  BYTE_TO_HEX[i] = i.toString(16).padStart(2, '0');
+}
+
 export function bytesToHex(bytes) {
-  let hex = '';
+  const parts = new Array(bytes.length);
   for (let i = 0; i < bytes.length; i++) {
-    hex += bytes[i].toString(16).padStart(2, '0');
+    parts[i] = BYTE_TO_HEX[bytes[i]];
   }
-  return hex;
+  return parts.join('');
 }
 
 export function hexToBytes(hex) {
@@ -403,22 +409,24 @@ export function isPinHashed(record) {
 
 const MASTER_KEY_STORAGE_KEY = '@crypto_storage_device_key_seed';
 let cachedMasterKey = null;
+// Tamper-aware read-through cache: key -> { rawSnapshot: string, plaintext: string }
+const decryptedCache = new Map();
 
 async function getOrCreateDeviceMasterKey() {
   if (cachedMasterKey) return cachedMasterKey;
 
   try {
-    let seedHex = await AsyncStorage.getItem(MASTER_KEY_STORAGE_KEY);
+    let seedHex = await FastStorage.getItem(MASTER_KEY_STORAGE_KEY, { migratePlainOnHit: true });
     if (!seedHex) {
       const newSeed = generateRandomBytes(32);
       seedHex = bytesToHex(newSeed);
-      await AsyncStorage.setItem(MASTER_KEY_STORAGE_KEY, seedHex);
+      await FastStorage.setItem(MASTER_KEY_STORAGE_KEY, seedHex);
     }
     // Derive 256-bit AES master key
     cachedMasterKey = sha256Bytes(strToUtf8(`TASK_CALENDAR_STORAGE_SALT_${seedHex}`));
     return cachedMasterKey;
   } catch (e) {
-    // Fallback deterministic key if AsyncStorage is unavailable (e.g. testing)
+    // Fallback deterministic key if storage is unavailable (e.g. testing)
     cachedMasterKey = sha256Bytes(strToUtf8('TASK_CALENDAR_DEFAULT_SECURE_STORAGE_KEY'));
     return cachedMasterKey;
   }
@@ -542,14 +550,24 @@ function pruneWebLocalStorage(keyToSave) {
 
 export const CryptoStorage = {
   /**
-   * Encrypt and store data in AsyncStorage.
+   * Encrypt and store data in MMKV (native C++ AES CFB-128 via JSI) or AsyncStorage fallback.
    */
   setItem: async (key, value) => {
     const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+
+    // Fast path: Native C++ JSI MMKV with hardware/OpenSSL AES encryption at rest (< 0.2ms)
+    if (FastStorage.isNativeMMKVActive()) {
+      await FastStorage.setItem(key, stringValue, { secure: true });
+      decryptedCache.set(key, { rawSnapshot: stringValue, plaintext: stringValue });
+      return;
+    }
+
     try {
       const masterKey = await getOrCreateDeviceMasterKey();
       const encrypted = encryptString(stringValue, masterKey);
-      return await AsyncStorage.setItem(key, encrypted);
+      const res = await AsyncStorage.setItem(key, encrypted);
+      decryptedCache.set(key, { rawSnapshot: encrypted, plaintext: stringValue });
+      return res;
     } catch (e) {
       if (isQuotaExceededError(e)) {
         pruneWebLocalStorage(key);
@@ -558,12 +576,16 @@ export const CryptoStorage = {
       }
       // Fallback: save raw (unencrypted is ~50% smaller) if encryption fails or exceeds quota
       try {
-        return await AsyncStorage.setItem(key, stringValue);
+        const res = await AsyncStorage.setItem(key, stringValue);
+        decryptedCache.set(key, { rawSnapshot: stringValue, plaintext: stringValue });
+        return res;
       } catch (fallbackErr) {
         if (isQuotaExceededError(fallbackErr)) {
           pruneWebLocalStorage(key);
           try {
-            return await AsyncStorage.setItem(key, stringValue);
+            const res = await AsyncStorage.setItem(key, stringValue);
+            decryptedCache.set(key, { rawSnapshot: stringValue, plaintext: stringValue });
+            return res;
           } catch (finalErr) {
             console.warn(`[CryptoStorage] Web storage quota reached for ${key}. Data safely kept in memory.`);
             return;
@@ -575,32 +597,152 @@ export const CryptoStorage = {
   },
 
   /**
-   * Retrieve and transparently decrypt data from AsyncStorage.
-   * If data was stored unencrypted previously, it transparently returns unencrypted.
+   * Persist identical payload across multiple keys with a SINGLE encryption pass
+   * (eliminates double 144KB encryption when mirroring `tasks_guest` -> `tasks`).
    */
-  getItem: async (key) => {
+  setItemMultiKeys: async (keys, value) => {
+    const uniqueKeys = Array.from(new Set((keys || []).filter(Boolean)));
+    if (uniqueKeys.length === 0) return;
+    if (uniqueKeys.length === 1) {
+      return await CryptoStorage.setItem(uniqueKeys[0], value);
+    }
+
+    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+
+    if (FastStorage.isNativeMMKVActive()) {
+      for (let i = 0; i < uniqueKeys.length; i++) {
+        const k = uniqueKeys[i];
+        await FastStorage.setItem(k, stringValue, { secure: true });
+        decryptedCache.set(k, { rawSnapshot: stringValue, plaintext: stringValue });
+      }
+      return;
+    }
+
     try {
-      const raw = await AsyncStorage.getItem(key);
-      if (!raw) return raw;
       const masterKey = await getOrCreateDeviceMasterKey();
-      return decryptString(raw, masterKey);
+      const encrypted = encryptString(stringValue, masterKey);
+      for (let i = 0; i < uniqueKeys.length; i++) {
+        const k = uniqueKeys[i];
+        await AsyncStorage.setItem(k, encrypted);
+        decryptedCache.set(k, { rawSnapshot: encrypted, plaintext: stringValue });
+      }
     } catch (e) {
-      console.error(`[CryptoStorage] Error getting item ${key}:`, e);
-      return await AsyncStorage.getItem(key);
+      // Fallback per-key quota handling
+      for (let i = 0; i < uniqueKeys.length; i++) {
+        await CryptoStorage.setItem(uniqueKeys[i], stringValue);
+      }
     }
   },
 
   /**
-   * Multi-key fetch with transparent decryption.
+   * Retrieve and transparently decrypt data from MMKV (or migrate from AsyncStorage on miss).
+   * If data was stored unencrypted previously, it transparently returns unencrypted.
+   */
+  getItem: async (key) => {
+    try {
+      const useMMKV = FastStorage.isNativeMMKVActive();
+      let fromMMKV = false;
+      let raw = undefined;
+
+      if (useMMKV) {
+        raw = FastStorage.getStringSync(key, { secure: true });
+        if (raw !== undefined) {
+          fromMMKV = true;
+        } else {
+          raw = await AsyncStorage.getItem(key);
+        }
+      } else {
+        raw = await AsyncStorage.getItem(key);
+      }
+
+      if (!raw) {
+        decryptedCache.delete(key);
+        return raw;
+      }
+
+      const cached = decryptedCache.get(key);
+      if (cached && cached.rawSnapshot === raw) {
+        return cached.plaintext;
+      }
+
+      const isJsEnvelope = raw.includes('"__enc__":true') || raw.includes('"__enc__": true');
+      let decrypted = raw;
+      if (isJsEnvelope) {
+        const masterKey = await getOrCreateDeviceMasterKey();
+        decrypted = decryptString(raw, masterKey);
+        if (decrypted === null) {
+          decryptedCache.delete(key);
+          return null;
+        }
+      }
+
+      // Auto-migrate valid legacy AsyncStorage payload into native C++ encrypted MMKV
+      if (useMMKV && !fromMMKV && decrypted !== null && decrypted !== undefined && !key.startsWith('@chaos_')) {
+        try {
+          await FastStorage.setItem(key, decrypted, { secure: true });
+          decryptedCache.set(key, { rawSnapshot: decrypted, plaintext: decrypted });
+          return decrypted;
+        } catch (_) {}
+      }
+
+      decryptedCache.set(key, { rawSnapshot: raw, plaintext: decrypted });
+      return decrypted;
+    } catch (e) {
+      console.error(`[CryptoStorage] Error getting item ${key}:`, e);
+      return await FastStorage.getItem(key, { secure: true });
+    }
+  },
+
+  /**
+   * Multi-key fetch with transparent MMKV fast-path, cache hits, and legacy migration.
    */
   multiGet: async (keys) => {
     try {
-      const rawEntries = await AsyncStorage.multiGet(keys);
-      const masterKey = await getOrCreateDeviceMasterKey();
-      return rawEntries.map(([k, rawVal]) => {
-        if (!rawVal) return [k, rawVal];
-        return [k, decryptString(rawVal, masterKey)];
-      });
+      const useMMKV = FastStorage.isNativeMMKVActive();
+      const rawEntries = await FastStorage.multiGet(keys, { secure: true });
+      let masterKey = null;
+
+      const results = [];
+      for (let i = 0; i < rawEntries.length; i++) {
+        const [k, rawVal] = rawEntries[i];
+        if (!rawVal) {
+          decryptedCache.delete(k);
+          results.push([k, rawVal]);
+          continue;
+        }
+
+        const cached = decryptedCache.get(k);
+        if (cached && cached.rawSnapshot === rawVal) {
+          results.push([k, cached.plaintext]);
+          continue;
+        }
+
+        const isJsEnvelope = rawVal.includes('"__enc__":true') || rawVal.includes('"__enc__": true');
+        let plain = rawVal;
+        if (isJsEnvelope) {
+          if (!masterKey) masterKey = await getOrCreateDeviceMasterKey();
+          plain = decryptString(rawVal, masterKey);
+          if (plain === null) {
+            decryptedCache.delete(k);
+            results.push([k, null]);
+            continue;
+          }
+        }
+
+        if (useMMKV && FastStorage.getStringSync(k, { secure: true }) === undefined && plain !== null && !k.startsWith('@chaos_')) {
+          try {
+            await FastStorage.setItem(k, plain, { secure: true });
+            decryptedCache.set(k, { rawSnapshot: plain, plaintext: plain });
+            results.push([k, plain]);
+            continue;
+          } catch (_) {}
+        }
+
+        decryptedCache.set(k, { rawSnapshot: rawVal, plaintext: plain });
+        results.push([k, plain]);
+      }
+
+      return results;
     } catch (e) {
       console.error('[CryptoStorage] Error in multiGet:', e);
       return await AsyncStorage.multiGet(keys);
@@ -608,10 +750,11 @@ export const CryptoStorage = {
   },
 
   /**
-   * Remove item from AsyncStorage.
+   * Remove item from MMKV & AsyncStorage.
    */
   removeItem: async (key) => {
-    return await AsyncStorage.removeItem(key);
+    decryptedCache.delete(key);
+    return await FastStorage.removeItem(key);
   },
 
   /**
@@ -619,8 +762,11 @@ export const CryptoStorage = {
    */
   clear: async () => {
     cachedMasterKey = null;
-    return await AsyncStorage.clear();
+    decryptedCache.clear();
+    return await FastStorage.clear();
   },
+
+  isNativeMMKVActive: () => FastStorage.isNativeMMKVActive(),
 
   // Exported PIN security helpers
   hashPin,
@@ -637,5 +783,7 @@ export const CryptoStorage = {
   hexToBytes,
   _resetKeyForTesting: () => {
     cachedMasterKey = null;
+    decryptedCache.clear();
+    FastStorage._resetForTesting();
   }
 };

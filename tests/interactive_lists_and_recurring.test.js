@@ -1256,6 +1256,95 @@ describe('Hardware Peak Guard & Automated Memory Hooks', () => {
   });
 });
 
+// ==============================================================================
+// 14. MODERN PERFORMANCE ARCHITECTURE: MMKV JSI & FAST STORAGE
+// ==============================================================================
+describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () => {
+  test('FastStorage & CryptoStorage leverage native MMKV JSI with transparent AsyncStorage migration and tamper safety', async () => {
+    const legacyAsyncStore = {};
+    const mmkvBacking = new Map();
+
+    class MockMMKV {
+      constructor({ id, encryptionKey } = {}) {
+        this.id = id || 'default';
+        this.encryptionKey = encryptionKey || null;
+        if (!mmkvBacking.has(this.id)) mmkvBacking.set(this.id, new Map());
+        this.map = mmkvBacking.get(this.id);
+      }
+      getString(k) {
+        return this.map.has(k) ? this.map.get(k) : undefined;
+      }
+      set(k, v) {
+        this.map.set(k, String(v));
+      }
+      delete(k) {
+        this.map.delete(k);
+      }
+      clearAll() {
+        this.map.clear();
+      }
+    }
+
+    const mockAsyncStorage = {
+      setItem: async (k, v) => { legacyAsyncStore[k] = String(v); },
+      getItem: async (k) => (legacyAsyncStore[k] !== undefined ? legacyAsyncStore[k] : null),
+      multiGet: async (keys) => keys.map(k => [k, legacyAsyncStore[k] !== undefined ? legacyAsyncStore[k] : null]),
+      removeItem: async (k) => { delete legacyAsyncStore[k]; },
+      clear: async () => { Object.keys(legacyAsyncStore).forEach(k => delete legacyAsyncStore[k]); },
+    };
+
+    // 1. Seed a legacy encrypted payload in AsyncStorage before enabling MMKV
+    global.__TEST_ENABLE_MMKV__ = false;
+    const legacyCryptoMod = loadTranspiledModule(path.resolve('src/utils/cryptoStorage.js'), {
+      '@react-native-async-storage/async-storage': mockAsyncStorage,
+    });
+    legacyCryptoMod.CryptoStorage._resetKeyForTesting();
+    const legacyTasks = [{ id: 'legacy_mmkv_1', taskname: 'Migrate me seamlessly' }];
+    await legacyCryptoMod.CryptoStorage.setItem('tasks_guest', JSON.stringify(legacyTasks));
+    assert.ok(legacyAsyncStore['tasks_guest'].includes('__enc__'), 'Legacy AsyncStorage must hold AES envelope');
+
+    // 2. Enable native JSI MMKV and verify transparent auto-migration + native encrypted vault
+    global.__TEST_ENABLE_MMKV__ = true;
+    try {
+      const mmkvCryptoMod = loadTranspiledModule(path.resolve('src/utils/cryptoStorage.js'), {
+        '@react-native-async-storage/async-storage': mockAsyncStorage,
+        'react-native-mmkv': { MMKV: MockMMKV },
+      });
+      const { CryptoStorage } = mmkvCryptoMod;
+      CryptoStorage._resetKeyForTesting();
+
+      assert.strictEqual(CryptoStorage.isNativeMMKVActive(), true, 'Native MMKV must be active when JSI is available');
+
+      // First getItem transparently decrypts from AsyncStorage and migrates into MMKV secure vault
+      const migratedJson = await CryptoStorage.getItem('tasks_guest');
+      assert.deepStrictEqual(JSON.parse(migratedJson), legacyTasks);
+
+      const secureVault = mmkvBacking.get('taskcalendar-secure-v1');
+      assert.ok(secureVault && secureVault.has('tasks_guest'), 'Legacy tasks_guest must be auto-migrated into MMKV secure store');
+
+      // setItemMultiKeys writes multiple keys synchronously into MMKV
+      const updatedTasks = [{ id: 'fast_1', taskname: 'Zero-bridge C++ MMKV write' }];
+      await CryptoStorage.setItemMultiKeys(['tasks_guest', 'tasks'], JSON.stringify(updatedTasks));
+      assert.deepStrictEqual(JSON.parse(await CryptoStorage.getItem('tasks_guest')), updatedTasks);
+      assert.deepStrictEqual(JSON.parse(await CryptoStorage.getItem('tasks')), updatedTasks);
+
+      // Tamper canary in AsyncStorage is still caught and rejected safely
+      legacyAsyncStore['@chaos_tamper_canary'] = JSON.stringify({
+        __enc__: true,
+        v: 1,
+        iv: '0102030405060708090a0b0c0d0e0f10',
+        ct: 'deadbeefcafebabe',
+        mac: 'badc0ffee0000000000000000000000000000000000000000000000000000000',
+      });
+      const tamperedRes = await CryptoStorage.getItem('@chaos_tamper_canary');
+      assert.strictEqual(tamperedRes, null, 'Tampered ciphertext must still return null when MMKV is active');
+    } finally {
+      delete global.__TEST_ENABLE_MMKV__;
+    }
+  });
+});
+
+
 
 
 
