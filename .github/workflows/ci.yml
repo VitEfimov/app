@@ -8,6 +8,7 @@ on:
       - task_calendar
       - simpliest_v1
       - simpliest_v2_new_design
+      - simpl_v2_new_perfomance
   pull_request:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
       - task_calendar
       - simpliest_v1
       - simpliest_v2_new_design
+      - simpl_v2_new_perfomance
   workflow_dispatch:
 
 concurrency:
