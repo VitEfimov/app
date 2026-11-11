@@ -576,9 +576,8 @@ useEffect(() => {
     }
   };
 
-  if (!task) return null;
-
   const handleUpdate = (updates) => {
+    if (!task) return;
     // Only used for immediate local updates like priority or subtask check
     dispatch(updateTask({ taskId: task.id || task._id, ...updates }));
   };
@@ -836,7 +835,7 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible || !task) return;
     const onBackPress = () => {
       if (confirmConfig.isVisible) {
         setConfirmConfig(prev => ({ ...prev, isVisible: false }));
@@ -873,6 +872,7 @@ useEffect(() => {
     return () => sub.remove();
   }, [
     isVisible,
+    Boolean(task),
     confirmConfig.isVisible,
     isAttachmentOptionsVisible,
     isYearPickerVisible,
@@ -1290,12 +1290,15 @@ useEffect(() => {
   };
 
   const toggleComplete = () => {
+    if (!task) return;
     const newCompletedState = !task.completed;
     handleUpdate({ completed: newCompletedState });
     if (newCompletedState) {
       onClose();
     }
   };
+
+  if (!task) return null;
 
   return (
     <Modal 
