@@ -43,6 +43,7 @@ export const parseCalendarHeaderDate = (date, fallbackDateStr) => {
 
 export function YearPickerModal({
   isVisible,
+  inline = false,
   onClose,
   currentYear,
   currentMonth,
@@ -168,28 +169,19 @@ export function YearPickerModal({
     onClose();
   };
 
-  return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      onBackButtonPress={onClose}
-      style={styles.modal}
+  const modalBody = (
+    <View
+      style={[
+        styles.content,
+        {
+          backgroundColor: isContrast
+            ? '#000000'
+            : (colors.bgCard || '#1e1e1e'),
+          borderColor: isContrast ? '#FFFFFF' : 'transparent',
+          borderWidth: isContrast ? 2 : 0,
+        },
+      ]}
     >
-      <View
-        style={[
-          styles.content,
-          {
-            backgroundColor: isContrast
-              ? '#000000'
-              : (colors.bgCard || '#1e1e1e'),
-            borderColor: isContrast ? '#FFFFFF' : 'transparent',
-            borderWidth: isContrast ? 2 : 0,
-          },
-        ]}
-      >
         {/* Drag Handle */}
         <View style={styles.dragHandleContainer}>
           <View
@@ -648,6 +640,29 @@ export function YearPickerModal({
           </TouchableOpacity>
         </View>
       </View>
+    );
+
+  if (inline) {
+    if (!isVisible) return null;
+    return (
+      <View style={[StyleSheet.absoluteFillObject, styles.inlineOverlay, { zIndex: 999999, elevation: 999999 }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
+        {modalBody}
+      </View>
+    );
+  }
+
+  return (
+    <Modal
+      isVisible={isVisible}
+      onSwipeComplete={onClose}
+      swipeDirection={['down']}
+      propagateSwipe={true}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      style={styles.modal}
+    >
+      {modalBody}
     </Modal>
   );
 }
@@ -656,6 +671,10 @@ export { YearPickerModal as MonthYearPickerModal };
 export default YearPickerModal;
 
 const styles = StyleSheet.create({
+  inlineOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   modal: {
     margin: 0,
     justifyContent: 'flex-end',

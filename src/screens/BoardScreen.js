@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
@@ -329,6 +329,22 @@ export default function BoardScreen({ route, navigation }) {
   }, []);
 
   useEffect(() => {
+    const onBackPress = () => {
+      if (sectionOptionsConfig.isVisible) {
+        setSectionOptionsConfig({ isVisible: false, section: null });
+        return true;
+      }
+      if (boardOptionsConfig.isVisible) {
+        setBoardOptionsConfig({ isVisible: false, board: null });
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [sectionOptionsConfig.isVisible, boardOptionsConfig.isVisible]);
+
+  useEffect(() => {
     if (route?.params?.editTaskId) {
       const t = tasks.find(tsk => tsk.id === route.params.editTaskId);
       if (t) {
@@ -531,7 +547,9 @@ export default function BoardScreen({ route, navigation }) {
     setActiveAddSectionId(null);
     try { Keyboard?.dismiss?.(); } catch (e) {}
     setSelectedTask(task);
-    setDetailsVisible(true);
+    setTimeout(() => {
+      setDetailsVisible(true);
+    }, 150);
   }, []);
 
   const handleSnoozePress = useCallback((task) => {
@@ -1871,16 +1889,15 @@ export default function BoardScreen({ route, navigation }) {
         maxLength={20}
       />
 
-      <Modal 
-        isVisible={sectionOptionsConfig.isVisible} 
-        onSwipeComplete={() => setSectionOptionsConfig({ isVisible: false, section: null })}
-        swipeDirection={['down']}
-        propagateSwipe={true}
-        onBackdropPress={() => setSectionOptionsConfig({ isVisible: false, section: null })}
-        style={{ margin: 0, justifyContent: 'flex-end' }}
-      >
-        <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
-          <View style={styles.optionsModalDragHandle} />
+      {Boolean(sectionOptionsConfig.isVisible) && (
+        <View style={[StyleSheet.absoluteFillObject, styles.sheetOverlay, { zIndex: 99998, elevation: 99998 }]}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFillObject} 
+            activeOpacity={1} 
+            onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })} 
+          />
+          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+            <View style={styles.optionsModalDragHandle} />
           <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
             {t('Options for')} {sectionOptionsConfig.section?.title}
           </Text>
@@ -1953,18 +1970,18 @@ export default function BoardScreen({ route, navigation }) {
             </>
           )}
         </View>
-      </Modal>
+        </View>
+      )}
 
-      <Modal 
-        isVisible={boardOptionsConfig.isVisible} 
-        onSwipeComplete={() => setBoardOptionsConfig({ isVisible: false, board: null })}
-        swipeDirection={['down']}
-        propagateSwipe={true}
-        onBackdropPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
-        style={{ margin: 0, justifyContent: 'flex-end' }}
-      >
-        <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
-          <View style={styles.optionsModalDragHandle} />
+      {Boolean(boardOptionsConfig.isVisible) && (
+        <View style={[StyleSheet.absoluteFillObject, styles.sheetOverlay, { zIndex: 99998, elevation: 99998 }]}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFillObject} 
+            activeOpacity={1} 
+            onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })} 
+          />
+          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+            <View style={styles.optionsModalDragHandle} />
           
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
             <View style={{
@@ -2160,7 +2177,8 @@ export default function BoardScreen({ route, navigation }) {
             <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
           </TouchableOpacity>
         </View>
-      </Modal>
+        </View>
+      )}
 
       <AutoManageSettings
         isVisible={boardAutomationModal.isVisible}
@@ -2382,6 +2400,10 @@ const styles = StyleSheet.create({
   ellipsisText: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  sheetOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
   optionsModalContent: {
     padding: 20,

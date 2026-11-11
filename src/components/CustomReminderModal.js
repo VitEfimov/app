@@ -4,7 +4,7 @@ import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../styles/ThemeContext';
 
-export default function CustomReminderModal({ isVisible, onClose, onSave, initialValue }) {
+export default function CustomReminderModal({ isVisible, inline = false, onClose, onSave, initialValue }) {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
 
@@ -55,19 +55,11 @@ export default function CustomReminderModal({ isVisible, onClose, onSave, initia
     return val === 1 ? t('day') : t('days');
   };
 
-  return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      onBackdropPress={onClose}
-      style={styles.modal}
-      avoidKeyboard={true}
+  const content = (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[styles.modalContent, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.modalContent, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}
-      >
         <View style={styles.dragHandle} />
 
         <View style={styles.header}>
@@ -175,11 +167,37 @@ export default function CustomReminderModal({ isVisible, onClose, onSave, initia
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+  );
+
+  if (inline) {
+    if (!isVisible) return null;
+    return (
+      <View style={[StyleSheet.absoluteFillObject, styles.inlineOverlay, { zIndex: 999999, elevation: 999999 }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Modal
+      isVisible={isVisible}
+      onSwipeComplete={onClose}
+      swipeDirection={['down']}
+      onBackdropPress={onClose}
+      style={styles.modal}
+      avoidKeyboard={true}
+    >
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  inlineOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   modal: {
     margin: 0,
     justifyContent: 'flex-end',

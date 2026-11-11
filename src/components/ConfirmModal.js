@@ -3,8 +3,41 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Modal from 'react-native-modal';
 import { useTheme } from '../styles/ThemeContext';
 
-export default function ConfirmModal({ isVisible, title, message, onCancel, onConfirm, confirmText = 'Confirm', cancelText = 'Cancel', isDestructive = false, secondaryIsDestructive = false, hideCancel = false, secondaryConfirmText, onSecondaryConfirm }) {
+export default function ConfirmModal({ isVisible, inline = false, title, message, onCancel, onConfirm, confirmText = 'Confirm', cancelText = 'Cancel', isDestructive = false, secondaryIsDestructive = false, hideCancel = false, secondaryConfirmText, onSecondaryConfirm }) {
   const { colors } = useTheme();
+
+  const content = (
+    <View style={[styles.container, { backgroundColor: colors.bgCard, borderColor: colors.borderColor || 'transparent' }]}>
+      <Text testID="confirm_modal_title" style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+      {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
+
+      <View style={styles.actions}>
+        {!hideCancel && (
+          <TouchableOpacity testID="confirm_modal_cancel" style={[styles.btn, { backgroundColor: colors.surfaceContainer, borderColor: colors.borderColor, borderWidth: 1 }]} onPress={onCancel}>
+            <Text style={[styles.btnText, { color: colors.textPrimary }]}>{cancelText}</Text>
+          </TouchableOpacity>
+        )}
+        {secondaryConfirmText && onSecondaryConfirm && (
+          <TouchableOpacity testID="confirm_modal_secondary" style={[styles.btn, { backgroundColor: colors.surfaceContainer, borderColor: colors.borderColor, borderWidth: 1 }]} onPress={onSecondaryConfirm}>
+            <Text style={[styles.btnText, { color: secondaryIsDestructive ? '#f44336' : colors.textPrimary, fontWeight: 'bold' }]}>{secondaryConfirmText}</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity testID="confirm_modal_submit" style={[styles.btn, { backgroundColor: isDestructive ? 'transparent' : colors.primary }]} onPress={onConfirm}>
+          <Text style={[styles.btnText, { color: isDestructive ? '#f44336' : colors.textInverse, fontWeight: 'bold' }]}>{confirmText}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  if (inline) {
+    if (!isVisible) return null;
+    return (
+      <View style={[StyleSheet.absoluteFillObject, styles.inlineOverlay, { zIndex: 999999, elevation: 999999 }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onCancel} />
+        {content}
+      </View>
+    );
+  }
 
   return (
     <Modal 
@@ -15,31 +48,18 @@ export default function ConfirmModal({ isVisible, title, message, onCancel, onCo
       onBackdropPress={onCancel}
       style={{ margin: 20, justifyContent: 'center', alignItems: 'center' }}
     >
-      <View style={[styles.container, { backgroundColor: colors.bgCard, borderColor: colors.borderColor || 'transparent' }]}>
-        <Text testID="confirm_modal_title" style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
-          {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
-
-          <View style={styles.actions}>
-            {!hideCancel && (
-              <TouchableOpacity testID="confirm_modal_cancel" style={[styles.btn, { backgroundColor: colors.surfaceContainer, borderColor: colors.borderColor, borderWidth: 1 }]} onPress={onCancel}>
-                <Text style={[styles.btnText, { color: colors.textPrimary }]}>{cancelText}</Text>
-              </TouchableOpacity>
-            )}
-            {secondaryConfirmText && onSecondaryConfirm && (
-              <TouchableOpacity testID="confirm_modal_secondary" style={[styles.btn, { backgroundColor: colors.surfaceContainer, borderColor: colors.borderColor, borderWidth: 1 }]} onPress={onSecondaryConfirm}>
-                <Text style={[styles.btnText, { color: secondaryIsDestructive ? '#f44336' : colors.textPrimary, fontWeight: 'bold' }]}>{secondaryConfirmText}</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity testID="confirm_modal_submit" style={[styles.btn, { backgroundColor: isDestructive ? 'transparent' : colors.primary }]} onPress={onConfirm}>
-              <Text style={[styles.btnText, { color: isDestructive ? '#f44336' : colors.textInverse, fontWeight: 'bold' }]}>{confirmText}</Text>
-            </TouchableOpacity>
-          </View>
-      </View>
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  inlineOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   container: {
     width: '100%',
     borderRadius: 12,

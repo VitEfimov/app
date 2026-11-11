@@ -41,6 +41,7 @@ const IconChevronRight = ({ color, size = 18 }) => (
 
 export default function CalendarDayOptionsModal({
   isVisible,
+  inline = false,
   onClose,
   dateFormatted,
   onSortTime,
@@ -55,17 +56,8 @@ export default function CalendarDayOptionsModal({
   const primaryAccent = colors.primary || '#5D45DB';
   const iconBg = isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.12)';
 
-  return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      onBackButtonPress={onClose}
-      style={styles.modalContainer}
-    >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF') }]}>
+  const content = (
+    <View style={[styles.modalContent, { backgroundColor: colors.bgCard || (isDark ? '#1C1B24' : '#FFFFFF') }]}>
         <View style={styles.dragHandleContainer}>
           <View style={[styles.dragHandle, { backgroundColor: colors.borderColor || '#DDD' }]} />
         </View>
@@ -186,11 +178,38 @@ export default function CalendarDayOptionsModal({
           </TouchableOpacity>
         </View>
       </View>
+  );
+
+  if (inline) {
+    if (!isVisible) return null;
+    return (
+      <View style={[StyleSheet.absoluteFillObject, styles.inlineOverlay, { zIndex: 999999, elevation: 999999 }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Modal
+      isVisible={isVisible}
+      onSwipeComplete={onClose}
+      swipeDirection={['down']}
+      propagateSwipe={true}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      style={styles.modalContainer}
+    >
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  inlineOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   modalContainer: {
     margin: 0,
     justifyContent: 'flex-end',

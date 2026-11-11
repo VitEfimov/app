@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../styles/ThemeContext';
 import CustomDropdown from './CustomDropdown';
 
-export default function CustomRepeatModal({ isVisible, onClose, onSave, initialConfig }) {
+export default function CustomRepeatModal({ isVisible, inline = false, onClose, onSave, initialConfig }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
@@ -61,17 +61,8 @@ export default function CustomRepeatModal({ isVisible, onClose, onSave, initialC
 
   const daysLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // 0 is Sunday in JS
 
-  return (
-    <Modal
-      isVisible={isVisible}
-      onSwipeComplete={onClose}
-      swipeDirection={['down']}
-      propagateSwipe={true}
-      onBackdropPress={onClose}
-      avoidKeyboard={true}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
-    >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
+  const content = (
+    <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
         <View style={styles.dragHandle} />
         
         <View style={styles.header}>
@@ -209,11 +200,38 @@ export default function CustomRepeatModal({ isVisible, onClose, onSave, initialC
 
         </ScrollView>
       </View>
+  );
+
+  if (inline) {
+    if (!isVisible) return null;
+    return (
+      <View style={[StyleSheet.absoluteFillObject, styles.inlineOverlay, { zIndex: 999999, elevation: 999999 }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Modal
+      isVisible={isVisible}
+      onSwipeComplete={onClose}
+      swipeDirection={['down']}
+      propagateSwipe={true}
+      onBackdropPress={onClose}
+      avoidKeyboard={true}
+      style={{ margin: 0, justifyContent: 'flex-end' }}
+    >
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  inlineOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

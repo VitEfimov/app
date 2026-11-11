@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal as RNModal, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions, BackHandler } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -63,6 +63,23 @@ const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placehol
     />
   );
 }));
+
+export const normalizeSubtasks = (rawSubtasks) => {
+  if (!rawSubtasks || !Array.isArray(rawSubtasks)) return [];
+  return rawSubtasks.map((st, idx) => {
+    if (typeof st === 'string') {
+      return { id: `st_${idx}`, text: st, completed: false };
+    }
+    if (st && typeof st === 'object') {
+      return {
+        id: st.id || `st_${idx}`,
+        text: st.text || st.name || st.title || '',
+        completed: Boolean(st.completed || st.done || st.isCompleted),
+      };
+    }
+    return { id: `st_${idx}`, text: String(st || ''), completed: false };
+  });
+};
 
 const IconClose = ({ color, size = 24 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -216,7 +233,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const [notes, setNotes] = useState('');
   const [attachments, setAttachments] = useState([]);
-  const [subtasks, setSubtasks] = useState(task ? (task.subtasks || []) : []);
+  const [subtasks, setSubtasks] = useState(task ? normalizeSubtasks(task.subtasks) : []);
   const [priority, setPriority] = useState('none');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerType, setDatePickerType] = useState('due');
@@ -362,7 +379,7 @@ export default function TaskDetailsModal({ task, isVisible, onClose }) {
           size: 0
         });
       }
-      const initialSubtasks = task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : [];
+      const initialSubtasks = normalizeSubtasks(task.subtasks);
       const initialPriority = (task.priority || 'none').toLowerCase();
       const initialBoardId = task.boardId || 'main';
       const rawDate = task.completionDate || task.dateString || task.dueDate || task.date || '';
@@ -818,6 +835,54 @@ useEffect(() => {
     }
   };
 
+  useEffect(() => {
+    if (!isVisible) return;
+    const onBackPress = () => {
+      if (confirmConfig.isVisible) {
+        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+        return true;
+      }
+      if (isAttachmentOptionsVisible) {
+        setAttachmentOptionsVisible(false);
+        return true;
+      }
+      if (isYearPickerVisible) {
+        setYearPickerVisible(false);
+        return true;
+      }
+      if (showDatePicker) {
+        setShowDatePicker(false);
+        return true;
+      }
+      if (isRepeatModalVisible) {
+        setIsRepeatModalVisible(false);
+        return true;
+      }
+      if (isCustomReminderModalVisible) {
+        setIsCustomReminderModalVisible(false);
+        return true;
+      }
+      if (isPremiumModalVisible) {
+        setPremiumModalVisible(false);
+        return true;
+      }
+      handleClose();
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [
+    isVisible,
+    confirmConfig.isVisible,
+    isAttachmentOptionsVisible,
+    isYearPickerVisible,
+    showDatePicker,
+    isRepeatModalVisible,
+    isCustomReminderModalVisible,
+    isPremiumModalVisible,
+    handleClose,
+  ]);
+
   const handleReminderSelect = (selectedVal) => {
     if (selectedVal === 'custom') {
       setIsCustomReminderModalVisible(true);
@@ -1140,7 +1205,7 @@ useEffect(() => {
   };
 
   const addSubtask = () => {
-    const newSubtasks = [...subtasks, { id: Date.now().toString(), text: '', completed: false }];
+    const newSubtasks = [...subtasks, { id: `st_${subtasks.length}_${Date.now()}`, text: '', completed: false }];
     setSubtasks(newSubtasks);
   };
 
@@ -1848,6 +1913,7 @@ useEffect(() => {
 
         <ConfirmModal
           isVisible={confirmConfig.isVisible}
+          inline={true}
           title={confirmConfig.title}
           message={confirmConfig.message}
           confirmText={confirmConfig.confirmText}
@@ -1867,13 +1933,8 @@ useEffect(() => {
           featureName={premiumFeatureName}
         />
 
-        <RNModal
-          visible={isAttachmentOptionsVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setAttachmentOptionsVisible(false)}
-        >
-          <View style={styles.calendarOverlay}>
+        {Boolean(isAttachmentOptionsVisible) && (
+          <View style={[StyleSheet.absoluteFillObject, styles.calendarOverlay, { zIndex: 99999, elevation: 99999 }]}>
             <TouchableOpacity
               activeOpacity={1}
               style={StyleSheet.absoluteFill}
@@ -2000,12 +2061,16 @@ useEffect(() => {
               </TouchableOpacity>
             </View>
           </View>
-        </RNModal>
+        )}
 
-
-        <RNModal visible={showDatePicker} transparent animationType="fade">
-          <View style={styles.calendarOverlay}>
-            <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard }]}>
+        {Boolean(showDatePicker) && (
+          <View style={[StyleSheet.absoluteFillObject, styles.calendarOverlay, { zIndex: 99998, elevation: 99998 }]}>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={StyleSheet.absoluteFill}
+              onPress={() => setShowDatePicker(false)}
+            />
+            <View style={[styles.calendarContainer, { backgroundColor: colors.bgCard, zIndex: 1 }]}>
               {(() => {
                 const activeCalendarDate = getValidDateString(
                   datePickerType === 'due' 
@@ -2086,10 +2151,11 @@ useEffect(() => {
               </View>
             </View>
           </View>
-        </RNModal>
+        )}
 
         <YearPickerModal
           isVisible={isYearPickerVisible}
+          inline={true}
           onClose={() => setYearPickerVisible(false)}
           currentYear={dayjs(
             datePickerType === 'due' 
@@ -2195,6 +2261,7 @@ useEffect(() => {
         )}
       <CustomRepeatModal
         isVisible={isRepeatModalVisible}
+        inline={true}
         onClose={() => setIsRepeatModalVisible(false)}
         initialConfig={repeatConfig}
         onSave={(newConfig) => {
@@ -2210,6 +2277,7 @@ useEffect(() => {
       />
       <CustomReminderModal
         isVisible={isCustomReminderModalVisible}
+        inline={true}
         initialValue={reminder}
         onClose={() => setIsCustomReminderModalVisible(false)}
         onSave={handleCustomReminderSave}

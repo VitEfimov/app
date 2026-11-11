@@ -1367,6 +1367,155 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
     const toastContent = fs.readFileSync(path.resolve('src/styles/ToastContext.js'), 'utf8');
     assert.match(toastContent, /bottom:\s*30\s*\+\s*\(insets\?\.bottom\s*\|\|\s*0\)/, 'ToastProvider must offset bottom toast above system navigation bar');
   });
+
+  describe('Phase 4: Modal & Sheet Architecture Hardening (In-Tree Overlays & BackHandler)', () => {
+    const taskDetailsMod = loadTranspiledModule(path.resolve('src/components/TaskDetailsModal.js'), {
+      'react-native': {
+        View: () => null,
+        Text: () => null,
+        TextInput: () => null,
+        TouchableOpacity: () => null,
+        StyleSheet: { create: s => s, absoluteFillObject: {}, absoluteFill: {} },
+        ScrollView: () => null,
+        Platform: { OS: 'android', select: obj => obj.android || obj.default },
+        Share: {},
+        Image: () => null,
+        KeyboardAvoidingView: () => null,
+        Keyboard: { dismiss: () => {} },
+        Alert: { alert: () => {} },
+        Switch: () => null,
+        AppState: { addEventListener: () => ({ remove: () => {} }) },
+        Linking: { openURL: () => {} },
+        useWindowDimensions: () => ({ width: 400, height: 800 }),
+        BackHandler: { addEventListener: () => ({ remove: () => {} }) },
+      },
+      'react-redux': { useDispatch: () => () => {}, useSelector: () => [] },
+      '../features/taskSlice': {},
+      '@expo/vector-icons': {},
+      '../styles/ThemeContext': { useTheme: () => ({ colors: {}, isDark: false }), hexToRgba: () => '' },
+      'dayjs': dayjs,
+      'expo-localization': {},
+      'react-native-svg': { default: () => null, Path: () => null, Circle: () => null, Rect: () => null, Polyline: () => null },
+      'react-native-calendars': { Calendar: () => null },
+      '../utils/notifications': { scheduleTaskReminder: async () => {}, cancelNotification: async () => {} },
+      '../custom-hooks/useTaskRepeat': { useTaskRepeat: () => ({ generateRepeatingTasks: () => [] }) },
+      './CustomDropdown': () => null,
+      './CustomRepeatModal': () => null,
+      './CustomReminderModal': () => null,
+      './YearPickerModal': { parseCalendarHeaderDate: () => dayjs() },
+      './ConfirmModal': () => null,
+      './PremiumModal': () => null,
+      './CustomTimePicker': () => null,
+      'react-i18next': { useTranslation: () => ({ t: k => k, i18n: { language: 'en' } }) },
+      'react-native-modal': () => null,
+      'expo-image-picker': { getPendingResultAsync: async () => null },
+      'expo-document-picker': {},
+      'expo-file-system': {},
+      'expo-sharing': {},
+      'expo-clipboard': {},
+      'expo-intent-launcher': {},
+      '../utils/securityLockHelper': { SecurityLockHelper: { subscribeLock: () => () => {} } },
+    });
+
+    const { normalizeSubtasks } = taskDetailsMod;
+
+    test('normalizeSubtasks converts strings and objects deterministically without Date.now() false positives', () => {
+      assert.strictEqual(typeof normalizeSubtasks, 'function', 'normalizeSubtasks must be exported as a function');
+      assert.deepStrictEqual(normalizeSubtasks(null), []);
+      assert.deepStrictEqual(normalizeSubtasks([]), []);
+
+      const rawStringList = ['Buy groceries', 'Call pharmacy'];
+      const normalized1 = normalizeSubtasks(rawStringList);
+      const normalized2 = normalizeSubtasks(rawStringList);
+
+      assert.strictEqual(normalized1.length, 2);
+      assert.strictEqual(normalized1[0].id, 'st_0');
+      assert.strictEqual(normalized1[0].text, 'Buy groceries');
+      assert.strictEqual(normalized1[0].completed, false);
+      assert.strictEqual(normalized1[1].id, 'st_1');
+      assert.strictEqual(normalized1[1].text, 'Call pharmacy');
+
+      // Deterministic identity check: string representations match 100% across multiple calls
+      assert.strictEqual(
+        JSON.stringify(normalized1),
+        JSON.stringify(normalized2),
+        'normalizeSubtasks must produce deterministic IDs (st_idx) to prevent hasUnsavedChanges() false triggers on mount'
+      );
+
+      // Existing IDs are preserved
+      const rawObjects = [
+        { id: 'custom_sub_99', text: 'Existing task', completed: true },
+        { name: 'Missing ID task' },
+      ];
+      const normObjects = normalizeSubtasks(rawObjects);
+      assert.strictEqual(normObjects[0].id, 'custom_sub_99');
+      assert.strictEqual(normObjects[0].completed, true);
+      assert.strictEqual(normObjects[1].id, 'st_1');
+      assert.strictEqual(normObjects[1].text, 'Missing ID task');
+      assert.strictEqual(normObjects[1].completed, false);
+    });
+
+    test('In-Tree Overlays: ConfirmModal, YearPickerModal, CustomRepeatModal, CustomReminderModal, and CalendarDayOptionsModal support inline={true}', () => {
+      const confirmModalContent = fs.readFileSync(path.resolve('src/components/ConfirmModal.js'), 'utf8');
+      assert.match(confirmModalContent, /inline\s*=\s*false/, 'ConfirmModal must support inline prop');
+      assert.match(confirmModalContent, /if\s*\(inline\)/, 'ConfirmModal must branch on inline prop');
+      assert.match(confirmModalContent, /styles\.inlineOverlay/, 'ConfirmModal inline mode must render in-tree overlay');
+
+      const yearPickerContent = fs.readFileSync(path.resolve('src/components/YearPickerModal.js'), 'utf8');
+      assert.match(yearPickerContent, /inline\s*=\s*false/, 'YearPickerModal must support inline prop');
+      assert.match(yearPickerContent, /if\s*\(inline\)/, 'YearPickerModal must branch on inline prop');
+      assert.match(yearPickerContent, /styles\.inlineOverlay/, 'YearPickerModal inline mode must render in-tree overlay');
+
+      const customRepeatContent = fs.readFileSync(path.resolve('src/components/CustomRepeatModal.js'), 'utf8');
+      assert.match(customRepeatContent, /inline\s*=\s*false/, 'CustomRepeatModal must support inline prop');
+      assert.match(customRepeatContent, /if\s*\(inline\)/, 'CustomRepeatModal must branch on inline prop');
+      assert.match(customRepeatContent, /styles\.inlineOverlay/, 'CustomRepeatModal inline mode must render in-tree overlay');
+
+      const customReminderContent = fs.readFileSync(path.resolve('src/components/CustomReminderModal.js'), 'utf8');
+      assert.match(customReminderContent, /inline\s*=\s*false/, 'CustomReminderModal must support inline prop');
+      assert.match(customReminderContent, /if\s*\(inline\)/, 'CustomReminderModal must branch on inline prop');
+      assert.match(customReminderContent, /styles\.inlineOverlay/, 'CustomReminderModal inline mode must render in-tree overlay');
+
+      const dayOptionsContent = fs.readFileSync(path.resolve('src/components/calendar/CalendarDayOptionsModal.js'), 'utf8');
+      assert.match(dayOptionsContent, /inline\s*=\s*false/, 'CalendarDayOptionsModal must support inline prop');
+      assert.match(dayOptionsContent, /if\s*\(inline\)/, 'CalendarDayOptionsModal must branch on inline prop');
+      assert.match(dayOptionsContent, /styles\.inlineOverlay/, 'CalendarDayOptionsModal inline mode must render in-tree overlay');
+    });
+
+    test('BoardScreen renders sectionOptionsConfig & boardOptionsConfig as in-tree absoluteFill overlays and buffers task press by 150ms', () => {
+      const boardScreenContent = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+
+      // In-tree overlays instead of Modal for kebab options
+      assert.match(boardScreenContent, /Boolean\(sectionOptionsConfig\.isVisible\)\s*&&\s*\(\s*<View\s+style=\s*\{\[StyleSheet\.absoluteFillObject,\s*styles\.sheetOverlay/, 'sectionOptionsConfig must be rendered as an in-tree overlay');
+      assert.match(boardScreenContent, /Boolean\(boardOptionsConfig\.isVisible\)\s*&&\s*\(\s*<View\s+style=\s*\{\[StyleSheet\.absoluteFillObject,\s*styles\.sheetOverlay/, 'boardOptionsConfig must be rendered as an in-tree overlay');
+
+      // 150ms buffer in handleTaskPress
+      assert.match(boardScreenContent, /setTimeout\(\(\)\s*=>\s*\{\s*setDetailsVisible\(true\);\s*\},\s*150\)/, 'handleTaskPress must buffer details modal presentation by 150ms to allow ACTION_UP completion');
+
+      // BackHandler listener in BoardScreen
+      assert.match(boardScreenContent, /BackHandler\.addEventListener\('hardwareBackPress'/, 'BoardScreen must register BackHandler for hardware back press');
+    });
+
+    test('TaskDetailsModal eliminates nested RNModals and passes inline={true} to all child dialogs', () => {
+      const taskDetailsContent = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+
+      // No nested RNModal tags
+      assert.doesNotMatch(taskDetailsContent, /<RNModal/, 'TaskDetailsModal must not contain any nested RNModal dialogs');
+
+      // In-tree overlay for attachment options & date picker
+      assert.match(taskDetailsContent, /Boolean\(isAttachmentOptionsVisible\)\s*&&\s*\(\s*<View\s+style=\s*\{\[StyleSheet\.absoluteFillObject,\s*styles\.calendarOverlay/, 'Attachment options must render as an in-tree overlay');
+      assert.match(taskDetailsContent, /Boolean\(showDatePicker\)\s*&&\s*\(\s*<View\s+style=\s*\{\[StyleSheet\.absoluteFillObject,\s*styles\.calendarOverlay/, 'Date picker must render as an in-tree overlay');
+
+      // Sub-modals passed inline={true}
+      assert.match(taskDetailsContent, /<ConfirmModal[\s\S]*?inline=\{true\}/, 'ConfirmModal must receive inline={true}');
+      assert.match(taskDetailsContent, /<YearPickerModal[\s\S]*?inline=\{true\}/, 'YearPickerModal must receive inline={true}');
+      assert.match(taskDetailsContent, /<CustomRepeatModal[\s\S]*?inline=\{true\}/, 'CustomRepeatModal must receive inline={true}');
+      assert.match(taskDetailsContent, /<CustomReminderModal[\s\S]*?inline=\{true\}/, 'CustomReminderModal must receive inline={true}');
+
+      // BackHandler listener in TaskDetailsModal
+      assert.match(taskDetailsContent, /BackHandler\.addEventListener\('hardwareBackPress'/, 'TaskDetailsModal must register BackHandler for hardware back press');
+    });
+  });
 });
 
 
