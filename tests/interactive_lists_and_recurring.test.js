@@ -1553,6 +1553,43 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const navContent = fs.readFileSync(path.resolve('src/navigation/AppNavigator.js'), 'utf8');
       assert.match(navContent, /detachInactiveScreens=\{false\}/, 'Tab.Navigator must disable screen detachment on RN 0.76 Fabric');
     });
+
+    test('GitHub Actions workflows prune old artifacts and enforce retention-days: 3 to stay under 500 MB quota', async () => {
+      const pruneArtifacts = require(path.resolve('.github/scripts/prune-artifacts.js'));
+      const deletedIds = [];
+      const mockArtifacts = [
+        { id: 1, name: 'taskcalendar-release.apk', size_in_bytes: 110 * 1024 * 1024, expired: false, created_at: '2026-11-01T00:00:00Z' },
+        { id: 2, name: 'old-other-bundle', size_in_bytes: 150 * 1024 * 1024, expired: false, created_at: '2026-11-02T00:00:00Z' },
+        { id: 3, name: 'taskcalendar-web-dist', size_in_bytes: 100 * 1024 * 1024, expired: false, created_at: '2026-11-03T00:00:00Z' },
+        { id: 4, name: 'expired-apk', size_in_bytes: 200 * 1024 * 1024, expired: true, created_at: '2026-10-01T00:00:00Z' },
+      ];
+
+      const mockGithub = {
+        rest: {
+          actions: {
+            listArtifactsForRepo: async () => ({ data: { artifacts: mockArtifacts } }),
+            deleteArtifact: async ({ artifact_id }) => { deletedIds.push(artifact_id); },
+          },
+        },
+      };
+
+      const res = await pruneArtifacts({
+        github: mockGithub,
+        context: { repo: { owner: 'user', repo: 'app' } },
+        targetArtifactName: 'taskcalendar-release.apk',
+        maxRepoBytes: 200 * 1024 * 1024,
+      });
+
+      assert.deepStrictEqual(deletedIds, [1, 2], 'Must delete matching artifact and oldest remaining artifact exceeding maxRepoBytes');
+      assert.strictEqual(res.remainingBytes, 100 * 1024 * 1024);
+
+      for (const wf of ['android-build.yml', 'ci.yml', 'web-deploy.yml']) {
+        const yml = fs.readFileSync(path.resolve('.github/workflows', wf), 'utf8');
+        assert.match(yml, /actions:\s*write/, `${wf} must declare actions: write permission`);
+        assert.match(yml, /prune-artifacts\.js/, `${wf} must run prune-artifacts.js before uploading`);
+        assert.match(yml, /retention-days:\s*3/, `${wf} must enforce short retention-days: 3`);
+      }
+    });
   });
 });
 
