@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler } from 'react-native';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
@@ -39,6 +38,23 @@ import { MemoryPressureGuard } from '../utils/memoryPressureGuard';
 let RNShare;
 if (Platform.OS !== 'web') {
   RNShare = require('react-native-share').default;
+}
+
+// Resolve @shopify/flash-list v2 when running on React Native New Architecture (Fabric).
+// On Web or inside a pre-rebuild legacy binary, cleanly falls back to FlatList.
+let FabricFlashList = null;
+const isNativeFabricActive =
+  Platform.OS !== 'web' &&
+  typeof global !== 'undefined' &&
+  (Boolean(global.nativeFabricUIManager) ||
+    Boolean(global.__turboModuleProxy) ||
+    global.RN$Bridgeless === true);
+if (isNativeFabricActive) {
+  try {
+    FabricFlashList = require('@shopify/flash-list').FlashList;
+  } catch (e) {
+    FabricFlashList = null;
+  }
 }
 
 // Responsive Web CSS for ultra-narrow screens (< 300px)
@@ -1353,6 +1369,19 @@ export default function BoardScreen({ route, navigation }) {
     isNarrow: windowWidth < 300,
   }), [activeBoardId, activeAddSectionId, tasks.length, boardTasks, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary, expensesPeriodFilter, listFilterCategory, windowWidth]);
 
+  const flashListRef = useRef(null);
+  const flatListRef = useRef(null);
+  const useFabricFlashList = Boolean(FabricFlashList);
+
+  const extractBoardItemKey = useCallback((item, index) => {
+    if (item?.uniqueKey) return item.uniqueKey;
+    if (item?.type === 'task') {
+      const taskId = item.task?.id || item.task?._id || `task_${index}`;
+      return `task_${taskId}_${item.section?.id || 'sec'}`;
+    }
+    return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
+  }, []);
+
   const isAnyModalOpen = isDetailsVisible || 
     isQuickMenuVisible || 
     isSnoozeVisible || 
@@ -1843,30 +1872,42 @@ export default function BoardScreen({ route, navigation }) {
           </ScrollView>
         </View>
 
-      <FlashList
-        key={activeBoardId}
-        data={flattenedData}
-        extraData={flashListExtraData}
-        ListHeaderComponent={renderListSummaryBar}
-        keyExtractor={(item, index) => {
-          if (item?.uniqueKey) return item.uniqueKey;
-          if (item?.type === 'task') {
-            const taskId = item.task?.id || item.task?._id || `task_${index}`;
-            return `task_${taskId}_${item.section?.id || 'sec'}`;
-          }
-          return `${item?.type || 'item'}_${item?.section?.id || 'sec'}`;
-        }}
-        getItemType={(item) => item.type}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={undefined}
-        keyboardShouldPersistTaps="handled"
-        onScrollBeginDrag={closeOpenSwipeableRow}
-        estimatedItemSize={70}
-        drawDistance={Platform.OS === 'web' ? 400 : 250}
-        disableAutoLayout={true}
-      />
+      {useFabricFlashList ? (
+        <FabricFlashList
+          ref={flashListRef}
+          key={activeBoardId}
+          data={flattenedData}
+          extraData={flashListExtraData}
+          ListHeaderComponent={renderListSummaryBar}
+          keyExtractor={(item, index) => extractBoardItemKey(item, index)}
+          getItemType={(item) => item.type}
+          renderItem={renderItem}
+          drawDistance={1500}
+          maintainVisibleContentPosition={{ disabled: true }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={closeOpenSwipeableRow}
+        />
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          key={activeBoardId}
+          data={flattenedData}
+          extraData={flashListExtraData}
+          ListHeaderComponent={renderListSummaryBar}
+          keyExtractor={(item, index) => extractBoardItemKey(item, index)}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={closeOpenSwipeableRow}
+          initialNumToRender={20}
+          maxToRenderPerBatch={15}
+          windowSize={21}
+          removeClippedSubviews={false}
+        />
+      )}
 
       {selectionMode.isActive && (
         <View testID="selection_action_bar" style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>

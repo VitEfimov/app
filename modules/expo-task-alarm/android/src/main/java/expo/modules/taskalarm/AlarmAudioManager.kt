@@ -40,14 +40,21 @@ object CarUtils {
 
     fun isConnectedToCar(context: Context): Boolean {
         // 1. Check TaskFlowCarService static flag
-        try {
-            val clazz = Class.forName("com.vitvalef.app.TaskFlowCarService")
-            val field = clazz.getDeclaredField("isCarConnected")
-            field.isAccessible = true
-            if (field.getBoolean(null)) {
-                return true
-            }
-        } catch (ignored: Throwable) {}
+        val candidateClasses = listOf(
+            "${context.packageName}.TaskFlowCarService",
+            "com.vitvalef.taskcalendar.TaskFlowCarService",
+            "com.vitvalef.app.TaskFlowCarService"
+        )
+        for (className in candidateClasses) {
+            try {
+                val clazz = Class.forName(className)
+                val field = clazz.getDeclaredField("isCarConnected")
+                field.isAccessible = true
+                if (field.getBoolean(null)) {
+                    return true
+                }
+            } catch (ignored: Throwable) {}
+        }
 
         // 2. Check Android standard UiModeManager for Car Mode
         try {

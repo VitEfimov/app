@@ -1052,14 +1052,15 @@ describe('Large Section Crash Prevention, FlashList Integrity & Hardware Diagnos
     assert.match(content, /Platform\.OS\s*!==\s*['"]android['"]/, 'Must not trigger native LayoutAnimation on Android FlashList');
   });
 
-  test('BoardScreen FlashList configures stable uniqueKey keyExtractor and disableAutoLayout', () => {
+  test('BoardScreen FlashList v2 configures stable uniqueKey keyExtractor and drawDistance', () => {
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
-    assert.match(content, /keyExtractor=\{\(item,\s*index\)/, 'keyExtractor must accept index parameter');
+    assert.match(content, /extractBoardItemKey\s*=\s*useCallback\(\(item,\s*index\)/, 'extractBoardItemKey must accept item and index parameters');
+    assert.match(content, /keyExtractor=\{\(item,\s*index\)\s*=>\s*extractBoardItemKey\(item,\s*index\)\}/, 'keyExtractor must delegate to extractBoardItemKey');
     assert.match(content, /if \(item\?\.uniqueKey\) return item\.uniqueKey;/, 'Must use stable uniqueKey to prevent key shift on section expand');
-    assert.match(content, /disableAutoLayout=\{true\}/, 'Must disable AutoLayoutView on single-column list to prevent Android native crash');
-    assert.match(content, /drawDistance=\{Platform\.OS === 'web' \? 400 : 250\}/, 'Must use conservative drawDistance on mobile');
+    assert.match(content, /maintainVisibleContentPosition=\{\{\s*disabled:\s*true\s*\}\}/, 'Must configure maintainVisibleContentPosition disabled for FlashList v2');
+    assert.match(content, /drawDistance=\{1500\}/, 'FlashList v2 must buffer 1500dp ahead/behind viewport');
     assert.match(content, /ListHeaderComponent=\{renderListSummaryBar\}/, 'Must wire summary bar into ListHeaderComponent to scroll with tasks');
   });
 
@@ -1200,14 +1201,14 @@ describe('Hardware Peak Guard & Automated Memory Hooks', () => {
     assert.match(content, /Run Emergency RAM Flush & GC/, 'DevLogsScreen must provide manual emergency flush trigger');
   });
 
-  test('BoardScreen protects large section expansion (e.g. 111 missed tasks) via progressive batching, stable keys, and disableAutoLayout', () => {
+  test('BoardScreen protects large section expansion (e.g. 111 missed tasks) via progressive batching, stable keys, and FlashList v2', () => {
     const boardPath = path.resolve('src/screens/BoardScreen.js');
     const content = fs.readFileSync(boardPath, 'utf8');
 
     assert.match(content, /INITIAL_SECTION_PAGE_SIZE/, 'BoardScreen must batch initial visible rows per section');
     assert.match(content, /type:\s*'show_more'/, 'BoardScreen must render a show_more pagination row when section exceeds page size');
-    assert.match(content, /disableAutoLayout=\{true\}/, 'BoardScreen FlashList must disable AutoLayoutView to prevent Android native dispatchDraw crash');
-    assert.doesNotMatch(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'BoardScreen FlashList must not combine removeClippedSubviews with FlashList');
+    assert.match(content, /maintainVisibleContentPosition=\{\{\s*disabled:\s*true\s*\}\}/, 'BoardScreen FlashList v2 must disable chat scroll anchoring on section toggles');
+    assert.doesNotMatch(content, /removeClippedSubviews=\{Platform\.OS === 'android'\}/, 'BoardScreen must not combine removeClippedSubviews with FlashList');
   });
 
   test('TaskAlarmReceiver uses full screen only when phone is locked and popup with sound when phone is active', () => {
@@ -1514,6 +1515,43 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       // BackHandler listener in TaskDetailsModal
       assert.match(taskDetailsContent, /BackHandler\.addEventListener\('hardwareBackPress'/, 'TaskDetailsModal must register BackHandler for hardware back press');
+    });
+  });
+
+  describe('Phase 5: Expo SDK 52, React Native 0.76.9 & FlashList v2 (Fabric & Bridgeless)', () => {
+    test('Expo SDK 52 + New Architecture (Fabric) + FlashList v2 + MMKV v3 + Bridgeless storage & navigation are configured cleanly', () => {
+      const appJson = JSON.parse(fs.readFileSync(path.resolve('app.json'), 'utf8'));
+      assert.strictEqual(appJson.expo.newArchEnabled, true, 'app.json must enable newArchEnabled: true for Fabric');
+
+      const buildPropsPlugin = (appJson.expo.plugins || []).find(
+        p => Array.isArray(p) && p[0] === 'expo-build-properties'
+      );
+      assert.ok(buildPropsPlugin, 'app.json must configure expo-build-properties');
+      assert.strictEqual(buildPropsPlugin[1]?.android?.compileSdkVersion, 35, 'Android compileSdkVersion must be 35');
+      assert.strictEqual(buildPropsPlugin[1]?.android?.targetSdkVersion, 35, 'Android targetSdkVersion must be 35');
+
+      const pkgJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+      assert.match(pkgJson.dependencies.expo, /52\./, 'package.json must target Expo SDK 52');
+      assert.match(pkgJson.dependencies['react-native'], /0\.76\./, 'package.json must target React Native 0.76');
+      assert.match(pkgJson.dependencies['@shopify/flash-list'], /\^2\./, 'package.json must use FlashList v2 for Fabric');
+      assert.match(pkgJson.dependencies['react-native-mmkv'], /\^3\./, 'package.json must use MMKV v3 TurboModule for New Architecture');
+
+      const boardContent = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      assert.match(boardContent, /require\(['"]@shopify\/flash-list['"]\)\.FlashList/, 'BoardScreen must load FlashList v2 conditionally on Native Fabric');
+      assert.match(boardContent, /<FabricFlashList/, 'BoardScreen must render FabricFlashList when Fabric is active');
+      assert.match(boardContent, /drawDistance=\{1500\}/, 'FabricFlashList must buffer 1500dp ahead/behind viewport');
+      assert.match(boardContent, /maintainVisibleContentPosition=\{\{\s*disabled:\s*true\s*\}\}/, 'FabricFlashList must disable chat scroll anchoring');
+      assert.doesNotMatch(boardContent, /estimatedItemSize=/, 'FlashList v2 must not pass deprecated estimatedItemSize prop');
+      assert.match(boardContent, /<FlatList/, 'BoardScreen must keep FlatList fallback for Web and legacy binaries');
+      assert.match(boardContent, /windowSize=\{21\}/, 'BoardScreen FlatList fallback must use windowSize={21}');
+
+      const fastStorageContent = fs.readFileSync(path.resolve('src/utils/fastStorage.js'), 'utf8');
+      assert.match(fastStorageContent, /nativeFabricUIManager/, 'FastStorage must detect Fabric JSI in Bridgeless mode');
+      assert.match(fastStorageContent, /RN\$Bridgeless/, 'FastStorage must detect RN 0.76 Bridgeless runtime');
+      assert.match(fastStorageContent, /createMMKV/, 'FastStorage must support MMKV v3 createMMKV factory');
+
+      const navContent = fs.readFileSync(path.resolve('src/navigation/AppNavigator.js'), 'utf8');
+      assert.match(navContent, /detachInactiveScreens=\{false\}/, 'Tab.Navigator must disable screen detachment on RN 0.76 Fabric');
     });
   });
 });

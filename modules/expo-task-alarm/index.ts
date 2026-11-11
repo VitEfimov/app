@@ -1,7 +1,18 @@
-import { requireNativeModule } from 'expo-modules-core';
+import { requireNativeModule, requireOptionalNativeModule } from 'expo-modules-core';
 import { Platform } from 'react-native';
 
-const ExpoTaskAlarm = Platform.OS === 'web' ? null : requireNativeModule('ExpoTaskAlarm');
+const ExpoTaskAlarm = (() => {
+  if (Platform.OS === 'web') return null;
+  try {
+    if (typeof requireOptionalNativeModule === 'function') {
+      return requireOptionalNativeModule('ExpoTaskAlarm');
+    }
+    return requireNativeModule('ExpoTaskAlarm');
+  } catch (e) {
+    console.warn('ExpoTaskAlarm native module unavailable:', e);
+    return null;
+  }
+})();
 
 export async function scheduleExactAlarm(
   taskId: string,

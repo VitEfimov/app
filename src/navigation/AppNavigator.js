@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 export const navigationRef = createNavigationContainerRef();
 import { useSelector } from 'react-redux';
-import { StatusBar, View } from 'react-native';
+import { Platform, StatusBar, View } from 'react-native';
 
 import BoardScreen from '../screens/BoardScreen';
 import CalendarScreen from '../screens/CalendarScreen';
@@ -18,9 +18,12 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       tabBar={(props) => <BottomMenu {...props} />}
+      detachInactiveScreens={false}
+      sceneContainerStyle={{ backgroundColor: colors.bgMain }}
       screenOptions={{
         headerShown: false,
       }}
@@ -34,12 +37,15 @@ function MainTabs() {
 }
 
 function MainStack() {
+  const { colors } = useTheme();
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        animation: 'fade',
-        contentStyle: { flex: 1, height: '100%', overflow: 'hidden' },
+        animation: Platform.OS === 'android' ? 'none' : 'fade',
+        contentStyle: Platform.OS === 'web'
+          ? { flex: 1, height: '100%', overflow: 'hidden', backgroundColor: colors.bgMain }
+          : { flex: 1, backgroundColor: colors.bgMain },
       }}
     >
       <Stack.Screen name="MainTabs" component={MainTabs} />

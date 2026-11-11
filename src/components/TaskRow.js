@@ -139,7 +139,7 @@ export const closeOpenSwipeableRow = () => {
   }
 };
 
-const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
+const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
@@ -434,9 +434,8 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
     };
   }, [isEditing, submitEdit]);
 
-  if (!task) return null;
-
   const getEffectiveHabitCategory = useCallback(() => {
+    if (!task) return 'Anytime';
     if (task.itemCategory && ['Morning', 'Afternoon', 'Evening', 'Anytime'].includes(task.itemCategory)) {
       if (task.itemCategory !== 'Anytime') return task.itemCategory;
     }
@@ -450,9 +449,10 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       }
     }
     return task.itemCategory || 'Anytime';
-  }, [task.itemCategory, task.time]);
+  }, [task?.itemCategory, task?.time]);
 
   const handleCycleHabitCategory = useCallback((e) => {
+    if (!task) return;
     if (e && e.stopPropagation) e.stopPropagation();
     const cycle = ['Morning', 'Afternoon', 'Evening', 'Anytime'];
     const current = getEffectiveHabitCategory();
@@ -462,7 +462,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       taskId: task.id || task._id,
       itemCategory: nextCategory
     }));
-  }, [getEffectiveHabitCategory, task.id, task._id, dispatch]);
+  }, [getEffectiveHabitCategory, task?.id, task?._id, dispatch]);
 
   const formatDisplayTime = (timeStr) => {
     if (!timeStr || timeStr === '--:--') return '--:--';
@@ -487,8 +487,6 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       return timeStr;
     }
   };
-
-
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
@@ -515,7 +513,7 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
   }, [rawDueDate]);
   const isDueDateValid = dueDateInfo.isValid;
   const priorityColor = getPriorityColor(task.priority);
-  const hasNotes = (task.description?.text && task.description.text.trim() !== '') || (task.description?.img && task.description.img.trim() !== '') || (task.description?.attachments && task.description.attachments.length > 0);
+  const hasNotes = Boolean((task.description?.text && task.description.text.trim() !== '') || (task.description?.img && task.description.img.trim() !== '') || (task.description?.attachments && task.description.attachments.length > 0));
   const subtasks = task.subtasks || [];
   const totalSubtasksCount = subtasks.length;
   const completedSubtasksCount = subtasks.filter(s => s.completed).length;
@@ -950,6 +948,11 @@ const TaskRow = React.memo(function TaskRow({ task, sectionId, hideDate = false,
       )}
     </>
   );
+});
+
+const TaskRow = React.memo(function TaskRow(props) {
+  if (!props.task) return null;
+  return <TaskRowInner {...props} />;
 });
 
 export default TaskRow;

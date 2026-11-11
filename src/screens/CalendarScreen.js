@@ -81,7 +81,7 @@ const IconSubtasksLines = ({ color = '#888', size = 14 }) => (
 export default function CalendarScreen({ navigation, route }) {
   const { colors, isDark, mode } = useTheme();
   const { t, i18n } = useTranslation();
-  const { showToast } = useToast ? useToast() : { showToast: () => {} };
+  const { showToast } = useToast();
   const dispatch = useDispatch();
 
   const tasks = useSelector(state => state.taskReducer?.tasks || []);

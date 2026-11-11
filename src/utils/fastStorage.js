@@ -26,6 +26,8 @@ function ensureMMKV() {
     typeof global !== 'undefined' &&
     (typeof global.nativeCallSyncHook === 'function' ||
       typeof global.__turboModuleProxy === 'function' ||
+      typeof global.nativeFabricUIManager !== 'undefined' ||
+      global.RN$Bridgeless === true ||
       global.__TEST_ENABLE_MMKV__ === true);
 
   if (!hasNativeJSI) {
@@ -36,10 +38,18 @@ function ensureMMKV() {
   try {
     // Dynamic require so Web bundlers and Node unit tests without native JSI never fail
     const mmkvModule = require('react-native-mmkv');
-    const MMKVClass = mmkvModule?.MMKV;
-    if (typeof MMKVClass === 'function') {
-      mmkvPlain = new MMKVClass({ id: 'taskcalendar-fast-v1' });
+    const createStore = (opts) => {
+      if (typeof mmkvModule?.MMKV === 'function') {
+        return new mmkvModule.MMKV(opts);
+      }
+      if (typeof mmkvModule?.createMMKV === 'function') {
+        return mmkvModule.createMMKV(opts);
+      }
+      return null;
+    };
 
+    mmkvPlain = createStore({ id: 'taskcalendar-fast-v1' });
+    if (mmkvPlain) {
       let vaultKey = mmkvPlain.getString(MMKV_VAULT_KEY_NAME);
       if (!vaultKey) {
         let generated = '';
@@ -58,7 +68,7 @@ function ensureMMKV() {
         mmkvPlain.set(MMKV_VAULT_KEY_NAME, vaultKey);
       }
 
-      mmkvSecure = new MMKVClass({
+      mmkvSecure = createStore({
         id: 'taskcalendar-secure-v1',
         encryptionKey: vaultKey,
       });
@@ -201,8 +211,8 @@ export const FastStorage = {
   removeItem: async (key) => {
     const { mmkvPlain: plain, mmkvSecure: sec } = ensureMMKV();
     if (plain || sec) {
-      try { plain?.delete(key); } catch (_) {}
-      try { sec?.delete(key); } catch (_) {}
+      try { typeof plain?.delete === 'function' ? plain.delete(key) : plain?.remove?.(key); } catch (_) {}
+      try { typeof sec?.delete === 'function' ? sec.delete(key) : sec?.remove?.(key); } catch (_) {}
       // Non-blocking cleanup of any legacy copy in AsyncStorage
       try {
         const p = AsyncStorage.removeItem(key);
