@@ -1868,6 +1868,34 @@ export default function BoardScreen({ route, navigation }) {
         disableAutoLayout={true}
       />
 
+      {selectionMode.isActive && (
+        <View testID="selection_action_bar" style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
+          <Text testID="selection_count_text" style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
+            <TouchableOpacity testID="action_bar_all" accessible={true} accessibilityRole="button" accessibilityLabel="Select all" onPress={handleSelectAll} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_move" accessible={true} accessibilityRole="button" accessibilityLabel="Move selected" onPress={() => setMoveBoardVisible(true)} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Move')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_share" accessible={true} accessibilityRole="button" accessibilityLabel="Share selected" onPress={handleShareSelected} style={styles.actionBtn}>
+              <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>{t('Share')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_complete" accessible={true} accessibilityRole="button" accessibilityLabel="Complete selected" onPress={handleCompleteSelected} style={styles.actionBtn}>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Complete')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_delete" accessible={true} accessibilityRole="button" accessibilityLabel="Delete selected" onPress={handleDeleteSelected} style={styles.actionBtn}>
+              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Delete')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="action_bar_cancel" accessible={true} accessibilityRole="button" accessibilityLabel="Cancel selection" onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
+              <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>{t('Cancel')}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+
+      </View>
+
       <TaskDetailsModal 
         task={selectedTask}
         isVisible={isDetailsVisible}
@@ -1890,13 +1918,19 @@ export default function BoardScreen({ route, navigation }) {
       />
 
       {Boolean(sectionOptionsConfig.isVisible) && (
-        <View style={[StyleSheet.absoluteFillObject, styles.sheetOverlay, { zIndex: 99998, elevation: 99998 }]}>
+        <View 
+          style={[StyleSheet.absoluteFillObject, styles.sheetOverlay, { zIndex: 99998, elevation: 99998 }]}
+          pointerEvents="auto"
+        >
           <TouchableOpacity 
             style={StyleSheet.absoluteFillObject} 
             activeOpacity={1} 
             onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })} 
           />
-          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+          <View 
+            style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={styles.optionsModalDragHandle} />
           <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
             {t('Options for')} {sectionOptionsConfig.section?.title}
@@ -1974,13 +2008,19 @@ export default function BoardScreen({ route, navigation }) {
       )}
 
       {Boolean(boardOptionsConfig.isVisible) && (
-        <View style={[StyleSheet.absoluteFillObject, styles.sheetOverlay, { zIndex: 99998, elevation: 99998 }]}>
+        <View 
+          style={[StyleSheet.absoluteFillObject, styles.sheetOverlay, { zIndex: 99998, elevation: 99998 }]}
+          pointerEvents="auto"
+        >
           <TouchableOpacity 
             style={StyleSheet.absoluteFillObject} 
             activeOpacity={1} 
             onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })} 
           />
-          <View style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}>
+          <View 
+            style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={styles.optionsModalDragHandle} />
           
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
@@ -2187,33 +2227,6 @@ export default function BoardScreen({ route, navigation }) {
         onClose={() => setBoardAutomationModal({ isVisible: false, boardId: null, boardName: '' })}
       />
 
-      {selectionMode.isActive && (
-        <View testID="selection_action_bar" style={[styles.actionBar, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
-          <Text testID="selection_count_text" style={[styles.actionBarText, { color: colors.textPrimary }]}>{selectionMode.selectedTaskIds.length} {t('Selected')}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionBarButtons} style={{ flex: 1, marginLeft: 10 }}>
-            <TouchableOpacity testID="action_bar_all" accessible={true} accessibilityRole="button" accessibilityLabel="Select all" onPress={handleSelectAll} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('All')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_move" accessible={true} accessibilityRole="button" accessibilityLabel="Move selected" onPress={() => setMoveBoardVisible(true)} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Move')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_share" accessible={true} accessibilityRole="button" accessibilityLabel="Share selected" onPress={handleShareSelected} style={styles.actionBtn}>
-              <Text style={{ color: '#2196f3', fontWeight: 'bold' }}>{t('Share')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_complete" accessible={true} accessibilityRole="button" accessibilityLabel="Complete selected" onPress={handleCompleteSelected} style={styles.actionBtn}>
-              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{t('Complete')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_delete" accessible={true} accessibilityRole="button" accessibilityLabel="Delete selected" onPress={handleDeleteSelected} style={styles.actionBtn}>
-              <Text style={{ color: '#f44336', fontWeight: 'bold' }}>{t('Delete')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="action_bar_cancel" accessible={true} accessibilityRole="button" accessibilityLabel="Cancel selection" onPress={() => setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] })} style={styles.actionBtn}>
-              <Text style={{ color: colors.textSecondary, fontWeight: 'bold' }}>{t('Cancel')}</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      )}
-
-      </View>
       <ConfirmModal
         isVisible={confirmConfig.isVisible}
         title={confirmConfig.title}
@@ -2406,11 +2419,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   optionsModalContent: {
+    width: '100%',
     padding: 20,
     paddingBottom: 40,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     alignItems: 'center',
+    zIndex: 10,
+    elevation: 10,
   },
   optionsModalDragHandle: {
     width: 40,
