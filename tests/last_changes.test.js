@@ -1079,7 +1079,7 @@ describe('OWASP MASVS Security Standards (Data-at-Rest & Screen Privacy)', () =>
     const envelope = JSON.parse(mockStorage['tamper_test']);
 
     // Tamper with the ciphertext by flipping bytes
-    const tamperedCt = envelope.ct.replace(/^[0-9a-f]{2}/, 'ff');
+    const tamperedCt = (envelope.ct.startsWith('ff') ? '00' : 'ff') + envelope.ct.slice(2);
     envelope.ct = tamperedCt;
     mockStorage['tamper_test'] = JSON.stringify(envelope);
 
