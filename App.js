@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useContext } from 'react';
 import './src/i18n';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,7 +18,7 @@ import { hydrateStatsState } from './src/features/statsSlice';
 import { hydrateEntitlementState } from './src/features/entitlementSlice';
 import { fetchTasks, hydrateTaskState } from './src/features/taskSlice';
 import axios from 'axios';
-import { Platform } from 'react-native';
+import { Platform, Dimensions, StatusBar } from 'react-native';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
 import { registerBackgroundFetchAsync } from './src/utils/backgroundTasks';
 import i18n from './src/i18n';
@@ -39,7 +39,36 @@ import { A11yHelper } from './src/utils/a11yHelper';
 import { HapticHelper } from './src/utils/hapticHelper';
 import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
 import { ToastProvider } from './src/styles/ToastContext';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaInsetsContext, initialWindowMetrics } from 'react-native-safe-area-context';
+
+// Guaranteed non-null initial safe area metrics for React Native 0.76+ Fabric / Bridgeless.
+// Without initialMetrics, SafeAreaProvider renders `null` (blank #141419 screen) until the native
+// RNCSafeAreaProvider fires its first onInsetsChange event, which can stall on Android cold start.
+const SAFE_INITIAL_METRICS = (() => {
+  if (
+    initialWindowMetrics &&
+    initialWindowMetrics.insets != null &&
+    initialWindowMetrics.frame != null &&
+    initialWindowMetrics.frame.height > 0
+  ) {
+    return initialWindowMetrics;
+  }
+  const win = Dimensions.get('window') || {};
+  return {
+    frame: {
+      x: 0,
+      y: 0,
+      width: win.width || 360,
+      height: win.height || 800,
+    },
+    insets: {
+      top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+  };
+})();
 
 // WCAG 1.4.4: Configure global font scaling upper bound to prevent UI clipping
 A11yHelper.configureGlobalFontScaling(1.5);
@@ -152,6 +181,7 @@ import AnimatedLoadingScreen from './src/components/AnimatedLoadingScreen';
 function InitApp() {
   const dispatch = useDispatch();
   const { colors, isDark, mode } = useTheme();
+  const insets = useContext(SafeAreaInsetsContext);
   const [ready, setReady] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadingDismissed, setLoadingDismissed] = useState(false);
@@ -630,7 +660,12 @@ function InitApp() {
     <View style={{ flex: 1 }}>
       {isHydrated && (
         <View 
-          style={{ flex: 1 }}
+          style={{
+            flex: 1,
+            paddingTop: insets?.top || 0,
+            paddingLeft: insets?.left || 0,
+            paddingRight: insets?.right || 0,
+          }}
           {...A11yHelper.getModalFocusTrapProps(isLocked)}
         >
           <AppNavigator />
@@ -704,15 +739,15 @@ export default function App() {
     <ErrorBoundary>
       <Provider store={store}>
         <ThemeProvider>
-          <ToastProvider>
-            <RootWrapper>
-              <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
-                <SafeAreaProvider>
+          <SafeAreaProvider initialMetrics={SAFE_INITIAL_METRICS}>
+            <ToastProvider>
+              <RootWrapper>
+                <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
                   <InitApp />
-                </SafeAreaProvider>
-              </GestureHandlerRootView>
-            </RootWrapper>
-          </ToastProvider>
+                </GestureHandlerRootView>
+              </RootWrapper>
+            </ToastProvider>
+          </SafeAreaProvider>
         </ThemeProvider>
       </Provider>
     </ErrorBoundary>

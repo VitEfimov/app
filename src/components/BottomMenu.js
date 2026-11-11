@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../styles/ThemeContext';
@@ -33,9 +34,15 @@ const IconSettings = ({ color, size = 22 }) => (
 export default function BottomMenu(props) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
+  const contextInsets = useContext(SafeAreaInsetsContext);
 
   // Support both React Navigation TabBar props and direct props
   const { state, navigation, activeTab, onTabPress } = props;
+  const rawBottomInset = Math.max(props.insets?.bottom || 0, contextInsets?.bottom || 0);
+  const bottomPadding = Platform.OS === 'ios'
+    ? Math.max(rawBottomInset, 20)
+    : 6 + rawBottomInset;
+  const barMinHeight = 60 + bottomPadding;
 
   const currentRouteName = state 
     ? state.routes[state.index]?.name 
@@ -75,6 +82,8 @@ export default function BottomMenu(props) {
     <View style={[
       styles.container, 
       { 
+        minHeight: barMinHeight,
+        paddingBottom: bottomPadding,
         backgroundColor: colors.bgCard || (isDark ? '#1F1E26' : '#FFFFFF'), 
         borderTopColor: colors.borderColor || (isDark ? '#2E2D3A' : '#ECECEF') 
       }

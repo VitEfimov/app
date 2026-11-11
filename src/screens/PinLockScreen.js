@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { setAppPin } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -52,6 +53,7 @@ const IconFingerprint = ({ color }) => (
 export default function PinLockScreen({ correctPin, onUnlock }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const insets = useContext(SafeAreaInsetsContext);
   const dispatch = useDispatch();
   const biometricUnlockEnabled = useSelector(state => state.themeReducer?.biometricUnlockEnabled !== false);
   const [pin, setPin] = useState('');
@@ -246,7 +248,14 @@ export default function PinLockScreen({ correctPin, onUnlock }) {
   const isKeypadDisabled = lockoutRemaining > 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
+    <View style={[
+      styles.container,
+      {
+        backgroundColor: colors.bgMain,
+        paddingTop: 20 + (insets?.top || 0),
+        paddingBottom: 20 + (insets?.bottom || 0),
+      }
+    ]}>
       <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>{t('Enter PIN')}</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
         {isBiometricAvailable && biometricUnlockEnabled

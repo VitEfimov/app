@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   drawerContainer: {
     flex: 1,
     borderRightWidth: 1,
-    paddingTop: Platform.OS === 'ios' ? 44 : 12,
+    paddingTop: 12,
   },
   brandRow: {
     flexDirection: 'row',

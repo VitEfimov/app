@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Clipboard,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { DevLogger } from '../utils/logger';
 import { CrashLogger } from '../utils/crashLogger';
 import { useTheme } from '../styles/ThemeContext';
@@ -74,6 +75,7 @@ const IconArrowLeft = ({ color = '#000', size = 20 }) => (
 
 export default function DevLogsScreen({ navigation }) {
   const { colors, isDark } = useTheme();
+  const insets = useContext(SafeAreaInsetsContext);
   const dispatch = useDispatch();
   const tasks = useSelector((state) => state.taskReducer.tasks || []);
   const themeState = useSelector((state) => state.themeReducer);
@@ -588,7 +590,7 @@ export default function DevLogsScreen({ navigation }) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bgMain }]}>
+    <View style={[styles.container, { backgroundColor: colors.bgMain, paddingBottom: insets?.bottom || 0 }]}>
       {/* Top Header with Back button */}
       <View style={[styles.screenHeader, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
         <TouchableOpacity
@@ -1715,7 +1717,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 44 : 14,
+    paddingTop: 14,
     paddingBottom: 14,
     borderBottomWidth: 1,
   },

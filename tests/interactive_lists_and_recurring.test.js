@@ -1342,6 +1342,31 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       delete global.__TEST_ENABLE_MMKV__;
     }
   });
+
+  test('Android 15 (targetSdkVersion 35) edge-to-edge safe-area insets protect top headers and BottomMenu height without double-padding', () => {
+    const appContent = fs.readFileSync(path.resolve('App.js'), 'utf8');
+    assert.match(appContent, /<SafeAreaProvider\s+initialMetrics=\{SAFE_INITIAL_METRICS\}>\s*<ToastProvider>/, 'SafeAreaProvider must wrap ToastProvider and InitApp');
+    assert.match(appContent, /paddingTop:\s*insets\?\.top\s*\|\|\s*0/, 'InitApp must apply top safe-area inset for status bar / cutout clearance');
+
+    const bottomMenuContent = fs.readFileSync(path.resolve('src/components/BottomMenu.js'), 'utf8');
+    assert.match(bottomMenuContent, /SafeAreaInsetsContext/, 'BottomMenu must read SafeAreaInsetsContext so Android 15 system navigation bar never clips tab items');
+    assert.match(bottomMenuContent, /minHeight:\s*barMinHeight/, 'BottomMenu must dynamically expand minHeight by bottom safe-area inset');
+    assert.match(bottomMenuContent, /paddingBottom:\s*bottomPadding/, 'BottomMenu must dynamically apply bottomPadding above system navigation bar');
+
+    const devLogsContent = fs.readFileSync(path.resolve('src/screens/DevLogsScreen.js'), 'utf8');
+    assert.match(devLogsContent, /paddingBottom:\s*insets\?\.bottom\s*\|\|\s*0/, 'DevLogsScreen (outside MainTabs) must apply bottom safe-area inset');
+    assert.doesNotMatch(devLogsContent, /paddingTop:\s*Platform\.OS\s*===\s*'ios'\s*\?\s*44/, 'DevLogsScreen must not double-pad top inset on iOS');
+
+    const drawerContent = fs.readFileSync(path.resolve('src/components/calendar/GoogleDrawer.js'), 'utf8');
+    assert.doesNotMatch(drawerContent, /paddingTop:\s*Platform\.OS\s*===\s*'ios'\s*\?\s*44/, 'GoogleDrawer inside inset screens must not double-pad top inset on iOS');
+
+    const pinLockContent = fs.readFileSync(path.resolve('src/screens/PinLockScreen.js'), 'utf8');
+    assert.match(pinLockContent, /paddingTop:\s*20\s*\+\s*\(insets\?\.top\s*\|\|\s*0\)/, 'PinLockScreen (statusBarTranslucent Modal) must apply top safe-area inset');
+    assert.match(pinLockContent, /paddingBottom:\s*20\s*\+\s*\(insets\?\.bottom\s*\|\|\s*0\)/, 'PinLockScreen (statusBarTranslucent Modal) must apply bottom safe-area inset');
+
+    const toastContent = fs.readFileSync(path.resolve('src/styles/ToastContext.js'), 'utf8');
+    assert.match(toastContent, /bottom:\s*30\s*\+\s*\(insets\?\.bottom\s*\|\|\s*0\)/, 'ToastProvider must offset bottom toast above system navigation bar');
+  });
 });
 
 
