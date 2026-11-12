@@ -14,6 +14,8 @@ import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { A11yHelper } from '../utils/a11yHelper';
 import { HapticHelper } from '../utils/hapticHelper';
+import { extractTaskAmountFromTitle, formatCurrency, isPriceBoardType, resolveCurrencyCode } from '../utils/currencyHelper';
+import { computeHabitStats, toggleHabitCompletionForDate } from '../utils/habitHelper';
 
 const inlineEditingListeners = new Set();
 
@@ -134,22 +136,23 @@ const PRICE_PARSE_CACHE = new Map();
 const DUE_DATE_CACHE = new Map();
 const TIME_DISPLAY_CACHE = new Map();
 
-export function getCachedTaskAmount(t) {
+export function getCachedTaskAmount(t, boardType = null) {
   if (!t) return 0;
-  if (t.itemPrice !== undefined && t.itemPrice !== null && !isNaN(Number(t.itemPrice))) {
+  if (t.itemPrice !== undefined && t.itemPrice !== null && t.itemPrice !== '' && !isNaN(Number(t.itemPrice))) {
     return Number(t.itemPrice);
   }
-  if (t.amount !== undefined && t.amount !== null && !isNaN(Number(t.amount))) {
+  if (t.amount !== undefined && t.amount !== null && t.amount !== '' && !isNaN(Number(t.amount))) {
     return Number(t.amount);
   }
   const name = String(t.taskname || t.name || '');
-  if (!name || !name.includes('$')) return 0;
-  const cached = PRICE_PARSE_CACHE.get(name);
+  if (!name) return 0;
+  const allowBare = isPriceBoardType(boardType);
+  const cacheKey = `${allowBare ? '1' : '0'}_${name}`;
+  const cached = PRICE_PARSE_CACHE.get(cacheKey);
   if (cached !== undefined) return cached;
-  const match = name.match(/\$(\d+(?:\.\d{1,2})?)/);
-  const parsed = match ? (parseFloat(match[1]) || 0) : 0;
+  const parsed = extractTaskAmountFromTitle(name, { allowBareTrailing: allowBare, boardType }) || 0;
   if (PRICE_PARSE_CACHE.size > 1000) PRICE_PARSE_CACHE.clear();
-  PRICE_PARSE_CACHE.set(name, parsed);
+  PRICE_PARSE_CACHE.set(cacheKey, parsed);
   return parsed;
 }
 
@@ -246,10 +249,21 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
   const dispatch = useDispatch();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Read shared preferences & O(1) board maps from single top-level context (0 per-row Redux subscriptions)
-  const { taskNameWrap, fontSizeSetting, boards, boardsByIdMap, boardColorsMap } = useTaskRowConfig();
+  const {
+    taskNameWrap,
+    fontSizeSetting,
+    boards,
+    boardsByIdMap,
+    boardColorsMap,
+    currencyCode,
+    boardCurrencies,
+    effectiveCurrencyCode,
+    deviceCurrencyCode,
+    habitStreakMode,
+  } = useTaskRowConfig();
 
   const titleFontSize = fontSizeSetting === 'small' ? 13 : fontSizeSetting === 'big' ? 18 : 15;
 
@@ -296,9 +310,29 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
   }, [boardTypeProp, boardsByIdMap, boards, task?.boardId, task?.board_id]);
   const boardType = boardTypeProp || currentBoard?.type || 'standard';
 
+  const rawTaskBoardId = task?.boardId || task?.board_id || 'main';
+  const rowCurrencyCode = useMemo(() => {
+    const boardCur = boardCurrencies?.[rawTaskBoardId];
+    if (boardCur && boardCur !== 'auto') {
+      return resolveCurrencyCode({
+        boardCurrencyCode: boardCur,
+        settingCode: currencyCode,
+        langCode: i18n?.language,
+        deviceCurrencyCode,
+      });
+    }
+    return effectiveCurrencyCode || 'USD';
+  }, [boardCurrencies, rawTaskBoardId, currencyCode, i18n?.language, deviceCurrencyCode, effectiveCurrencyCode]);
+
   const itemQty = task?.itemQuantity !== undefined && !isNaN(Number(task.itemQuantity)) ? Math.max(1, Number(task.itemQuantity)) : 1;
-  const unitPrice = getCachedTaskAmount(task);
-  const itemTotal = unitPrice > 0 ? (itemQty * unitPrice).toFixed(2) : null;
+  const unitPrice = getCachedTaskAmount(task, boardType);
+  const unitPriceFormatted = unitPrice > 0 ? formatCurrency(unitPrice, rowCurrencyCode) : null;
+  const itemTotalFormatted = unitPrice > 0 ? formatCurrency(itemQty * unitPrice, rowCurrencyCode) : null;
+
+  const habitStats = useMemo(() => {
+    if (boardType !== 'habits' || !task) return null;
+    return computeHabitStats(task, dayjs().format('YYYY-MM-DD'), habitStreakMode);
+  }, [boardType, task, habitStreakMode]);
 
   const [confirmConfig, setConfirmConfig] = useState({
     isVisible: false,
@@ -329,41 +363,45 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
       Animated.spring(checkboxScale, { toValue: 1.22, friction: 4, tension: 220, useNativeDriver: useNative }),
       Animated.spring(checkboxScale, { toValue: 1, friction: 5, tension: 180, useNativeDriver: useNative }),
     ]).start();
-    const habitUpdates = boardType === 'habits' ? (
-      newCompletedState ? {
-        habitStreak: (task.habitStreak || 0) + 1,
-        habitLastCompleted: dayjs().format('YYYY-MM-DD')
-      } : {
-        habitStreak: Math.max(0, (task.habitStreak || 1) - 1)
-      }
-    ) : {};
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    let habitUpdates = {};
+    let undoHabitUpdates = {};
+    let targetCompletedState = newCompletedState;
+
+    if (boardType === 'habits') {
+      const toggled = toggleHabitCompletionForDate(task, todayStr, todayStr, habitStreakMode);
+      habitUpdates = toggled.patch;
+      undoHabitUpdates = toggled.undoPatch;
+      targetCompletedState = toggled.patch.completed;
+    }
 
     dispatch(updateTask({
       taskId: task.id || task._id,
-      completed: newCompletedState,
+      completed: targetCompletedState,
       ...habitUpdates
     }));
     
-    A11yHelper.announce(newCompletedState ? (t('Task Completed') || 'Task Completed') : (t('Task Uncompleted') || 'Task Uncompleted'));
+    A11yHelper.announce(targetCompletedState ? (t('Task Completed') || 'Task Completed') : (t('Task Uncompleted') || 'Task Uncompleted'));
 
-    if (newCompletedState) {
+    if (targetCompletedState) {
       HapticHelper.success();
     } else {
       HapticHelper.light();
     }
 
     showToast(
-      newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
+      targetCompletedState ? t('Task Completed') : t('Task Uncompleted'),
       t('Undo'),
       () => {
-        const undoHabitUpdates = boardType === 'habits' ? {
-          habitStreak: task.habitStreak || 0,
-          habitLastCompleted: task.habitLastCompleted || null
-        } : {};
-        dispatch(updateTask({ taskId: task.id || task._id, completed: !newCompletedState, isUndo: true, ...undoHabitUpdates }));
+        dispatch(updateTask({
+          taskId: task.id || task._id,
+          completed: !targetCompletedState,
+          isUndo: true,
+          ...undoHabitUpdates
+        }));
       }
     );
-  }, [task, boardType, checkboxScale, dispatch, showToast, t]);
+  }, [task, boardType, habitStreakMode, checkboxScale, dispatch, showToast, t]);
 
   const handleSwipeComplete = useCallback(() => {
     closeSwipeable();
@@ -751,7 +789,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
           )}
 
           {/* Interactive controls for specialized list types */}
-          {boardType === 'grocery' && (
+          {(boardType === 'grocery' || boardType === 'shopping') && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', borderRadius: 10, paddingHorizontal: 3, paddingVertical: 1, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB', gap: 2 }}>
                 <TouchableOpacity
@@ -784,7 +822,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
               {unitPrice > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B9811A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
                   <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981' }}>
-                    {itemQty > 1 ? `$${unitPrice.toFixed(2)} ea · $${itemTotal}` : `$${unitPrice.toFixed(2)}`}
+                    {itemQty > 1 ? `${unitPriceFormatted} ${t('ea') || 'ea'} · ${itemTotalFormatted}` : unitPriceFormatted}
                   </Text>
                 </View>
               ) : null}
@@ -796,7 +834,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
               {unitPrice > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: task.completed ? '#10B9811A' : '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
                   <Text style={{ fontSize: 11, fontWeight: 'bold', color: task.completed ? '#10B981' : '#EF4444' }}>
-                    ${unitPrice.toFixed(2)}
+                    {unitPriceFormatted}
                   </Text>
                 </View>
               ) : null}
@@ -818,13 +856,58 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
             </View>
           )}
 
-          {boardType === 'habits' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {boardType === 'habits' && habitStats && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2 }}>
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
-                  🔥 {task.habitStreak || 0} {t('days') || 'd'}
+                  🔥 {habitStats.currentStreak} {t('days') || 'd'}{habitStats.freezeActive ? ' ❄️' : ''}
                 </Text>
               </View>
+
+              {habitStats.status === 'missed_yesterday' ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF4444' }}>
+                    {t('Missed yesterday') || 'Missed yesterday'}
+                  </Text>
+                </View>
+              ) : habitStats.status === 'missed_days' ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF4444' }}>
+                    {t('Missed {{count}}d ago', { count: habitStats.missedScheduledDays }) || `Missed ${habitStats.missedScheduledDays}d ago`}
+                  </Text>
+                </View>
+              ) : habitStats.status === 'rest_day' ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '600', color: colors.textSecondary }}>
+                    {t('Rest day') || 'Rest day'}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }} accessible={false}>
+                {habitStats.last7Days.map((dot) => {
+                  const dotStyle =
+                    dot.state === 'done'
+                      ? { backgroundColor: '#10B981', borderColor: '#10B981', borderWidth: 1 }
+                      : dot.state === 'pending_today'
+                      ? { backgroundColor: 'transparent', borderColor: '#F59E0B', borderWidth: 1.5 }
+                      : dot.state === 'missed'
+                      ? { backgroundColor: '#EF444460', borderColor: '#EF444480', borderWidth: 0.5 }
+                      : { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', borderColor: 'transparent', borderWidth: 0 };
+                  return (
+                    <View
+                      key={dot.dateStr}
+                      style={{
+                        width: dot.isToday ? 7 : 6,
+                        height: dot.isToday ? 7 : 6,
+                        borderRadius: 4,
+                        ...dotStyle,
+                      }}
+                    />
+                  );
+                })}
+              </View>
+
               <TouchableOpacity
                 onPress={handleCycleHabitCategory}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}

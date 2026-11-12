@@ -4,6 +4,7 @@ import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
+import { computeHabitStats, isHabitTask, toggleHabitCompletionForDate } from '../utils/habitHelper';
 import { useToast } from '../styles/ToastContext';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
@@ -104,19 +105,51 @@ export default function TaskQuickMenuModal({
   const boards = useSelector(state => state.userReducer.boards || []);
   const [isMoveBoardVisible, setMoveBoardVisible] = React.useState(false);
   const [confirmConfig, setConfirmConfig] = React.useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, secondaryIsDestructive: false, hideCancel: false, onConfirm: null, secondaryConfirmText: null, onSecondaryConfirm: null });
+  const streakMode = useSelector(state => state.themeReducer?.habitStreakMode || 'grace');
 
   if (!task) return null;
 
+  const taskBoard = boards.find(b => b && (b.id === (task.boardId || task.board_id) || b._id === (task.boardId || task.board_id)));
+  const isHabit = isHabitTask(task, taskBoard);
+  const todayStr = dayjs().format('YYYY-MM-DD');
+  const yesterdayStr = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+  const habitStats = isHabit ? computeHabitStats(task, todayStr, streakMode) : null;
+
   const handleComplete = () => {
     const newCompletedState = !task.completed;
-    dispatch(updateTask({ taskId: task.id, completed: newCompletedState }));
+    let habitUpdates = {};
+    let undoHabitUpdates = {};
+    let targetCompleted = newCompletedState;
+
+    if (isHabit) {
+      const toggled = toggleHabitCompletionForDate(task, todayStr, todayStr, streakMode);
+      habitUpdates = toggled.patch;
+      undoHabitUpdates = toggled.undoPatch;
+      targetCompleted = toggled.patch.completed;
+    }
+
+    dispatch(updateTask({ taskId: task.id, completed: targetCompleted, ...habitUpdates }));
     onClose();
     
     showToast(
-      newCompletedState ? t('Task Completed') : t('Task Uncompleted'),
+      targetCompleted ? t('Task Completed') : t('Task Uncompleted'),
       t('Undo'),
       () => {
-        dispatch(updateTask({ taskId: task.id, completed: !newCompletedState, isUndo: true }));
+        dispatch(updateTask({ taskId: task.id, completed: !targetCompleted, isUndo: true, ...undoHabitUpdates }));
+      }
+    );
+  };
+
+  const handleToggleYesterdayHabit = () => {
+    if (!isHabit) return;
+    const toggled = toggleHabitCompletionForDate(task, yesterdayStr, todayStr, streakMode);
+    dispatch(updateTask({ taskId: task.id, ...toggled.patch }));
+    onClose();
+    showToast(
+      toggled.nowCompletedOnTarget ? (t('Marked yesterday done') || 'Marked yesterday done') : (t('Updated yesterday') || 'Updated yesterday'),
+      t('Undo'),
+      () => {
+        dispatch(updateTask({ taskId: task.id, isUndo: true, ...toggled.undoPatch }));
       }
     );
   };
@@ -367,6 +400,11 @@ export default function TaskQuickMenuModal({
   const actionItems = [
     { label: t('Edit'), icon: IconEdit, onPress: () => { onClose(); if (typeof handleEditAction === 'function') handleEditAction(task); } },
     { label: task.completed ? t('Mark Uncomplete') : t('Complete'), icon: IconComplete, onPress: handleComplete },
+    ...(isHabit ? [{
+      label: habitStats?.completedYesterday ? (t('Undo yesterday') || 'Undo yesterday') : (t('Mark yesterday done') || 'Mark yesterday done'),
+      icon: IconComplete,
+      onPress: handleToggleYesterdayHabit,
+    }] : []),
     { label: t('Move Forward'), icon: IconMoveForward, onPress: () => handleMoveTaskDate('forward') },
     { label: t('Move Backward'), icon: IconMoveBackward, onPress: () => handleMoveTaskDate('backward') },
     { label: t('Move to Board'), icon: IconFolder, onPress: () => { onClose(); setTimeout(() => setMoveBoardVisible(true), 300); } },

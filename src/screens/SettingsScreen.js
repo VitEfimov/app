@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions, LayoutAnimation, UIManager } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
+import { clearTasks, updateTask, batchSyncCalendarTasks, rolloverHabitTasks } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setCurrencyCode, setHabitStreakMode } from '../features/themeSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync } from '../utils/calendarSync';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
@@ -26,6 +26,8 @@ import { BiometricHelper } from '../utils/biometricHelper';
 import { CryptoStorage } from '../utils/cryptoStorage';
 import { A11yHelper } from '../utils/a11yHelper';
 import { ResponsiveHelper } from '../utils/responsiveHelper';
+import { CURRENCY_OPTION_CODES, getCurrencyMeta, resolveCurrencyCode } from '../utils/currencyHelper';
+import * as Localization from 'expo-localization';
 
 const SOUND_ASSETS = {
   'pisk.mp3': require('../../assets/audio/pisk.mp3'),
@@ -292,6 +294,21 @@ export default function SettingsScreen({ navigation }) {
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
   const [isSnoozePickerOpen, setSnoozePickerOpen] = useState(false);
+  const currencySetting = theme.currencyCode || 'auto';
+  const [isCurrencyPickerOpen, setCurrencyPickerOpen] = useState(false);
+  const habitStreakMode = theme.habitStreakMode || 'grace';
+  const [isStreakModePickerOpen, setStreakModePickerOpen] = useState(false);
+  const deviceCurrencyCode = (() => {
+    try { return Localization.getLocales?.()?.[0]?.currencyCode || null; } catch (e) { return null; }
+  })();
+  const resolvedAutoCurrency = resolveCurrencyCode({
+    settingCode: 'auto',
+    langCode: i18n?.language,
+    deviceCurrencyCode,
+  });
+  const activeCurrencyMeta = getCurrencyMeta(
+    currencySetting === 'auto' ? resolvedAutoCurrency : currencySetting
+  );
   const [isBiometricHardwareAvailable, setIsBiometricHardwareAvailable] = useState(false);
 
   useEffect(() => {
@@ -1146,6 +1163,139 @@ export default function SettingsScreen({ navigation }) {
                     {isSelected && (
                       <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
                     )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Default Currency */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setCurrencyPickerOpen(!isCurrencyPickerOpen)}
+            style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isCurrencyPickerOpen }}
+            accessibilityLabel={`${t('Currency') || 'Currency'}. ${currencySetting === 'auto' ? `${t('Auto') || 'Auto'} (${activeCurrencyMeta.code})` : activeCurrencyMeta.label}`}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+              <Text style={{ fontSize: 16, fontWeight: '700', color: primaryAccent }}>{activeCurrencyMeta.symbol}</Text>
+            </View>
+            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Currency') || 'Currency'}
+              </Text>
+              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
+                {currencySetting === 'auto'
+                  ? `${t('Auto (by language)') || 'Auto (by language)'} · ${activeCurrencyMeta.code} (${activeCurrencyMeta.symbol})`
+                  : activeCurrencyMeta.label}
+              </Text>
+            </View>
+            <IconChevronRight color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          {isCurrencyPickerOpen && (
+            <View style={styles.expandedSubOptions}>
+              {CURRENCY_OPTION_CODES.map((code) => {
+                const isSelected = currencySetting === code;
+                const label = code === 'auto'
+                  ? `${t('Auto (by language)') || 'Auto (by language)'} (${resolvedAutoCurrency} ${getCurrencyMeta(resolvedAutoCurrency).symbol})`
+                  : getCurrencyMeta(code).label;
+                return (
+                  <TouchableOpacity
+                    key={code}
+                    style={styles.soundItemRow}
+                    onPress={() => {
+                      dispatch(setCurrencyCode(code));
+                      setCurrencyPickerOpen(false);
+                    }}
+                    accessible={true}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
+                  >
+                    <Text style={[
+                      styles.soundItemText,
+                      { color: isSelected ? primaryAccent : colors.textPrimary, fontWeight: isSelected ? '700' : '500' }
+                    ]}>
+                      {label}
+                    </Text>
+                    {isSelected && <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+          {/* Habit Streak Mode */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setStreakModePickerOpen(!isStreakModePickerOpen)}
+            style={styles.cardItemRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isStreakModePickerOpen }}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+              <Text style={{ fontSize: 15 }}>🔥</Text>
+            </View>
+            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
+              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {t('Habit Streak Mode') || 'Habit Streak Mode'}
+              </Text>
+              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
+                {habitStreakMode === 'strict'
+                  ? (t('Strict (No skips)') || 'Strict (No skips)')
+                  : (t('1-Day Freeze (Grace)') || '1-Day Freeze (Grace)')}
+              </Text>
+            </View>
+            <IconChevronRight color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          {isStreakModePickerOpen && (
+            <View style={styles.expandedSubOptions}>
+              {[
+                {
+                  id: 'grace',
+                  title: t('1-Day Freeze (Grace)') || '1-Day Freeze (Grace)',
+                  desc: t('Allows 1 missed scheduled day without breaking your streak') || 'Allows 1 missed scheduled day without breaking your streak',
+                },
+                {
+                  id: 'strict',
+                  title: t('Strict (No skips)') || 'Strict (No skips)',
+                  desc: t('Any missed scheduled day resets your active streak') || 'Any missed scheduled day resets your active streak',
+                },
+              ].map((opt) => {
+                const isSelected = habitStreakMode === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.soundItemRow, { paddingVertical: 10 }]}
+                    onPress={() => {
+                      dispatch(setHabitStreakMode(opt.id));
+                      setStreakModePickerOpen(false);
+                      dispatch(rolloverHabitTasks());
+                    }}
+                    accessible={true}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
+                  >
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={[
+                        styles.soundItemText,
+                        { color: isSelected ? primaryAccent : colors.textPrimary, fontWeight: isSelected ? '700' : '500' }
+                      ]}>
+                        {opt.title}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected && <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>}
                   </TouchableOpacity>
                 );
               })}

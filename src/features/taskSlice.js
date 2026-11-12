@@ -9,6 +9,7 @@ import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } 
 import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, addTombstoneAsync } from '../utils/calendarSync';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import { sanitizeId, sanitizeForStorage } from '../utils/securitySanitizer';
+import { computeHabitRolloverUpdates } from '../utils/habitHelper';
 import axios from 'axios';
 
 dayjs.extend(isSameOrBefore);
@@ -325,6 +326,11 @@ const taskSlice = createSlice({
                 if (action.payload.itemProgress !== undefined) task.itemProgress = action.payload.itemProgress;
                 if (action.payload.habitStreak !== undefined) task.habitStreak = action.payload.habitStreak;
                 if (action.payload.habitLastCompleted !== undefined) task.habitLastCompleted = action.payload.habitLastCompleted;
+                if (action.payload.habitCompletedDates !== undefined) task.habitCompletedDates = action.payload.habitCompletedDates;
+                if (action.payload.habitBestStreak !== undefined) task.habitBestStreak = action.payload.habitBestStreak;
+                if (action.payload.habitSchedule !== undefined) task.habitSchedule = action.payload.habitSchedule;
+                if (action.payload.habitLastRolloverDate !== undefined) task.habitLastRolloverDate = action.payload.habitLastRolloverDate;
+                if (action.payload.habitCreatedAt !== undefined) task.habitCreatedAt = action.payload.habitCreatedAt;
                 if (description) {
                     task.description = {
                         text: description.text !== undefined ? description.text : (task.description?.text || ''),
@@ -386,6 +392,11 @@ const taskSlice = createSlice({
                 if (patch.itemProgress !== undefined) task.itemProgress = patch.itemProgress;
                 if (patch.habitStreak !== undefined) task.habitStreak = patch.habitStreak;
                 if (patch.habitLastCompleted !== undefined) task.habitLastCompleted = patch.habitLastCompleted;
+                if (patch.habitCompletedDates !== undefined) task.habitCompletedDates = patch.habitCompletedDates;
+                if (patch.habitBestStreak !== undefined) task.habitBestStreak = patch.habitBestStreak;
+                if (patch.habitSchedule !== undefined) task.habitSchedule = patch.habitSchedule;
+                if (patch.habitLastRolloverDate !== undefined) task.habitLastRolloverDate = patch.habitLastRolloverDate;
+                if (patch.habitCreatedAt !== undefined) task.habitCreatedAt = patch.habitCreatedAt;
                 if (patch.description) {
                     task.description = {
                         text: patch.description.text !== undefined ? patch.description.text : (task.description?.text || ''),
@@ -1266,7 +1277,25 @@ export const deleteRecurringSeries = (payload) => async (dispatch, getState) => 
 
 let lastAutoManageRun = 0;
 
+export const rolloverHabitTasks = () => async (dispatch, getState) => {
+    const state = getState();
+    const tasks = state.taskReducer?.tasks || [];
+    if (!tasks || tasks.length === 0) return [];
+    const boards = state.userReducer?.boards || [];
+    const streakMode = state.themeReducer?.habitStreakMode || 'grace';
+    const todayStr = dayjs().format('YYYY-MM-DD');
+
+    const patches = computeHabitRolloverUpdates(tasks, boards, todayStr, streakMode);
+    if (patches.length === 0) return [];
+
+    const updates = patches.map(({ taskId, ...rest }) => ({ taskId, ...rest }));
+    dispatch(updateMultipleTasksSync({ updates }));
+    persistTasksToStorage(getState().taskReducer.tasks, getState);
+    return updates;
+};
+
 export const processAutoManageTasks = (force = false) => async (dispatch, getState) => {
+    await dispatch(rolloverHabitTasks());
     const state = getState();
     const isPremium = state.entitlementReducer?.isPremium;
     if (!isPremium) return;

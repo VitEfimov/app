@@ -764,7 +764,7 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     'Average Rating'
   ];
 
-  test('all 10 languages exist, have valid JSON, and have exactly 837 keys each', () => {
+  test('all 10 languages exist, have valid JSON, and have exactly 861 keys each', () => {
     const loaded = {};
     for (const lang of languages) {
       const p = path.join(localesDir, `${lang}.json`);
@@ -774,14 +774,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 837, `English locale must contain 837 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 861, `English locale must contain 861 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        837,
-        `Language ${lang} has ${count} keys, expected 837 (matching EN)`
+        861,
+        `Language ${lang} has ${count} keys, expected 861 (matching EN)`
       );
     }
   });
@@ -1633,7 +1633,224 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       }
     });
   });
+
+  // ============================================================================
+  // PHASE 6: MULTI-CURRENCY PARSING & PERSISTENT HABIT ARCHITECTURE TESTS
+  // ============================================================================
+  describe('Phase 6: Multi-Currency Parsing, Formatting & Persistent Habit Engine', () => {
+    const currencyHelper = loadTranspiledModule(path.resolve('src/utils/currencyHelper.js'));
+    const habitHelper = loadTranspiledModule(path.resolve('src/utils/habitHelper.js'), { dayjs });
+
+    test('parses explicit symbols/codes in multiple scripts and comma/dot decimals', () => {
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Almond Milk 2x $4.99'), 4.99);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Кофе 350₽'), 350);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Молоко 120 руб'), 120);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Хлеб 65,50 р.'), 65.5);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Wine €12,50'), 12.5);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Ramen 980円'), 980);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Bento ¥1,200'), 1200);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Tea ₹250'), 250);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Kimchi ₩5000'), 5000);
+      assert.strictEqual(currencyHelper.extractTaskAmountFromTitle('Internet RUB 750'), 750);
+    });
+
+    test('parses bare trailing price on price boards while ignoring weights, counts, and embedded numbers', () => {
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Молоко 120', { boardType: 'grocery' }),
+        120
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('2x Apples 3.50', { boardType: 'grocery' }),
+        3.5
+      );
+      assert.strictEqual(
+        currencyHelper.extractGroceryQuantity('2x Apples 3.50'),
+        2
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Хлеб 2 шт 65', { boardType: 'grocery' }),
+        65
+      );
+      assert.strictEqual(
+        currencyHelper.extractGroceryQuantity('Хлеб 2 шт 65'),
+        2
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Box 50', { boardType: 'grocery' }),
+        50
+      );
+
+      // Guard against false positives
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Eggs x 2', { boardType: 'grocery' }),
+        0
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('2 apples', { boardType: 'grocery' }),
+        0
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Flour 500g', { boardType: 'grocery' }),
+        0
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Eggs 12 pcs', { boardType: 'grocery' }),
+        0
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Vitamin B12', { boardType: 'grocery' }),
+        0
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Milk 2%', { boardType: 'grocery' }),
+        0
+      );
+      assert.strictEqual(
+        currencyHelper.extractTaskAmountFromTitle('Chrome 120', { boardType: 'standard' }),
+        0
+      );
+    });
+
+    test('resolves regional currencies by language/override and formats decimals cleanly', () => {
+      assert.strictEqual(currencyHelper.resolveCurrencyCode({ langCode: 'ru' }), 'RUB');
+      assert.strictEqual(currencyHelper.resolveCurrencyCode({ langCode: 'ja' }), 'JPY');
+      assert.strictEqual(currencyHelper.resolveCurrencyCode({ langCode: 'ko' }), 'KRW');
+      assert.strictEqual(currencyHelper.resolveCurrencyCode({ langCode: 'zh' }), 'CNY');
+      assert.strictEqual(currencyHelper.resolveCurrencyCode({ langCode: 'hi' }), 'INR');
+      assert.strictEqual(currencyHelper.resolveCurrencyCode({ langCode: 'en' }), 'USD');
+      assert.strictEqual(
+        currencyHelper.resolveCurrencyCode({ boardCurrencyCode: 'EUR', settingCode: 'RUB', langCode: 'ru' }),
+        'EUR'
+      );
+
+      assert.strictEqual(currencyHelper.formatCurrency(1200, 'JPY'), '¥1,200');
+      assert.strictEqual(currencyHelper.formatCurrency(120, 'RUB'), '120 ₽');
+      assert.strictEqual(currencyHelper.formatCurrency(120.5, 'RUB'), '120.50 ₽');
+      assert.strictEqual(currencyHelper.formatCurrency(12.5, 'USD'), '$12.50');
+    });
+
+    test('computes deterministic habit streaks, strict vs grace freeze, missed days, and 7-day consistency dots', () => {
+      // Today = Thursday 2026-11-12
+      const today = '2026-11-12';
+
+      // 1. Daily habit completed Nov 8, skipped Nov 9-11 -> 3 missed scheduled days before today
+      const lapsedTask = {
+        id: 'h1',
+        taskname: 'Meditate',
+        habitCompletedDates: ['2026-11-08'],
+        habitSchedule: { preset: 'daily' },
+      };
+      const lapsedStats = habitHelper.computeHabitStats(lapsedTask, today, 'grace');
+      assert.strictEqual(lapsedStats.missedScheduledDays, 3);
+      assert.strictEqual(lapsedStats.status, 'missed_days');
+      assert.strictEqual(lapsedStats.currentStreak, 0);
+      assert.strictEqual(lapsedStats.last7Days.length, 7);
+      assert.strictEqual(lapsedStats.last7Days[6].state, 'pending_today');
+
+      // 2. Missed ONLY yesterday with 3 prior completed days: grace preserves 3 + freezeActive; strict resets to 0
+      const graceCandidate = {
+        id: 'h2',
+        taskname: 'Workout',
+        habitCompletedDates: ['2026-11-08', '2026-11-09', '2026-11-10'],
+        habitSchedule: { preset: 'daily' },
+      };
+      const graceStats = habitHelper.computeHabitStats(graceCandidate, today, 'grace');
+      assert.strictEqual(graceStats.status, 'missed_yesterday');
+      assert.strictEqual(graceStats.currentStreak, 3);
+      assert.strictEqual(graceStats.freezeActive, true);
+
+      const strictStats = habitHelper.computeHabitStats(graceCandidate, today, 'strict');
+      assert.strictEqual(strictStats.currentStreak, 0);
+      assert.strictEqual(strictStats.freezeActive, false);
+
+      // 3. Weekdays schedule checked on Monday 2026-11-09 when last completed Friday 2026-11-06 -> 0 missed days
+      const weekdayHabit = {
+        id: 'h3',
+        taskname: 'Standup Prep',
+        habitCompletedDates: ['2026-11-05', '2026-11-06'],
+        habitSchedule: { preset: 'weekdays' },
+      };
+      const mondayStats = habitHelper.computeHabitStats(weekdayHabit, '2026-11-09', 'strict');
+      assert.strictEqual(mondayStats.missedScheduledDays, 0);
+      assert.strictEqual(mondayStats.currentStreak, 2);
+
+      // 4. Mark yesterday done backfills yesterday without marking today completed
+      const markYest = habitHelper.toggleHabitCompletionForDate(graceCandidate, '2026-11-11', today, 'strict');
+      assert.strictEqual(markYest.patch.completed, false);
+      assert.strictEqual(markYest.patch.habitStreak, 4);
+      assert.strictEqual(markYest.patch.habitBestStreak, 4);
+
+      // 5. Same-day toggle prevention + Undo accuracy
+      const toggleOn = habitHelper.toggleHabitCompletionForDate(lapsedTask, today, today, 'grace');
+      assert.strictEqual(toggleOn.patch.completed, true);
+      assert.strictEqual(toggleOn.patch.habitStreak, 1);
+      const taskAfterOn = { ...lapsedTask, ...toggleOn.patch };
+      const toggleOff = habitHelper.toggleHabitCompletionForDate(taskAfterOn, today, today, 'grace');
+      assert.strictEqual(toggleOff.patch.completed, false);
+      assert.strictEqual(toggleOff.patch.habitStreak, 0);
+    });
+
+    test('daily rollover resets yesterday completed habits back to today and migrates legacy streaks', () => {
+      const boards = [{ id: 'habits_1', name: 'Habits', type: 'habits' }];
+      const tasks = [
+        {
+          id: 'legacy_h',
+          boardId: 'habits_1',
+          taskname: 'Read 20 pages',
+          completed: true,
+          habitStreak: 5,
+          habitLastCompleted: '2026-11-11',
+          dateString: '2026-11-11',
+          completionDate: '2026-11-11',
+        },
+        {
+          id: 'future_h',
+          boardId: 'habits_1',
+          taskname: 'Weekend Swim',
+          completed: false,
+          habitCompletedDates: [],
+          habitSchedule: { preset: 'weekends' },
+          dateString: '2026-11-14',
+          completionDate: '2026-11-14',
+        },
+      ];
+
+      const updates = habitHelper.computeHabitRolloverUpdates(tasks, boards, '2026-11-12', 'grace');
+      const legacyUpd = updates.find(u => u.taskId === 'legacy_h');
+      assert.ok(legacyUpd, 'Legacy habit from yesterday must roll over to today');
+      assert.strictEqual(legacyUpd.completed, false, 'Habit checked off yesterday must reset unchecked today');
+      assert.strictEqual(legacyUpd.habitStreak, 5, 'Legacy 5-day streak must carry over cleanly');
+      assert.strictEqual(legacyUpd.habitBestStreak, 5);
+      assert.strictEqual(legacyUpd.completionDate, '2026-11-12');
+      assert.strictEqual(legacyUpd.habitCompletedDates.length, 5);
+
+      const futureUpd = updates.find(u => u.taskId === 'future_h');
+      assert.strictEqual(futureUpd.completionDate, undefined, 'Future scheduled habit must keep its planned date');
+    });
+
+    test('source files wire currencyHelper, habitHelper, and rolloverHabitTasks properly', () => {
+      const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
+      assert.match(taskSliceSrc, /rolloverHabitTasks/);
+      assert.match(taskSliceSrc, /habitCompletedDates/);
+      assert.match(taskSliceSrc, /habitBestStreak/);
+      assert.match(taskSliceSrc, /habitSchedule/);
+
+      const taskRowSrc = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
+      assert.match(taskRowSrc, /extractTaskAmountFromTitle/);
+      assert.match(taskRowSrc, /formatCurrency/);
+      assert.match(taskRowSrc, /toggleHabitCompletionForDate/);
+      assert.match(taskRowSrc, /Missed yesterday/);
+
+      const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
+      assert.match(settingsSrc, /setCurrencyCode/);
+      assert.match(settingsSrc, /setHabitStreakMode/);
+
+      const appSrc = fs.readFileSync(path.resolve('App.js'), 'utf8');
+      assert.match(appSrc, /rolloverHabitTasks/);
+    });
+  });
 });
+
 
 
 

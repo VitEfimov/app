@@ -21,7 +21,10 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTask, addMultipleTasks, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
-import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
+import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency } from '../features/themeSlice';
+import { useTaskRowConfig } from '../components/TaskRowConfigContext';
+import { formatCurrency, resolveCurrencyCode, CURRENCY_OPTION_CODES, getCurrencyMeta, isPriceBoardType } from '../utils/currencyHelper';
+import { computeHabitStats } from '../utils/habitHelper';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
@@ -190,8 +193,14 @@ export default function BoardScreen({ route, navigation }) {
 
   const { colors, isDark, mode } = useTheme();
   const { showToast } = useToast();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dispatch = useDispatch();
+  const {
+    currencyCode: currencySetting,
+    boardCurrencies,
+    deviceCurrencyCode,
+    habitStreakMode,
+  } = useTaskRowConfig();
 
   const handleToggleTheme = () => {
     const modes = ['light', 'dark', 'contrast'];
@@ -262,6 +271,13 @@ export default function BoardScreen({ route, navigation }) {
     setListFilterCategory('All');
     setExpensesPeriodFilter('month');
   }, [activeBoardId]);
+
+  const activeCurrencyCode = useMemo(() => resolveCurrencyCode({
+    boardCurrencyCode: boardCurrencies?.[activeBoardId],
+    settingCode: currencySetting,
+    langCode: i18n?.language,
+    deviceCurrencyCode,
+  }), [boardCurrencies, activeBoardId, currencySetting, i18n?.language, deviceCurrencyCode]);
 
   const getTaskAmount = getCachedTaskAmount;
 
@@ -1352,7 +1368,7 @@ export default function BoardScreen({ route, navigation }) {
       let inCartSpent = 0;
       boardTasks.forEach(t => {
         const qty = t.itemQuantity !== undefined && !isNaN(Number(t.itemQuantity)) ? Math.max(1, Number(t.itemQuantity)) : 1;
-        const price = getTaskAmount(t);
+        const price = getTaskAmount(t, type);
         const itemTot = qty * price;
         grandTotal += itemTot;
         if (t.completed) inCartSpent += itemTot;
@@ -1365,16 +1381,16 @@ export default function BoardScreen({ route, navigation }) {
           {/* Top Row: Grand Total & Cart summary */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary }}>${grandTotal.toFixed(2)}</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary }}>{formatCurrency(grandTotal, activeCurrencyCode)}</Text>
               <Text style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Grand Total') || 'Grand Total'}</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                {t('In Cart') || 'In Cart'}: <Text style={{ fontWeight: '700', color: '#10B981' }}>${inCartSpent.toFixed(2)}</Text>
+                {t('In Cart') || 'In Cart'}: <Text style={{ fontWeight: '700', color: '#10B981' }}>{formatCurrency(inCartSpent, activeCurrencyCode)}</Text>
               </Text>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>•</Text>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                {t('Remaining') || 'Due'}: <Text style={{ fontWeight: '700', color: '#F59E0B' }}>${remaining.toFixed(2)}</Text>
+                {t('Remaining') || 'Due'}: <Text style={{ fontWeight: '700', color: '#F59E0B' }}>{formatCurrency(remaining, activeCurrencyCode)}</Text>
               </Text>
             </View>
           </View>
@@ -1418,7 +1434,7 @@ export default function BoardScreen({ route, navigation }) {
       let monthlyPaid = 0;
 
       boardTasks.forEach(t => {
-        const amt = getTaskAmount(t);
+        const amt = getTaskAmount(t, type);
         allTotal += amt;
         if (t.completed) allPaid += amt;
 
@@ -1445,7 +1461,7 @@ export default function BoardScreen({ route, navigation }) {
           {/* Top Row: Amount & Label on Left, Sleek Compact Segmented Toggle on Right */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-              <Text style={{ fontSize: 19, fontWeight: 'bold', color: colors.textPrimary }}>${displayTotal.toFixed(2)}</Text>
+              <Text style={{ fontSize: 19, fontWeight: 'bold', color: colors.textPrimary }}>{formatCurrency(displayTotal, activeCurrencyCode)}</Text>
               <Text 
                 nativeID="expenses-title-label"
                 style={{ 
@@ -1509,24 +1525,24 @@ export default function BoardScreen({ route, navigation }) {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 5, paddingTop: 5, borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                {t('Paid') || 'Paid'}: <Text style={{ fontWeight: '700', color: '#10B981' }}>${displayPaid.toFixed(2)}</Text>
+                {t('Paid') || 'Paid'}: <Text style={{ fontWeight: '700', color: '#10B981' }}>{formatCurrency(displayPaid, activeCurrencyCode)}</Text>
               </Text>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>•</Text>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                {t('Remaining Due') || 'Due'}: <Text style={{ fontWeight: '700', color: '#EF4444' }}>${displayRemaining.toFixed(2)}</Text>
+                {t('Remaining Due') || 'Due'}: <Text style={{ fontWeight: '700', color: '#EF4444' }}>{formatCurrency(displayRemaining, activeCurrencyCode)}</Text>
               </Text>
             </View>
 
             {isMonthlyView && allTotal > monthlyTotal ? (
               <TouchableOpacity onPress={() => setExpensesPeriodFilter('all')}>
                 <Text style={{ fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline' }}>
-                  {t('All scheduled:') || 'All:'} ${allTotal.toFixed(2)} →
+                  {t('All scheduled:') || 'All:'} {formatCurrency(allTotal, activeCurrencyCode)} →
                 </Text>
               </TouchableOpacity>
             ) : !isMonthlyView && monthlyTotal > 0 ? (
               <TouchableOpacity onPress={() => setExpensesPeriodFilter('month')}>
                 <Text style={{ fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline' }}>
-                  {t('This month:') || 'Month:'} ${monthlyTotal.toFixed(2)} →
+                  {t('This month:') || 'Month:'} {formatCurrency(monthlyTotal, activeCurrencyCode)} →
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -1595,15 +1611,29 @@ export default function BoardScreen({ route, navigation }) {
     if (type === 'habits') {
       const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
       const timesOfDay = ['All', 'Morning', 'Afternoon', 'Evening', 'Anytime'];
-      const bestStreak = boardTasks.reduce((max, t) => Math.max(max, Number(t.habitStreak) || 0), 0);
+      const todayKey = dayjs().format('YYYY-MM-DD');
+      let bestStreak = 0;
+      let missedCount = 0;
+      for (let i = 0; i < boardTasks.length; i++) {
+        const hs = computeHabitStats(boardTasks[i], todayKey, habitStreakMode);
+        if (hs.bestStreak > bestStreak) bestStreak = hs.bestStreak;
+        if (hs.status === 'missed_yesterday' || hs.status === 'missed_days') missedCount++;
+      }
 
       return (
         <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, gap: 6, flexWrap: 'wrap' }}>
             <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>
               ⚡ {t("Today's Habits") || 'Habits'}: {completedCount}/{totalCount} ({progressPercent}%)
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {missedCount > 0 && (
+                <View style={{ backgroundColor: '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF4444' }}>
+                    {t('{{count}} missed', { count: missedCount }) || `${missedCount} missed`}
+                  </Text>
+                </View>
+              )}
               <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
                 🔥 {t('Best Streak') || 'Best Streak'}: {bestStreak} {t('days') || 'd'}
               </Text>
@@ -1695,7 +1725,7 @@ export default function BoardScreen({ route, navigation }) {
     }
 
     return null;
-  }, [activeBoard?.type, boardTasks, colors.bgCard, colors.borderColor, colors.primary, colors.textPrimary, colors.textSecondary, dispatch, expensesPeriodFilter, getTaskAmount, isDark, listFilterCategory, showToast, t, windowWidth]);
+  }, [activeBoard?.type, activeCurrencyCode, boardTasks, colors.bgCard, colors.borderColor, colors.primary, colors.textPrimary, colors.textSecondary, dispatch, expensesPeriodFilter, getTaskAmount, habitStreakMode, isDark, listFilterCategory, showToast, t, windowWidth]);
 
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
@@ -2153,6 +2183,44 @@ export default function BoardScreen({ route, navigation }) {
             >
               <Text style={[styles.optionText, { color: colors.primary, fontWeight: 'bold' }]}>{t('Board Automations')}</Text>
             </TouchableOpacity>
+          )}
+
+          {isPriceBoardType(boardOptionsConfig.board?.type) && (
+            <View style={[styles.optionBtn, { borderBottomColor: colors.borderColor, flexDirection: 'column', alignItems: 'flex-start', paddingVertical: 10 }]}>
+              <Text style={[styles.optionText, { color: colors.textSecondary, fontSize: 13, marginBottom: 8 }]}>
+                {t('Currency') || 'Currency'}
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {CURRENCY_OPTION_CODES.map((code) => {
+                  const boardId = boardOptionsConfig.board?.id;
+                  const currentCode = (boardCurrencies && boardId && boardCurrencies[boardId]) || 'auto';
+                  const isSelected = currentCode === code;
+                  const label = code === 'auto' ? (t('Auto') || 'Auto') : `${code} (${getCurrencyMeta(code).symbol})`;
+                  return (
+                    <TouchableOpacity
+                      key={code}
+                      onPress={() => {
+                        if (boardId) {
+                          dispatch(setBoardCurrency({ boardId, currencyCode: code }));
+                        }
+                      }}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 10,
+                        backgroundColor: isSelected ? colors.primary : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                        borderWidth: 1,
+                        borderColor: isSelected ? colors.primary : colors.borderColor,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           )}
 
           {boardOptionsConfig.board?.repeatConfig && (

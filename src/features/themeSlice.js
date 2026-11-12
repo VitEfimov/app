@@ -166,6 +166,11 @@ const initialState = {
   // Per-Board Automations Map
   boardAutomations: loaded?.boardAutomations || {},
 
+  // Regional Currency & Habit Streak Preferences
+  currencyCode: loaded?.currencyCode || 'auto',
+  boardCurrencies: loaded?.boardCurrencies || {},
+  habitStreakMode: loaded?.habitStreakMode || 'grace',
+
   // Navigation & Drawer
   isGoogleDrawerOpen: false,
   jumpToTodayTrigger: 0
@@ -283,6 +288,9 @@ const themeSlice = createSlice({
       state.eveningReminderTime = '20:00';
       state.summaryReminder = false;
       state.summaryReminderTime = '09:00';
+      state.currencyCode = 'auto';
+      state.boardCurrencies = {};
+      state.habitStreakMode = 'grace';
 
       AsyncStorage.removeItem('customTheme');
     },
@@ -370,6 +378,22 @@ const themeSlice = createSlice({
     },
     setBlockScreenshots: (state, action) => {
       state.blockScreenshots = action.payload;
+    },
+    setCurrencyCode: (state, action) => {
+      state.currencyCode = action.payload || 'auto';
+    },
+    setBoardCurrency: (state, action) => {
+      const { boardId, currencyCode } = action.payload || {};
+      if (!boardId) return;
+      if (!state.boardCurrencies) state.boardCurrencies = {};
+      if (!currencyCode || currencyCode === 'auto') {
+        delete state.boardCurrencies[boardId];
+      } else {
+        state.boardCurrencies[boardId] = currencyCode;
+      }
+    },
+    setHabitStreakMode: (state, action) => {
+      state.habitStreakMode = action.payload === 'strict' ? 'strict' : 'grace';
     }
   }
 });
@@ -435,7 +459,7 @@ export const {
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
   setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId,
-  setBlockScreenshots,
+  setBlockScreenshots, setCurrencyCode, setBoardCurrency, setHabitStreakMode,
   setGoogleDrawerOpen, triggerJumpToToday
 } = themeSlice.actions;
 

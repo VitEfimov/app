@@ -11,6 +11,8 @@ import { Calendar } from 'react-native-calendars';
 import getFilters from '../utils/filters';
 import { getBoardColor } from '../utils/boardColors';
 import YearPickerModal, { parseCalendarHeaderDate } from './YearPickerModal';
+import { extractTaskAmountFromTitle, extractGroceryQuantity, isPriceBoardType, parseLocalizedNumber, resolveCurrencyCode, getCurrencyMeta } from '../utils/currencyHelper';
+import { normalizeHabitSchedule } from '../utils/habitHelper';
 
 const IconPlus = ({ color }) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -53,6 +55,11 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
   const boards = useSelector(state => state.userReducer.boards || []);
   const [selectedBoardId, setSelectedBoardId] = useState(defaultBoardId || activeBoardId || 'main');
   const [showBoardPicker, setShowBoardPicker] = useState(false);
+  const [explicitPriceText, setExplicitPriceText] = useState('');
+  const [showPriceInput, setShowPriceInput] = useState(false);
+  const [habitPreset, setHabitPreset] = useState('daily');
+  const currencySetting = useSelector(state => state.themeReducer?.currencyCode || 'auto');
+  const boardCurrencies = useSelector(state => state.themeReducer?.boardCurrencies || {});
   const { t, i18n } = useTranslation();
 
   useEffect(() => {
@@ -134,8 +141,10 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
 
     const targetBoardId = selectedBoardId || activeBoardId || 'main';
     const activeBoard = boards.find(b => b.id === targetBoardId);
-    const isEventsBoard = activeBoard?.type === 'birthdays' || activeBoard?.type === 'events' || (activeBoard?.name && activeBoard.name.toLowerCase() === 'events');
-    const isExpensesBoard = activeBoard?.type === 'expenses';
+    const boardType = activeBoard?.type || 'standard';
+    const isEventsBoard = boardType === 'birthdays' || boardType === 'events' || (activeBoard?.name && activeBoard.name.toLowerCase() === 'events');
+    const isExpensesBoard = boardType === 'expenses';
+    const isPriceBoard = isPriceBoardType(boardType);
     const boardRepeatConfig = activeBoard?.repeatConfig || (isEventsBoard ? { preset: 'every_year' } : (isExpensesBoard ? { preset: 'every_month' } : null));
     const hasDefaultRepeat = Boolean(boardRepeatConfig && boardRepeatConfig.preset && boardRepeatConfig.preset !== 'None');
 
@@ -152,28 +161,39 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
 
     let finalTaskName = taskName.trim();
     let itemPrice = undefined;
-    let itemQuantity = activeBoard?.type === 'grocery' ? 1 : undefined;
+    let itemQuantity = (boardType === 'grocery' || boardType === 'shopping') ? 1 : undefined;
     let itemCategory = undefined;
 
-    const priceMatch = finalTaskName.match(/\$(\d+(?:\.\d{1,2})?)/);
-    if (priceMatch) {
-      itemPrice = parseFloat(priceMatch[1]);
-    }
-
-    if (activeBoard?.type === 'grocery') {
-      const qtyMatch = finalTaskName.match(/(?:^|\s)(\d+)\s*(?:x|pcs|pk|pack|kg|lb)(?:\s|$)/i);
-      if (qtyMatch) {
-        itemQuantity = parseInt(qtyMatch[1], 10);
+    const explicitParsed = explicitPriceText.trim() ? parseLocalizedNumber(explicitPriceText.trim()) : NaN;
+    if (!isNaN(explicitParsed) && explicitParsed > 0) {
+      itemPrice = explicitParsed;
+    } else {
+      const parsedFromTitle = extractTaskAmountFromTitle(finalTaskName, {
+        allowBareTrailing: isPriceBoard,
+        boardType,
+      });
+      if (parsedFromTitle > 0) {
+        itemPrice = parsedFromTitle;
       }
     }
 
-    if (activeBoard?.type === 'packing') {
+    if (boardType === 'grocery' || boardType === 'shopping') {
+      const parsedQty = extractGroceryQuantity(finalTaskName);
+      if (parsedQty !== null) {
+        itemQuantity = parsedQty;
+      }
+    }
+
+    if (boardType === 'packing') {
       itemCategory = 'Carry-On';
-    } else if (activeBoard?.type === 'habits') {
+    } else if (boardType === 'habits') {
       itemCategory = 'Anytime';
-    } else if (activeBoard?.type === 'media') {
+    } else if (boardType === 'media') {
       itemCategory = 'Book';
     }
+
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    const normalizedHabitSchedule = boardType === 'habits' ? normalizeHabitSchedule({ preset: habitPreset }) : undefined;
 
     const newTask = {
       id: new Date().getTime().toString(),
@@ -189,7 +209,14 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
       ...(itemPrice !== undefined ? { itemPrice } : {}),
       ...(itemQuantity !== undefined ? { itemQuantity } : {}),
       ...(itemCategory !== undefined ? { itemCategory } : {}),
-      ...(activeBoard?.type === 'habits' ? { habitStreak: 0 } : {}),
+      ...(boardType === 'habits' ? {
+        habitStreak: 0,
+        habitBestStreak: 0,
+        habitCompletedDates: [],
+        habitSchedule: normalizedHabitSchedule,
+        habitCreatedAt: todayStr,
+        habitLastRolloverDate: todayStr,
+      } : {}),
       ...(hasDefaultRepeat ? {
         repeat: boardRepeatConfig.preset === 'every_year' ? 'yearly' : boardRepeatConfig.preset,
         repeatFrequency: boardRepeatConfig.preset,
@@ -225,6 +252,9 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
     }
 
     setTaskName('');
+    setExplicitPriceText('');
+    setShowPriceInput(false);
+    setHabitPreset('daily');
     setSelectedDate(getCompletionDate(sectionId));
     setIsEditing(false);
     Keyboard.dismiss();
@@ -255,6 +285,17 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
       </TouchableOpacity>
     );
   }
+
+  const effectiveInlineBoardId = selectedBoardId || activeBoardId || 'main';
+  const effectiveInlineBoard = boards.find(b => b.id === effectiveInlineBoardId);
+  const inlineBoardType = effectiveInlineBoard?.type || 'standard';
+  const inlineShowPriceChip = isPriceBoardType(inlineBoardType);
+  const inlineCurrencyCode = resolveCurrencyCode({
+    boardCurrencyCode: boardCurrencies?.[effectiveInlineBoardId],
+    settingCode: currencySetting,
+    langCode: i18n?.language,
+  });
+  const inlineCurrencySymbol = getCurrencyMeta(inlineCurrencyCode).symbol;
 
   return (
     <React.Fragment>
@@ -325,6 +366,49 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
                     {boards.find(b => b.id === selectedBoardId)?.name === 'Main' ? t('Main') : (boards.find(b => b.id === selectedBoardId)?.name || t('Main'))}
                   </Text>
                   <Text style={{ fontSize: 10, color: colors.textSecondary }}>▼</Text>
+                </TouchableOpacity>
+              )}
+
+              {inlineShowPriceChip && (
+                showPriceInput ? (
+                  <View style={[styles.chipBtn, { backgroundColor: '#10B9811A', borderColor: '#10B98160', paddingVertical: 2 }]}>
+                    <Text style={[styles.chipText, { color: '#10B981' }]}>{inlineCurrencySymbol}</Text>
+                    <TextInput
+                      style={{ minWidth: 52, maxWidth: 85, fontSize: 13, fontWeight: '600', color: colors.textPrimary, paddingVertical: 2, paddingHorizontal: 2 }}
+                      value={explicitPriceText}
+                      onChangeText={setExplicitPriceText}
+                      placeholder={t('Price') || 'Price'}
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="decimal-pad"
+                      autoFocus={true}
+                    />
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    accessible={true} accessibilityRole="button" accessibilityLabel={t('Price') || 'Price'}
+                    style={[styles.chipBtn, { backgroundColor: chipBg, borderColor: cardBorder }]}
+                    onPress={() => setShowPriceInput(true)}
+                  >
+                    <Text style={[styles.chipText, { color: colors.textPrimary }]}>
+                      {inlineCurrencySymbol} {t('Price') || 'Price'}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
+
+              {inlineBoardType === 'habits' && (
+                <TouchableOpacity
+                  accessible={true} accessibilityRole="button" accessibilityLabel={t('Habit Schedule') || 'Habit Schedule'}
+                  style={[styles.chipBtn, { backgroundColor: '#F59E0B1A', borderColor: '#F59E0B60' }]}
+                  onPress={() => {
+                    const order = ['daily', 'weekdays', 'weekends'];
+                    const next = order[(order.indexOf(habitPreset) + 1) % order.length];
+                    setHabitPreset(next);
+                  }}
+                >
+                  <Text style={[styles.chipText, { color: '#D97706' }]}>
+                    🔁 {habitPreset === 'weekdays' ? (t('Weekdays') || 'Weekdays') : habitPreset === 'weekends' ? (t('Weekends') || 'Weekends') : (t('Daily') || 'Daily')}
+                  </Text>
                 </TouchableOpacity>
               )}
             </ScrollView>

@@ -35,6 +35,8 @@ import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { SecurityLockHelper } from '../utils/securityLockHelper';
 import { A11yHelper } from '../utils/a11yHelper';
+import { extractTaskAmountFromTitle, getCurrencyMeta, isPriceBoardType, parseLocalizedNumber, resolveCurrencyCode } from '../utils/currencyHelper';
+import { computeHabitStats, isHabitTask, normalizeHabitSchedule } from '../utils/habitHelper';
 
 const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style }, ref) => {
   const [text, setText] = useState(initialValue || '');
@@ -250,6 +252,9 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
   const [isRepeatModalVisible, setIsRepeatModalVisible] = useState(false);
   const [repeatStartDate, setRepeatStartDate] = useState('');
   const [repeatEndDate, setRepeatEndDate] = useState('');
+  const [itemPriceInput, setItemPriceInput] = useState('');
+  const [habitSchedule, setHabitSchedule] = useState({ preset: 'daily', daysOfWeek: [0, 1, 2, 3, 4, 5, 6] });
+  const [habitCompletedDatesState, setHabitCompletedDatesState] = useState([]);
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryIsDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null, hideCancel: false, cancelText: '' });
   const { generateRepeatingTasks } = useTaskRepeat();
 
@@ -297,11 +302,42 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
     }
   }, [priority, isDark, colors]);
 
+  const selectedBoardObj = useMemo(() => {
+    return boards.find(b => b && (b.id === selectedBoardId || b._id === selectedBoardId)) || null;
+  }, [boards, selectedBoardId]);
+
   const selectedBoardName = useMemo(() => {
-    const found = boards.find(b => b.id === selectedBoardId);
-    if (!found) return 'Main';
-    return found.name === 'Main' ? t('Main') : found.name;
-  }, [boards, selectedBoardId, t]);
+    if (!selectedBoardObj) return 'Main';
+    return selectedBoardObj.name === 'Main' ? t('Main') : selectedBoardObj.name;
+  }, [selectedBoardObj, t]);
+
+  const selectedBoardType = selectedBoardObj?.type || 'standard';
+  const showPriceEditor = isPriceBoardType(selectedBoardType);
+  const showHabitEditor = isHabitTask(task, selectedBoardObj);
+
+  const modalCurrencyCode = useMemo(() => {
+    let deviceCur = null;
+    try {
+      deviceCur = Localization.getLocales?.()?.[0]?.currencyCode || null;
+    } catch (e) {}
+    return resolveCurrencyCode({
+      boardCurrencyCode: themeState?.boardCurrencies?.[selectedBoardId],
+      settingCode: themeState?.currencyCode || 'auto',
+      langCode: i18n?.language,
+      deviceCurrencyCode: deviceCur,
+    });
+  }, [themeState?.boardCurrencies, themeState?.currencyCode, selectedBoardId, i18n?.language]);
+
+  const modalCurrencyMeta = useMemo(() => getCurrencyMeta(modalCurrencyCode), [modalCurrencyCode]);
+  const habitStreakMode = themeState?.habitStreakMode || 'grace';
+  const liveHabitStats = useMemo(() => {
+    if (!showHabitEditor || !task) return null;
+    return computeHabitStats(
+      { ...task, habitCompletedDates: habitCompletedDatesState, habitSchedule },
+      dayjs().format('YYYY-MM-DD'),
+      habitStreakMode
+    );
+  }, [showHabitEditor, task, habitCompletedDatesState, habitSchedule, habitStreakMode]);
 
   const getValidDateString = (dateVal) => {
     if (!dateVal) return dayjs().format('YYYY-MM-DD');
@@ -412,6 +448,15 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
       const initialAlarmVal = task.isAlarm || false;
       const initialKeepNotificationVal = task.keepNotificationAllDay || false;
 
+      const initialPriceStr = (task.itemPrice !== undefined && task.itemPrice !== null && task.itemPrice !== '' && !isNaN(Number(task.itemPrice)))
+        ? String(task.itemPrice)
+        : '';
+      const initialHabitSchedule = normalizeHabitSchedule(task.habitSchedule);
+      const boardForTask = boards.find(b => b && (b.id === initialBoardId || b._id === initialBoardId)) || null;
+      const initialHabitDates = isHabitTask(task, boardForTask)
+        ? computeHabitStats(task, dayjs().format('YYYY-MM-DD'), habitStreakMode).completedDates
+        : [];
+
       setTaskName(initialTaskName);
       setNameInputHeight(48);
       setNotes(initialNotesText);
@@ -427,6 +472,9 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
       setReminder(initialReminderVal);
       setIsAlarm(initialAlarmVal);
       setKeepNotificationAllDay(initialKeepNotificationVal);
+      setItemPriceInput(initialPriceStr);
+      setHabitSchedule(initialHabitSchedule);
+      setHabitCompletedDatesState(initialHabitDates);
       dispatch(setTaskOptionsCollapsed(true));
 
       initialSnapshotRef.current = {
@@ -444,6 +492,9 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
         reminder: initialReminderVal,
         isAlarm: initialAlarmVal,
         keepNotificationAllDay: initialKeepNotificationVal,
+        itemPriceInput: initialPriceStr,
+        habitScheduleJson: JSON.stringify(initialHabitSchedule),
+        habitCompletedDatesJson: JSON.stringify(initialHabitDates),
       };
     }
   }, [isVisible, task?.id]);
@@ -601,6 +652,9 @@ useEffect(() => {
     if (reminder !== snap.reminder) return true;
     if (isAlarm !== snap.isAlarm) return true;
     if (keepNotificationAllDay !== snap.keepNotificationAllDay) return true;
+    if (itemPriceInput !== snap.itemPriceInput) return true;
+    if (JSON.stringify(habitSchedule) !== snap.habitScheduleJson) return true;
+    if (JSON.stringify(habitCompletedDatesState) !== snap.habitCompletedDatesJson) return true;
 
     return false;
   };
@@ -680,6 +734,40 @@ useEffect(() => {
     
     if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) {
       updates.subtasks = subtasks;
+    }
+
+    const snap = initialSnapshotRef.current;
+    if (snap && itemPriceInput !== snap.itemPriceInput) {
+      const trimmedPrice = itemPriceInput.trim();
+      if (!trimmedPrice) {
+        updates.itemPrice = null;
+      } else {
+        const parsedPrice = parseLocalizedNumber(trimmedPrice);
+        if (!isNaN(parsedPrice)) {
+          updates.itemPrice = parsedPrice;
+        }
+      }
+    }
+
+    if (
+      snap &&
+      isHabitTask(task, selectedBoardObj) &&
+      (JSON.stringify(habitSchedule) !== snap.habitScheduleJson ||
+        JSON.stringify(habitCompletedDatesState) !== snap.habitCompletedDatesJson)
+    ) {
+      const todayKey = dayjs().format('YYYY-MM-DD');
+      const nextHabitStats = computeHabitStats(
+        { ...task, habitCompletedDates: habitCompletedDatesState, habitSchedule },
+        todayKey,
+        habitStreakMode
+      );
+      updates.habitSchedule = nextHabitStats.schedule;
+      updates.habitCompletedDates = nextHabitStats.completedDates;
+      updates.completed = nextHabitStats.completedToday;
+      updates.habitStreak = nextHabitStats.currentStreak;
+      updates.habitBestStreak = nextHabitStats.bestStreak;
+      updates.habitLastCompleted = nextHabitStats.lastCompletedDate;
+      updates.habitLastRolloverDate = todayKey;
     }
     
     // If repeat is newly configured or task does not have a recurring series yet
@@ -1502,6 +1590,206 @@ useEffect(() => {
                 <Svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2.5"><Path d="M6 9l6 6 6-6" /></Svg>
               </TouchableOpacity>
             </View>
+
+            {showPriceEditor && (
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#10B9811A', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>{modalCurrencyMeta.symbol}</Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>
+                    {t('Price') || 'Price'} ({modalCurrencyMeta.code})
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard, borderRadius: 10, borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', paddingHorizontal: 10, minWidth: 110, height: 36 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginRight: 4 }}>
+                    {modalCurrencyMeta.symbol}
+                  </Text>
+                  <TextInput
+                    testID="task_details_price_input"
+                    value={itemPriceInput}
+                    onChangeText={setItemPriceInput}
+                    placeholder={(() => {
+                      const detected = extractTaskAmountFromTitle(taskName, { allowBareTrailing: true, boardType: selectedBoardType });
+                      return detected > 0 ? String(detected) : '0.00';
+                    })()}
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="decimal-pad"
+                    style={{ flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary, paddingVertical: 4, textAlign: 'right' }}
+                  />
+                  {itemPriceInput.length > 0 && (
+                    <TouchableOpacity onPress={() => setItemPriceInput('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 6 }}>
+                      <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '700' }}>×</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {showHabitEditor && liveHabitStats && (
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), gap: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ backgroundColor: '#F59E0B1A', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#D97706' }}>
+                        🔥 {liveHabitStats.currentStreak} {t('days') || 'd'}{liveHabitStats.freezeActive ? ' ❄️' : ''}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '600' }}>
+                      🏆 {t('Best Streak') || 'Best Streak'}: {liveHabitStats.bestStreak} {t('days') || 'd'}
+                    </Text>
+                  </View>
+
+                  {liveHabitStats.status === 'missed_yesterday' ? (
+                    <View style={{ backgroundColor: '#EF44441A', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444' }}>
+                        {t('Missed yesterday') || 'Missed yesterday'}
+                      </Text>
+                    </View>
+                  ) : liveHabitStats.status === 'missed_days' ? (
+                    <View style={{ backgroundColor: '#EF44441A', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444' }}>
+                        {t('Missed {{count}} days ago', { count: liveHabitStats.missedScheduledDays }) || `Missed ${liveHabitStats.missedScheduledDays} days ago`}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {liveHabitStats.last7Days.map((dot) => {
+                      const dotBg =
+                        dot.state === 'done'
+                          ? '#10B981'
+                          : dot.state === 'missed'
+                          ? '#EF444440'
+                          : 'transparent';
+                      const dotBorder =
+                        dot.state === 'done'
+                          ? '#10B981'
+                          : dot.state === 'pending_today'
+                          ? '#F59E0B'
+                          : dot.state === 'missed'
+                          ? '#EF4444'
+                          : (colors.borderColor || '#D1D5DB');
+                      return (
+                        <TouchableOpacity
+                          key={dot.dateStr}
+                          onPress={() => {
+                            setHabitCompletedDatesState(prev => {
+                              const s = new Set(prev);
+                              if (s.has(dot.dateStr)) s.delete(dot.dateStr);
+                              else s.add(dot.dateStr);
+                              return Array.from(s).sort();
+                            });
+                          }}
+                          style={{ alignItems: 'center', gap: 2 }}
+                        >
+                          <Text style={{ fontSize: 9, fontWeight: dot.isToday ? '800' : '600', color: dot.isToday ? colors.primary : colors.textSecondary }}>
+                            {dayjs(dot.dateStr).format('dd').slice(0, 1)}
+                          </Text>
+                          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: dotBg, borderWidth: 1.5, borderColor: dotBorder, alignItems: 'center', justifyContent: 'center' }}>
+                            {dot.state === 'done' && <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>✓</Text>}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      const yesterdayKey = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+                      setHabitCompletedDatesState(prev => {
+                        const s = new Set(prev);
+                        if (s.has(yesterdayKey)) s.delete(yesterdayKey);
+                        else s.add(yesterdayKey);
+                        return Array.from(s).sort();
+                      });
+                    }}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 10,
+                      backgroundColor: liveHabitStats.completedYesterday ? '#10B9811A' : hexToRgba(colors.primary, 0.12),
+                      borderWidth: 1,
+                      borderColor: liveHabitStats.completedYesterday ? '#10B981' : colors.primary,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: liveHabitStats.completedYesterday ? '#10B981' : colors.primary }}>
+                      {liveHabitStats.completedYesterday ? (t('Done yesterday') || 'Done yesterday') : (t('Mark yesterday done') || 'Mark yesterday done')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
+                    {t('Habit Schedule') || 'Habit Schedule'}
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {[
+                      { id: 'daily', label: t('Daily') || 'Daily' },
+                      { id: 'weekdays', label: t('Weekdays') || 'Weekdays' },
+                      { id: 'weekends', label: t('Weekends') || 'Weekends' },
+                      { id: 'custom_days', label: t('Custom days') || 'Custom days' },
+                    ].map((opt) => {
+                      const selected = habitSchedule?.preset === opt.id;
+                      return (
+                        <TouchableOpacity
+                          key={opt.id}
+                          onPress={() => setHabitSchedule(normalizeHabitSchedule({ preset: opt.id, daysOfWeek: habitSchedule?.daysOfWeek }))}
+                          style={{
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            borderRadius: 10,
+                            backgroundColor: selected ? '#F59E0B' : colors.bgCard,
+                            borderWidth: 1,
+                            borderColor: selected ? '#F59E0B' : (colors.borderColor || '#E5E5EA'),
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: selected ? '#FFFFFF' : colors.textPrimary }}>
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  {habitSchedule?.preset === 'custom_days' && (
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+                      {[0, 1, 2, 3, 4, 5, 6].map((dow) => {
+                        const active = (habitSchedule.daysOfWeek || []).includes(dow);
+                        const dayLabel = dayjs().day(dow).format('dd').slice(0, 2);
+                        return (
+                          <TouchableOpacity
+                            key={dow}
+                            onPress={() => {
+                              const current = new Set(habitSchedule.daysOfWeek || []);
+                              if (current.has(dow) && current.size > 1) current.delete(dow);
+                              else current.add(dow);
+                              setHabitSchedule(normalizeHabitSchedule({ preset: 'custom_days', daysOfWeek: Array.from(current) }));
+                            }}
+                            style={{
+                              width: 32,
+                              height: 30,
+                              borderRadius: 8,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: active ? '#F59E0B' : colors.bgCard,
+                              borderWidth: 1,
+                              borderColor: active ? '#F59E0B' : (colors.borderColor || '#E5E5EA'),
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#FFFFFF' : colors.textPrimary }}>
+                              {dayLabel}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
 
             {/* Collapsible Section Card: Priority, Reminder, Repeat */}
             <View style={[styles.optionsCard, { borderWidth: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingVertical: isVeryCompact ? 8 : (isCompact ? 10 : 12), paddingHorizontal: 12, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }]}>

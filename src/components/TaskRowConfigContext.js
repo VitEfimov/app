@@ -1,8 +1,22 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
+import * as Localization from 'expo-localization';
 import { getBoardColor } from '../utils/boardColors';
+import { resolveCurrencyCode } from '../utils/currencyHelper';
 
 const EMPTY_BOARDS = [];
+const EMPTY_MAP = {};
+
+function getDeviceCurrencySafe() {
+  try {
+    const locales = Localization.getLocales?.();
+    if (Array.isArray(locales) && locales.length > 0 && locales[0]?.currencyCode) {
+      return locales[0].currencyCode;
+    }
+  } catch (e) {}
+  return null;
+}
 
 const DEFAULT_ROW_CONFIG = {
   taskNameWrap: 'nowrap',
@@ -10,6 +24,11 @@ const DEFAULT_ROW_CONFIG = {
   boards: EMPTY_BOARDS,
   boardsByIdMap: new Map(),
   boardColorsMap: new Map(),
+  currencyCode: 'auto',
+  boardCurrencies: EMPTY_MAP,
+  effectiveCurrencyCode: 'USD',
+  deviceCurrencyCode: null,
+  habitStreakMode: 'grace',
 };
 
 const TaskRowConfigContext = createContext(DEFAULT_ROW_CONFIG);
@@ -20,9 +39,15 @@ const TaskRowConfigContext = createContext(DEFAULT_ROW_CONFIG);
  * across 50-200 mounted TaskRow instances during scrolling and task completion.
  */
 export function TaskRowConfigProvider({ children }) {
+  const { i18n } = useTranslation();
   const taskNameWrap = useSelector(state => state.themeReducer?.taskNameWrap || 'nowrap');
   const fontSizeSetting = useSelector(state => state.themeReducer?.fontSize || 'normal');
+  const currencyCode = useSelector(state => state.themeReducer?.currencyCode || 'auto');
+  const boardCurrencies = useSelector(state => state.themeReducer?.boardCurrencies || EMPTY_MAP);
+  const habitStreakMode = useSelector(state => state.themeReducer?.habitStreakMode || 'grace');
   const boards = useSelector(state => state.userReducer?.boards ?? EMPTY_BOARDS);
+  const langCode = i18n?.language || 'en';
+  const deviceCurrencyCode = useMemo(() => getDeviceCurrencySafe(), []);
 
   const value = useMemo(() => {
     const boardsByIdMap = new Map();
@@ -50,14 +75,25 @@ export function TaskRowConfigProvider({ children }) {
       boardColorsMap.set('main', getBoardColor('main', boards));
     }
 
+    const effectiveCurrencyCode = resolveCurrencyCode({
+      settingCode: currencyCode,
+      langCode,
+      deviceCurrencyCode,
+    });
+
     return {
       taskNameWrap,
       fontSizeSetting,
       boards,
       boardsByIdMap,
       boardColorsMap,
+      currencyCode,
+      boardCurrencies,
+      effectiveCurrencyCode,
+      deviceCurrencyCode,
+      habitStreakMode,
     };
-  }, [taskNameWrap, fontSizeSetting, boards]);
+  }, [taskNameWrap, fontSizeSetting, boards, currencyCode, boardCurrencies, langCode, deviceCurrencyCode, habitStreakMode]);
 
   return (
     <TaskRowConfigContext.Provider value={value}>

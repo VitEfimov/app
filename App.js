@@ -350,6 +350,10 @@ function InitApp() {
             const parsedCached = JSON.parse(cachedTasksJson);
             if (Array.isArray(parsedCached) && parsedCached.length > 0) {
               dispatch(hydrateTaskState(parsedCached));
+              try {
+                const { rolloverHabitTasks } = require('./src/features/taskSlice');
+                await dispatch(rolloverHabitTasks());
+              } catch (e) {}
             }
           } catch (parseErr) {
             console.error("Failed to parse cached tasks", parseErr);
@@ -374,6 +378,10 @@ function InitApp() {
 
         // Fetch/sync latest tasks with remote DB
         await dispatch(fetchTasks());
+        try {
+          const { rolloverHabitTasks } = require('./src/features/taskSlice');
+          await dispatch(rolloverHabitTasks());
+        } catch (e) {}
       } catch (e) {
         console.error("Initialization failed", e);
       } finally {
