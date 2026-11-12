@@ -32,12 +32,13 @@ const IconDetails = ({ color }) => (
   </Svg>
 );
 
-export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDetails, onAddTask, defaultBoardId, hideUnderline = false }) {
+const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, onToggle, onToggleSection, onAddDetails, onAddTask, defaultBoardId, hideUnderline = false }) {
   const { generateRepeatingTasks } = useTaskRepeat();
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const isEditing = isActive !== undefined ? isActive : internalIsEditing;
   const setIsEditing = (val) => {
-    if (onToggle) onToggle(val);
+    if (onToggleSection) onToggleSection(sectionId, val);
+    else if (onToggle) onToggle(val);
     setInternalIsEditing(val);
   };
   const [taskName, setTaskName] = useState('');
@@ -484,7 +485,9 @@ export default function InlineAddTask({ sectionId, isActive, onToggle, onAddDeta
       />
     </React.Fragment>
   );
-}
+});
+
+export default InlineAddTask;
 
 const styles = StyleSheet.create({
   addBtn: {

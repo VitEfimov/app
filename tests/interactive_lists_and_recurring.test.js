@@ -1057,11 +1057,11 @@ describe('Large Section Crash Prevention, FlashList Integrity & Hardware Diagnos
     const content = fs.readFileSync(boardPath, 'utf8');
 
     assert.match(content, /extractBoardItemKey\s*=\s*useCallback\(\(item,\s*index\)/, 'extractBoardItemKey must accept item and index parameters');
-    assert.match(content, /keyExtractor=\{\(item,\s*index\)\s*=>\s*extractBoardItemKey\(item,\s*index\)\}/, 'keyExtractor must delegate to extractBoardItemKey');
+    assert.match(content, /keyExtractor=\{extractBoardItemKey\}/, 'keyExtractor must reuse stable extractBoardItemKey callback');
     assert.match(content, /if \(item\?\.uniqueKey\) return item\.uniqueKey;/, 'Must use stable uniqueKey to prevent key shift on section expand');
     assert.match(content, /maintainVisibleContentPosition=\{\{\s*disabled:\s*true\s*\}\}/, 'Must configure maintainVisibleContentPosition disabled for FlashList v2');
-    assert.match(content, /drawDistance=\{1500\}/, 'FlashList v2 must buffer 1500dp ahead/behind viewport');
-    assert.match(content, /ListHeaderComponent=\{renderListSummaryBar\}/, 'Must wire summary bar into ListHeaderComponent to scroll with tasks');
+    assert.match(content, /drawDistance=\{500\}/, 'FlashList v2 must buffer balanced 500dp ahead/behind viewport');
+    assert.match(content, /ListHeaderComponent=\{renderListSummaryBar\}/, 'Must wire memoized summary bar into ListHeaderComponent to scroll with tasks');
   });
 
   test('ExpoTaskAlarmModule and index.ts expose getSystemMemoryMetrics and native crash capture', () => {
@@ -1539,9 +1539,12 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const boardContent = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
       assert.match(boardContent, /require\(['"]@shopify\/flash-list['"]\)\.FlashList/, 'BoardScreen must load FlashList v2 conditionally on Native Fabric');
       assert.match(boardContent, /<FabricFlashList/, 'BoardScreen must render FabricFlashList when Fabric is active');
-      assert.match(boardContent, /drawDistance=\{1500\}/, 'FabricFlashList must buffer 1500dp ahead/behind viewport');
+      assert.match(boardContent, /drawDistance=\{500\}/, 'FabricFlashList must use balanced 500dp drawDistance');
+      assert.match(boardContent, /getItemType=\{getBoardItemType\}/, 'FabricFlashList must pass hoisted getBoardItemType');
       assert.match(boardContent, /maintainVisibleContentPosition=\{\{\s*disabled:\s*true\s*\}\}/, 'FabricFlashList must disable chat scroll anchoring');
       assert.doesNotMatch(boardContent, /estimatedItemSize=/, 'FlashList v2 must not pass deprecated estimatedItemSize prop');
+      assert.match(boardContent, /boardTypeProp=\{activeType\}/, 'BoardScreen must pass boardTypeProp directly to TaskRow');
+      assert.match(boardContent, /const renderListSummaryBar = useCallback/, 'renderListSummaryBar must be memoized with useCallback');
       assert.match(boardContent, /<FlatList/, 'BoardScreen must keep FlatList fallback for Web and legacy binaries');
       assert.match(boardContent, /windowSize=\{21\}/, 'BoardScreen FlatList fallback must use windowSize={21}');
 
@@ -1552,6 +1555,34 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       const navContent = fs.readFileSync(path.resolve('src/navigation/AppNavigator.js'), 'utf8');
       assert.match(navContent, /detachInactiveScreens=\{false\}/, 'Tab.Navigator must disable screen detachment on RN 0.76 Fabric');
+
+      // UI-Thread Scroll & Row Performance Optimizations
+      const appContent = fs.readFileSync(path.resolve('App.js'), 'utf8');
+      assert.match(appContent, /<TaskRowConfigProvider>/, 'App.js must wrap InitApp in TaskRowConfigProvider');
+
+      const taskRowContent = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
+      assert.match(taskRowContent, /import ReanimatedSwipeRow from '\.\/ReanimatedSwipeRow'/, 'TaskRow must use UI-thread ReanimatedSwipeRow');
+      assert.match(taskRowContent, /useTaskRowConfig\(\)/, 'TaskRow must read shared config from TaskRowConfigContext');
+      assert.match(taskRowContent, /function areTaskRowPropsEqual/, 'TaskRow must use custom areTaskRowPropsEqual comparator');
+      assert.match(taskRowContent, /PRICE_PARSE_CACHE/, 'TaskRow must cache parsed prices in O(1) Map');
+      assert.match(taskRowContent, /DUE_DATE_CACHE/, 'TaskRow must cache formatted due dates in O(1) Map');
+
+      assert.doesNotMatch(taskRowContent, /useAnimatedStyle\s*\(/, 'TaskRow must avoid Reanimated useAnimatedStyle so modals do not collapse on Fabric (#6659)');
+
+      const swipeRowContent = fs.readFileSync(path.resolve('src/components/ReanimatedSwipeRow.js'), 'utf8');
+      assert.match(swipeRowContent, /PanGestureHandler/, 'ReanimatedSwipeRow must use native RNGH PanGestureHandler');
+      assert.doesNotMatch(swipeRowContent, /useAnimatedStyle\s*\(/, 'ReanimatedSwipeRow must use native-driver Animated rather than Reanimated useAnimatedStyle on Fabric (#6659)');
+      assert.match(swipeRowContent, /actionsMounted &&/, 'ReanimatedSwipeRow must lazily mount swipe drawers');
+
+      const inlineAddContent = fs.readFileSync(path.resolve('src/components/InlineAddTask.js'), 'utf8');
+      assert.match(inlineAddContent, /const InlineAddTask = React\.memo/, 'InlineAddTask must be wrapped in React.memo');
+
+      const detailsContent = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+      assert.match(detailsContent, /const TaskDetailsModal = React\.memo/, 'TaskDetailsModal must be wrapped in React.memo');
+
+      for (const unusedDep of ['@gorhom/bottom-sheet', '@react-native-community/datetimepicker', 'react-native-draggable-flatlist', 'reanimated-color-picker']) {
+        assert.strictEqual(pkgJson.dependencies[unusedDep], undefined, `Unused dependency ${unusedDep} must not remain in package.json`);
+      }
     });
 
     test('GitHub Actions workflows prune old artifacts and enforce retention-days: 3 to stay under 500 MB quota', async () => {

@@ -210,7 +210,7 @@ const IconChevronDown = ({ color, isCollapsed }) => (
   </Svg>
 );
 
-export default function TaskDetailsModal({ task, isVisible, onClose }) {
+const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isCompact = windowHeight < 820;
@@ -2287,7 +2287,13 @@ useEffect(() => {
       />
     </Modal>
   );
-}
+}, (prev, next) => (
+  prev.isVisible === next.isVisible &&
+  prev.task === next.task &&
+  (!next.isVisible || prev.onClose === next.onClose)
+));
+
+export default TaskDetailsModal;
 
 const styles = StyleSheet.create({
   modalOverlay: {

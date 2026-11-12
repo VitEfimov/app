@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler } from 'react-native';
-import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
-import TaskRow, { closeOpenSwipeableRow, cancelAllInlineEditing } from '../components/TaskRow';
+import TaskRow, { closeOpenSwipeableRow, cancelAllInlineEditing, getCachedTaskAmount } from '../components/TaskRow';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
 import SnoozeModal from '../components/SnoozeModal';
@@ -56,6 +55,8 @@ if (isNativeFabricActive) {
     FabricFlashList = null;
   }
 }
+
+const getBoardItemType = (item) => item.type;
 
 // Responsive Web CSS for ultra-narrow screens (< 300px)
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -262,19 +263,7 @@ export default function BoardScreen({ route, navigation }) {
     setExpensesPeriodFilter('month');
   }, [activeBoardId]);
 
-  const getTaskAmount = useCallback((task) => {
-    if (!task) return 0;
-    if (task.itemPrice !== undefined && task.itemPrice !== null && !isNaN(Number(task.itemPrice))) {
-      return Number(task.itemPrice);
-    }
-    const title = task.taskname || task.name || '';
-    const match = title.match(/\$(\d+(?:\.\d{1,2})?)/);
-    if (match) {
-      const parsed = parseFloat(match[1]);
-      return isNaN(parsed) ? 0 : parsed;
-    }
-    return 0;
-  }, []);
+  const getTaskAmount = getCachedTaskAmount;
 
   const getHabitTimeCategory = useCallback((task) => {
     if (!task) return 'Anytime';
@@ -628,8 +617,9 @@ export default function BoardScreen({ route, navigation }) {
     );
   }, []);
 
-  // Single-pass O(N) deduplication of recurring tasks (eliminates per-series sorting allocations)
-  const hiddenRecurringTaskIds = useMemo(() => {
+  // Single-pass O(N) deduplication of recurring tasks shared by board view and board counts
+  const allHiddenRecurringTaskIds = useMemo(() => {
+    if (showRecurringTasksOnBoard) return new Set();
     const hiddenIds = new Set();
     const todayStr = dayjs().format('YYYY-MM-DD');
 
@@ -641,15 +631,8 @@ export default function BoardScreen({ route, navigation }) {
       if (!isNaN(num)) hiddenIds.add(num);
     };
 
-    // When toggle is ON ('Show recurring tasks'): Show ALL recurring tasks!
-    if (showRecurringTasksOnBoard) {
-      return hiddenIds; // empty Set -> show all tasks
-    }
-
-    // When toggle is OFF ('Do not show recurring tasks'): Show JUST NEXT ONE!
-    // Deduplicate each recurring series so only the single next (earliest upcoming) occurrence appears
     const earliestSeriesMap = new Map();
-    for (const task of boardTasks) {
+    for (const task of tasks) {
       if (!task || task.completed) continue;
       const isRepeating = isRepeatingTask(task);
       const titleKey = String(task.taskname || task.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -681,7 +664,8 @@ export default function BoardScreen({ route, navigation }) {
     }
 
     return hiddenIds;
-  }, [boardTasks, showRecurringTasksOnBoard, activeBoard, isRepeatingTask]);
+  }, [tasks, showRecurringTasksOnBoard, isRepeatingTask]);
+  const hiddenRecurringTaskIds = allHiddenRecurringTaskIds;
 
   const isCompletedCollapsed = collapsedSections.includes('completed');
 
@@ -894,51 +878,6 @@ export default function BoardScreen({ route, navigation }) {
     });
     return result;
   }, [sections, sectionVisibleCounts, collapsedSections]);
-
-  const allHiddenRecurringTaskIds = useMemo(() => {
-    if (showRecurringTasksOnBoard) return new Set();
-    const hiddenIds = new Set();
-    const todayStr = dayjs().format('YYYY-MM-DD');
-
-    const addToHidden = (id) => {
-      if (id === undefined || id === null) return;
-      hiddenIds.add(id);
-      hiddenIds.add(String(id));
-      const num = Number(id);
-      if (!isNaN(num)) hiddenIds.add(num);
-    };
-
-    const earliestSeriesMap = new Map();
-    for (const task of tasks) {
-      if (!task || task.completed) continue;
-      const isRepeating = isRepeatingTask(task);
-      const titleKey = String(task.taskname || task.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
-      const rawBId = String(task.boardId || task.board_id || 'main');
-      const seriesKey = task.recurringSeriesId
-        ? ('series_' + task.recurringSeriesId)
-        : (isRepeating && titleKey ? (`title_${rawBId}_${titleKey}`) : null);
-      if (!seriesKey) continue;
-
-      const dateStr = getTaskDateStr(task);
-      if (dateStr && dateStr < todayStr) continue;
-
-      const existing = earliestSeriesMap.get(seriesKey);
-      const taskId = task.id || task._id;
-      if (!existing) {
-        earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: dateStr || '9999-12-31' });
-      } else {
-        const taskVal = dateStr || '9999-12-31';
-        const existingVal = existing.dateStr;
-        if (taskVal < existingVal) {
-          addToHidden(existing.taskId);
-          earliestSeriesMap.set(seriesKey, { task, taskId, dateStr: taskVal });
-        } else {
-          addToHidden(taskId);
-        }
-      }
-    }
-    return hiddenIds;
-  }, [tasks, showRecurringTasksOnBoard, isRepeatingTask]);
 
   const boardCounts = useMemo(() => {
     const counts = {};
@@ -1233,22 +1172,26 @@ export default function BoardScreen({ route, navigation }) {
     );
   }, [collapsedSections, selectionMode.isActive, getSectionTasks, selectedTaskIdsSet, toggleSection, handleMenuPress, handleToggleSelectSection]);
 
+  const handleInlineAddToggle = useCallback((sectionId, active) => {
+    setActiveAddSectionId(active ? sectionId : null);
+    if (active) setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
+  }, []);
+
+  const handleInlineAddDetails = useCallback((task) => {
+    setSelectedTask(task);
+    setDetailsVisible(true);
+  }, []);
+
   const renderSectionFooter = useCallback(({ section }) => {
     return (
       <InlineAddTask 
         sectionId={section.id} 
         isActive={activeAddSectionId === section.id}
-        onToggle={(active) => {
-          setActiveAddSectionId(active ? section.id : null);
-          if (active) setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
-        }}
-        onAddDetails={(task) => {
-          setSelectedTask(task);
-          setDetailsVisible(true);
-        }}
+        onToggleSection={handleInlineAddToggle}
+        onAddDetails={handleInlineAddDetails}
       />
     );
-  }, [activeAddSectionId]);
+  }, [activeAddSectionId, handleInlineAddToggle, handleInlineAddDetails]);
 
   const renderShowMoreRow = useCallback((item) => {
     const sectionId = item.section?.id;
@@ -1331,11 +1274,13 @@ export default function BoardScreen({ route, navigation }) {
     if (item.type === 'task') {
       const task = item.task;
       const section = item.section;
-      const isListBoard = ['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeBoard?.type);
+      const activeType = activeBoard?.type || 'standard';
+      const isListBoard = ['simple_list', 'shopping', 'grocery', 'packing', 'habits', 'media'].includes(activeType);
       return (
         <TaskRow 
           task={task} 
           sectionId={section.id}
+          boardTypeProp={activeType}
           hideDate={isListBoard}
           hideBoardBadge={true}
           isSelectionMode={selectionMode.isActive}
@@ -1353,13 +1298,9 @@ export default function BoardScreen({ route, navigation }) {
   const flashListExtraData = useMemo(() => ({
     activeBoardId,
     activeAddSectionId,
-    tasksCount: tasks.length,
-    boardTasksRef: boardTasks,
     collapsedKey: collapsedSections.join(','),
-    sortKey: JSON.stringify(sortConfig),
     selectionActive: selectionMode.isActive,
-    selectedCount: selectedTaskIdsSet.size,
-    flattenedLength: flattenedData.length,
+    selectedTaskIdsSet,
     themeMode: mode,
     themeIsDark: isDark,
     themeBg: colors.bgMain,
@@ -1367,7 +1308,7 @@ export default function BoardScreen({ route, navigation }) {
     expensesPeriodFilter,
     listFilterCategory,
     isNarrow: windowWidth < 300,
-  }), [activeBoardId, activeAddSectionId, tasks.length, boardTasks, collapsedSections, sortConfig, selectionMode.isActive, selectedTaskIdsSet.size, flattenedData.length, mode, isDark, colors.bgMain, colors.textPrimary, expensesPeriodFilter, listFilterCategory, windowWidth]);
+  }), [activeBoardId, activeAddSectionId, collapsedSections, selectionMode.isActive, selectedTaskIdsSet, mode, isDark, colors.bgMain, colors.textPrimary, expensesPeriodFilter, listFilterCategory, windowWidth]);
 
   const flashListRef = useRef(null);
   const flatListRef = useRef(null);
@@ -1395,7 +1336,7 @@ export default function BoardScreen({ route, navigation }) {
     isMoveBoardVisible || 
     isGoogleDrawerOpen;
 
-  const renderListSummaryBar = () => {
+  const renderListSummaryBar = useCallback(() => {
     const type = activeBoard?.type;
     if (!['grocery', 'shopping', 'expenses', 'packing', 'habits', 'media'].includes(type)) {
       return null;
@@ -1754,7 +1695,7 @@ export default function BoardScreen({ route, navigation }) {
     }
 
     return null;
-  };
+  }, [activeBoard?.type, boardTasks, colors.bgCard, colors.borderColor, colors.primary, colors.textPrimary, colors.textSecondary, dispatch, expensesPeriodFilter, getTaskAmount, isDark, listFilterCategory, showToast, t, windowWidth]);
 
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
@@ -1879,10 +1820,10 @@ export default function BoardScreen({ route, navigation }) {
           data={flattenedData}
           extraData={flashListExtraData}
           ListHeaderComponent={renderListSummaryBar}
-          keyExtractor={(item, index) => extractBoardItemKey(item, index)}
-          getItemType={(item) => item.type}
+          keyExtractor={extractBoardItemKey}
+          getItemType={getBoardItemType}
           renderItem={renderItem}
-          drawDistance={1500}
+          drawDistance={500}
           maintainVisibleContentPosition={{ disabled: true }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -1896,7 +1837,7 @@ export default function BoardScreen({ route, navigation }) {
           data={flattenedData}
           extraData={flashListExtraData}
           ListHeaderComponent={renderListSummaryBar}
-          keyExtractor={(item, index) => extractBoardItemKey(item, index)}
+          keyExtractor={extractBoardItemKey}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

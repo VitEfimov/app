@@ -40,6 +40,7 @@ import { HapticHelper } from './src/utils/hapticHelper';
 import { ThemeProvider, useTheme } from './src/styles/ThemeContext';
 import { ToastProvider } from './src/styles/ToastContext';
 import { SafeAreaProvider, SafeAreaInsetsContext, initialWindowMetrics } from 'react-native-safe-area-context';
+import { TaskRowConfigProvider } from './src/components/TaskRowConfigContext';
 
 // Guaranteed non-null initial safe area metrics for React Native 0.76+ Fabric / Bridgeless.
 // Without initialMetrics, SafeAreaProvider renders `null` (blank #141419 screen) until the native
@@ -743,7 +744,9 @@ export default function App() {
             <ToastProvider>
               <RootWrapper>
                 <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'transparent' }}>
-                  <InitApp />
+                  <TaskRowConfigProvider>
+                    <InitApp />
+                  </TaskRowConfigProvider>
                 </GestureHandlerRootView>
               </RootWrapper>
             </ToastProvider>
