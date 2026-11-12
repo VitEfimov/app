@@ -11,12 +11,32 @@ dayjs.extend(isSameOrBefore);
 // Set how notifications should be handled when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
+    shouldShowAlert: true,
     shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
+
+const DATE_TRIGGER_TYPE = Notifications.SchedulableTriggerInputTypes?.DATE || 'date';
+const TIME_INTERVAL_TRIGGER_TYPE = Notifications.SchedulableTriggerInputTypes?.TIME_INTERVAL || 'timeInterval';
+
+export function buildDateTrigger(dateInput, channelId = null) {
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (Platform.OS === 'android' && channelId) {
+    return { type: DATE_TRIGGER_TYPE, date, channelId };
+  }
+  return { type: DATE_TRIGGER_TYPE, date };
+}
+
+export function buildTimeIntervalTrigger(seconds, channelId = null, repeats = false) {
+  const safeSeconds = Math.max(1, Number(seconds) || 1);
+  if (Platform.OS === 'android' && channelId) {
+    return { type: TIME_INTERVAL_TRIGGER_TYPE, seconds: safeSeconds, repeats: !!repeats, channelId };
+  }
+  return { type: TIME_INTERVAL_TRIGGER_TYPE, seconds: safeSeconds, repeats: !!repeats };
+}
 
 export const VIBRATION_PATTERNS = {
   notificationSoft: [0, 35, 45, 40],
@@ -775,15 +795,7 @@ export async function schedulePersistentTaskNotification(
         sticky: true,
         autoDismiss: false,
       },
-      trigger:
-        Platform.OS === 'android'
-          ? {
-              date: targetDate.toDate(),
-              channelId,
-            }
-          : {
-              date: targetDate.toDate(),
-            },
+      trigger: buildDateTrigger(targetDate.toDate(), channelId),
     });
 
     DevLogger.success(`Successfully scheduled persistent notification`, { scheduledId, channelId, taskName });
@@ -895,15 +907,7 @@ export async function scheduleExactTaskReminder(
         autoDismiss: !isAlarm,
       },
 
-      trigger:
-        Platform.OS === 'android'
-          ? {
-              date: targetDate.toDate(),
-              channelId: activeChannelId,
-            }
-          : {
-              date: targetDate.toDate(),
-            },
+      trigger: buildDateTrigger(targetDate.toDate(), activeChannelId),
     });
     
     DevLogger.success(`Successfully scheduled exact notification`, { scheduledId, channelId, sound, taskName });
@@ -951,14 +955,10 @@ export async function scheduleLocalNotification(
           body,
           sound: isSilent ? null : 'default',
           // Use LOW priority to match channel importance
-          priority: isSilent ? Notifications.AndroidNotificationPriority.LOW : Notifications.AndroidImportance.MAX,
+          priority: isSilent ? Notifications.AndroidNotificationPriority.LOW : Notifications.AndroidNotificationPriority.MAX,
         },
 
-        trigger: {
-          seconds,
-          repeats: false,
-          channelId,
-        },
+        trigger: buildTimeIntervalTrigger(seconds, channelId, false),
       });
     }
 
@@ -969,10 +969,7 @@ export async function scheduleLocalNotification(
         sound: isSilent ? null : 'default',
       },
 
-      trigger: {
-        seconds,
-        repeats: false,
-      },
+      trigger: buildTimeIntervalTrigger(seconds, null, false),
     });
   } catch (error) {
     console.error(
@@ -1015,7 +1012,7 @@ export async function scheduleCalendarNotification(
       priority: Notifications.AndroidNotificationPriority.HIGH,
       data,
     },
-    trigger: Platform.OS === 'android' ? { date: date instanceof Date ? date : new Date(date), channelId } : { date: date instanceof Date ? date : new Date(date) },
+    trigger: buildDateTrigger(date instanceof Date ? date : new Date(date), channelId),
   });
 }
 
@@ -1204,7 +1201,7 @@ export async function updateRecurringAutomations(themeState, tasks = [], isPremi
             sound: true,
             data: { isAutomation: true, automationType: 'morning' },
           },
-          trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
+          trigger: buildDateTrigger(triggerDate.toDate(), channelId),
         });
       } catch (error) {
         DevLogger.error('Failed to schedule morning reminder', error);
@@ -1239,7 +1236,7 @@ export async function updateRecurringAutomations(themeState, tasks = [], isPremi
             sound: true,
             data: { isAutomation: true, automationType: 'summary' },
           },
-          trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
+          trigger: buildDateTrigger(triggerDate.toDate(), channelId),
         });
       } catch (error) {
         DevLogger.error('Failed to schedule summary reminder', error);
@@ -1274,7 +1271,7 @@ export async function updateRecurringAutomations(themeState, tasks = [], isPremi
             sound: true,
             data: { isAutomation: true, automationType: 'evening' },
           },
-          trigger: Platform.OS === 'android' ? { date: triggerDate.toDate(), channelId } : { date: triggerDate.toDate() }
+          trigger: buildDateTrigger(triggerDate.toDate(), channelId),
         });
       } catch (error) {
         DevLogger.error('Failed to schedule evening reminder', error);
@@ -1427,11 +1424,7 @@ export async function testAndroidDefaultNotification() {
           },
         },
 
-        trigger: {
-          seconds: 3,
-          repeats: false,
-          channelId,
-        },
+        trigger: buildTimeIntervalTrigger(3, channelId, false),
       });
 
     DevLogger.success(

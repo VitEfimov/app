@@ -1848,6 +1848,51 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const appSrc = fs.readFileSync(path.resolve('App.js'), 'utf8');
       assert.match(appSrc, /rolloverHabitTasks/);
     });
+
+    test('SDK 52 expo-notifications triggers include explicit type and foreground shouldShowAlert', () => {
+      const notificationsSrc = fs.readFileSync(path.resolve('src/utils/notifications.js'), 'utf8');
+      assert.match(notificationsSrc, /shouldShowAlert:\s*true/, 'Notification handler must enable shouldShowAlert for expo-notifications 0.29');
+      assert.match(notificationsSrc, /export function buildDateTrigger/, 'Must export typed DATE trigger builder');
+      assert.match(notificationsSrc, /export function buildTimeIntervalTrigger/, 'Must export typed TIME_INTERVAL trigger builder');
+      assert.doesNotMatch(
+        notificationsSrc,
+        /trigger:\s*(?:Platform\.OS\s*===\s*'android'\s*\?\s*)?\{\s*date:/,
+        'Do not pass untyped SDK 51 { date, channelId } trigger objects (they fire immediately as type: channel on SDK 52)'
+      );
+      assert.doesNotMatch(
+        notificationsSrc,
+        /trigger:\s*\{\s*seconds:/,
+        'Do not pass untyped SDK 51 { seconds } trigger objects'
+      );
+
+      const notifMod = loadTranspiledModule(path.resolve('src/utils/notifications.js'), {
+        'expo-notifications': {
+          setNotificationHandler: () => {},
+          SchedulableTriggerInputTypes: { DATE: 'date', TIME_INTERVAL: 'timeInterval' },
+        },
+        'expo-device': {},
+        'react-native': { Platform: { OS: 'android' }, ToastAndroid: { show: () => {} } },
+        '../../modules/expo-task-alarm': {},
+        './logger': { DevLogger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} } },
+        dayjs,
+      });
+
+      const future = new Date(Date.now() + 900000);
+      const dateTrig = notifMod.buildDateTrigger(future, 'task_default_notification_vib1_v17');
+      assert.deepStrictEqual(dateTrig, {
+        type: 'date',
+        date: future,
+        channelId: 'task_default_notification_vib1_v17',
+      });
+
+      const intervalTrig = notifMod.buildTimeIntervalTrigger(3, 'debug_system_sound_v16', false);
+      assert.deepStrictEqual(intervalTrig, {
+        type: 'timeInterval',
+        seconds: 3,
+        repeats: false,
+        channelId: 'debug_system_sound_v16',
+      });
+    });
   });
 });
 
