@@ -178,10 +178,16 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
     <Modal
       isVisible={isVisible}
       onSwipeComplete={onClose}
-      swipeDirection={scrollOffset > 0 ? undefined : ['down']}
+      swipeDirection={(scrollOffset > 0 || timePickerTarget) ? undefined : ['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
-      onBackButtonPress={onClose}
+      onBackButtonPress={() => {
+        if (timePickerTarget) {
+          setTimePickerTarget(null);
+          return;
+        }
+        onClose();
+      }}
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
@@ -406,6 +412,7 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
         {timePickerTarget && (
           <CustomTimePicker
             visible={!!timePickerTarget}
+            inline={true}
             value={
               timePickerTarget === 'morning' ? morningReminderTime :
               timePickerTarget === 'evening' ? eveningReminderTime :

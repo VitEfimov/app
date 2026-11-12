@@ -1579,6 +1579,17 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       const detailsContent = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
       assert.match(detailsContent, /const TaskDetailsModal = React\.memo/, 'TaskDetailsModal must be wrapped in React.memo');
+      assert.match(detailsContent, /<CustomTimePicker[\s\S]*inline=\{true\}/, 'TaskDetailsModal must render CustomTimePicker inline to avoid nested native Dialog deadlocks');
+
+      const autoManageContent = fs.readFileSync(path.resolve('src/components/AutoManageSettings.js'), 'utf8');
+      assert.match(autoManageContent, /<CustomTimePicker[\s\S]*inline=\{true\}/, 'AutoManageSettings must render CustomTimePicker inline');
+
+      const timePickerContent = fs.readFileSync(path.resolve('src/components/CustomTimePicker.js'), 'utf8');
+      const activeStartIdx = timePickerContent.search(/^import React,/m);
+      const activeTimePickerCode = activeStartIdx >= 0 ? timePickerContent.slice(activeStartIdx) : timePickerContent;
+      assert.match(activeTimePickerCode, /PanResponder\.create/, 'CustomTimePicker must use RN PanResponder rather than GestureHandlerRootView inside Modals');
+      assert.doesNotMatch(activeTimePickerCode, /GestureHandlerRootView/, 'CustomTimePicker must not wrap Modal content in GestureHandlerRootView on Fabric');
+      assert.doesNotMatch(activeTimePickerCode, /useAnimatedStyle\s*\(/, 'CustomTimePicker must avoid Reanimated useAnimatedStyle inside Modals (#6659)');
 
       for (const unusedDep of ['@gorhom/bottom-sheet', '@react-native-community/datetimepicker', 'react-native-draggable-flatlist', 'reanimated-color-picker']) {
         assert.strictEqual(pkgJson.dependencies[unusedDep], undefined, `Unused dependency ${unusedDep} must not remain in package.json`);

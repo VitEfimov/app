@@ -1340,8 +1340,10 @@ import React, {
 } from 'react';
 
 import {
+  BackHandler,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   StyleSheet,
   Text,
@@ -1360,28 +1362,6 @@ import Svg, {
   Path,
 } from 'react-native-svg';
 
-import {
-  Gesture,
-  GestureDetector,
-} from 'react-native-gesture-handler';
-
-import Animated, {
-  runOnJS,
-  useAnimatedProps,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
-
-const AnimatedLine =
-  Animated.createAnimatedComponent(Line);
-
-const AnimatedCircle =
-  Animated.createAnimatedComponent(Circle);
-
-const AnimatedText =
-  Animated.createAnimatedComponent(Text);
-
 const DIAL_SIZE = 250;
 const CENTER = DIAL_SIZE / 2;
 
@@ -1389,19 +1369,11 @@ const OUTER_RADIUS = 80;
 const INNER_RADIUS = 50;
 const OUTER_RADIUS_THRESHOLD = 65;
 
-const SPRING_CONFIG = {
-  damping: 14,
-  stiffness: 400,
-  mass: 0.45,
-};
-
 const angleToHour = (
   angle,
   distance,
   is24Hour
 ) => {
-  'worklet';
-
   let hour = Math.floor((angle + 15) / 30);
 
   if (hour === 12) {
@@ -1423,8 +1395,6 @@ const angleToHour = (
 };
 
 const angleToMinute = (angle) => {
-  'worklet';
-
   let minute = Math.floor((angle + 3) / 6);
 
   if (minute >= 60) {
@@ -1627,38 +1597,9 @@ const IconClock = ({ color }) => (
 const DialNumber = React.memo(
   function DialNumber({
     item,
-    isHourMode,
-    is24HourSV,
-    sharedAngle,
-    sharedRadius,
+    isSelected,
     scheme,
   }) {
-    const animatedStyle =
-      useAnimatedStyle(() => {
-        const selectedValue =
-          isHourMode.value
-            ? angleToHour(
-                sharedAngle.value,
-                sharedRadius.value,
-                is24HourSV.value
-              )
-            : angleToMinute(
-                sharedAngle.value
-              );
-
-        const isSelected =
-          selectedValue ===
-          item.numericValue;
-
-        return {
-          color: isSelected
-            ? scheme.onPrimary
-            : item.isInner
-              ? scheme.onSurfaceVariant
-              : scheme.onSurface,
-        };
-      });
-
     return (
       <View
         pointerEvents="none"
@@ -1670,18 +1611,21 @@ const DialNumber = React.memo(
           },
         ]}
       >
-        <AnimatedText
+        <Text
           style={[
             styles.dialNumberText,
-
-            item.isInner &&
-              styles.innerDialNumberText,
-
-            animatedStyle,
+            item.isInner && styles.innerDialNumberText,
+            {
+              color: isSelected
+                ? scheme.onPrimary
+                : item.isInner
+                  ? scheme.onSurfaceVariant
+                  : scheme.onSurface,
+            },
           ]}
         >
           {item.label}
-        </AnimatedText>
+        </Text>
       </View>
     );
   }
@@ -1699,401 +1643,152 @@ function ClockDial({
   onToggleAmPm,
 }) {
   const dialRef = useRef(null);
-
-  const sharedAngle =
-    useSharedValue(0);
-
-  const sharedRadius =
-    useSharedValue(OUTER_RADIUS);
-
-  const isDragging =
-    useSharedValue(false);
-
-  const lastValue =
-    useSharedValue(-1);
-
-  const prevAngle =
-    useSharedValue(-1);
-
-  const accumulatedAngle =
-    useSharedValue(0);
-
-  const is24HourSV =
-    useSharedValue(is24Hour);
-
-  const isHourMode =
-    useSharedValue(
-      dialMode === 'hour'
-    );
-
-  const globalCenterX =
-    useSharedValue(0);
-
-  const globalCenterY =
-    useSharedValue(0);
-
-  const modeRef =
-    useRef(dialMode);
-
-  const is24HourRef =
-    useRef(is24Hour);
+  const dialOriginRef = useRef({ pageX: 0, pageY: 0, ready: false });
+  const isDraggingRef = useRef(false);
+  const lastValueRef = useRef(-1);
+  const prevAngleRef = useRef(-1);
+  const accumulatedAngleRef = useRef(0);
+  const modeRef = useRef(dialMode);
+  const is24HourRef = useRef(is24Hour);
+  const [dragVisual, setDragVisual] = useState(null);
 
   useEffect(() => {
     modeRef.current = dialMode;
-
-    isHourMode.value =
-      dialMode === 'hour';
-
-    lastValue.value = -1;
-  }, [
-    dialMode,
-    isHourMode,
-    lastValue,
-  ]);
+    lastValueRef.current = -1;
+    prevAngleRef.current = -1;
+    setDragVisual(null);
+  }, [dialMode]);
 
   useEffect(() => {
-    is24HourRef.current =
-      is24Hour;
+    is24HourRef.current = is24Hour;
+  }, [is24Hour]);
 
-    is24HourSV.value =
-      is24Hour;
-  }, [
-    is24Hour,
-    is24HourSV,
-  ]);
-
-  const measureDial =
-    useCallback(() => {
-      requestAnimationFrame(() => {
-        dialRef.current?.measureInWindow(
-          (
-            x,
-            y,
-            width,
-            height
-          ) => {
-            globalCenterX.value =
-              x + width / 2;
-
-            globalCenterY.value =
-              y + height / 2;
-          }
-        );
+  const measureDial = useCallback(() => {
+    requestAnimationFrame(() => {
+      dialRef.current?.measureInWindow((x, y) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          dialOriginRef.current = { pageX: x, pageY: y, ready: true };
+        }
       });
-    }, [
-      globalCenterX,
-      globalCenterY,
-    ]);
+    });
+  }, []);
 
   useEffect(() => {
     measureDial();
-  }, [
-    measureDial,
-    dialMode,
-    is24Hour,
-  ]);
+  }, [measureDial, dialMode, is24Hour]);
 
-  useEffect(() => {
-    if (isDragging.value) {
-      return;
-    }
+  const commitValueFromAngle = useCallback(
+    (angle, distance) => {
+      if (modeRef.current === 'hour') {
+        const nextHour = angleToHour(angle, distance, is24HourRef.current);
+        onHourChange(String(nextHour));
+        return;
+      }
+      const nextMinute = angleToMinute(angle);
+      onMinuteChange(String(nextMinute).padStart(2, '0'));
+    },
+    [onHourChange, onMinuteChange]
+  );
 
-    const target =
-      valueToAngleAndRadius({
-        mode: dialMode,
-        hour,
-        minute,
-        is24Hour,
-      });
+  const computeDialPoint = useCallback((localX, localY) => {
+    const dx = localX - CENTER;
+    const dy = localY - CENTER;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const angle = ((Math.atan2(dy, dx) * 180) / Math.PI + 450) % 360;
+    const radius =
+      modeRef.current === 'hour' && is24HourRef.current
+        ? distance < OUTER_RADIUS_THRESHOLD
+          ? INNER_RADIUS
+          : OUTER_RADIUS
+        : OUTER_RADIUS;
+    const selected =
+      modeRef.current === 'hour'
+        ? angleToHour(angle, distance, is24HourRef.current)
+        : angleToMinute(angle);
+    return { angle, distance, radius, selected };
+  }, []);
 
-    sharedAngle.value =
-      withSpring(
-        target.angle,
-        SPRING_CONFIG
-      );
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          isDraggingRef.current = true;
+          lastValueRef.current = -1;
 
-    sharedRadius.value =
-      withSpring(
-        target.radius,
-        SPRING_CONFIG
-      );
-  }, [
-    dialMode,
-    hour,
-    minute,
-    is24Hour,
-    isDragging,
-    sharedAngle,
-    sharedRadius,
-  ]);
+          const ne = evt?.nativeEvent || {};
+          const lx = typeof ne.locationX === 'number' ? ne.locationX : CENTER;
+          const ly = typeof ne.locationY === 'number' ? ne.locationY : CENTER;
+          if (typeof ne.pageX === 'number' && typeof ne.pageY === 'number') {
+            dialOriginRef.current = {
+              pageX: ne.pageX - lx,
+              pageY: ne.pageY - ly,
+              ready: true,
+            };
+          }
 
-  const commitValueFromAngle =
-    useCallback(
-      (
-        angle,
-        distance
-      ) => {
-        if (
-          modeRef.current ===
-          'hour'
-        ) {
-          const nextHour =
-            angleToHour(
-              angle,
-              distance,
-              is24HourRef.current
-            );
+          const { angle, distance, radius, selected } = computeDialPoint(lx, ly);
+          prevAngleRef.current = angle;
+          accumulatedAngleRef.current = angle;
+          lastValueRef.current = selected;
+          setDragVisual({ angle, radius });
+          commitValueFromAngle(angle, distance);
+        },
+        onPanResponderMove: (evt, gestureState) => {
+          const ne = evt?.nativeEvent || {};
+          let lx;
+          let ly;
+          if (dialOriginRef.current.ready) {
+            const px = typeof ne.pageX === 'number' ? ne.pageX : gestureState.moveX;
+            const py = typeof ne.pageY === 'number' ? ne.pageY : gestureState.moveY;
+            lx = px - dialOriginRef.current.pageX;
+            ly = py - dialOriginRef.current.pageY;
+          } else {
+            lx = typeof ne.locationX === 'number' ? ne.locationX : CENTER;
+            ly = typeof ne.locationY === 'number' ? ne.locationY : CENTER;
+          }
 
-          onHourChange(
-            String(nextHour)
-          );
+          const { angle, distance, radius, selected } = computeDialPoint(lx, ly);
 
-          return;
-        }
-
-        const nextMinute =
-          angleToMinute(angle);
-
-        onMinuteChange(
-          String(
-            nextMinute
-          ).padStart(2, '0')
-        );
-      },
-      [
-        onHourChange,
-        onMinuteChange,
-      ]
-    );
-
-  const panGesture =
-    useMemo(
-      () =>
-        Gesture.Pan()
-          .minDistance(0)
-          .hitSlop(20)
-          .shouldCancelWhenOutside(
-            false
-          )
-
-          .onBegin((event) => {
-            'worklet';
-
-            isDragging.value =
-              true;
-
-            lastValue.value =
-              -1;
-
-            const dx =
-              event.absoluteX -
-              globalCenterX.value;
-
-            const dy =
-              event.absoluteY -
-              globalCenterY.value;
-
-            const distance =
-              Math.sqrt(
-                dx * dx +
-                dy * dy
-              );
-
-            const angle =
-              (
-                Math.atan2(
-                  dy,
-                  dx
-                ) *
-                  180 /
-                  Math.PI +
-                450
-              ) % 360;
-
-            sharedAngle.value =
-              angle;
-
-            prevAngle.value =
-              angle;
-            
-            accumulatedAngle.value =
-              angle;
-
-            sharedRadius.value =
-              isHourMode.value &&
-              is24HourSV.value
-                ? distance <
-                  OUTER_RADIUS_THRESHOLD
-                  ? INNER_RADIUS
-                  : OUTER_RADIUS
-                : OUTER_RADIUS;
-
-            const value =
-              isHourMode.value
-                ? angleToHour(
-                    angle,
-                    distance,
-                    is24HourSV.value
-                  )
-                : angleToMinute(
-                    angle
-                  );
-
-            lastValue.value =
-              value;
-
-            runOnJS(
-              commitValueFromAngle
-            )(
-              angle,
-              distance
-            );
-          })
-
-          .onUpdate((event) => {
-            'worklet';
-
-            const dx =
-              event.absoluteX -
-              globalCenterX.value;
-
-            const dy =
-              event.absoluteY -
-              globalCenterY.value;
-
-            const distance =
-              Math.sqrt(
-                dx * dx +
-                dy * dy
-              );
-
-            const angle =
-              (
-                Math.atan2(
-                  dy,
-                  dx
-                ) *
-                  180 /
-                  Math.PI +
-                450
-              ) % 360;
-
-            /*
-             * These shared values move
-             * continuously with the finger.
-             */
-            sharedAngle.value =
-              angle;
-            
-            if (prevAngle.value !== -1) {
-              let delta = angle - prevAngle.value;
-              if (delta > 180) delta -= 360;
-              if (delta < -180) delta += 360;
-              
-              const previousAccumulated = accumulatedAngle.value;
-              accumulatedAngle.value += delta;
-              
-              if (isHourMode.value && !is24HourSV.value && onToggleAmPm) {
-                const prevRot = Math.floor(previousAccumulated / 360);
-                const currRot = Math.floor(accumulatedAngle.value / 360);
-                if (prevRot !== currRot) {
-                  runOnJS(onToggleAmPm)();
-                }
+          if (prevAngleRef.current !== -1) {
+            let delta = angle - prevAngleRef.current;
+            if (delta > 180) delta -= 360;
+            if (delta < -180) delta += 360;
+            const prevAcc = accumulatedAngleRef.current;
+            accumulatedAngleRef.current += delta;
+            if (modeRef.current === 'hour' && !is24HourRef.current && onToggleAmPm) {
+              if (Math.floor(prevAcc / 360) !== Math.floor(accumulatedAngleRef.current / 360)) {
+                onToggleAmPm();
               }
             }
-            prevAngle.value = angle;
+          }
+          prevAngleRef.current = angle;
 
-            sharedRadius.value =
-              isHourMode.value &&
-              is24HourSV.value
-                ? distance <
-                  OUTER_RADIUS_THRESHOLD
-                  ? INNER_RADIUS
-                  : OUTER_RADIUS
-                : OUTER_RADIUS;
-
-            const value =
-              isHourMode.value
-                ? angleToHour(
-                    angle,
-                    distance,
-                    is24HourSV.value
-                  )
-                : angleToMinute(
-                    angle
-                  );
-
-            /*
-             * React state changes only when
-             * the selected number changes.
-             */
-            if (
-              value !==
-              lastValue.value
-            ) {
-              lastValue.value =
-                value;
-
-              runOnJS(
-                commitValueFromAngle
-              )(
-                angle,
-                distance
-              );
-            }
-          })
-
-          .onFinalize(() => {
-            'worklet';
-
-            const wasHourMode =
-              isHourMode.value;
-
-            isDragging.value =
-              false;
-
-            const step =
-              wasHourMode
-                ? 30
-                : 6;
-
-            let snappedAngle =
-              Math.round(
-                sharedAngle.value /
-                  step
-              ) * step;
-
-            if (
-              snappedAngle >= 360
-            ) {
-              snappedAngle = 0;
-            }
-
-            sharedAngle.value =
-              withSpring(
-                snappedAngle,
-                SPRING_CONFIG
-              );
-
-            if (wasHourMode) {
-              runOnJS(
-                onHourGestureEnd
-              )();
-            }
-          }),
-      [
-        commitValueFromAngle,
-        globalCenterX,
-        globalCenterY,
-        is24HourSV,
-        isDragging,
-        isHourMode,
-        lastValue,
-        onHourGestureEnd,
-        sharedAngle,
-        sharedRadius,
-      ]
-    );
+          setDragVisual({ angle, radius });
+          if (selected !== lastValueRef.current) {
+            lastValueRef.current = selected;
+            commitValueFromAngle(angle, distance);
+          }
+        },
+        onPanResponderRelease: () => {
+          isDraggingRef.current = false;
+          prevAngleRef.current = -1;
+          setDragVisual(null);
+          if (modeRef.current === 'hour') {
+            onHourGestureEnd();
+          }
+        },
+        onPanResponderTerminate: () => {
+          isDraggingRef.current = false;
+          prevAngleRef.current = -1;
+          setDragVisual(null);
+        },
+      }),
+    [commitValueFromAngle, computeDialPoint, onHourGestureEnd, onToggleAmPm]
+  );
 
   const items =
     useMemo(() => {
@@ -2243,70 +1938,30 @@ function ClockDial({
       is24Hour,
     ]);
 
-  const animatedLineProps =
-    useAnimatedProps(() => {
-      const angleRadians =
-        (
-          sharedAngle.value -
-          90
-        ) *
-        (
-          Math.PI /
-          180
-        );
+  const targetVisual = useMemo(
+    () =>
+      valueToAngleAndRadius({
+        mode: dialMode,
+        hour,
+        minute,
+        is24Hour,
+      }),
+    [dialMode, hour, minute, is24Hour]
+  );
 
-      return {
-        x2:
-          CENTER +
-          sharedRadius.value *
-            Math.cos(
-              angleRadians
-            ),
-
-        y2:
-          CENTER +
-          sharedRadius.value *
-            Math.sin(
-              angleRadians
-            ),
-      };
-    });
-
-  const animatedCircleProps =
-    useAnimatedProps(() => {
-      const angleRadians =
-        (
-          sharedAngle.value -
-          90
-        ) *
-        (
-          Math.PI /
-          180
-        );
-
-      return {
-        cx:
-          CENTER +
-          sharedRadius.value *
-            Math.cos(
-              angleRadians
-            ),
-
-        cy:
-          CENTER +
-          sharedRadius.value *
-            Math.sin(
-              angleRadians
-            ),
-      };
-    });
+  const activeVisual = dragVisual || targetVisual;
+  const angleRadians = ((activeVisual.angle - 90) * Math.PI) / 180;
+  const tipX = CENTER + activeVisual.radius * Math.cos(angleRadians);
+  const tipY = CENTER + activeVisual.radius * Math.sin(angleRadians);
+  const selectedNumericValue =
+    dragVisual && typeof dragVisual.selected === 'number'
+      ? dragVisual.selected
+      : dialMode === 'hour'
+        ? parseInt(hour, 10) || (is24Hour ? 0 : 12)
+        : parseInt(minute, 10) || 0;
 
   return (
-    <View
-      style={
-        styles.dialContainer
-      }
-    >
+    <View style={styles.dialContainer}>
       <View
         ref={dialRef}
         collapsable={false}
@@ -2314,17 +1969,14 @@ function ClockDial({
         style={[
           styles.dialCircle,
           {
-            backgroundColor:
-              scheme.surfaceContainerHighest,
+            backgroundColor: scheme.surfaceContainerHighest,
           },
         ]}
       >
         <Svg
           width={DIAL_SIZE}
           height={DIAL_SIZE}
-          style={
-            StyleSheet.absoluteFill
-          }
+          style={StyleSheet.absoluteFill}
           pointerEvents="none"
         >
           <Circle
@@ -2333,27 +1985,19 @@ function ClockDial({
             r="4"
             fill={scheme.primary}
           />
-
-          <AnimatedLine
+          <Line
             x1={CENTER}
             y1={CENTER}
-            animatedProps={
-              animatedLineProps
-            }
-            stroke={
-              scheme.primary
-            }
+            x2={tipX}
+            y2={tipY}
+            stroke={scheme.primary}
             strokeWidth="2"
           />
-
-          <AnimatedCircle
-            animatedProps={
-              animatedCircleProps
-            }
+          <Circle
+            cx={tipX}
+            cy={tipY}
             r="16"
-            fill={
-              scheme.primary
-            }
+            fill={scheme.primary}
           />
         </Svg>
 
@@ -2361,31 +2005,16 @@ function ClockDial({
           <DialNumber
             key={`${dialMode}-${item.numericValue}`}
             item={item}
-            isHourMode={
-              isHourMode
-            }
-            is24HourSV={
-              is24HourSV
-            }
-            sharedAngle={
-              sharedAngle
-            }
-            sharedRadius={
-              sharedRadius
-            }
+            isSelected={item.numericValue === selectedNumericValue}
             scheme={scheme}
           />
         ))}
 
-        <GestureDetector
-          gesture={panGesture}
-        >
-          <Animated.View
-            style={
-              StyleSheet.absoluteFillObject
-            }
-          />
-        </GestureDetector>
+        <View
+          collapsable={false}
+          style={StyleSheet.absoluteFillObject}
+          {...panResponder.panHandlers}
+        />
       </View>
     </View>
   );
@@ -2393,6 +2022,7 @@ function ClockDial({
 
 export default function CustomTimePicker({
   visible,
+  inline = false,
   value,
   onClose,
   onSave,
@@ -2741,6 +2371,17 @@ export default function CustomTimePicker({
       );
     }, []);
 
+  useEffect(() => {
+    if (!inline || !visible) {
+      return;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (onClose) onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [inline, visible, onClose]);
+
   const toggleInputMode =
     useCallback(() => {
       setInputMode(
@@ -2752,44 +2393,42 @@ export default function CustomTimePicker({
       );
     }, []);
 
-  return (
-    <Modal
-      transparent
-      animationType="fade"
-      visible={visible}
-      statusBarTranslucent
-      onRequestClose={onClose}
+  if (inline && !visible) {
+    return null;
+  }
+
+  const pickerBody = (
+    <View
+      testID={inline ? 'custom_time_picker_inline' : 'custom_time_picker_overlay'}
+      style={[
+        inline ? StyleSheet.absoluteFillObject : null,
+        styles.overlay,
+        {
+          backgroundColor: scheme.scrim,
+          ...(inline ? { zIndex: 999999, elevation: 999999 } : {}),
+        },
+      ]}
     >
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <TouchableOpacity
+        style={StyleSheet.absoluteFillObject}
+        activeOpacity={1}
+        onPress={onClose}
+        accessible={false}
+      />
+      <KeyboardAvoidingView
+        pointerEvents="box-none"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardAvoidingView}
+      >
         <View
+          onStartShouldSetResponder={() => true}
           style={[
-            styles.overlay,
+            styles.container,
             {
-              backgroundColor:
-                scheme.scrim,
+              backgroundColor: colors.bgCard || scheme.surfaceContainerHigh,
             },
           ]}
         >
-          <KeyboardAvoidingView
-            behavior={
-              Platform.OS ===
-              'ios'
-                ? 'padding'
-                : undefined
-            }
-            style={
-              styles.keyboardAvoidingView
-            }
-          >
-          <View
-            style={[
-              styles.container,
-              {
-                backgroundColor:
-                  colors.bgCard || scheme.surfaceContainerHigh,
-              },
-            ]}
-          >
             <Text
               style={[
                 styles.title,
@@ -3194,10 +2833,24 @@ export default function CustomTimePicker({
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-      </GestureHandlerRootView>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+
+  if (inline) {
+    return pickerBody;
+  }
+
+  return (
+    <Modal
+      transparent
+      animationType="fade"
+      visible={visible}
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      {pickerBody}
     </Modal>
   );
 }

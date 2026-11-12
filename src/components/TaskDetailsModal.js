@@ -853,6 +853,10 @@ useEffect(() => {
         setShowDatePicker(false);
         return true;
       }
+      if (showTimePicker) {
+        setShowTimePicker(false);
+        return true;
+      }
       if (isRepeatModalVisible) {
         setIsRepeatModalVisible(false);
         return true;
@@ -877,6 +881,7 @@ useEffect(() => {
     isAttachmentOptionsVisible,
     isYearPickerVisible,
     showDatePicker,
+    showTimePicker,
     isRepeatModalVisible,
     isCustomReminderModalVisible,
     isPremiumModalVisible,
@@ -1305,9 +1310,15 @@ useEffect(() => {
       testID="task_details_modal"
       isVisible={isVisible} 
       onSwipeComplete={handleClose}
-      swipeDirection={scrollOffset > 0 ? undefined : ['down']}
+      swipeDirection={(scrollOffset > 0 || showTimePicker) ? undefined : ['down']}
       onBackdropPress={handleClose}
-      onBackButtonPress={handleClose}
+      onBackButtonPress={() => {
+        if (showTimePicker) {
+          setShowTimePicker(false);
+          return;
+        }
+        handleClose();
+      }}
       propagateSwipe={true}
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
@@ -1694,24 +1705,6 @@ useEffect(() => {
                 </View>
               )}
             </View>
-
-            {showTimePicker && (
-              <CustomTimePicker
-                visible={showTimePicker}
-                value={selectedTime}
-                colors={colors}
-                isDark={isDark}
-                onClose={() => setShowTimePicker(false)}
-                onSave={(newTime) => {
-                  setSelectedTime(newTime);
-                  handleUpdate({
-                    time: newTime,
-                    hasUserSelectedTime: true,
-                  });
-                  setShowTimePicker(false);
-                }}
-              />
-            )}
 
             {/* Notes & Attachments Card */}
             <View style={{ marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }}>
@@ -2285,6 +2278,24 @@ useEffect(() => {
         onClose={() => setIsCustomReminderModalVisible(false)}
         onSave={handleCustomReminderSave}
       />
+      {showTimePicker && (
+        <CustomTimePicker
+          visible={showTimePicker}
+          inline={true}
+          value={selectedTime}
+          colors={colors}
+          isDark={isDark}
+          onClose={() => setShowTimePicker(false)}
+          onSave={(newTime) => {
+            setSelectedTime(newTime);
+            handleUpdate({
+              time: newTime,
+              hasUserSelectedTime: true,
+            });
+            setShowTimePicker(false);
+          }}
+        />
+      )}
     </Modal>
   );
 }, (prev, next) => (
