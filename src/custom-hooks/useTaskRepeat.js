@@ -196,6 +196,11 @@ export const useTaskRepeat = () => {
                     .map(att => ({ ...att }))
                 : [];
 
+            const targetItemPrice = formData.itemPrice !== undefined ? formData.itemPrice : (originalTask.itemPrice !== undefined ? originalTask.itemPrice : undefined);
+            const targetItemQuantity = formData.itemQuantity !== undefined ? formData.itemQuantity : (originalTask.itemQuantity !== undefined ? originalTask.itemQuantity : undefined);
+            const targetItemUnit = formData.itemUnit !== undefined ? formData.itemUnit : (originalTask.itemUnit !== undefined ? originalTask.itemUnit : undefined);
+            const targetItemCategory = formData.itemCategory !== undefined ? formData.itemCategory : (originalTask.itemCategory !== undefined ? originalTask.itemCategory : undefined);
+
             tasksToGenerate.push({
                 id: newTaskId,
                 boardId: originalTask.boardId || 'main',
@@ -221,6 +226,10 @@ export const useTaskRepeat = () => {
                 repeatConfig: repeatConfig,
                 repeatStartDate: startDate,
                 repeatEndDate: endDate,
+                ...(targetItemPrice !== undefined ? { itemPrice: targetItemPrice } : {}),
+                ...(targetItemQuantity !== undefined ? { itemQuantity: targetItemQuantity } : {}),
+                ...(targetItemUnit !== undefined ? { itemUnit: targetItemUnit } : {}),
+                ...(targetItemCategory !== undefined ? { itemCategory: targetItemCategory } : {}),
                 lastUpdatedDate: new Date().toISOString()
             });
         }

@@ -1965,6 +1965,67 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
       assert.match(taskSliceSrc, /scheduleFieldChanged/);
     });
+
+    test('Recurring series price tag propagation & hash amount extraction (#34.5, series updates)', () => {
+      const currencyHelper = loadTranspiledModule(path.resolve('src/utils/currencyHelper.js'));
+      const { extractTaskAmountFromTitle, formatCurrency } = currencyHelper;
+
+      // 1. Hash-prefixed decimal amounts parse correctly
+      assert.strictEqual(extractTaskAmountFromTitle('Mr Wash #34.5', { boardType: 'expenses' }), 34.5);
+      assert.strictEqual(extractTaskAmountFromTitle('Mr Wash #34.50', { boardType: 'expenses' }), 34.5);
+      assert.strictEqual(extractTaskAmountFromTitle('Costco $400', { boardType: 'expenses' }), 400);
+      assert.strictEqual(extractTaskAmountFromTitle('Dinner #45.50'), 45.5, 'Decimal hash amount works on general boards');
+      assert.strictEqual(extractTaskAmountFromTitle('Issue #5'), 0, 'Integer issue # is not misparsed as currency on standard boards');
+      assert.strictEqual(extractTaskAmountFromTitle('Room #101'), 0, 'Integer room # is not misparsed as currency on standard boards');
+      assert.strictEqual(formatCurrency(34.5, 'USD'), '$34.50');
+
+      // 2. taskSlice updateRecurringSeriesSync propagates itemPrice, itemQuantity, itemCategory
+      const taskSliceMod = loadTranspiledModule(path.resolve('src/features/taskSlice.js'), {
+        '../utils/logger': { DevLogger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} } },
+        '../utils/CryptoStorage': { setItemMultiKeys: async () => {}, getItem: async () => null },
+        '../utils/notifications': { cancelNotification: async () => {}, scheduleTaskReminder: async () => [] },
+        'react-native': { Platform: { OS: 'ios' } },
+        dayjs,
+      });
+
+      const taskReducer = taskSliceMod.default;
+      const { updateRecurringSeriesSync } = taskSliceMod;
+      const initialState = {
+        tasks: [
+          { id: 'task_1', recurringSeriesId: 'series_bill_1', taskname: 'Toyota Corolla', completionDate: '2026-12-28T09:00:00.000Z', isRecurring: true },
+          { id: 'task_2', recurringSeriesId: 'series_bill_1', taskname: 'Toyota Corolla', completionDate: '2027-01-28T09:00:00.000Z', isRecurring: true },
+          { id: 'task_3', recurringSeriesId: 'series_bill_1', taskname: 'Toyota Corolla', completionDate: '2027-02-28T09:00:00.000Z', isRecurring: true },
+        ],
+      };
+
+      const action = updateRecurringSeriesSync({
+        seriesId: 'series_bill_1',
+        fromDate: '2026-12-28T09:00:00.000Z',
+        updates: {
+          name: 'Toyota Corolla',
+          itemPrice: 425.50,
+          itemQuantity: 1,
+          itemCategory: 'Bills',
+        },
+      });
+
+      const nextState = taskReducer(initialState, action);
+
+      assert.strictEqual(nextState.tasks[0].itemPrice, 425.50, 'Instance 1 must have updated itemPrice');
+      assert.strictEqual(nextState.tasks[1].itemPrice, 425.50, 'Instance 2 must have updated itemPrice');
+      assert.strictEqual(nextState.tasks[2].itemPrice, 425.50, 'Instance 3 must have updated itemPrice');
+      assert.strictEqual(nextState.tasks[0].itemCategory, 'Bills');
+
+      // 3. Verify useTaskRepeat preserves itemPrice & itemQuantity
+      const repeatHookSrc = fs.readFileSync(path.resolve('src/custom-hooks/useTaskRepeat.js'), 'utf8');
+      assert.match(repeatHookSrc, /targetItemPrice/);
+      assert.match(repeatHookSrc, /\.\.\.\(targetItemPrice !== undefined \? \{ itemPrice: targetItemPrice \} : \{\}\)/);
+
+      // 4. Verify TaskDetailsModal passes itemPrice to updateRecurringSeries & generateRepeatingTasks
+      const detailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+      assert.match(detailsSrc, /itemPrice:\s*effectivePrice/);
+      assert.match(detailsSrc, /dispatch\(updateRecurringSeries\(/);
+    });
   });
 });
 

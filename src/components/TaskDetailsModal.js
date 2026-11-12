@@ -758,7 +758,22 @@ useEffect(() => {
           updates.itemPrice = parsedPrice;
         }
       }
+    } else if (updates.itemPrice === undefined && (task.itemPrice === undefined || task.itemPrice === null) && showPriceEditor) {
+      const detected = extractTaskAmountFromTitle(taskName, { allowBareTrailing: true, boardType: selectedBoardType });
+      if (detected > 0) {
+        updates.itemPrice = detected;
+      }
     }
+
+    const effectivePrice = updates.itemPrice !== undefined
+      ? updates.itemPrice
+      : (task.itemPrice !== undefined ? task.itemPrice : undefined);
+    const effectiveQuantity = updates.itemQuantity !== undefined
+      ? updates.itemQuantity
+      : (task.itemQuantity !== undefined ? task.itemQuantity : undefined);
+    const effectiveCategory = updates.itemCategory !== undefined
+      ? updates.itemCategory
+      : (task.itemCategory !== undefined ? task.itemCategory : undefined);
 
     if (
       snap &&
@@ -796,7 +811,10 @@ useEffect(() => {
           keepNotificationAllDay,
           attachments, 
           subtasks, 
-          description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments }
+          description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments },
+          itemPrice: effectivePrice,
+          itemQuantity: effectiveQuantity,
+          itemCategory: effectiveCategory
         }, 
         { ...repeatConfig, startDate: effectiveStartDate, endDate: effectiveEndDate }
       );
@@ -842,7 +860,10 @@ useEffect(() => {
             keepNotificationAllDay,
             attachments, 
             subtasks, 
-            description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments }
+            description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments },
+            itemPrice: effectivePrice,
+            itemQuantity: effectiveQuantity,
+            itemCategory: effectiveCategory
           }, 
           { ...repeatConfig, startDate: effectiveStartDate, endDate: effectiveEndDate }
         );
@@ -873,7 +894,10 @@ useEffect(() => {
             repeatConfig: repeatConfig,
             repeatFrequency: repeatConfig.preset,
             repeatStartDate: effectiveStartDate,
-            repeatEndDate: effectiveEndDate
+            repeatEndDate: effectiveEndDate,
+            itemPrice: effectivePrice,
+            itemQuantity: effectiveQuantity,
+            itemCategory: effectiveCategory
           }
         }));
       }

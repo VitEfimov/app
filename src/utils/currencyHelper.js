@@ -123,6 +123,10 @@ export function parseLocalizedNumber(raw) {
 const PREFIX_SYMBOL_RE = /(?:^|[\s([{"'])([$€£¥₽₹₩₴₺₸])\s*(\d+(?:[\s\u00A0.,']\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/;
 const PREFIX_CODE_RE = /(?:^|[\s([{"'])(USD|EUR|RUB|GBP|JPY|CNY|INR|KRW|UAH|TRY|KZT)\s+(\d+(?:[\s\u00A0.,']\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?=$|[\s.,;!?)}\]"'])/i;
 const SUFFIX_CURRENCY_RE = /(?:^|[\s([{"'])(\d+(?:[\s\u00A0.,']\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:([$€£¥₽₹₩₴₺₸])|(USD|EUR|RUB|GBP|JPY|CNY|INR|KRW|UAH|TRY|KZT|руб\.?|р\.|грн\.?|тг\.?|円|元|원)(?=$|[\s,;!?)\]}"']))/i;
+// Decimal amount with hash prefix (e.g. "Mr Wash #34.5", "#34.50") - decimal points distinguish amounts from integer IDs
+const HASH_DECIMAL_RE = /(?:^|[\s([{"'])#\s*(\d+(?:[\s\u00A0.,']\d{3})*[.,]\d{1,2}|\d+[.,]\d{1,2})(?=$|[\s.,;!?)}\]"'])/;
+// Hash followed by any number on price-oriented boards (e.g. "Mr Wash #34.5", "Rent #1200")
+const HASH_PRICE_BOARD_RE = /(?:^|[\s([{"'])#\s*(\d+(?:[\s\u00A0.,']\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?=$|[\s.,;!?)}\]"'])/;
 
 // Tokens that introduce an identifier/multiplier AFTER them (e.g., "Room 101", "Episode 4", "Eggs x 2")
 const NUMBER_PREFIX_WORDS = /^(?:x|х|×|\*|no\.?|nr\.?|№|#|ep\.?|ch\.?|vol\.?|part|pt\.?|ver\.?|v\.?|level|lvl|step|room|apt|suite|page|pg\.?|p\.?)$/i;
@@ -164,8 +168,21 @@ export function extractTaskAmountFromTitle(title, options = {}) {
     if (!isNaN(val)) return val;
   }
 
-  // 4. Safe trailing bare-number heuristic on price-oriented boards
+  // 4. Decimal amount with '#' prefix (e.g. "Mr Wash #34.5", "Bill #15.99")
+  const hashDec = trimmed.match(HASH_DECIMAL_RE);
+  if (hashDec) {
+    const val = parseLocalizedNumber(hashDec[1]);
+    if (!isNaN(val)) return val;
+  }
+
+  // 5. Safe trailing bare-number heuristic or hash-prefixed amount on price-oriented boards
   if (useBareHeuristic) {
+    const hashBoard = trimmed.match(HASH_PRICE_BOARD_RE);
+    if (hashBoard) {
+      const val = parseLocalizedNumber(hashBoard[1]);
+      if (!isNaN(val)) return val;
+    }
+
     // Require whitespace before the trailing number so "Vitamin B12" or "A4" never matches.
     const trailingMatch = trimmed.match(/^(.*\S)\s+(\d+(?:[.,]\d{1,2})?)\s*$/);
     if (trailingMatch) {

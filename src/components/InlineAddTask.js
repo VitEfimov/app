@@ -241,7 +241,10 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
           reminder: 'None',
           isAlarm: false,
           description: { text: '', img: '', url: '' },
-          subtasks: []
+          subtasks: [],
+          itemPrice: newTask.itemPrice,
+          itemQuantity: newTask.itemQuantity,
+          itemCategory: newTask.itemCategory
         },
         {
           ...boardRepeatConfig,

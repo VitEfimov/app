@@ -105,7 +105,10 @@ export default function QuickAddTaskModal({
           reminder: 'None',
           isAlarm: false,
           description: { text: '' },
-          subtasks: []
+          subtasks: [],
+          itemPrice: newTask.itemPrice,
+          itemQuantity: newTask.itemQuantity,
+          itemCategory: newTask.itemCategory
         },
         {
           ...boardRepeatConfig,

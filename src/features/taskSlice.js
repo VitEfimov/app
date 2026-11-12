@@ -457,6 +457,12 @@ const taskSlice = createSlice({
                         if (updates.boardId !== undefined) updated.boardId = updates.boardId;
                         if (updates.isAlarm !== undefined) updated.isAlarm = updates.isAlarm;
                         if (updates.keepNotificationAllDay !== undefined) updated.keepNotificationAllDay = updates.keepNotificationAllDay;
+                        if (updates.itemPrice !== undefined) updated.itemPrice = updates.itemPrice;
+                        if (updates.itemQuantity !== undefined) updated.itemQuantity = updates.itemQuantity;
+                        if (updates.itemUnit !== undefined) updated.itemUnit = updates.itemUnit;
+                        if (updates.itemCategory !== undefined) updated.itemCategory = updates.itemCategory;
+                        if (updates.itemRating !== undefined) updated.itemRating = updates.itemRating;
+                        if (updates.itemProgress !== undefined) updated.itemProgress = updates.itemProgress;
                         if (updates.description !== undefined) {
                             updated.description = {
                                 text: updates.description.text !== undefined ? updates.description.text : (task.description?.text || ''),
