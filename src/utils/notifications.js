@@ -657,9 +657,21 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     if (persistentId) ids.push(persistentId);
   }
 
-  const dateOnly = (typeof completionDateStr === 'string' && completionDateStr.includes('T'))
-    ? completionDateStr.split('T')[0]
-    : dayjs(completionDateStr).format('YYYY-MM-DD');
+  let dateOnly;
+  if (
+    advancedOptions?.dateString &&
+    /^\d{4}-\d{2}-\d{2}$/.test(String(advancedOptions.dateString).trim())
+  ) {
+    dateOnly = String(advancedOptions.dateString).trim();
+  } else if (
+    typeof completionDateStr === 'string' &&
+    (/^\d{4}-\d{2}-\d{2}$/.test(completionDateStr.trim()) ||
+      /^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/i.test(completionDateStr.trim()))
+  ) {
+    dateOnly = completionDateStr.trim().slice(0, 10);
+  } else {
+    dateOnly = dayjs(completionDateStr).format('YYYY-MM-DD');
+  }
 
   if (timeStr) {
     const parsedTime = dayjs(
@@ -695,7 +707,22 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
       if (timeId) ids.push(timeId);
     }
   } else {
-    targetDate = targetDate.hour(9).minute(0).second(0); // Default to 9 AM
+    targetDate = dayjs(`${dateOnly} 09:00`, 'YYYY-MM-DD HH:mm', true);
+    if (!targetDate.isValid()) {
+      targetDate = dayjs(completionDateStr).hour(9).minute(0).second(0);
+    }
+    if (reminderValue === 'Day of' || isAlarm) {
+      const dayOfId = await scheduleExactTaskReminder(
+        taskName,
+        targetDate.toDate(),
+        taskId,
+        isAlarm,
+        isAlarm ? 'task_reminder' : 'task_regular',
+        themeState,
+        advancedOptions
+      );
+      if (dayOfId) ids.push(dayOfId);
+    }
   }
 
   if (reminderValue && reminderValue !== 'None') {
@@ -719,7 +746,15 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
 
     if (offset) {
       let reminderDate = targetDate.subtract(offset.amount, offset.unit);
-      const remId = await scheduleExactTaskReminder(taskName, reminderDate.toDate(), taskId, isAlarm, 'task_reminder', themeState, advancedOptions);
+      const remId = await scheduleExactTaskReminder(
+        taskName,
+        reminderDate.toDate(),
+        taskId,
+        isAlarm,
+        'task_reminder',
+        themeState,
+        { ...advancedOptions, reminderOffsetLabel: reminderValue }
+      );
       if (remId) ids.push(remId);
     }
   }
@@ -877,6 +912,7 @@ export async function scheduleExactTaskReminder(
       }
     }
 
+    const offsetSuffix = advancedOptions?.reminderOffsetLabel ? ` (${advancedOptions.reminderOffsetLabel})` : '';
     const scheduledId = await Notifications.scheduleNotificationAsync({
       content: {
         title: isAlarm
@@ -885,7 +921,7 @@ export async function scheduleExactTaskReminder(
 
         body: isAlarm
           ? `${taskName} is due now`
-          : taskName,
+          : `${taskName}${offsetSuffix}`,
 
         sound: isCar ? null : (activeSound || 'default'),
 

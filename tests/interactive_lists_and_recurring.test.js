@@ -1893,6 +1893,78 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
         channelId: 'debug_system_sound_v16',
       });
     });
+
+    test('scheduleTaskReminder schedules both before-offset and on-time typed date triggers without premature Redux mutation', async () => {
+      const scheduledCalls = [];
+      const notifMod = loadTranspiledModule(path.resolve('src/utils/notifications.js'), {
+        'expo-notifications': {
+          setNotificationHandler: () => {},
+          SchedulableTriggerInputTypes: { DATE: 'date', TIME_INTERVAL: 'timeInterval' },
+          AndroidNotificationPriority: { MAX: 'max', HIGH: 'high', LOW: 'low' },
+          AndroidImportance: { MAX: 5, HIGH: 4, LOW: 2, NONE: 0 },
+          AndroidAudioUsage: { NOTIFICATION: 5, ALARM: 4 },
+          AndroidAudioContentType: { SONIFICATION: 4 },
+          AndroidNotificationVisibility: { PUBLIC: 1 },
+          setNotificationChannelAsync: async () => ({}),
+          getNotificationChannelAsync: async () => ({ importance: 4, sound: 'default' }),
+          scheduleNotificationAsync: async (req) => {
+            scheduledCalls.push(req);
+            return `sched_${scheduledCalls.length}`;
+          },
+          getAllScheduledNotificationsAsync: async () => [],
+          getPresentedNotificationsAsync: async () => [],
+          cancelScheduledNotificationAsync: async () => {},
+          dismissNotificationAsync: async () => {},
+        },
+        'expo-device': {},
+        'react-native': { Platform: { OS: 'android' }, ToastAndroid: { show: () => {} } },
+        '../../modules/expo-task-alarm': {
+          scheduleExactAlarm: async () => false,
+          cancelAlarm: async () => {},
+          isCarConnected: async () => false,
+          setSavedAndroidAutoMute: () => {},
+        },
+        './logger': { DevLogger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} } },
+        dayjs,
+      });
+
+      const futureDue = dayjs().add(3, 'hour').second(0).millisecond(0);
+      const dueDateStr = futureDue.format('YYYY-MM-DD');
+      const dueTimeStr = futureDue.format('HH:mm');
+
+      const ids = await notifMod.scheduleTaskReminder(
+        'Doctor Visit',
+        '30 min before',
+        dueDateStr,
+        dueTimeStr,
+        'task_99',
+        false,
+        {}
+      );
+
+      assert.strictEqual(ids.length, 2, 'Must schedule both exact-time notification and 30 min before notification');
+      assert.strictEqual(scheduledCalls.length, 2);
+      assert.strictEqual(scheduledCalls[0].trigger.type, 'date');
+      assert.strictEqual(scheduledCalls[1].trigger.type, 'date');
+      assert.strictEqual(scheduledCalls[0].trigger.date.getTime(), futureDue.toDate().getTime());
+      assert.strictEqual(
+        scheduledCalls[1].trigger.date.getTime(),
+        futureDue.subtract(30, 'minute').toDate().getTime(),
+        'Before reminder trigger must fire 30 minutes before task time'
+      );
+      assert.strictEqual(scheduledCalls[1].content.body, 'Doctor Visit (30 min before)');
+
+      // Verify TaskDetailsModal does not mutate Redux reminder/time prematurely before Save
+      const detailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+      assert.match(detailsSrc, /skipReschedule:\s*didScheduleInSave/);
+      const reminderSelectBlock = detailsSrc.match(/const handleReminderSelect[\s\S]*?const handleCustomReminderSave[\s\S]*?\};/);
+      assert.ok(reminderSelectBlock, 'handleReminderSelect and handleCustomReminderSave must exist');
+      assert.doesNotMatch(reminderSelectBlock[0], /handleUpdate\(/, 'Reminder pickers must not mutate Redux before Save changes');
+
+      // Verify taskSlice.updateTask reschedules when reminder/time changes directly (e.g. SnoozeModal)
+      const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
+      assert.match(taskSliceSrc, /scheduleFieldChanged/);
+    });
   });
 });
 

@@ -702,6 +702,7 @@ export const addTask = (payload) => async (dispatch, getState) => {
                 isAlarm,
                 themeState,
                 {
+                    dateString: payload.task.dateString,
                     isNagMode: payload.task.isNagMode,
                     escalationLevel: payload.task.escalationLevel,
                     keepNotificationAllDay: payload.task.keepNotificationAllDay
@@ -965,13 +966,33 @@ export const updateTask = (payload) => async (dispatch, getState) => {
 
     if (updatedTask) {
         const effectiveId = updatedTask.id || updatedTask._id;
+        const scheduleFieldChanged = Boolean(
+            payload &&
+            !payload.skipReschedule &&
+            payload.notificationId === undefined &&
+            (
+                payload.completionDate !== undefined ||
+                payload.time !== undefined ||
+                payload.reminder !== undefined ||
+                payload.isAlarm !== undefined ||
+                payload.isNagMode !== undefined ||
+                payload.escalationLevel !== undefined ||
+                payload.keepNotificationAllDay !== undefined ||
+                payload.name !== undefined
+            )
+        );
+        const justUncompleted = Boolean(existingTask && existingTask.completed && !updatedTask.completed);
+
         if (updatedTask.completed) {
             await cancelNotification(updatedTask.notificationId, effectiveId);
-        } else if (existingTask && existingTask.completed && !updatedTask.completed) {
+        } else if (justUncompleted || scheduleFieldChanged) {
+            if (scheduleFieldChanged) {
+                await cancelNotification(existingTask?.notificationId || updatedTask.notificationId, effectiveId);
+            }
             const hasReminder = updatedTask.reminder && updatedTask.reminder !== 'None';
             const isKeepAllDay = !!updatedTask.keepNotificationAllDay;
             const isAlarm = !!updatedTask.isAlarm;
-            if (hasReminder || isKeepAllDay || isAlarm) {
+            if ((hasReminder || isKeepAllDay || isAlarm) && updatedTask.completionDate) {
                 try {
                     const notifIds = await scheduleTaskReminder(
                         updatedTask.taskname,
@@ -982,15 +1003,16 @@ export const updateTask = (payload) => async (dispatch, getState) => {
                         isAlarm,
                         state.themeReducer,
                         {
+                            dateString: updatedTask.dateString,
                             isNagMode: updatedTask.isNagMode,
                             escalationLevel: updatedTask.escalationLevel,
                             keepNotificationAllDay: updatedTask.keepNotificationAllDay
                         }
                     );
-                    if (notifIds && notifIds.length > 0) {
-                        dispatch(updateTaskSync({ taskId: effectiveId, notificationId: notifIds }));
-                    }
+                    dispatch(updateTaskSync({ taskId: effectiveId, notificationId: Array.isArray(notifIds) ? notifIds : [] }));
                 } catch (e) {}
+            } else if (scheduleFieldChanged) {
+                dispatch(updateTaskSync({ taskId: effectiveId, notificationId: [] }));
             }
         }
     }

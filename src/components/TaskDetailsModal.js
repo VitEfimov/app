@@ -674,7 +674,16 @@ useEffect(() => {
       };
     }
     
-    if (selectedTime !== (task.time || '')) updates.time = selectedTime;
+    const snap = initialSnapshotRef.current;
+    const baseTime = snap ? snap.time : (task.time || null);
+    const baseDate = snap ? snap.date : (task.completionDate || '');
+    const baseReminder = snap ? snap.reminder : (task.reminder || 'None');
+    const baseIsAlarm = snap ? snap.isAlarm : (task.isAlarm || false);
+    const baseKeepAllDay = snap ? snap.keepNotificationAllDay : (task.keepNotificationAllDay || false);
+    const baseName = snap ? snap.taskName : (task.taskname || '');
+
+    if ((selectedTime || null) !== (task.time || null)) updates.time = selectedTime;
+    if (selectedTime) updates.hasUserSelectedTime = true;
     if (selectedDate !== (task.completionDate || '')) updates.completionDate = selectedDate;
     if (priority !== (task.priority || 'none').toLowerCase()) updates.priority = priority;
     if (selectedBoardId !== (task.boardId || 'main')) updates.boardId = selectedBoardId;
@@ -684,7 +693,7 @@ useEffect(() => {
 
     const initialConfig = task.repeatConfig || { preset: task.repeatFrequency || 'None' };
     const repeatConfigChanged = JSON.stringify(repeatConfig) !== JSON.stringify(initialConfig);
-    const dateChanged = selectedDate !== (task.completionDate || '');
+    const dateChanged = selectedDate !== baseDate;
     const repeatStartDateChanged = repeatStartDate !== (task.repeatStartDate || task.completionDate || '');
     const repeatEndDateChanged = repeatEndDate !== (task.repeatEndDate || '');
 
@@ -696,16 +705,17 @@ useEffect(() => {
     if (repeatStartDateChanged || effectiveStartDate !== (task.repeatStartDate || '')) updates.repeatStartDate = effectiveStartDate;
     if (repeatEndDateChanged || effectiveEndDate !== (task.repeatEndDate || '')) updates.repeatEndDate = effectiveEndDate;
     
-    const timeChanged = selectedTime !== (task.time || '');
-    const reminderChanged = reminder !== (task.reminder || 'None');
-    const isAlarmChanged = isAlarm !== (task.isAlarm || false);
-    const keepNotificationAllDayChanged = keepNotificationAllDay !== (task.keepNotificationAllDay || false);
-    const nameChanged = taskName !== task.taskname;
+    const timeChanged = (selectedTime || null) !== (baseTime || null);
+    const reminderChanged = reminder !== baseReminder;
+    const isAlarmChanged = isAlarm !== baseIsAlarm;
+    const keepNotificationAllDayChanged = keepNotificationAllDay !== baseKeepAllDay;
+    const nameChanged = taskName !== baseName;
 
     if (isAlarmChanged) updates.isAlarm = isAlarm;
     if (keepNotificationAllDayChanged) updates.keepNotificationAllDay = keepNotificationAllDay;
 
     const effectiveTaskId = task.id || task._id;
+    let didScheduleInSave = false;
     if (timeChanged || dateChanged || reminderChanged || isAlarmChanged || keepNotificationAllDayChanged || nameChanged) {
       updates.reminder = reminder;
       updates.isNagMode = reminder === 'Nag Mode (Every 10 min)';
@@ -724,19 +734,20 @@ useEffect(() => {
         isAlarm,
         themeState,
         {
+          dateString: selectedDate || dayjs().format('YYYY-MM-DD'),
           isNagMode: updates.isNagMode,
           escalationLevel: updates.escalationLevel,
           keepNotificationAllDay: keepNotificationAllDay
         }
       );
       if (notifIds && notifIds.length > 0) updates.notificationId = notifIds;
+      didScheduleInSave = true;
     }
     
     if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) {
       updates.subtasks = subtasks;
     }
 
-    const snap = initialSnapshotRef.current;
     if (snap && itemPriceInput !== snap.itemPriceInput) {
       const trimmedPrice = itemPriceInput.trim();
       if (!trimmedPrice) {
@@ -869,7 +880,7 @@ useEffect(() => {
     }
 
     if (Object.keys(updates).length > 0) {
-      dispatch(updateTask({ taskId: task.id || task._id, ...updates }));
+      dispatch(updateTask({ taskId: task.id || task._id, skipReschedule: didScheduleInSave, ...updates }));
     }
 
     onClose();
@@ -982,22 +993,10 @@ useEffect(() => {
       return;
     }
     setReminder(selectedVal);
-    let updates = { 
-      reminder: selectedVal, 
-      isNagMode: selectedVal === 'Nag Mode (Every 10 min)', 
-      escalationLevel: selectedVal === 'Escalating Reminder' ? 'active' : 'none' 
-    };
-    handleUpdate(updates);
   };
 
   const handleCustomReminderSave = (customReminderStr) => {
     setReminder(customReminderStr);
-    let updates = {
-      reminder: customReminderStr,
-      isNagMode: false,
-      escalationLevel: 'none'
-    };
-    handleUpdate(updates);
   };
 
   const handleNameBlur = () => {
@@ -2576,10 +2575,6 @@ useEffect(() => {
           onClose={() => setShowTimePicker(false)}
           onSave={(newTime) => {
             setSelectedTime(newTime);
-            handleUpdate({
-              time: newTime,
-              hasUserSelectedTime: true,
-            });
             setShowTimePicker(false);
           }}
         />
