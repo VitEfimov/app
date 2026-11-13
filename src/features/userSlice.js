@@ -266,6 +266,15 @@ const userSlice = createSlice({
             state.isTaskOptionsCollapsed = action.payload;
             AsyncStorage.setItem('isTaskOptionsCollapsed', String(action.payload));
         },
+        updateBoardRepeatSettings: (state, action) => {
+            const { boardId, repeatConfig, repeatDuration } = action.payload || {};
+            const board = state.boards.find(b => b && (b.id === boardId || b._id === boardId));
+            if (board) {
+                if (repeatConfig !== undefined) board.repeatConfig = repeatConfig;
+                if (repeatDuration !== undefined) board.repeatDuration = repeatDuration;
+                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+            }
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -399,6 +408,6 @@ const userSlice = createSlice({
     }
 });
 
-export const { hydrateUserState, logout, continueAsGuest, updateUserTheme, updateShowWeather, setActiveBoardId, setDashboardFilterType, toggleLayoutVersion, toggleTaskOptionsCollapsed, setTaskOptionsCollapsed } = userSlice.actions;
+export const { hydrateUserState, logout, continueAsGuest, updateUserTheme, updateShowWeather, setActiveBoardId, setDashboardFilterType, toggleLayoutVersion, toggleTaskOptionsCollapsed, setTaskOptionsCollapsed, updateBoardRepeatSettings } = userSlice.actions;
 export default userSlice.reducer;
 

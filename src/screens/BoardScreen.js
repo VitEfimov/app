@@ -14,6 +14,7 @@ import MoveBoardModal from '../components/MoveBoardModal';
 import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
 import AutoManageSettings from '../components/AutoManageSettings';
+import PaymentBoardSettingsModal from '../components/PaymentBoardSettingsModal';
 import Modal from 'react-native-modal';
 import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, isTaskOnBoard, getDateThresholds, classifyTaskDate, compareTasks, PRIORITY_SCORES } from '../utils/filters';
 import dayjs from 'dayjs';
@@ -260,12 +261,14 @@ export default function BoardScreen({ route, navigation }) {
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false });
   const [sectionOptionsConfig, setSectionOptionsConfig] = useState({ isVisible: false, section: null });
   const [boardOptionsConfig, setBoardOptionsConfig] = useState({ isVisible: false, board: null });
+  const [paymentSettingsBoard, setPaymentSettingsBoard] = useState(null);
   const [boardAutomationModal, setBoardAutomationModal] = useState({ isVisible: false, boardId: null, boardName: '' });
   const [isMoveBoardVisible, setMoveBoardVisible] = useState(false);
   const [sortConfig, setSortConfig] = useState({});
   const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
   const [listFilterCategory, setListFilterCategory] = useState('All');
   const [expensesPeriodFilter, setExpensesPeriodFilter] = useState('month');
+  const boardExpensesSettings = useSelector(state => state.themeReducer?.boardExpensesSettings || {});
 
   useEffect(() => {
     setListFilterCategory('All');
@@ -351,6 +354,10 @@ export default function BoardScreen({ route, navigation }) {
 
   useEffect(() => {
     const onBackPress = () => {
+      if (paymentSettingsBoard) {
+        setPaymentSettingsBoard(null);
+        return true;
+      }
       if (sectionOptionsConfig.isVisible) {
         setSectionOptionsConfig({ isVisible: false, section: null });
         return true;
@@ -363,7 +370,7 @@ export default function BoardScreen({ route, navigation }) {
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
-  }, [sectionOptionsConfig.isVisible, boardOptionsConfig.isVisible]);
+  }, [sectionOptionsConfig.isVisible, boardOptionsConfig.isVisible, paymentSettingsBoard]);
 
   useEffect(() => {
     if (route?.params?.editTaskId) {
@@ -1348,6 +1355,7 @@ export default function BoardScreen({ route, navigation }) {
     confirmConfig.isVisible || 
     sectionOptionsConfig.isVisible || 
     boardOptionsConfig.isVisible || 
+    Boolean(paymentSettingsBoard) ||
     boardAutomationModal.isVisible || 
     isMoveBoardVisible || 
     isGoogleDrawerOpen;
@@ -1456,6 +1464,12 @@ export default function BoardScreen({ route, navigation }) {
         ? (t("This Month's Bills") || 'This Month')
         : (t('Total Bills') || 'Total Bills');
 
+      const expenseSettings = boardExpensesSettings[activeBoardId] || {};
+      const monthlyBudget = expenseSettings.monthlyBudget ? Number(expenseSettings.monthlyBudget) : 0;
+      const budgetRemaining = monthlyBudget > 0 ? (monthlyBudget - monthlyTotal) : 0;
+      const isOverBudget = monthlyBudget > 0 && budgetRemaining < 0;
+      const percentUsed = monthlyBudget > 0 ? Math.min(100, Math.round((monthlyTotal / monthlyBudget) * 100)) : 0;
+
       return (
         <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
           {/* Top Row: Amount & Label on Left, Sleek Compact Segmented Toggle on Right */}
@@ -1547,6 +1561,26 @@ export default function BoardScreen({ route, navigation }) {
               </TouchableOpacity>
             ) : null}
           </View>
+
+          {monthlyBudget > 0 && (
+            <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary }}>
+                  {t('Budget') || 'Budget'}: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{formatCurrency(monthlyBudget, activeCurrencyCode)}</Text> ({percentUsed}%)
+                </Text>
+                <View style={{ backgroundColor: isOverBudget ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: isOverBudget ? '#EF4444' : '#10B981' }}>
+                    {isOverBudget 
+                      ? `+${formatCurrency(Math.abs(budgetRemaining), activeCurrencyCode)} ${t('over budget') || 'over budget'}` 
+                      : `${formatCurrency(budgetRemaining, activeCurrencyCode)} ${t('remaining budget') || 'left'}`}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ height: 4, borderRadius: 2, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)', overflow: 'hidden', marginTop: 5 }}>
+                <View style={{ height: '100%', width: `${percentUsed}%`, backgroundColor: isOverBudget ? '#EF4444' : (percentUsed > 85 ? '#F59E0B' : '#10B981'), borderRadius: 2 }} />
+              </View>
+            </View>
+          )}
         </View>
       );
     }
@@ -2234,6 +2268,27 @@ export default function BoardScreen({ route, navigation }) {
             </View>
           )}
 
+          {(boardOptionsConfig.board?.type === 'expenses' || boardOptionsConfig.board?.name?.toLowerCase() === 'payments') && (
+            <TouchableOpacity
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('Payment Board Settings')}
+              style={[styles.optionBtn, { borderBottomColor: colors.borderColor, flexDirection: 'row', alignItems: 'center', gap: 8 }]}
+              onPress={() => {
+                const b = boardOptionsConfig.board;
+                setBoardOptionsConfig({ isVisible: false, board: null });
+                setTimeout(() => {
+                  setPaymentSettingsBoard(b);
+                }, 200);
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>⚙️</Text>
+              <Text style={[styles.optionText, { color: colors.textPrimary, fontWeight: '700' }]}>
+                {t('Payment Board Settings') || 'Payment Board Settings'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {boardOptionsConfig.board?.id !== 'main' && (
             <>
               <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Rename board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setPromptConfig({ isVisible: true, type: 'rename', targetBoard: boardOptionsConfig.board }); setBoardOptionsConfig({ isVisible: false, board: null }); }}>
@@ -2275,6 +2330,14 @@ export default function BoardScreen({ route, navigation }) {
         boardId={boardAutomationModal.boardId}
         boardName={boardAutomationModal.boardName}
         onClose={() => setBoardAutomationModal({ isVisible: false, boardId: null, boardName: '' })}
+      />
+
+      <PaymentBoardSettingsModal
+        isVisible={Boolean(paymentSettingsBoard)}
+        board={paymentSettingsBoard}
+        onClose={() => setPaymentSettingsBoard(null)}
+        colors={colors}
+        isDark={isDark}
       />
 
       <ConfirmModal

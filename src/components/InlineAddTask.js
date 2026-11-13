@@ -60,6 +60,9 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
   const [habitPreset, setHabitPreset] = useState('daily');
   const currencySetting = useSelector(state => state.themeReducer?.currencyCode || 'auto');
   const boardCurrencies = useSelector(state => state.themeReducer?.boardCurrencies || {});
+  const boardExpensesSettings = useSelector(state => state.themeReducer?.boardExpensesSettings || {});
+  const defaultReminderEnabled = useSelector(state => state.themeReducer?.defaultReminderEnabled || false);
+  const defaultReminderTime = useSelector(state => state.themeReducer?.defaultReminderTime || '15 min before');
   const { t, i18n } = useTranslation();
 
   useEffect(() => {
@@ -145,17 +148,31 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
     const isEventsBoard = boardType === 'birthdays' || boardType === 'events' || (activeBoard?.name && activeBoard.name.toLowerCase() === 'events');
     const isExpensesBoard = boardType === 'expenses';
     const isPriceBoard = isPriceBoardType(boardType);
-    const boardRepeatConfig = activeBoard?.repeatConfig || (isEventsBoard ? { preset: 'every_year' } : (isExpensesBoard ? { preset: 'every_month' } : null));
+
+    const expenseSettings = isExpensesBoard ? (boardExpensesSettings[targetBoardId] || {}) : {};
+    let customRepeat = activeBoard?.repeatConfig;
+    if (isExpensesBoard && expenseSettings.repeatPreset !== undefined) {
+      customRepeat = expenseSettings.repeatPreset === 'None' ? null : { preset: expenseSettings.repeatPreset };
+    }
+    const boardRepeatConfig = customRepeat || (isEventsBoard ? { preset: 'every_year' } : (isExpensesBoard ? { preset: 'every_month' } : null));
     const hasDefaultRepeat = Boolean(boardRepeatConfig && boardRepeatConfig.preset && boardRepeatConfig.preset !== 'None');
 
     const startDateStr = dayjs(selectedDate).format('YYYY-MM-DD');
     let endDateStr = startDateStr;
     if (hasDefaultRepeat) {
-      const dur = activeBoard?.repeatDuration || (isExpensesBoard ? { count: 12, unit: 'month' } : { count: 10, unit: 'year' });
+      let dur = activeBoard?.repeatDuration;
+      if (isExpensesBoard && expenseSettings.repeatDurationCount) {
+        dur = { count: expenseSettings.repeatDurationCount, unit: expenseSettings.repeatDurationUnit || 'month' };
+      }
+      dur = dur || (isExpensesBoard ? { count: 12, unit: 'month' } : { count: 10, unit: 'year' });
       const count = parseInt(dur.count, 10) || (boardRepeatConfig.preset === 'every_year' ? 10 : 12);
       const unit = dur.unit || (boardRepeatConfig.preset === 'every_year' ? 'year' : 'month');
       endDateStr = dayjs(selectedDate).add(count, unit).format('YYYY-MM-DD');
     }
+
+    const defaultReminderVal = (isExpensesBoard && expenseSettings.defaultReminder)
+      ? expenseSettings.defaultReminder
+      : (defaultReminderEnabled ? defaultReminderTime : 'None');
 
     const seriesId = hasDefaultRepeat ? ('series_' + Date.now().toString() + Math.random().toString(36).substr(2, 9)) : undefined;
 
@@ -205,6 +222,7 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
       dateString: startDateStr,
       priority: 'none',
       completed: false,
+      reminder: defaultReminderVal,
       description: { text: '', img: '', url: '' },
       ...(itemPrice !== undefined ? { itemPrice } : {}),
       ...(itemQuantity !== undefined ? { itemQuantity } : {}),
@@ -238,7 +256,7 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
           name: taskName,
           priority: 'none',
           time: null,
-          reminder: 'None',
+          reminder: defaultReminderVal,
           isAlarm: false,
           description: { text: '', img: '', url: '' },
           subtasks: [],

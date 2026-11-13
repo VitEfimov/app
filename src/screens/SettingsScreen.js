@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions, LayoutAnimation, UIManager } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks, rolloverHabitTasks } from '../features/taskSlice';
@@ -17,6 +17,7 @@ import PremiumModal from '../components/PremiumModal';
 import CustomDropdown from '../components/CustomDropdown';
 import PromptModal from '../components/PromptModal';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
+import PaymentBoardSettingsModal from '../components/PaymentBoardSettingsModal';
 import { exportDataAsJsonAsync, exportTasksAsCsvAsync, importDataFromJsonAsync, importTasksFromCsvAsync, pickAndReadTextFileAsync, wipeAllUserDataAsync } from '../utils/gdprHelper';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,7 +27,7 @@ import { BiometricHelper } from '../utils/biometricHelper';
 import { CryptoStorage } from '../utils/cryptoStorage';
 import { A11yHelper } from '../utils/a11yHelper';
 import { ResponsiveHelper } from '../utils/responsiveHelper';
-import { CURRENCY_OPTION_CODES, getCurrencyMeta, resolveCurrencyCode } from '../utils/currencyHelper';
+import { CURRENCY_OPTION_CODES, getCurrencyMeta, resolveCurrencyCode, formatCurrency } from '../utils/currencyHelper';
 import * as Localization from 'expo-localization';
 
 const SOUND_ASSETS = {
@@ -243,6 +244,13 @@ const IconTrash = ({ color = '#E53935', size = 20 }) => (
   </Svg>
 );
 
+const IconCreditCard = ({ color = '#6246EA', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="2" y="5" width="20" height="14" rx="2" />
+    <Line x1="2" y1="10" x2="22" y2="10" />
+  </Svg>
+);
+
 export default function SettingsScreen({ navigation }) {
   const { width: windowWidth } = useWindowDimensions();
   const dispatch = useDispatch();
@@ -252,17 +260,27 @@ export default function SettingsScreen({ navigation }) {
   const theme = useSelector(state => state.themeReducer);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const tasks = useSelector(state => state.taskReducer?.tasks || []);
-  const boards = useSelector(state => state.taskReducer?.boards || []);
+  const boards = useSelector(state => state.userReducer?.boards || state.taskReducer?.boards || []);
+  const boardExpensesSettings = useSelector(state => state.themeReducer?.boardExpensesSettings || {});
   const stats = useSelector(state => state.statsReducer || {});
   const pomodoro = useSelector(state => state.pomodoroReducer || {});
   const user = useSelector(state => state.userReducer || {});
 
+  const [selectedPaymentBoard, setSelectedPaymentBoard] = useState(null);
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  const expenseBoards = useMemo(() => {
+    return (boards || []).filter(b => {
+      if (!b) return false;
+      const name = (b.name || '').toLowerCase();
+      return b.type === 'expenses' || name === 'payments' || name === 'expenses' || name.includes('payment') || name.includes('bills');
+    });
+  }, [boards]);
 
   useEffect(() => {
     AsyncStorage.getItem('@settings_privacy_expanded').then(val => {
@@ -697,7 +715,8 @@ export default function SettingsScreen({ navigation }) {
     isPremiumModalVisible ||
     pinPromptVisible ||
     confirmConfig.isVisible ||
-    isPrivacyModalVisible;
+    isPrivacyModalVisible ||
+    Boolean(selectedPaymentBoard);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
@@ -909,6 +928,87 @@ export default function SettingsScreen({ navigation }) {
               accessibilityHint={t('Enables or disables blocking screenshots and screen recording') || 'Enables or disables blocking screenshots and screen recording'}
             />
           </View>
+        </View>
+
+        {/* Section: Payment & Bills Boards */}
+        <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: 24 }]}>
+          {t('Payment & Bills Boards') || 'Payment & Bills Boards'}
+        </Text>
+
+        <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+          {expenseBoards.length === 0 ? (
+            <View style={styles.cardItemRow}>
+              <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+                <IconCreditCard color={primaryAccent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t('No payment boards yet') || 'No payment boards yet'}
+                </Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                  {t('Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.') || 'Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.'}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            expenseBoards.map((b, idx) => {
+              const bId = b.id || b._id;
+              const s = boardExpensesSettings[bId] || {};
+              const bCur = resolveCurrencyCode({
+                boardCurrencyCode: theme?.boardCurrencies?.[bId] || 'auto',
+                settingCode: theme?.currencyCode || 'auto',
+                langCode: i18n?.language,
+              });
+              const bRepeat = s.repeatPreset !== undefined ? s.repeatPreset : (b.repeatConfig?.preset || 'every_month');
+              const bReminder = s.defaultReminder || 'None';
+              const bBudget = s.monthlyBudget ? Number(s.monthlyBudget) : 0;
+
+              const repeatLabels = {
+                every_month: t('Monthly') || 'Monthly',
+                every_2_weeks: t('Bi-weekly') || 'Bi-weekly',
+                every_week: t('Weekly') || 'Weekly',
+                every_year: t('Annual') || 'Annual',
+                None: t('Manual / Off') || 'Manual / Off',
+              };
+              const displayRepeat = repeatLabels[bRepeat] || bRepeat;
+              let subParts = [`${bCur}`, `🔁 ${displayRepeat}`];
+              if (bReminder && bReminder !== 'None') {
+                subParts.push(`🔔 ${t(bReminder) || bReminder}`);
+              }
+              if (bBudget > 0) {
+                subParts.push(`${t('Budget') || 'Budget'}: ${formatCurrency(bBudget, bCur)}`);
+              }
+              const subtext = subParts.join(' · ');
+
+              return (
+                <React.Fragment key={bId || `board_${idx}`}>
+                  {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />}
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    onPress={() => setSelectedPaymentBoard(b)}
+                    style={styles.cardItemRow}
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${b.name || t('Payments') || 'Payments'}, ${subtext}`}
+                    accessibilityHint={t('Configure payment board settings') || 'Configure payment board settings'}
+                  >
+                    <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
+                      <IconCreditCard color={primaryAccent} />
+                    </View>
+                    <View style={{ flex: 1, marginRight: 10, justifyContent: 'center' }}>
+                      <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                        {b.name || t('Payments') || 'Payments'}
+                      </Text>
+                      <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
+                        {subtext}
+                      </Text>
+                    </View>
+                    <IconChevronRight color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </React.Fragment>
+              );
+            })
+          )}
         </View>
 
         {/* Section 2: Notifications */}
@@ -1598,6 +1698,14 @@ export default function SettingsScreen({ navigation }) {
       <PrivacyPolicyModal
         isVisible={isPrivacyModalVisible}
         onClose={() => setPrivacyModalVisible(false)}
+      />
+
+      <PaymentBoardSettingsModal
+        isVisible={Boolean(selectedPaymentBoard)}
+        board={selectedPaymentBoard}
+        onClose={() => setSelectedPaymentBoard(null)}
+        colors={colors}
+        isDark={isDark}
       />
 
       <ConfirmModal

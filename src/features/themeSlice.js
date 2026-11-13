@@ -170,6 +170,7 @@ const initialState = {
   currencyCode: loaded?.currencyCode || 'auto',
   boardCurrencies: loaded?.boardCurrencies || {},
   habitStreakMode: loaded?.habitStreakMode || 'grace',
+  boardExpensesSettings: loaded?.boardExpensesSettings || {},
 
   // Navigation & Drawer
   isGoogleDrawerOpen: false,
@@ -394,6 +395,16 @@ const themeSlice = createSlice({
     },
     setHabitStreakMode: (state, action) => {
       state.habitStreakMode = action.payload === 'strict' ? 'strict' : 'grace';
+    },
+    setBoardExpensesSettings: (state, action) => {
+      const { boardId, settings } = action.payload || {};
+      if (!boardId) return;
+      if (!state.boardExpensesSettings) state.boardExpensesSettings = {};
+      state.boardExpensesSettings[boardId] = {
+        ...(state.boardExpensesSettings[boardId] || {}),
+        ...settings,
+      };
+      persistThemeToStorage(state);
     }
   }
 });
@@ -459,7 +470,7 @@ export const {
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
   setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId,
-  setBlockScreenshots, setCurrencyCode, setBoardCurrency, setHabitStreakMode,
+  setBlockScreenshots, setCurrencyCode, setBoardCurrency, setHabitStreakMode, setBoardExpensesSettings,
   setGoogleDrawerOpen, triggerJumpToToday
 } = themeSlice.actions;
 

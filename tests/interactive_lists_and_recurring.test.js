@@ -764,7 +764,7 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     'Average Rating'
   ];
 
-  test('all 10 languages exist, have valid JSON, and have exactly 861 keys each', () => {
+  test('all 10 languages exist, have valid JSON, and have exactly 892 keys each', () => {
     const loaded = {};
     for (const lang of languages) {
       const p = path.join(localesDir, `${lang}.json`);
@@ -774,14 +774,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 861, `English locale must contain 861 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 892, `English locale must contain 892 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        861,
-        `Language ${lang} has ${count} keys, expected 861 (matching EN)`
+        892,
+        `Language ${lang} has ${count} keys, expected 892 (matching EN)`
       );
     }
   });
@@ -2025,6 +2025,154 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const detailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
       assert.match(detailsSrc, /itemPrice:\s*effectivePrice/);
       assert.match(detailsSrc, /dispatch\(updateRecurringSeries\(/);
+    });
+  });
+
+  describe('Payment Board Settings, Recurring Engine & Monthly Budget', () => {
+    test('themeReducer updates boardExpensesSettings per boardId', () => {
+      const themeModule = loadTranspiledModule(path.resolve('src/features/themeSlice.js'), {
+        '@react-native-async-storage/async-storage': { setItem: async () => {}, getItem: async () => null },
+        '../utils/cryptoStorage': { CryptoStorage: { setItem: async () => {}, getItem: async () => null } },
+        '../styles/theme': { themes: { dark: {}, light: {} } },
+      });
+      const { setBoardExpensesSettings } = themeModule;
+      const themeReducer = themeModule.default;
+
+      const initialThemeState = {
+        boardExpensesSettings: {},
+      };
+
+      const payload = {
+        boardId: 'payments_board_123',
+        settings: {
+          monthlyBudget: 2500,
+          repeatPreset: 'every_month',
+          repeatDurationCount: 12,
+          repeatDurationUnit: 'month',
+          defaultReminder: '1 day before',
+        },
+      };
+
+      const nextState = themeReducer(initialThemeState, setBoardExpensesSettings(payload));
+      assert.deepStrictEqual(nextState.boardExpensesSettings['payments_board_123'], payload.settings);
+      assert.strictEqual(nextState.boardExpensesSettings['payments_board_123'].monthlyBudget, 2500);
+      assert.strictEqual(nextState.boardExpensesSettings['payments_board_123'].defaultReminder, '1 day before');
+    });
+
+    test('userReducer updates board repeat settings on matching board', () => {
+      const userModule = loadTranspiledModule(path.resolve('src/features/userSlice.js'), {
+        '@react-native-async-storage/async-storage': { setItem: async () => {}, getItem: async () => null },
+        '../services/api': {},
+      });
+      const { updateBoardRepeatSettings } = userModule;
+      const userReducer = userModule.default;
+
+      const initialUserState = {
+        boards: [
+          { id: 'main', name: 'Main' },
+          { id: 'payments_board_123', name: 'Payments', type: 'expenses', repeatConfig: null },
+        ],
+      };
+
+      const payload = {
+        boardId: 'payments_board_123',
+        repeatConfig: { preset: 'every_month' },
+        repeatDuration: { count: 12, unit: 'month' },
+      };
+
+      const nextState = userReducer(initialUserState, updateBoardRepeatSettings(payload));
+      const board = nextState.boards.find(b => b.id === 'payments_board_123');
+      assert.ok(board);
+      assert.deepStrictEqual(board.repeatConfig, { preset: 'every_month' });
+      assert.deepStrictEqual(board.repeatDuration, { count: 12, unit: 'month' });
+    });
+
+    test('monthly budget calculations correctly handle under budget, over budget, and percentages', () => {
+      const calculateBudgetState = (monthlyTotal, monthlyBudget) => {
+        const remaining = monthlyBudget > 0 ? (monthlyBudget - monthlyTotal) : 0;
+        const isOverBudget = monthlyBudget > 0 && remaining < 0;
+        const percentUsed = monthlyBudget > 0 ? Math.min(100, Math.round((monthlyTotal / monthlyBudget) * 100)) : 0;
+        return { remaining, isOverBudget, percentUsed };
+      };
+
+      // Under budget
+      const under = calculateBudgetState(400, 1000);
+      assert.strictEqual(under.remaining, 600);
+      assert.strictEqual(under.isOverBudget, false);
+      assert.strictEqual(under.percentUsed, 40);
+
+      // Over budget
+      const over = calculateBudgetState(1250, 1000);
+      assert.strictEqual(over.remaining, -250);
+      assert.strictEqual(over.isOverBudget, true);
+      assert.strictEqual(over.percentUsed, 100);
+
+      // No budget set
+      const noBudget = calculateBudgetState(350, 0);
+      assert.strictEqual(noBudget.remaining, 0);
+      assert.strictEqual(noBudget.isOverBudget, false);
+      assert.strictEqual(noBudget.percentUsed, 0);
+    });
+
+    test('all 31 payment board settings keys are non-empty in all 10 locales', () => {
+      const localesDir = path.resolve('src/locales');
+      const languages = ['de', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'ru', 'zh'];
+      const requiredKeys = [
+        'Payment Board Settings',
+        'Customize currency, billing cycle, bill reminders, and monthly budget for this board.',
+        'Monthly Budget',
+        'Target budget limit per month. Track used vs remaining spending balance directly in the board summary bar.',
+        'e.g. 1500',
+        'No budget limit',
+        'Clear budget',
+        'Billing Cycle & Repeat',
+        'Default recurrence preset applied when new bills and payments are added to this board.',
+        'Bi-weekly',
+        'Annual',
+        'Manual / Off',
+        'Generate Ahead Duration',
+        'How far ahead recurring bills are automatically populated on the calendar and board.',
+        '3 months',
+        '6 months',
+        '12 months',
+        '24 months',
+        'Default Bill Reminder',
+        "Automatically schedules a notification before each bill's due date on this board.",
+        'Day of (due date)',
+        '3 days before',
+        '1 week before',
+        'Payment board settings updated',
+        'Budget',
+        'over budget',
+        'remaining budget',
+        'Payment & Bills Boards',
+        'No payment boards yet',
+        'Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.',
+        'Configure payment board settings'
+      ];
+
+      for (const lang of languages) {
+        const filePath = path.join(localesDir, `${lang}.json`);
+        const json = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        for (const k of requiredKeys) {
+          assert.ok(
+            json[k] && json[k].trim().length > 0,
+            `Key "${k}" missing or empty in ${lang}.json`
+          );
+        }
+      }
+    });
+
+    test('PaymentBoardSettingsModal is integrated in both BoardScreen and SettingsScreen', () => {
+      const boardScreenSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      assert.match(boardScreenSrc, /import PaymentBoardSettingsModal from '\.\.\/components\/PaymentBoardSettingsModal'/);
+      assert.match(boardScreenSrc, /<PaymentBoardSettingsModal/);
+      assert.match(boardScreenSrc, /Payment Board Settings/);
+
+      const settingsScreenSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
+      assert.match(settingsScreenSrc, /import PaymentBoardSettingsModal from '\.\.\/components\/PaymentBoardSettingsModal'/);
+      assert.match(settingsScreenSrc, /<PaymentBoardSettingsModal/);
+      assert.match(settingsScreenSrc, /Payment & Bills Boards/);
     });
   });
 });
