@@ -1841,9 +1841,13 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(taskRowSrc, /toggleHabitCompletionForDate/);
       assert.match(taskRowSrc, /Missed yesterday/);
 
-      const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
-      assert.match(settingsSrc, /setCurrencyCode/);
-      assert.match(settingsSrc, /setHabitStreakMode/);
+      const boardSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      assert.match(boardSrc, /setHabitStreakMode/);
+      assert.match(boardSrc, /Habit Streak Mode/);
+
+      const modalSrc = fs.readFileSync(path.resolve('src/components/PaymentBoardSettingsModal.js'), 'utf8');
+      assert.match(modalSrc, /CURRENCY_OPTION_CODES/);
+      assert.match(modalSrc, /setBoardCurrency/);
 
       const appSrc = fs.readFileSync(path.resolve('App.js'), 'utf8');
       assert.match(appSrc, /rolloverHabitTasks/);
@@ -2163,16 +2167,23 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       }
     });
 
-    test('PaymentBoardSettingsModal is integrated in both BoardScreen and SettingsScreen', () => {
+    test('PaymentBoardSettingsModal is integrated directly on BoardScreen and removed from SettingsScreen', () => {
       const boardScreenSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
       assert.match(boardScreenSrc, /import PaymentBoardSettingsModal from '\.\.\/components\/PaymentBoardSettingsModal'/);
       assert.match(boardScreenSrc, /<PaymentBoardSettingsModal/);
       assert.match(boardScreenSrc, /Payment Board Settings/);
+      assert.match(boardScreenSrc, /setPaymentSettingsBoard\(activeBoard\)/);
 
       const settingsScreenSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
-      assert.match(settingsScreenSrc, /import PaymentBoardSettingsModal from '\.\.\/components\/PaymentBoardSettingsModal'/);
-      assert.match(settingsScreenSrc, /<PaymentBoardSettingsModal/);
-      assert.match(settingsScreenSrc, /Payment & Bills Boards/);
+      assert.doesNotMatch(settingsScreenSrc, /import PaymentBoardSettingsModal/);
+      assert.doesNotMatch(settingsScreenSrc, /<PaymentBoardSettingsModal/);
+      assert.doesNotMatch(settingsScreenSrc, /Payment & Bills Boards/);
+      assert.doesNotMatch(settingsScreenSrc, /setCurrencyCode/);
+      assert.doesNotMatch(settingsScreenSrc, /setHabitStreakMode/);
+      assert.match(settingsScreenSrc, /isNotificationsExpanded/);
+      assert.match(settingsScreenSrc, /toggleNotificationsSection/);
+      assert.match(settingsScreenSrc, /isMoreExpanded/);
+      assert.match(settingsScreenSrc, /toggleMoreSection/);
     });
   });
 });

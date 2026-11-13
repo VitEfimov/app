@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions, LayoutAnimation, UIManager } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { clearTasks, updateTask, batchSyncCalendarTasks, rolloverHabitTasks } from '../features/taskSlice';
+import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setCurrencyCode, setHabitStreakMode } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync } from '../utils/calendarSync';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
@@ -17,7 +17,6 @@ import PremiumModal from '../components/PremiumModal';
 import CustomDropdown from '../components/CustomDropdown';
 import PromptModal from '../components/PromptModal';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
-import PaymentBoardSettingsModal from '../components/PaymentBoardSettingsModal';
 import { exportDataAsJsonAsync, exportTasksAsCsvAsync, importDataFromJsonAsync, importTasksFromCsvAsync, pickAndReadTextFileAsync, wipeAllUserDataAsync } from '../utils/gdprHelper';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,8 +26,6 @@ import { BiometricHelper } from '../utils/biometricHelper';
 import { CryptoStorage } from '../utils/cryptoStorage';
 import { A11yHelper } from '../utils/a11yHelper';
 import { ResponsiveHelper } from '../utils/responsiveHelper';
-import { CURRENCY_OPTION_CODES, getCurrencyMeta, resolveCurrencyCode, formatCurrency } from '../utils/currencyHelper';
-import * as Localization from 'expo-localization';
 
 const SOUND_ASSETS = {
   'pisk.mp3': require('../../assets/audio/pisk.mp3'),
@@ -244,13 +241,6 @@ const IconTrash = ({ color = '#E53935', size = 20 }) => (
   </Svg>
 );
 
-const IconCreditCard = ({ color = '#6246EA', size = 20 }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <Rect x="2" y="5" width="20" height="14" rx="2" />
-    <Line x1="2" y1="10" x2="22" y2="10" />
-  </Svg>
-);
-
 export default function SettingsScreen({ navigation }) {
   const { width: windowWidth } = useWindowDimensions();
   const dispatch = useDispatch();
@@ -261,28 +251,27 @@ export default function SettingsScreen({ navigation }) {
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
   const tasks = useSelector(state => state.taskReducer?.tasks || []);
   const boards = useSelector(state => state.userReducer?.boards || state.taskReducer?.boards || []);
-  const boardExpensesSettings = useSelector(state => state.themeReducer?.boardExpensesSettings || {});
   const stats = useSelector(state => state.statsReducer || {});
   const pomodoro = useSelector(state => state.pomodoroReducer || {});
   const user = useSelector(state => state.userReducer || {});
 
-  const [selectedPaymentBoard, setSelectedPaymentBoard] = useState(null);
   const [isThemeModalVisible, setThemeModalVisible] = useState(false);
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [isNotificationsExpanded, setIsNotificationsExpanded] = useState(true);
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
+  const [isMoreExpanded, setIsMoreExpanded] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
-  const expenseBoards = useMemo(() => {
-    return (boards || []).filter(b => {
-      if (!b) return false;
-      const name = (b.name || '').toLowerCase();
-      return b.type === 'expenses' || name === 'payments' || name === 'expenses' || name.includes('payment') || name.includes('bills');
-    });
-  }, [boards]);
-
   useEffect(() => {
+    AsyncStorage.getItem('@settings_notifications_expanded').then(val => {
+      if (val !== null) {
+        try {
+          setIsNotificationsExpanded(JSON.parse(val));
+        } catch (e) {}
+      }
+    }).catch(() => {});
     AsyncStorage.getItem('@settings_privacy_expanded').then(val => {
       if (val !== null) {
         try {
@@ -290,7 +279,25 @@ export default function SettingsScreen({ navigation }) {
         } catch (e) {}
       }
     }).catch(() => {});
+    AsyncStorage.getItem('@settings_more_expanded').then(val => {
+      if (val !== null) {
+        try {
+          setIsMoreExpanded(JSON.parse(val));
+        } catch (e) {}
+      }
+    }).catch(() => {});
   }, []);
+
+  const toggleNotificationsSection = () => {
+    if (Platform.OS !== 'web' && LayoutAnimation?.configureNext) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
+    setIsNotificationsExpanded(prev => {
+      const nextVal = !prev;
+      AsyncStorage.setItem('@settings_notifications_expanded', JSON.stringify(nextVal)).catch(() => {});
+      return nextVal;
+    });
+  };
 
   const togglePrivacySection = () => {
     if (Platform.OS !== 'web' && LayoutAnimation?.configureNext) {
@@ -302,6 +309,18 @@ export default function SettingsScreen({ navigation }) {
       return nextVal;
     });
   };
+
+  const toggleMoreSection = () => {
+    if (Platform.OS !== 'web' && LayoutAnimation?.configureNext) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
+    setIsMoreExpanded(prev => {
+      const nextVal = !prev;
+      AsyncStorage.setItem('@settings_more_expanded', JSON.stringify(nextVal)).catch(() => {});
+      return nextVal;
+    });
+  };
+
   const [isNotificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [isSoundPickerOpen, setSoundPickerOpen] = useState(false);
   const [isAlarmSoundPickerOpen, setAlarmSoundPickerOpen] = useState(false);
@@ -312,21 +331,6 @@ export default function SettingsScreen({ navigation }) {
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, hideCancel: false, onConfirm: null });
   const defaultSnoozeTime = theme.defaultSnoozeTime || 30;
   const [isSnoozePickerOpen, setSnoozePickerOpen] = useState(false);
-  const currencySetting = theme.currencyCode || 'auto';
-  const [isCurrencyPickerOpen, setCurrencyPickerOpen] = useState(false);
-  const habitStreakMode = theme.habitStreakMode || 'grace';
-  const [isStreakModePickerOpen, setStreakModePickerOpen] = useState(false);
-  const deviceCurrencyCode = (() => {
-    try { return Localization.getLocales?.()?.[0]?.currencyCode || null; } catch (e) { return null; }
-  })();
-  const resolvedAutoCurrency = resolveCurrencyCode({
-    settingCode: 'auto',
-    langCode: i18n?.language,
-    deviceCurrencyCode,
-  });
-  const activeCurrencyMeta = getCurrencyMeta(
-    currencySetting === 'auto' ? resolvedAutoCurrency : currencySetting
-  );
   const [isBiometricHardwareAvailable, setIsBiometricHardwareAvailable] = useState(false);
 
   useEffect(() => {
@@ -715,8 +719,7 @@ export default function SettingsScreen({ navigation }) {
     isPremiumModalVisible ||
     pinPromptVisible ||
     confirmConfig.isVisible ||
-    isPrivacyModalVisible ||
-    Boolean(selectedPaymentBoard);
+    isPrivacyModalVisible;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
@@ -930,94 +933,33 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Section: Payment & Bills Boards */}
-        <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: 24 }]}>
-          {t('Payment & Bills Boards') || 'Payment & Bills Boards'}
-        </Text>
-
-        <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-          {expenseBoards.length === 0 ? (
-            <View style={styles.cardItemRow}>
-              <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
-                <IconCreditCard color={primaryAccent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                  {t('No payment boards yet') || 'No payment boards yet'}
-                </Text>
-                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                  {t('Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.') || 'Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.'}
-                </Text>
-              </View>
+        {/* Section 2: Notifications - Collapsible & Adjustable */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={toggleNotificationsSection}
+          style={[styles.collapsibleSectionHeader, { marginTop: 24 }]}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isNotificationsExpanded }}
+          accessibilityLabel={`${t('Notifications') || 'Notifications'}. ${isNotificationsExpanded ? (t('Tap to collapse') || 'Tap to collapse') : (t('Tap to expand') || 'Tap to expand')}`}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[styles.sectionHeadingText, { color: colors.textSecondary }]}>
+              {t('Notifications') || 'Notifications'}
+            </Text>
+            <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(93, 69, 219, 0.20)' : 'rgba(93, 69, 219, 0.10)' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                {isNotificationsExpanded ? (t('Tap to collapse') || 'Tap to collapse') : (t('Tap to expand') || 'Tap to expand')}
+              </Text>
             </View>
-          ) : (
-            expenseBoards.map((b, idx) => {
-              const bId = b.id || b._id;
-              const s = boardExpensesSettings[bId] || {};
-              const bCur = resolveCurrencyCode({
-                boardCurrencyCode: theme?.boardCurrencies?.[bId] || 'auto',
-                settingCode: theme?.currencyCode || 'auto',
-                langCode: i18n?.language,
-              });
-              const bRepeat = s.repeatPreset !== undefined ? s.repeatPreset : (b.repeatConfig?.preset || 'every_month');
-              const bReminder = s.defaultReminder || 'None';
-              const bBudget = s.monthlyBudget ? Number(s.monthlyBudget) : 0;
+          </View>
+          <IconChevronDown color={colors.textSecondary} size={18} isExpanded={isNotificationsExpanded} />
+        </TouchableOpacity>
 
-              const repeatLabels = {
-                every_month: t('Monthly') || 'Monthly',
-                every_2_weeks: t('Bi-weekly') || 'Bi-weekly',
-                every_week: t('Weekly') || 'Weekly',
-                every_year: t('Annual') || 'Annual',
-                None: t('Manual / Off') || 'Manual / Off',
-              };
-              const displayRepeat = repeatLabels[bRepeat] || bRepeat;
-              let subParts = [`${bCur}`, `🔁 ${displayRepeat}`];
-              if (bReminder && bReminder !== 'None') {
-                subParts.push(`🔔 ${t(bReminder) || bReminder}`);
-              }
-              if (bBudget > 0) {
-                subParts.push(`${t('Budget') || 'Budget'}: ${formatCurrency(bBudget, bCur)}`);
-              }
-              const subtext = subParts.join(' · ');
-
-              return (
-                <React.Fragment key={bId || `board_${idx}`}>
-                  {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />}
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    onPress={() => setSelectedPaymentBoard(b)}
-                    style={styles.cardItemRow}
-                    accessible={true}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${b.name || t('Payments') || 'Payments'}, ${subtext}`}
-                    accessibilityHint={t('Configure payment board settings') || 'Configure payment board settings'}
-                  >
-                    <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
-                      <IconCreditCard color={primaryAccent} />
-                    </View>
-                    <View style={{ flex: 1, marginRight: 10, justifyContent: 'center' }}>
-                      <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                        {b.name || t('Payments') || 'Payments'}
-                      </Text>
-                      <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
-                        {subtext}
-                      </Text>
-                    </View>
-                    <IconChevronRight color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </React.Fragment>
-              );
-            })
-          )}
-        </View>
-
-        {/* Section 2: Notifications */}
-        <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: 24 }]}>
-          {t('Notifications') || 'Notifications'}
-        </Text>
-
-        <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-          {/* Notification settings */}
+        {isNotificationsExpanded && (
+          <>
+            <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+              {/* Notification settings */}
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => setNotificationSettingsOpen(!isNotificationSettingsOpen)}
@@ -1271,139 +1213,6 @@ export default function SettingsScreen({ navigation }) {
 
           <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
-          {/* Default Currency */}
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => setCurrencyPickerOpen(!isCurrencyPickerOpen)}
-            style={styles.cardItemRow}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: isCurrencyPickerOpen }}
-            accessibilityLabel={`${t('Currency') || 'Currency'}. ${currencySetting === 'auto' ? `${t('Auto') || 'Auto'} (${activeCurrencyMeta.code})` : activeCurrencyMeta.label}`}
-          >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
-              <Text style={{ fontSize: 16, fontWeight: '700', color: primaryAccent }}>{activeCurrencyMeta.symbol}</Text>
-            </View>
-            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
-              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                {t('Currency') || 'Currency'}
-              </Text>
-              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
-                {currencySetting === 'auto'
-                  ? `${t('Auto (by language)') || 'Auto (by language)'} · ${activeCurrencyMeta.code} (${activeCurrencyMeta.symbol})`
-                  : activeCurrencyMeta.label}
-              </Text>
-            </View>
-            <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          {isCurrencyPickerOpen && (
-            <View style={styles.expandedSubOptions}>
-              {CURRENCY_OPTION_CODES.map((code) => {
-                const isSelected = currencySetting === code;
-                const label = code === 'auto'
-                  ? `${t('Auto (by language)') || 'Auto (by language)'} (${resolvedAutoCurrency} ${getCurrencyMeta(resolvedAutoCurrency).symbol})`
-                  : getCurrencyMeta(code).label;
-                return (
-                  <TouchableOpacity
-                    key={code}
-                    style={styles.soundItemRow}
-                    onPress={() => {
-                      dispatch(setCurrencyCode(code));
-                      setCurrencyPickerOpen(false);
-                    }}
-                    accessible={true}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: isSelected }}
-                  >
-                    <Text style={[
-                      styles.soundItemText,
-                      { color: isSelected ? primaryAccent : colors.textPrimary, fontWeight: isSelected ? '700' : '500' }
-                    ]}>
-                      {label}
-                    </Text>
-                    {isSelected && <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
-
-          {/* Habit Streak Mode */}
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => setStreakModePickerOpen(!isStreakModePickerOpen)}
-            style={styles.cardItemRow}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: isStreakModePickerOpen }}
-          >
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
-              <Text style={{ fontSize: 15 }}>🔥</Text>
-            </View>
-            <View style={{ flex: 1, marginRight: 12, justifyContent: 'center' }}>
-              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                {t('Habit Streak Mode') || 'Habit Streak Mode'}
-              </Text>
-              <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
-                {habitStreakMode === 'strict'
-                  ? (t('Strict (No skips)') || 'Strict (No skips)')
-                  : (t('1-Day Freeze (Grace)') || '1-Day Freeze (Grace)')}
-              </Text>
-            </View>
-            <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          {isStreakModePickerOpen && (
-            <View style={styles.expandedSubOptions}>
-              {[
-                {
-                  id: 'grace',
-                  title: t('1-Day Freeze (Grace)') || '1-Day Freeze (Grace)',
-                  desc: t('Allows 1 missed scheduled day without breaking your streak') || 'Allows 1 missed scheduled day without breaking your streak',
-                },
-                {
-                  id: 'strict',
-                  title: t('Strict (No skips)') || 'Strict (No skips)',
-                  desc: t('Any missed scheduled day resets your active streak') || 'Any missed scheduled day resets your active streak',
-                },
-              ].map((opt) => {
-                const isSelected = habitStreakMode === opt.id;
-                return (
-                  <TouchableOpacity
-                    key={opt.id}
-                    style={[styles.soundItemRow, { paddingVertical: 10 }]}
-                    onPress={() => {
-                      dispatch(setHabitStreakMode(opt.id));
-                      setStreakModePickerOpen(false);
-                      dispatch(rolloverHabitTasks());
-                    }}
-                    accessible={true}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: isSelected }}
-                  >
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={[
-                        styles.soundItemText,
-                        { color: isSelected ? primaryAccent : colors.textPrimary, fontWeight: isSelected ? '700' : '500' }
-                      ]}>
-                        {opt.title}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-                        {opt.desc}
-                      </Text>
-                    </View>
-                    {isSelected && <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
-
           {/* Android Auto mute sounds toggle */}
           <View style={styles.cardItemRow}>
             <View style={[styles.iconWrapper, { backgroundColor: iconBg }]} accessible={false} importantForAccessibility="no">
@@ -1441,6 +1250,8 @@ export default function SettingsScreen({ navigation }) {
             {t("Set reminders on individual tasks. You're in control of when they notify you.") || "Set reminders on individual tasks. You're in control of when they notify you."}
           </Text>
         </View>
+          </>
+        )}
 
         {/* Privacy & Data (GDPR & CCPA Compliance) - Collapsible & Adjustable */}
         <TouchableOpacity
@@ -1627,44 +1438,64 @@ export default function SettingsScreen({ navigation }) {
           </View>
         )}
 
-        {/* More Options / Advanced Card */}
-        <Text style={[styles.sectionHeading, { color: colors.textSecondary, marginTop: 24 }]}>
-          {t('More') || 'More'}
-        </Text>
-
-        <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => setAutoManageModalVisible(true)}
-            style={styles.cardItemRow}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                {t('Task Automations & Cleanup') || 'Task Automations & Cleanup'}
+        {/* More Options / Advanced Card - Collapsible & Adjustable */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={toggleMoreSection}
+          style={[styles.collapsibleSectionHeader, { marginTop: 24 }]}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isMoreExpanded }}
+          accessibilityLabel={`${t('More') || 'More'}. ${isMoreExpanded ? (t('Tap to collapse') || 'Tap to collapse') : (t('Tap to expand') || 'Tap to expand')}`}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[styles.sectionHeadingText, { color: colors.textSecondary }]}>
+              {t('More') || 'More'}
+            </Text>
+            <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(93, 69, 219, 0.20)' : 'rgba(93, 69, 219, 0.10)' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                {isMoreExpanded ? (t('Tap to collapse') || 'Tap to collapse') : (t('Tap to expand') || 'Tap to expand')}
               </Text>
             </View>
-            <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
+          </View>
+          <IconChevronDown color={colors.textSecondary} size={18} isExpanded={isMoreExpanded} />
+        </TouchableOpacity>
 
-          <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+        {isMoreExpanded && (
+          <View style={[styles.groupedCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setAutoManageModalVisible(true)}
+              style={styles.cardItemRow}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t('Task Automations & Cleanup') || 'Task Automations & Cleanup'}
+                </Text>
+              </View>
+              <IconChevronRight color={colors.textSecondary} />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            testID="settings_debugger_btn"
-            activeOpacity={0.75}
-            onPress={() => navigation.navigate('DevLogs')}
-            style={styles.cardItemRow}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                {t('Debugger & System Logs') || 'Debugger & System Logs'}
-              </Text>
-              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                {t('Diagnose notifications, alarms, scheduler & logs') || 'Diagnose notifications, alarms, scheduler & logs'}
-              </Text>
-            </View>
-            <IconChevronRight color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
+            <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+            <TouchableOpacity
+              testID="settings_debugger_btn"
+              activeOpacity={0.75}
+              onPress={() => navigation.navigate('DevLogs')}
+              style={styles.cardItemRow}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                  {t('Debugger & System Logs') || 'Debugger & System Logs'}
+                </Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                  {t('Diagnose notifications, alarms, scheduler & logs') || 'Diagnose notifications, alarms, scheduler & logs'}
+                </Text>
+              </View>
+              <IconChevronRight color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* Modals */}
@@ -1698,14 +1529,6 @@ export default function SettingsScreen({ navigation }) {
       <PrivacyPolicyModal
         isVisible={isPrivacyModalVisible}
         onClose={() => setPrivacyModalVisible(false)}
-      />
-
-      <PaymentBoardSettingsModal
-        isVisible={Boolean(selectedPaymentBoard)}
-        board={selectedPaymentBoard}
-        onClose={() => setSelectedPaymentBoard(null)}
-        colors={colors}
-        isDark={isDark}
       />
 
       <ConfirmModal

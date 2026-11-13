@@ -20,9 +20,9 @@ import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, 
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
-import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTask, addMultipleTasks, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk } from '../features/taskSlice';
+import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTask, addMultipleTasks, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk, rolloverHabitTasks } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
-import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency } from '../features/themeSlice';
+import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency, setHabitStreakMode } from '../features/themeSlice';
 import { useTaskRowConfig } from '../components/TaskRowConfigContext';
 import { formatCurrency, resolveCurrencyCode, CURRENCY_OPTION_CODES, getCurrencyMeta, isPriceBoardType } from '../utils/currencyHelper';
 import { computeHabitStats } from '../utils/habitHelper';
@@ -1472,7 +1472,7 @@ export default function BoardScreen({ route, navigation }) {
 
       return (
         <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
-          {/* Top Row: Amount & Label on Left, Sleek Compact Segmented Toggle on Right */}
+          {/* Top Row: Amount & Label on Left, Settings Button on Right */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
               <Text style={{ fontSize: 19, fontWeight: 'bold', color: colors.textPrimary }}>{formatCurrency(displayTotal, activeCurrencyCode)}</Text>
@@ -1490,52 +1490,37 @@ export default function BoardScreen({ route, navigation }) {
               </Text>
             </View>
 
-            {/* Compact Segmented Switcher */}
-            <View style={{
-              flexDirection: 'row',
-              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-              borderRadius: 8,
-              padding: 2,
-            }}>
-              <TouchableOpacity
-                onPress={() => setExpensesPeriodFilter('month')}
-                style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: 6,
-                  backgroundColor: isMonthlyView ? '#EF4444' : 'transparent',
-                }}
-              >
-                <Text style={{
-                  fontSize: 11,
-                  fontWeight: isMonthlyView ? '700' : '500',
-                  color: isMonthlyView ? '#FFFFFF' : colors.textSecondary,
-                }}>
-                  {t('Month') || 'Month'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setExpensesPeriodFilter('all')}
-                style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: 6,
-                  backgroundColor: !isMonthlyView ? '#EF4444' : 'transparent',
-                }}
-              >
-                <Text style={{
-                  fontSize: 11,
-                  fontWeight: !isMonthlyView ? '700' : '500',
-                  color: !isMonthlyView ? '#FFFFFF' : colors.textSecondary,
-                }}>
-                  {t('All') || 'All'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {/* Payment Board Settings Button */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setPaymentSettingsBoard(activeBoard)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                borderRadius: 8,
+                paddingHorizontal: 9,
+                paddingVertical: 4,
+                borderWidth: 1,
+                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+              }}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('Payment Board Settings') || 'Payment Board Settings'}
+            >
+              <Text style={{ fontSize: 13 }}>⚙️</Text>
+              <Text style={{
+                fontSize: 11,
+                fontWeight: '700',
+                color: colors.textPrimary,
+              }}>
+                {t('Settings') || 'Settings'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Sub Row: Paid & Due Chips */}
+          {/* Sub Row: Paid & Due Chips, and Month/All Switch Link */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 5, paddingTop: 5, borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>
@@ -1547,19 +1532,16 @@ export default function BoardScreen({ route, navigation }) {
               </Text>
             </View>
 
-            {isMonthlyView && allTotal > monthlyTotal ? (
-              <TouchableOpacity onPress={() => setExpensesPeriodFilter('all')}>
-                <Text style={{ fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline' }}>
-                  {t('All scheduled:') || 'All:'} {formatCurrency(allTotal, activeCurrencyCode)} →
-                </Text>
-              </TouchableOpacity>
-            ) : !isMonthlyView && monthlyTotal > 0 ? (
-              <TouchableOpacity onPress={() => setExpensesPeriodFilter('month')}>
-                <Text style={{ fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline' }}>
-                  {t('This month:') || 'Month:'} {formatCurrency(monthlyTotal, activeCurrencyCode)} →
-                </Text>
-              </TouchableOpacity>
-            ) : null}
+            <TouchableOpacity 
+              onPress={() => setExpensesPeriodFilter(isMonthlyView ? 'all' : 'month')}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Text style={{ fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline', fontWeight: '600' }}>
+                {isMonthlyView 
+                  ? `${t('All scheduled:') || 'All:'} ${formatCurrency(allTotal, activeCurrencyCode)} →` 
+                  : `${t('This month:') || 'Month:'} ${formatCurrency(monthlyTotal, activeCurrencyCode)} →`}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {monthlyBudget > 0 && (
@@ -1671,6 +1653,38 @@ export default function BoardScreen({ route, navigation }) {
               <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
                 🔥 {t('Best Streak') || 'Best Streak'}: {bestStreak} {t('days') || 'd'}
               </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const nextMode = habitStreakMode === 'strict' ? 'grace' : 'strict';
+                  dispatch(setHabitStreakMode(nextMode));
+                  dispatch(rolloverHabitTasks());
+                  showToast(
+                    nextMode === 'strict'
+                      ? (t('Any missed scheduled day resets your active streak') || 'Strict Mode: Any missed scheduled day resets streak')
+                      : (t('Allows 1 missed scheduled day without breaking your streak') || 'Grace Period: Allows 1 missed scheduled day'),
+                    'info'
+                  );
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 3,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                  paddingHorizontal: 7,
+                  paddingVertical: 2,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'),
+                }}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('Habit Streak Mode') || 'Habit Streak Mode'}: ${habitStreakMode === 'strict' ? (t('Strict (No skips)') || 'Strict') : (t('1-Day Freeze (Grace)') || 'Grace')}`}
+                accessibilityHint={t('Tap to toggle between Grace and Strict mode') || 'Tap to toggle between Grace and Strict mode'}
+              >
+                <Text style={{ fontSize: 10, fontWeight: '700', color: habitStreakMode === 'strict' ? '#EF4444' : '#10B981' }}>
+                  {habitStreakMode === 'strict' ? `⚡ ${t('Strict (No skips)') || 'Strict'}` : `🛡️ ${t('1-Day Freeze (Grace)') || 'Grace'}`}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -1759,7 +1773,7 @@ export default function BoardScreen({ route, navigation }) {
     }
 
     return null;
-  }, [activeBoard?.type, activeCurrencyCode, boardTasks, colors.bgCard, colors.borderColor, colors.primary, colors.textPrimary, colors.textSecondary, dispatch, expensesPeriodFilter, getTaskAmount, habitStreakMode, isDark, listFilterCategory, showToast, t, windowWidth]);
+  }, [activeBoard, activeBoard?.type, activeCurrencyCode, boardTasks, colors.bgCard, colors.borderColor, colors.primary, colors.textPrimary, colors.textSecondary, dispatch, expensesPeriodFilter, getTaskAmount, habitStreakMode, isDark, listFilterCategory, showToast, t, windowWidth]);
 
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
@@ -2287,6 +2301,70 @@ export default function BoardScreen({ route, navigation }) {
                 {t('Payment Board Settings') || 'Payment Board Settings'}
               </Text>
             </TouchableOpacity>
+          )}
+
+          {(boardOptionsConfig.board?.type === 'habits' || boardOptionsConfig.board?.name?.toLowerCase()?.includes('habit')) && (
+            <View style={[styles.optionBtn, { borderBottomColor: colors.borderColor, paddingVertical: 10 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={[styles.optionText, { color: colors.textPrimary, fontWeight: '700' }]}>
+                  {t('Habit Streak Mode') || 'Habit Streak Mode'}
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: habitStreakMode === 'strict' ? '#EF4444' : '#10B981' }}>
+                  {habitStreakMode === 'strict' ? (t('Strict (No skips)') || 'Strict') : (t('1-Day Freeze (Grace)') || 'Grace')}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    dispatch(setHabitStreakMode('grace'));
+                    dispatch(rolloverHabitTasks());
+                    showToast(t('Allows 1 missed scheduled day without breaking your streak') || 'Grace Period: 1 skip allowed', 'info');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    paddingHorizontal: 8,
+                    borderRadius: 8,
+                    backgroundColor: habitStreakMode === 'grace' ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#E6F4EA') : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
+                    borderWidth: 1.5,
+                    borderColor: habitStreakMode === 'grace' ? '#10B981' : (colors.borderColor || '#E5E7EB'),
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: habitStreakMode === 'grace' ? '#10B981' : colors.textPrimary }}>
+                    🛡️ {t('1-Day Freeze (Grace)') || 'Grace (1 skip)'}
+                  </Text>
+                  <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, textAlign: 'center' }} numberOfLines={1}>
+                    {t('Allows 1 missed scheduled day without breaking your streak') || '1 skip allowed'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    dispatch(setHabitStreakMode('strict'));
+                    dispatch(rolloverHabitTasks());
+                    showToast(t('Any missed scheduled day resets your active streak') || 'Strict Mode: Any missed day resets streak', 'info');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    paddingHorizontal: 8,
+                    borderRadius: 8,
+                    backgroundColor: habitStreakMode === 'strict' ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#FDE8E8') : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
+                    borderWidth: 1.5,
+                    borderColor: habitStreakMode === 'strict' ? '#EF4444' : (colors.borderColor || '#E5E7EB'),
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: habitStreakMode === 'strict' ? '#EF4444' : colors.textPrimary }}>
+                    ⚡ {t('Strict (No skips)') || 'Strict (0 skips)'}
+                  </Text>
+                  <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, textAlign: 'center' }} numberOfLines={1}>
+                    {t('Any missed scheduled day resets your active streak') || '0 skips allowed'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
 
           {boardOptionsConfig.board?.id !== 'main' && (
