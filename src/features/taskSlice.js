@@ -592,12 +592,29 @@ const taskSlice = createSlice({
                 state.tasks = sortTasksChronologically(normalized);
             })
             .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; })
-            .addCase('user/deleteBoard/fulfilled', (state, action) => {
-                const deletedBoardId = action.payload;
-                if (deletedBoardId) {
+            .addCase('user/deleteBoard/pending', (state, action) => {
+                const deletedTarget = action.meta?.arg;
+                const deletedId = (typeof deletedTarget === 'object' && deletedTarget !== null)
+                    ? (deletedTarget.id || deletedTarget._id || deletedTarget.boardId)
+                    : deletedTarget;
+                if (deletedId) {
+                    const strDelId = String(deletedId);
                     state.tasks = state.tasks.filter(t => {
                         const bId = t.boardId || t.board_id;
-                        return bId !== deletedBoardId;
+                        return String(bId) !== strDelId;
+                    });
+                }
+            })
+            .addCase('user/deleteBoard/fulfilled', (state, action) => {
+                const deletedTarget = action.payload || action.meta?.arg;
+                const deletedId = (typeof deletedTarget === 'object' && deletedTarget !== null)
+                    ? (deletedTarget.id || deletedTarget._id || deletedTarget.boardId)
+                    : deletedTarget;
+                if (deletedId) {
+                    const strDelId = String(deletedId);
+                    state.tasks = state.tasks.filter(t => {
+                        const bId = t.boardId || t.board_id;
+                        return String(bId) !== strDelId;
                     });
                 }
             });

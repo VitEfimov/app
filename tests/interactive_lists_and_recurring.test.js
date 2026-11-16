@@ -2185,6 +2185,64 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(settingsScreenSrc, /isMoreExpanded/);
       assert.match(settingsScreenSrc, /toggleMoreSection/);
     });
+
+    test('board deletion permanently removes board, updates storage, and prevents resurrection via tombstones', () => {
+      const storageWrites = {};
+      const mockStorage = {
+        setItem: async (k, v) => { storageWrites[k] = v; },
+        getItem: async (k) => storageWrites[k] || null,
+        multiGet: async (keys) => keys.map(k => [k, storageWrites[k] || null]),
+      };
+
+      const userModule = loadTranspiledModule(path.resolve('src/features/userSlice.js'), {
+        '@react-native-async-storage/async-storage': mockStorage,
+        '../utils/cryptoStorage': { CryptoStorage: mockStorage },
+        '../services/api': {},
+      });
+      const { deleteBoardAsync, hydrateUserState } = userModule;
+      const userReducer = userModule.default;
+
+      // Initial state with duplicate Payments boards (empty board 101, and board 102 with tasks)
+      const initialState = {
+        boards: [
+          { id: 'main', name: 'Main', type: 'standard' },
+          { id: 'payments_empty', name: 'Payments', type: 'expenses' },
+          { id: 'payments_with_tasks', name: 'Payments', type: 'expenses' },
+        ],
+        deletedBoardIds: [],
+        activeBoardId: 'payments_empty',
+      };
+
+      // 1. Delete the empty Payments board
+      const pendingState = userReducer(initialState, {
+        type: deleteBoardAsync.pending.type,
+        meta: { arg: { id: 'payments_empty', name: 'Payments' } },
+      });
+
+      // Assert it was removed immediately in pending
+      assert.strictEqual(pendingState.boards.some(b => b.id === 'payments_empty'), false);
+      assert.strictEqual(pendingState.boards.some(b => b.id === 'payments_with_tasks'), true);
+      assert.strictEqual(pendingState.activeBoardId, 'main'); // reset from deleted board
+      assert.ok(pendingState.deletedBoardIds.includes('payments_empty'));
+
+      // 2. Storage was updated
+      assert.ok(storageWrites.boards, 'boards must be persisted to storage');
+      assert.ok(storageWrites.deleted_boards, 'deleted_boards must be persisted to storage');
+      const savedBoards = JSON.parse(storageWrites.boards);
+      assert.strictEqual(savedBoards.some(b => b.id === 'payments_empty'), false);
+
+      // 3. Stale hydration with resurrecting payload is blocked by tombstones
+      const resurrectedPayload = {
+        boards: [
+          { id: 'main', name: 'Main', type: 'standard' },
+          { id: 'payments_empty', name: 'Payments', type: 'expenses' }, // stale storage or remote board
+          { id: 'payments_with_tasks', name: 'Payments', type: 'expenses' },
+        ],
+      };
+      const hydratedState = userReducer(pendingState, hydrateUserState(resurrectedPayload));
+      assert.strictEqual(hydratedState.boards.some(b => b.id === 'payments_empty'), false, 'Tombstone must prevent deleted board from reappearing');
+      assert.strictEqual(hydratedState.boards.some(b => b.id === 'payments_with_tasks'), true);
+    });
   });
 });
 

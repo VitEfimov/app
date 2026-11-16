@@ -626,7 +626,7 @@ export default function BoardScreen({ route, navigation }) {
   }, [tasks, activeBoardId, mainBoardId, boards]);
 
   const activeBoard = useMemo(() => {
-    return boards.find(b => b.id === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
+    return boards.find(b => (b.id || b._id) === activeBoardId) || { id: 'main', name: 'Main', type: 'standard' };
   }, [boards, activeBoardId]);
 
   const isRepeatingTask = useCallback((task) => {
@@ -1133,7 +1133,8 @@ export default function BoardScreen({ route, navigation }) {
         dispatch(addBoardAsync({ id, name: value.trim() }));
         dispatch(setActiveBoardId(id));
       } else if (promptConfig.type === 'rename' && promptConfig.targetBoard) {
-        dispatch(renameBoardAsync({ id: promptConfig.targetBoard.id, name: value.trim() }));
+        const targetId = promptConfig.targetBoard.id || promptConfig.targetBoard._id;
+        dispatch(renameBoardAsync({ id: targetId, name: value.trim() }));
       }
     }
     setPromptConfig({ isVisible: false, type: null, targetBoard: null });
@@ -1825,15 +1826,16 @@ export default function BoardScreen({ route, navigation }) {
         {/* Board Pills Horizontal Scroll */}
         <View style={{ marginBottom: 6 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 6 }}>
-            {boards.map(board => {
-              const isSelected = activeBoardId === board.id;
+            {boards.map((board, bIdx) => {
+              const bId = board.id || board._id;
+              const isSelected = activeBoardId === bId;
               const boardColor = getBoardColor(board, boards);
-              const count = boardCounts[board.id] || 0;
+              const count = boardCounts[bId] || (board.id ? boardCounts[board.id] : 0) || 0;
 
               return (
                 <TouchableOpacity 
-                  key={board.id} 
-                  testID={`board_tab_${board.id}`}
+                  key={bId || `board_${bIdx}`} 
+                  testID={`board_tab_${bId}`}
                   accessible={true} 
                   accessibilityRole="tab" 
                   accessibilityLabel={`${board.name === 'Main' ? (t('Main') || 'Main') : board.name} board, ${count} ${count === 1 ? 'task' : 'tasks'}`} 
@@ -1853,7 +1855,7 @@ export default function BoardScreen({ route, navigation }) {
                         : colors.bgCard,
                     }
                   ]}
-                  onPress={() => dispatch(setActiveBoardId(board.id))}
+                  onPress={() => dispatch(setActiveBoardId(bId))}
                   onLongPress={() => handleBoardOptions(board)}
                   onContextMenu={(e) => {
                     if (e && e.preventDefault) e.preventDefault();
@@ -2117,7 +2119,7 @@ export default function BoardScreen({ route, navigation }) {
                     let formatted = val.trim();
                     if (!formatted.startsWith('#') && formatted.length > 0) formatted = `#${formatted}`;
                     if (boardOptionsConfig.board) {
-                      const boardId = boardOptionsConfig.board.id;
+                      const boardId = boardOptionsConfig.board.id || boardOptionsConfig.board._id;
                       dispatch(updateBoardColorAsync({ id: boardId, color: formatted }));
                       setBoardOptionsConfig(prev => ({
                         ...prev,
@@ -2144,7 +2146,7 @@ export default function BoardScreen({ route, navigation }) {
                     accessibilityState={{ selected: isSelected }}
                     onPress={() => {
                       if (boardOptionsConfig.board) {
-                        const boardId = boardOptionsConfig.board.id;
+                        const boardId = boardOptionsConfig.board.id || boardOptionsConfig.board._id;
                         dispatch(updateBoardColorAsync({ id: boardId, color: c }));
                         setBoardOptionsConfig(prev => ({
                           ...prev,
@@ -2196,7 +2198,7 @@ export default function BoardScreen({ route, navigation }) {
                     onChange={(e) => {
                       const newColor = e.target.value;
                       if (boardOptionsConfig.board) {
-                        const boardId = boardOptionsConfig.board.id;
+                        const boardId = boardOptionsConfig.board.id || boardOptionsConfig.board._id;
                         dispatch(updateBoardColorAsync({ id: boardId, color: newColor }));
                         setBoardOptionsConfig(prev => ({
                           ...prev,
@@ -2367,7 +2369,7 @@ export default function BoardScreen({ route, navigation }) {
             </View>
           )}
 
-          {boardOptionsConfig.board?.id !== 'main' && (
+          {((boardOptionsConfig.board?.id || boardOptionsConfig.board?._id) !== 'main' && boardOptionsConfig.board?.name?.toLowerCase() !== 'main') && (
             <>
               <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Rename board" style={[styles.optionBtn, { borderBottomColor: colors.borderColor }]} onPress={() => { setPromptConfig({ isVisible: true, type: 'rename', targetBoard: boardOptionsConfig.board }); setBoardOptionsConfig({ isVisible: false, board: null }); }}>
                 <Text style={[styles.optionText, { color: colors.textPrimary }]}>{t('Rename')}</Text>
@@ -2384,8 +2386,13 @@ export default function BoardScreen({ route, navigation }) {
                     confirmText: t('Delete'),
                     isDestructive: true,
                     onConfirm: () => {
-                      dispatch(deleteBoardAsync(board.id));
-                      dispatch(deleteTasksByBoard({ boardId: board.id, boardName: board.name }));
+                      const targetBoardId = board?.id || board?._id;
+                      const targetBoardName = board?.name;
+                      if (activeBoardId === targetBoardId || activeBoard?.id === targetBoardId) {
+                        dispatch(setActiveBoardId('main'));
+                      }
+                      dispatch(deleteBoardAsync({ id: targetBoardId, _id: board?._id, name: targetBoardName }));
+                      dispatch(deleteTasksByBoard({ boardId: targetBoardId, boardName: targetBoardName }));
                       setConfirmConfig(prev => ({ ...prev, isVisible: false }));
                     }
                   });

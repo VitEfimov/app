@@ -258,6 +258,7 @@ function InitApp() {
           'isGuest',
           'rememberedUser',
           'boards',
+          'deleted_boards',
           'dashboardFilterType',
           'pomodoro',
           'appLanguage',
@@ -317,8 +318,22 @@ function InitApp() {
           dispatch(continueAsGuest());
         }
 
-        const boardsJson = storageMap.boards;
-        if (boardsJson) dispatch(hydrateUserState({ boards: JSON.parse(boardsJson) }));
+        let initialUserHydration = {};
+        if (storageMap.deleted_boards) {
+          try {
+            const parsed = JSON.parse(storageMap.deleted_boards);
+            if (Array.isArray(parsed)) initialUserHydration.deletedBoardIds = parsed;
+          } catch (e) {}
+        }
+        if (storageMap.boards) {
+          try {
+            const parsed = JSON.parse(storageMap.boards);
+            if (Array.isArray(parsed)) initialUserHydration.boards = parsed;
+          } catch (e) {}
+        }
+        if (Object.keys(initialUserHydration).length > 0) {
+          dispatch(hydrateUserState(initialUserHydration));
+        }
 
         const dashboardFilterType = storageMap.dashboardFilterType;
         if (dashboardFilterType) dispatch(hydrateUserState({ dashboardFilterType }));

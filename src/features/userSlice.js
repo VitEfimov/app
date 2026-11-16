@@ -3,6 +3,34 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { Platform } from 'react-native';
 import axios from 'axios';
 import { sanitizeAuthCredentials, sanitizeId, sanitizeForStorage } from '../utils/securitySanitizer';
+import { CryptoStorage } from '../utils/cryptoStorage';
+
+const memoryDeletedBoardIds = new Set();
+
+const persistBoards = async (boards) => {
+    const clean = (boards || []).map(b => sanitizeForStorage(b));
+    const serialized = JSON.stringify(clean);
+    try {
+        if (CryptoStorage && typeof CryptoStorage.setItem === 'function') {
+            await CryptoStorage.setItem('boards', serialized);
+        }
+    } catch (e) {}
+    try {
+        await AsyncStorage.setItem('boards', serialized);
+    } catch (e) {}
+};
+
+const persistDeletedBoardIds = async (deletedIds) => {
+    const serialized = JSON.stringify(Array.from(new Set(deletedIds || [])));
+    try {
+        if (CryptoStorage && typeof CryptoStorage.setItem === 'function') {
+            await CryptoStorage.setItem('deleted_boards', serialized);
+        }
+    } catch (e) {}
+    try {
+        await AsyncStorage.setItem('deleted_boards', serialized);
+    } catch (e) {}
+};
 
 const loadThemeFromLocalStorage = () => "light";
 const loadShowWeatherFromLocalStorage = () => false;
@@ -149,45 +177,106 @@ export const updateBoardColorAsync = createAsyncThunk('user/updateBoardColor', a
     return { id: safeId, color: safePayload.color };
 });
 
-export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (id, thunkAPI) => {
+export const deleteBoardAsync = createAsyncThunk('user/deleteBoard', async (arg, thunkAPI) => {
     const fullState = thunkAPI.getState();
     const state = fullState.userReducer;
     const dbSyncEnabled = fullState.themeReducer?.dbSyncEnabled !== false;
-    const safeId = sanitizeId(id);
-    if (state.isAuthenticated && dbSyncEnabled) {
+
+    let rawId = null;
+    let rawName = null;
+    if (typeof arg === 'object' && arg !== null) {
+        rawId = arg.id || arg._id || arg.boardId;
+        rawName = arg.name || arg.boardName;
+    } else {
+        rawId = arg;
+    }
+
+    const safeId = sanitizeId(rawId);
+
+    if (state.isAuthenticated && dbSyncEnabled && safeId && safeId !== 'main') {
         try {
             await axios.delete(`/api/boards/${safeId}`, { withCredentials: true });
         } catch (e) {
             // Optimistic fallback
         }
     }
-    return safeId;
+    return { id: safeId || (rawId ? String(rawId) : ''), name: rawName };
 });
 
-const mergeBoards = (currentBoards = [], incomingBoards = []) => {
+const mergeBoards = (currentBoards = [], incomingBoards = [], deletedIds = []) => {
+    const tombstoneSet = new Set((deletedIds || []).map(String));
     const boardMap = new Map();
+
     (currentBoards || []).forEach(b => {
-        if (b && (b.id || b.name)) {
-            const key = b.id || b.name;
-            boardMap.set(key, b);
+        if (!b) return;
+        const id = b.id || b._id;
+        const strId = id ? String(id).trim() : null;
+        if (strId && tombstoneSet.has(strId)) return;
+        const key = strId || (b.name ? String(b.name).trim().toLowerCase() : null);
+        if (key) {
+            boardMap.set(key, { ...b, id: id || b.name });
         }
     });
+
     (incomingBoards || []).forEach(b => {
-        if (b && (b.id || b.name)) {
-            const key = b.id || b.name;
-            const existing = boardMap.get(key) || boardMap.get(b.id);
-            boardMap.set(b.id || key, { ...(existing || {}), ...b });
+        if (!b) return;
+        const id = b.id || b._id;
+        const strId = id ? String(id).trim() : null;
+        if (strId && tombstoneSet.has(strId)) return;
+
+        // Check if existing by ID
+        let existingKey = (strId && boardMap.has(strId)) ? strId : null;
+        // If not by ID, check by matching name (case-insensitive) to prevent duplicate boards (e.g. 2 Payments)
+        if (!existingKey && b.name) {
+            const cleanName = String(b.name).trim().toLowerCase();
+            for (const [k, v] of boardMap.entries()) {
+                if (v.name && String(v.name).trim().toLowerCase() === cleanName) {
+                    existingKey = k;
+                    break;
+                }
+            }
+        }
+
+        if (existingKey) {
+            const existing = boardMap.get(existingKey);
+            boardMap.set(existingKey, {
+                ...existing,
+                ...b,
+                id: existing.id || id || existingKey,
+                _id: b._id || existing._id,
+            });
+        } else {
+            const finalKey = strId || (b.name ? String(b.name).trim().toLowerCase() : 'board_' + Date.now());
+            boardMap.set(finalKey, { ...b, id: id || finalKey });
         }
     });
-    return Array.from(boardMap.values());
+
+    const result = Array.from(boardMap.values());
+    if (!result.some(b => (b.id || b._id) === 'main' || b.name === 'Main')) {
+        result.unshift({ id: 'main', name: 'Main', type: 'standard' });
+    }
+    return result;
 };
 
-const syncUnsyncedBoards = async (mergedBoards = [], remoteBoards = [], dbSyncEnabled = true) => {
+const syncUnsyncedBoards = async (mergedBoards = [], remoteBoards = [], dbSyncEnabled = true, deletedBoardIds = []) => {
     if (!dbSyncEnabled) return;
-    const remoteIds = new Set((remoteBoards || []).map(b => b.id || b._id));
+    const tombstoneSet = new Set((deletedBoardIds || []).map(String));
+
+    for (const delId of tombstoneSet) {
+        if (delId && delId !== 'main') {
+            try {
+                await axios.delete(`/api/boards/${delId}`, { withCredentials: true });
+            } catch (err) {
+                // Ignore if already deleted on backend
+            }
+        }
+    }
+
+    const remoteIds = new Set((remoteBoards || []).map(b => String(b.id || b._id)));
     const remoteNames = new Set((remoteBoards || []).map(b => b.name));
     for (const b of mergedBoards) {
-        if (b && (b.id || b.name) && !remoteIds.has(b.id) && !remoteNames.has(b.name)) {
+        const bId = String(b.id || b._id || '');
+        if (b && (b.id || b.name) && !tombstoneSet.has(bId) && !remoteIds.has(bId) && !remoteNames.has(b.name)) {
             try {
                 await axios.post('/api/boards', { id: b.id, name: b.name, type: b.type, color: b.color }, { withCredentials: true });
             } catch (err) {
@@ -196,7 +285,6 @@ const syncUnsyncedBoards = async (mergedBoards = [], remoteBoards = [], dbSyncEn
         }
     }
 };
-
 
 const initialState = {
     isAuthenticated: false,
@@ -207,10 +295,60 @@ const initialState = {
     showWeather: loadShowWeatherFromLocalStorage(),
     isGuest: loadIsGuestFromLocalStorage(),
     boards: loadBoardsFromLocalStorage(),
+    deletedBoardIds: [],
     activeBoardId: 'main',
     dashboardFilterType: 'all',
     layoutVersion: loadLayoutVersionFromLocalStorage(),
     isTaskOptionsCollapsed: loadTaskOptionsCollapsedFromLocalStorage(),
+};
+
+const removeBoardFromState = (state, target) => {
+    let rawId = null;
+    let rawName = null;
+    if (typeof target === 'object' && target !== null) {
+        rawId = target.id || target._id || target.boardId;
+        rawName = target.name || target.boardName;
+    } else {
+        rawId = target;
+    }
+
+    const strId = rawId ? String(rawId).trim() : null;
+    const strName = rawName ? String(rawName).trim().toLowerCase() : null;
+
+    if (!strId && !strName) return;
+
+    if (strId && strId !== 'main') {
+        memoryDeletedBoardIds.add(strId);
+        if (!state.deletedBoardIds) state.deletedBoardIds = [];
+        if (!state.deletedBoardIds.includes(strId)) {
+            state.deletedBoardIds.push(strId);
+        }
+        persistDeletedBoardIds(state.deletedBoardIds);
+    }
+
+    state.boards = (state.boards || []).filter(b => {
+        if (!b) return false;
+        const bId = b.id || b._id;
+        const strBId = bId ? String(bId).trim() : null;
+        const strBName = b.name ? String(b.name).trim().toLowerCase() : null;
+
+        // Never delete Main
+        if (strBId === 'main' || strBName === 'main') return true;
+
+        // Match by ID
+        if (strId && strBId === strId) return false;
+
+        // If no ID matched but name matched and this was a name-only delete
+        if (!strId && strName && strBName === strName) return false;
+
+        return true;
+    });
+
+    if (strId && (state.activeBoardId === strId || String(state.activeBoardId) === strId)) {
+        state.activeBoardId = 'main';
+    }
+
+    persistBoards(state.boards);
 };
 
 const userSlice = createSlice({
@@ -218,17 +356,35 @@ const userSlice = createSlice({
     initialState,
     reducers: {
         hydrateUserState: (state, action) => {
-            const newState = { ...state, ...action.payload };
-            if (action.payload && action.payload.boards && Array.isArray(action.payload.boards)) {
-                newState.boards = mergeBoards(state.boards, action.payload.boards);
+            const { boards, deletedBoardIds, ...rest } = action.payload || {};
+            Object.assign(state, rest);
+
+            if (deletedBoardIds && Array.isArray(deletedBoardIds)) {
+                const combined = new Set([...(state.deletedBoardIds || []), ...deletedBoardIds.map(String)]);
+                state.deletedBoardIds = Array.from(combined);
+                state.deletedBoardIds.forEach(id => memoryDeletedBoardIds.add(id));
             }
-            return newState;
+
+            if (boards && Array.isArray(boards)) {
+                const tombstoneSet = new Set((state.deletedBoardIds || []).map(String));
+                let validBoards = boards.filter(b => {
+                    if (!b) return false;
+                    const bId = String(b.id || b._id || '');
+                    return !tombstoneSet.has(bId);
+                });
+                if (!validBoards.some(b => (b.id || b._id) === 'main' || b.name === 'Main')) {
+                    validBoards.unshift({ id: 'main', name: 'Main', type: 'standard' });
+                }
+                state.boards = validBoards;
+            }
+            return state;
         },
         logout: (state) => {
             state.isAuthenticated = false;
             state.userEmail = null;
             state.isGuest = true;
             state.boards = loadBoardsFromLocalStorage();
+            state.deletedBoardIds = [];
             state.activeBoardId = 'main';
             state.dashboardFilterType = 'all';
             AsyncStorage.setItem('isGuest', 'true');
@@ -268,11 +424,11 @@ const userSlice = createSlice({
         },
         updateBoardRepeatSettings: (state, action) => {
             const { boardId, repeatConfig, repeatDuration } = action.payload || {};
-            const board = state.boards.find(b => b && (b.id === boardId || b._id === boardId));
+            const board = state.boards.find(b => b && (String(b.id) === String(boardId) || String(b._id) === String(boardId)));
             if (board) {
                 if (repeatConfig !== undefined) board.repeatConfig = repeatConfig;
                 if (repeatDuration !== undefined) board.repeatDuration = repeatDuration;
-                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+                persistBoards(state.boards);
             }
         },
     },
@@ -287,10 +443,12 @@ const userSlice = createSlice({
                     state.userEmail = action.payload.email;
                 }
                 const remoteBoards = action.payload?.boards || [];
-                const merged = mergeBoards(state.boards, remoteBoards);
+                const tombstoneSet = new Set((state.deletedBoardIds || []).map(String));
+                const filteredRemote = remoteBoards.filter(b => b && !tombstoneSet.has(String(b.id || b._id)));
+                const merged = mergeBoards(state.boards, filteredRemote, state.deletedBoardIds);
                 state.boards = merged;
-                AsyncStorage.setItem('boards', JSON.stringify(merged));
-                syncUnsyncedBoards(merged, remoteBoards, !action.payload?.dbSyncDisabled);
+                persistBoards(merged);
+                syncUnsyncedBoards(merged, filteredRemote, !action.payload?.dbSyncDisabled, state.deletedBoardIds);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);
@@ -311,10 +469,12 @@ const userSlice = createSlice({
                     state.userEmail = action.payload.email;
                 }
                 const remoteBoards = action.payload?.boards || [];
-                const merged = mergeBoards(state.boards, remoteBoards);
+                const tombstoneSet = new Set((state.deletedBoardIds || []).map(String));
+                const filteredRemote = remoteBoards.filter(b => b && !tombstoneSet.has(String(b.id || b._id)));
+                const merged = mergeBoards(state.boards, filteredRemote, state.deletedBoardIds);
                 state.boards = merged;
-                AsyncStorage.setItem('boards', JSON.stringify(merged));
-                syncUnsyncedBoards(merged, remoteBoards, !action.payload?.dbSyncDisabled);
+                persistBoards(merged);
+                syncUnsyncedBoards(merged, filteredRemote, !action.payload?.dbSyncDisabled, state.deletedBoardIds);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);
@@ -333,10 +493,12 @@ const userSlice = createSlice({
                     state.userEmail = action.payload.email;
                 }
                 const remoteBoards = action.payload?.boards || [];
-                const merged = mergeBoards(state.boards, remoteBoards);
+                const tombstoneSet = new Set((state.deletedBoardIds || []).map(String));
+                const filteredRemote = remoteBoards.filter(b => b && !tombstoneSet.has(String(b.id || b._id)));
+                const merged = mergeBoards(state.boards, filteredRemote, state.deletedBoardIds);
                 state.boards = merged;
-                AsyncStorage.setItem('boards', JSON.stringify(merged));
-                syncUnsyncedBoards(merged, remoteBoards, !action.payload?.dbSyncDisabled);
+                persistBoards(merged);
+                syncUnsyncedBoards(merged, filteredRemote, !action.payload?.dbSyncDisabled, state.deletedBoardIds);
                 if (action.payload?.theme) {
                     state.theme = action.payload.theme;
                     AsyncStorage.setItem('theme', action.payload.theme);
@@ -360,50 +522,53 @@ const userSlice = createSlice({
                 state.userEmail = null;
                 state.isGuest = true;
                 state.boards = loadBoardsFromLocalStorage();
+                state.deletedBoardIds = [];
                 state.activeBoardId = 'main';
             })
             .addCase(addBoardAsync.pending, (state, action) => {
                 const { id, name, type = 'standard', color, repeatConfig, repeatDuration } = action.meta.arg;
-                if (!state.boards.find(b => b.id === id)) {
-                    state.boards.push({ id, name, type, color, repeatConfig, repeatDuration });
+                const safeId = sanitizeId(id);
+                const existing = state.boards.find(b => (b.id && String(b.id) === String(safeId)) || (b.name && String(b.name).toLowerCase() === String(name).toLowerCase()));
+                if (!existing) {
+                    state.boards.push({ id: safeId, name, type, color, repeatConfig, repeatDuration });
                 }
-                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+                persistBoards(state.boards);
             })
             .addCase(addBoardAsync.fulfilled, (state, action) => {
                 if (action.payload?.boards && Array.isArray(action.payload.boards)) {
-                    const merged = mergeBoards(state.boards, action.payload.boards);
+                    const merged = mergeBoards(state.boards, action.payload.boards, state.deletedBoardIds);
                     state.boards = merged;
-                    AsyncStorage.setItem('boards', JSON.stringify(merged));
-                } else if (action.payload && action.payload.id) {
-                    const merged = mergeBoards(state.boards, [action.payload]);
+                    persistBoards(merged);
+                } else if (action.payload && (action.payload.id || action.payload._id || action.payload.name)) {
+                    const merged = mergeBoards(state.boards, [action.payload], state.deletedBoardIds);
                     state.boards = merged;
-                    AsyncStorage.setItem('boards', JSON.stringify(merged));
+                    persistBoards(merged);
                 }
             })
             .addCase(renameBoardAsync.fulfilled, (state, action) => {
-                const board = state.boards.find(b => b.id === action.payload.id);
+                const targetId = action.payload?.id || action.meta?.arg?.id;
+                const board = state.boards.find(b => b && (String(b.id) === String(targetId) || String(b._id) === String(targetId)));
                 if (board) board.name = action.payload.name;
-                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+                persistBoards(state.boards);
             })
             .addCase(updateBoardColorAsync.pending, (state, action) => {
                 const { id, color } = action.meta.arg;
-                const board = state.boards.find(b => b.id === id);
+                const board = state.boards.find(b => b && (String(b.id) === String(id) || String(b._id) === String(id)));
                 if (board) board.color = color;
-                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+                persistBoards(state.boards);
             })
             .addCase(updateBoardColorAsync.fulfilled, (state, action) => {
                 const boardId = action.payload?.id || action.meta.arg.id;
                 const color = action.payload?.color || action.meta.arg.color;
-                const board = state.boards.find(b => b.id === boardId);
+                const board = state.boards.find(b => b && (String(b.id) === String(boardId) || String(b._id) === String(boardId)));
                 if (board) board.color = color;
-                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+                persistBoards(state.boards);
+            })
+            .addCase(deleteBoardAsync.pending, (state, action) => {
+                removeBoardFromState(state, action.meta?.arg);
             })
             .addCase(deleteBoardAsync.fulfilled, (state, action) => {
-                state.boards = state.boards.filter(b => b.id !== action.payload);
-                if (state.activeBoardId === action.payload) {
-                    state.activeBoardId = 'main';
-                }
-                AsyncStorage.setItem('boards', JSON.stringify(state.boards));
+                removeBoardFromState(state, action.payload || action.meta?.arg);
             });
     }
 });
