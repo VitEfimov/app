@@ -261,7 +261,7 @@ export default function PaymentBoardSettingsModal({
           <View style={[styles.sectionCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
             <View style={styles.sectionTitleRow}>
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-                {t('Monthly Budget Limit') || 'Monthly Budget Limit'}
+                {t('Monthly Budget') || 'Monthly Budget'}
               </Text>
               {parsedBudgetVal !== null && (
                 <View style={[styles.budgetChip, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.12)' }]}>
@@ -272,7 +272,7 @@ export default function PaymentBoardSettingsModal({
               )}
             </View>
             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-              {t('Track spending progress and remaining balance in the summary bar') || 'Track spending progress and remaining balance in the summary bar'}
+              {t('Target budget limit per month. Track used vs remaining spending balance directly in the board summary bar.') || 'Target budget limit per month. Track used vs remaining spending balance directly in the board summary bar.'}
             </Text>
 
             <View style={[styles.budgetInputRow, { borderColor: borderCol, backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.02)' }]}>
@@ -302,7 +302,7 @@ export default function PaymentBoardSettingsModal({
             <View style={styles.quickChipsRow}>
               {BUDGET_PRESETS.map((val) => {
                 const isSelected = (val === 0 && !parsedBudgetVal) || (parsedBudgetVal === val);
-                const chipLabel = val === 0 ? (t('No budget set') || 'No budget') : formatCurrency(val, effectiveCurrencyCode);
+                const chipLabel = val === 0 ? (t('No budget limit') || 'No budget') : formatCurrency(val, effectiveCurrencyCode);
                 return (
                   <TouchableOpacity
                     key={val}
@@ -337,7 +337,7 @@ export default function PaymentBoardSettingsModal({
               </View>
             </View>
             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-              {t('Default recurrence applied to bills added to this board') || 'Default recurrence applied to bills added to this board'}
+              {t('Default recurrence preset applied when new bills and payments are added to this board.') || 'Default recurrence preset applied when new bills and payments are added to this board.'}
             </Text>
 
             <View style={styles.optionsWrap}>
@@ -411,7 +411,7 @@ export default function PaymentBoardSettingsModal({
               </View>
             </View>
             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-              {t('Automatically notifies you before upcoming bills and payment due dates') || 'Automatically notifies you before upcoming bills and payment due dates'}
+              {t('Automatically schedules a notification before each bill\'s due date on this board.') || 'Automatically schedules a notification before each bill\'s due date on this board.'}
             </Text>
 
             <View style={styles.optionsWrap}>
@@ -454,7 +454,7 @@ export default function PaymentBoardSettingsModal({
               {t('Currency symbol and formatting for this board') || 'Currency symbol and formatting for this board'}
             </Text>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
+            <View style={styles.optionsWrap}>
               {CURRENCY_OPTION_CODES.map((code) => {
                 const isSelected = selectedCurrency === code;
                 const label = code === 'auto' ? (t('Auto') || 'Auto') : `${code} (${getCurrencyMeta(code).symbol})`;
@@ -463,20 +463,20 @@ export default function PaymentBoardSettingsModal({
                     key={code}
                     onPress={() => setSelectedCurrency(code)}
                     style={[
-                      styles.quickChip,
+                      styles.selectPill,
                       {
                         backgroundColor: isSelected ? primaryAccent : chipBgInactive,
                         borderColor: isSelected ? primaryAccent : borderCol,
                       },
                     ]}
                   >
-                    <Text style={[styles.quickChipText, { color: isSelected ? '#FFFFFF' : colors.textPrimary }]}>
+                    <Text style={[styles.selectPillText, { color: isSelected ? '#FFFFFF' : colors.textPrimary }]}>
                       {label}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </View>
           </View>
         </ScrollView>
 

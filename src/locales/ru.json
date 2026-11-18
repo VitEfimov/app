@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "Доски платежей и счетов",
   "No payment boards yet": "Платежных досок пока нет",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "Создайте доску «Расходы и счета» в Задачах для управления регулярными платежами, бюджетом и напоминаниями.",
-  "Configure payment board settings": "Настроить параметры платежной доски"
+  "Configure payment board settings": "Настроить параметры платежной доски",
+  "Currency symbol and formatting for this board": "Символ валюты и формат для этой доски",
+  "Luggage Category": "Категория багажа",
+  "Luggage Type": "Тип багажа",
+  "Media Category & Rating": "Категория и оценка",
+  "Books": "Книги",
+  "Movies/TV": "Фильмы/ТВ",
+  "Courses": "Курсы",
+  "Type currency code e.g. USD, EUR, $": "Введите код валюты, напр. USD, EUR, $",
+  "Converted total": "Сконвертировано"
 }

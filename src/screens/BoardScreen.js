@@ -24,7 +24,7 @@ import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTa
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency, setHabitStreakMode } from '../features/themeSlice';
 import { useTaskRowConfig } from '../components/TaskRowConfigContext';
-import { formatCurrency, resolveCurrencyCode, CURRENCY_OPTION_CODES, getCurrencyMeta, isPriceBoardType } from '../utils/currencyHelper';
+import { formatCurrency, resolveCurrencyCode, CURRENCY_OPTION_CODES, getCurrencyMeta, isPriceBoardType, convertCurrency, getCachedTaskCurrency } from '../utils/currencyHelper';
 import { computeHabitStats } from '../utils/habitHelper';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import { useTranslation } from 'react-i18next';
@@ -107,6 +107,15 @@ const IconMinusSquare = ({ color, size = 18 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
     <Path d="M8 12h8" />
+  </Svg>
+);
+
+const IconSettingsSliders = ({ color = '#666', size = 16 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Line x1="4" y1="7" x2="20" y2="7" />
+    <Line x1="4" y1="17" x2="20" y2="17" />
+    <Circle cx="9" cy="7" r="2.5" fill="none" />
+    <Circle cx="15" cy="17" r="2.5" fill="none" />
   </Svg>
 );
 
@@ -1432,7 +1441,9 @@ export default function BoardScreen({ route, navigation }) {
       let inCartSpent = 0;
       boardTasks.forEach(t => {
         const qty = t.itemQuantity !== undefined && !isNaN(Number(t.itemQuantity)) ? Math.max(1, Number(t.itemQuantity)) : 1;
-        const price = getTaskAmount(t, type);
+        const rawPrice = getTaskAmount(t, type);
+        const taskCur = getCachedTaskCurrency(t, type) || activeCurrencyCode;
+        const price = convertCurrency(rawPrice, taskCur, activeCurrencyCode);
         const itemTot = qty * price;
         grandTotal += itemTot;
         if (t.completed) inCartSpent += itemTot;
@@ -1443,12 +1454,12 @@ export default function BoardScreen({ route, navigation }) {
       return (
         <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
           {/* Top Row: Grand Total & Cart summary */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 5 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary }}>{formatCurrency(grandTotal, activeCurrencyCode)}</Text>
               <Text style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '600' }}>{t('Grand Total') || 'Grand Total'}</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>
                 {t('In Cart') || 'In Cart'}: <Text style={{ fontWeight: '700', color: '#10B981' }}>{formatCurrency(inCartSpent, activeCurrencyCode)}</Text>
               </Text>
@@ -1498,7 +1509,9 @@ export default function BoardScreen({ route, navigation }) {
       let monthlyPaid = 0;
 
       boardTasks.forEach(t => {
-        const amt = getTaskAmount(t, type);
+        const rawAmt = getTaskAmount(t, type);
+        const taskCur = getCachedTaskCurrency(t, type) || activeCurrencyCode;
+        const amt = convertCurrency(rawAmt, taskCur, activeCurrencyCode);
         allTotal += amt;
         if (t.completed) allPaid += amt;
 
@@ -1551,28 +1564,20 @@ export default function BoardScreen({ route, navigation }) {
               activeOpacity={0.75}
               onPress={() => setPaymentSettingsBoard(activeBoard)}
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5,
+                width: 32,
+                height: 32,
+                borderRadius: 16,
                 backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-                borderRadius: 8,
-                paddingHorizontal: 9,
-                paddingVertical: 4,
                 borderWidth: 1,
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                borderColor: isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'),
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
               accessible={true}
               accessibilityRole="button"
               accessibilityLabel={t('Payment Board Settings') || 'Payment Board Settings'}
             >
-              <Text style={{ fontSize: 13 }}>⚙️</Text>
-              <Text style={{
-                fontSize: 11,
-                fontWeight: '700',
-                color: colors.textPrimary,
-              }}>
-                {t('Settings') || 'Settings'}
-              </Text>
+              <IconSettingsSliders color={colors.textSecondary} size={16} />
             </TouchableOpacity>
           </View>
 
@@ -1698,7 +1703,7 @@ export default function BoardScreen({ route, navigation }) {
             <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>
               ⚡ {t("Today's Habits") || 'Habits'}: {completedCount}/{totalCount} ({progressPercent}%)
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {missedCount > 0 && (
                 <View style={{ backgroundColor: '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
                   <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF4444' }}>
@@ -1748,7 +1753,7 @@ export default function BoardScreen({ route, navigation }) {
             <View style={{ height: '100%', width: `${progressPercent}%`, backgroundColor: '#F59E0B', borderRadius: 2 }} />
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 5 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingRight: 10 }}>
             {timesOfDay.map((tod) => {
               const isSelected = listFilterCategory === tod;
               return (

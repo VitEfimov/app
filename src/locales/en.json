@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "Payment & Bills Boards",
   "No payment boards yet": "No payment boards yet",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.",
-  "Configure payment board settings": "Configure payment board settings"
+  "Configure payment board settings": "Configure payment board settings",
+  "Currency symbol and formatting for this board": "Currency symbol and formatting for this board",
+  "Luggage Category": "Luggage Category",
+  "Luggage Type": "Luggage Type",
+  "Media Category & Rating": "Media Category & Rating",
+  "Books": "Books",
+  "Movies/TV": "Movies/TV",
+  "Courses": "Courses",
+  "Type currency code e.g. USD, EUR, $": "Type currency code e.g. USD, EUR, $",
+  "Converted total": "Converted total"
 }

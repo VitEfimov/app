@@ -319,6 +319,7 @@ const taskSlice = createSlice({
                 if (action.payload.escalationLevel !== undefined) task.escalationLevel = action.payload.escalationLevel;
                 if (action.payload.keepNotificationAllDay !== undefined) task.keepNotificationAllDay = action.payload.keepNotificationAllDay;
                 if (action.payload.itemPrice !== undefined) task.itemPrice = action.payload.itemPrice;
+                if (action.payload.itemCurrency !== undefined) task.itemCurrency = action.payload.itemCurrency;
                 if (action.payload.itemQuantity !== undefined) task.itemQuantity = action.payload.itemQuantity;
                 if (action.payload.itemUnit !== undefined) task.itemUnit = action.payload.itemUnit;
                 if (action.payload.itemCategory !== undefined) task.itemCategory = action.payload.itemCategory;
@@ -385,6 +386,7 @@ const taskSlice = createSlice({
                 if (patch.escalationLevel !== undefined) task.escalationLevel = patch.escalationLevel;
                 if (patch.keepNotificationAllDay !== undefined) task.keepNotificationAllDay = patch.keepNotificationAllDay;
                 if (patch.itemPrice !== undefined) task.itemPrice = patch.itemPrice;
+                if (patch.itemCurrency !== undefined) task.itemCurrency = patch.itemCurrency;
                 if (patch.itemQuantity !== undefined) task.itemQuantity = patch.itemQuantity;
                 if (patch.itemUnit !== undefined) task.itemUnit = patch.itemUnit;
                 if (patch.itemCategory !== undefined) task.itemCategory = patch.itemCategory;
@@ -458,6 +460,7 @@ const taskSlice = createSlice({
                         if (updates.isAlarm !== undefined) updated.isAlarm = updates.isAlarm;
                         if (updates.keepNotificationAllDay !== undefined) updated.keepNotificationAllDay = updates.keepNotificationAllDay;
                         if (updates.itemPrice !== undefined) updated.itemPrice = updates.itemPrice;
+                        if (updates.itemCurrency !== undefined) updated.itemCurrency = updates.itemCurrency;
                         if (updates.itemQuantity !== undefined) updated.itemQuantity = updates.itemQuantity;
                         if (updates.itemUnit !== undefined) updated.itemUnit = updates.itemUnit;
                         if (updates.itemCategory !== undefined) updated.itemCategory = updates.itemCategory;

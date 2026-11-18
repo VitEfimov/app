@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "支付与账单看板",
   "No payment boards yet": "暂无支付看板",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "在任务中创建“支出与账单”看板以管理定期账单、预算和到期提醒。",
-  "Configure payment board settings": "配置支付看板设置"
+  "Configure payment board settings": "配置支付看板设置",
+  "Currency symbol and formatting for this board": "此看板的货币符号和格式",
+  "Luggage Category": "行李类别",
+  "Luggage Type": "行李类型",
+  "Media Category & Rating": "分类与评分",
+  "Books": "图书",
+  "Movies/TV": "影视/剧集",
+  "Courses": "课程",
+  "Type currency code e.g. USD, EUR, $": "输入货币代码，例如 USD、EUR、$",
+  "Converted total": "已折算总额"
 }

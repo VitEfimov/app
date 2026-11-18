@@ -18,6 +18,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Calendar } from 'react-native-calendars';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
+import { getFirstDayOfWeek } from '../utils/filters';
 import Modal from 'react-native-modal';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 
@@ -617,6 +618,7 @@ export default function CalendarScreen({ navigation, route }) {
         <Calendar
           testID="task_calendar"
           key={`cal-${calendarMonth}-${colors.bgCard}-${isDark}-${i18n.language}`}
+          firstDay={getFirstDayOfWeek(i18n.language)}
           current={calendarMonth}
           onDayPress={(day) => {
             setSelectedDate(day.dateString);

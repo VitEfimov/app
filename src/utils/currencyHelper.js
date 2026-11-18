@@ -23,6 +23,54 @@ export const CURRENCY_OPTION_CODES = [
   'auto', 'USD', 'EUR', 'RUB', 'GBP', 'JPY', 'CNY', 'INR', 'KRW', 'UAH', 'TRY', 'KZT',
 ];
 
+export const DEFAULT_EXCHANGE_RATES = {
+  USD: 1.0,
+  EUR: 0.92,
+  RUB: 96.5,
+  GBP: 0.79,
+  JPY: 152.0,
+  CNY: 7.24,
+  INR: 84.0,
+  KRW: 1380.0,
+  UAH: 41.5,
+  TRY: 34.3,
+  KZT: 495.0,
+};
+
+export const SYMBOL_TO_CURRENCY_CODE = {
+  '$': 'USD',
+  '€': 'EUR',
+  '₽': 'RUB',
+  'руб': 'RUB',
+  'руб.': 'RUB',
+  'р.': 'RUB',
+  '£': 'GBP',
+  '¥': 'CNY',
+  '円': 'JPY',
+  '元': 'CNY',
+  '₹': 'INR',
+  '₩': 'KRW',
+  '원': 'KRW',
+  '₴': 'UAH',
+  'грн': 'UAH',
+  'грн.': 'UAH',
+  '₺': 'TRY',
+  '₸': 'KZT',
+  'тг': 'KZT',
+  'тг.': 'KZT',
+  'USD': 'USD',
+  'EUR': 'EUR',
+  'RUB': 'RUB',
+  'GBP': 'GBP',
+  'JPY': 'JPY',
+  'CNY': 'CNY',
+  'INR': 'INR',
+  'KRW': 'KRW',
+  'UAH': 'UAH',
+  'TRY': 'TRY',
+  'KZT': 'KZT',
+};
+
 export function isPriceBoardType(boardType) {
   return PRICE_BOARD_TYPES.has(boardType);
 }
@@ -250,4 +298,133 @@ export function formatCurrency(amount, currencyCode = 'USD', options = {}) {
     return `${sign}${numberStr}${meta.space ? ' ' : ''}${meta.symbol}`;
   }
   return `${sign}${meta.symbol}${meta.space ? ' ' : ''}${numberStr}`;
+}
+
+/**
+ * Converts a monetary amount from one currency to another using exchange rates.
+ * Defaults to embedded reliable offline rates, supporting custom or live fetched rates.
+ */
+export function convertCurrency(amount, fromCode = 'USD', toCode = 'USD', customRates = null) {
+  const num = Number(amount);
+  if (!Number.isFinite(num) || num === 0) return 0;
+  const safeFrom = String(fromCode || 'USD').toUpperCase();
+  const safeTo = String(toCode || 'USD').toUpperCase();
+  if (safeFrom === safeTo) return num;
+
+  const rates = { ...DEFAULT_EXCHANGE_RATES, ...(customRates || {}) };
+  const fromRate = rates[safeFrom] || DEFAULT_EXCHANGE_RATES[safeFrom] || 1.0;
+  const toRate = rates[safeTo] || DEFAULT_EXCHANGE_RATES[safeTo] || 1.0;
+
+  const inUSD = num / fromRate;
+  const inTarget = inUSD * toRate;
+
+  return inTarget;
+}
+
+/**
+ * Extracts both amount and explicit currency symbol/code from text (e.g. "$20", "Costco $400", "20€", "120 руб").
+ */
+export function extractTaskAmountAndCurrency(title, options = {}) {
+  if (!title || typeof title !== 'string') return { amount: 0, currency: null };
+  const trimmed = title.trim();
+  if (!trimmed) return { amount: 0, currency: null };
+
+  // 1. Explicit currency symbol prefix ($4.99, €12,50, ¥1200, ₽120, ₴45, £20, etc.)
+  const prefixSym = trimmed.match(/(?:^|[\s([{"'])([$€£¥₽₹₩₴₺₸])\s*(\d+(?:[\s\u00A0.,']\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/);
+  if (prefixSym) {
+    const val = parseLocalizedNumber(prefixSym[2]);
+    if (!isNaN(val)) {
+      const code = SYMBOL_TO_CURRENCY_CODE[prefixSym[1]] || null;
+      return { amount: val, currency: code };
+    }
+  }
+
+  // 2. Explicit currency ISO code prefix (USD 4.50, EUR 20, RUB 120, etc.)
+  const prefixCode = trimmed.match(/(?:^|[\s([{"'])(USD|EUR|RUB|GBP|JPY|CNY|INR|KRW|UAH|TRY|KZT)\s+(\d+(?:[\s\u00A0.,']\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?=$|[\s.,;!?)}\]"'])/i);
+  if (prefixCode) {
+    const val = parseLocalizedNumber(prefixCode[2]);
+    if (!isNaN(val)) {
+      return { amount: val, currency: prefixCode[1].toUpperCase() };
+    }
+  }
+
+  // 3. Explicit currency symbol or local currency suffix (120₽, 20$, 50EUR, 100 руб, 45 грн, etc.)
+  const suffixCur = trimmed.match(/(?:^|[\s([{"'])(\d+(?:[\s\u00A0.,']\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:([$€£¥₽₹₩₴₺₸])|(USD|EUR|RUB|GBP|JPY|CNY|INR|KRW|UAH|TRY|KZT|руб\.?|р\.|грн\.?|тг\.?|円|元|원)(?=$|[\s,;!?)\]}"']))/i);
+  if (suffixCur) {
+    const val = parseLocalizedNumber(suffixCur[1]);
+    if (!isNaN(val)) {
+      const marker = suffixCur[2] || suffixCur[3];
+      const code = SYMBOL_TO_CURRENCY_CODE[marker] || (marker ? marker.toUpperCase() : null);
+      return { amount: val, currency: code };
+    }
+  }
+
+  // Fallback to standard amount extraction
+  const amt = extractTaskAmountFromTitle(title, options);
+  return { amount: amt, currency: null };
+}
+
+const TASK_CURRENCY_CACHE = new Map();
+
+/**
+ * Returns the effective currency for a task:
+ * 1. Explicit itemCurrency on task object
+ * 2. Currency marker parsed from task title
+ * 3. null (falls back to board currency)
+ */
+export function getCachedTaskCurrency(t, boardType = null) {
+  if (!t) return null;
+  if (t.itemCurrency && t.itemCurrency !== 'auto' && t.itemCurrency !== '') {
+    return t.itemCurrency;
+  }
+  const name = String(t.taskname || t.name || '');
+  if (!name) return null;
+  const cached = TASK_CURRENCY_CACHE.get(name);
+  if (cached !== undefined) return cached;
+
+  const { currency } = extractTaskAmountAndCurrency(name, { boardType });
+  if (TASK_CURRENCY_CACHE.size > 1000) TASK_CURRENCY_CACHE.clear();
+  TASK_CURRENCY_CACHE.set(name, currency || null);
+  return currency || null;
+}
+
+export function clearTaskCurrencyCache() {
+  TASK_CURRENCY_CACHE.clear();
+}
+
+let cachedLiveRates = null;
+let lastRatesFetchTime = 0;
+
+/**
+ * Optionally refreshes live rates in background.
+ * Falls back gracefully to DEFAULT_EXCHANGE_RATES on network failure or offline mode.
+ */
+export async function fetchLiveExchangeRatesAsync() {
+  const now = Date.now();
+  if (cachedLiveRates && now - lastRatesFetchTime < 3600000) {
+    return cachedLiveRates;
+  }
+  try {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 4000) : null;
+    const res = await fetch('https://open.er-api.com/v6/latest/USD', {
+      signal: controller?.signal
+    });
+    if (timer) clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.rates && data.result === 'success') {
+        const rates = { ...DEFAULT_EXCHANGE_RATES };
+        Object.keys(DEFAULT_EXCHANGE_RATES).forEach(code => {
+          if (data.rates[code] && Number(data.rates[code]) > 0) {
+            rates[code] = Number(data.rates[code]);
+          }
+        });
+        cachedLiveRates = rates;
+        lastRatesFetchTime = now;
+        return rates;
+      }
+    }
+  } catch (e) {}
+  return cachedLiveRates || DEFAULT_EXCHANGE_RATES;
 }

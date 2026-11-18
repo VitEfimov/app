@@ -774,14 +774,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 892, `English locale must contain 892 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 901, `English locale must contain 901 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        892,
-        `Language ${lang} has ${count} keys, expected 892 (matching EN)`
+        901,
+        `Language ${lang} has ${count} keys, expected 901 (matching EN)`
       );
     }
   });
@@ -2336,6 +2336,174 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       const taskRowSrc = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
       assert.match(taskRowSrc, /backgroundColor\s*\|\|\s*colors\.bgMain/, 'TaskRow must use colors.bgMain for default background');
+    });
+
+    test('Calendar firstDay starts on Monday (1) for Russian and other European locales, Sunday (0) for English/Japanese/Korean', () => {
+      const filtersMod = loadTranspiledModule(path.resolve('src/utils/filters.js'));
+      const { getFirstDayOfWeek, MONDAY_FIRST_LANGUAGES } = filtersMod;
+      
+      assert.strictEqual(getFirstDayOfWeek('ru'), 1, 'Russian must start on Monday');
+      assert.strictEqual(getFirstDayOfWeek('de'), 1, 'German must start on Monday');
+      assert.strictEqual(getFirstDayOfWeek('fr'), 1, 'French must start on Monday');
+      assert.strictEqual(getFirstDayOfWeek('es'), 1, 'Spanish must start on Monday');
+      assert.strictEqual(getFirstDayOfWeek('it'), 1, 'Italian must start on Monday');
+      assert.strictEqual(getFirstDayOfWeek('zh'), 1, 'Chinese must start on Monday');
+      assert.strictEqual(getFirstDayOfWeek('en'), 0, 'English must start on Sunday');
+      assert.strictEqual(getFirstDayOfWeek('ja'), 0, 'Japanese must start on Sunday');
+      assert.strictEqual(getFirstDayOfWeek('ko'), 0, 'Korean must start on Sunday');
+
+      const calSrc = fs.readFileSync(path.resolve('src/screens/CalendarScreen.js'), 'utf8');
+      assert.match(calSrc, /firstDay=\{getFirstDayOfWeek\(i18n\.language\)\}/, 'CalendarScreen must pass localized firstDay to Calendar');
+
+      const inlineSrc = fs.readFileSync(path.resolve('src/components/InlineAddTask.js'), 'utf8');
+      assert.match(inlineSrc, /firstDay=\{getFirstDayOfWeek\(i18n\.language\)\}/, 'InlineAddTask must pass localized firstDay to Calendar');
+
+      const detailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+      assert.match(detailsSrc, /firstDay=\{getFirstDayOfWeek\(i18n\.language\)\}/, 'TaskDetailsModal must pass localized firstDay to Calendar');
+    });
+
+    test('Specialized boards and InlineAddTask prevent label overflow and increase interactive button height', () => {
+      const boardSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      
+      // Payments board settings button: no text label, uses clean IconSettingsSliders SVG
+      assert.doesNotMatch(boardSrc, /\{t\('Settings'\)\s*\|\|\s*'Settings'\}/, 'Payments board must not render Settings text label in card header');
+      assert.match(boardSrc, /<IconSettingsSliders color=\{colors\.textSecondary\} size=\{16\} \/>/, 'Payments board must render IconSettingsSliders SVG icon');
+
+      // Grocery summary bar: flexWrap on top row prevents collision of large totals with localized labels
+      assert.match(boardSrc, /flexDirection:\s*'row',\s*justifyContent:\s*'space-between',\s*alignItems:\s*'center',\s*flexWrap:\s*'wrap',\s*gap:\s*6/, 'Grocery summary bar top row must use flexWrap');
+
+      // Habits summary bar: flexWrap on streak and freeze badges prevents right-edge clipping
+      assert.match(boardSrc, /flexDirection:\s*'row',\s*alignItems:\s*'center',\s*gap:\s*6,\s*flexWrap:\s*'wrap'/, 'Habits summary badges must use flexWrap');
+
+      // InlineAddTask: increased height and padding for interactive buttons
+      const inlineSrc = fs.readFileSync(path.resolve('src/components/InlineAddTask.js'), 'utf8');
+      assert.match(inlineSrc, /minHeight:\s*220/, 'InlineAddTask editContainer must have minHeight >= 220');
+      assert.match(inlineSrc, /minHeight:\s*44/, 'InlineAddTask action buttons must have minHeight >= 44 for comfortable tap targets');
+    });
+
+    test('Luggage and Media categories are selectable in InlineAddTask, TaskDetailsModal, and interactive in TaskRow', () => {
+      const inlineSrc = fs.readFileSync(path.resolve('src/components/InlineAddTask.js'), 'utf8');
+      assert.match(inlineSrc, /selectedPackingCategory/, 'InlineAddTask must have state for luggage type');
+      assert.match(inlineSrc, /selectedMediaCategory/, 'InlineAddTask must have state for media category');
+      assert.match(inlineSrc, /inlineBoardType === 'packing'/, 'InlineAddTask must render luggage type chip');
+      assert.match(inlineSrc, /inlineBoardType === 'media'/, 'InlineAddTask must render media category chip');
+
+      const detailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+      assert.match(detailsSrc, /selectedBoardType === 'packing'/, 'TaskDetailsModal must render luggage category section');
+      assert.match(detailsSrc, /selectedBoardType === 'media'/, 'TaskDetailsModal must render media category and rating section');
+
+      const taskRowSrc = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
+      assert.match(taskRowSrc, /handleCyclePackingCategory/, 'TaskRow must support cycling packing category on tap');
+      assert.match(taskRowSrc, /handleCycleMediaCategory/, 'TaskRow must support cycling media category on tap');
+
+      const modalSrc = fs.readFileSync(path.resolve('src/components/PaymentBoardSettingsModal.js'), 'utf8');
+      assert.match(modalSrc, /<View style=\{styles\.optionsWrap\}>\s*\{CURRENCY_OPTION_CODES\.map/, 'PaymentBoardSettingsModal must wrap all currency chips so all are visible');
+      assert.doesNotMatch(modalSrc, /Track spending progress and remaining balance/, 'Outdated English subtitle must be replaced with localized key');
+    });
+
+    test('Multi-currency conversion: tasks in foreign currencies display natively on task row while converting in board totals', () => {
+      const curMod = require(path.resolve('src/utils/currencyHelper.js'));
+      const { convertCurrency, extractTaskAmountAndCurrency, formatCurrency } = curMod;
+
+      // 1. Math conversion: 20 USD to RUB is 1930 RUB
+      const convertedRub = convertCurrency(20, 'USD', 'RUB');
+      assert.strictEqual(convertedRub, 1930, '20 USD must convert to 1930 RUB');
+      const convertedUsd = convertCurrency(1930, 'RUB', 'USD');
+      assert.strictEqual(convertedUsd, 20, '1930 RUB must convert back to 20 USD');
+
+      // 2. Detection of currency and amount from text
+      const d1 = extractTaskAmountAndCurrency('Costco $400');
+      assert.strictEqual(d1.amount, 400);
+      assert.strictEqual(d1.currency, 'USD');
+
+      const d2 = extractTaskAmountAndCurrency('$20');
+      assert.strictEqual(d2.amount, 20);
+      assert.strictEqual(d2.currency, 'USD');
+
+      const d3 = extractTaskAmountAndCurrency('Mr Wash 34.50 EUR');
+      assert.strictEqual(d3.amount, 34.5);
+      assert.strictEqual(d3.currency, 'EUR');
+
+      const d4 = extractTaskAmountAndCurrency('Билеты 5000 руб');
+      assert.strictEqual(d4.amount, 5000);
+      assert.strictEqual(d4.currency, 'RUB');
+
+      // 3. BoardScreen converts multi-currency item totals into board currency
+      const boardSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      assert.match(boardSrc, /convertCurrency\(rawPrice,\s*taskCur,\s*activeCurrencyCode\)/, 'BoardScreen must convert grocery item prices into activeCurrencyCode');
+      assert.match(boardSrc, /convertCurrency\(rawAmt,\s*taskCur,\s*activeCurrencyCode\)/, 'BoardScreen must convert bill amounts into activeCurrencyCode');
+
+      // 4. TaskRow displays native item currency with converted total annotation
+      const taskRowSrc = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
+      assert.match(taskRowSrc, /hasDifferentCurrency\s*&&/, 'TaskRow must detect when item currency differs from board currency');
+      assert.match(taskRowSrc, /convertedTotalFormatted/, 'TaskRow must display converted total annotation');
+
+      // 5. InlineAddTask and TaskDetailsModal allow picking/typing currency
+      const inlineSrc = fs.readFileSync(path.resolve('src/components/InlineAddTask.js'), 'utf8');
+      assert.match(inlineSrc, /setShowCurrencyModal\(true\)/, 'InlineAddTask must open currency picker when currency button is clicked');
+      assert.match(inlineSrc, /extractTaskAmountAndCurrency/, 'InlineAddTask must parse currency from input text');
+
+      const detailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+      assert.match(detailsSrc, /setShowCurrencyModal\(true\)/, 'TaskDetailsModal must open currency picker when currency button is clicked');
+      assert.match(detailsSrc, /itemCurrencyState/, 'TaskDetailsModal must have state for item currency');
+      assert.match(detailsSrc, /convertCurrency\(parsedPriceNum,\s*effectiveTaskCurrencyCode,\s*modalCurrencyCode\)/, 'TaskDetailsModal must show live conversion preview');
+      assert.match(detailsSrc, /import\s*\{[^}]*formatCurrency[^}]*\}\s*from\s*['"]\.\.\/utils\/currencyHelper['"]/, 'TaskDetailsModal must import formatCurrency');
+
+      // 6. Modern Pressable used over deprecated TouchableWithoutFeedback
+      const customDropdownSrc = fs.readFileSync(path.resolve('src/components/CustomDropdown.js'), 'utf8');
+      assert.ok(!customDropdownSrc.includes('TouchableWithoutFeedback'), 'CustomDropdown should not use deprecated TouchableWithoutFeedback');
+      assert.ok(!inlineSrc.includes('TouchableWithoutFeedback'), 'InlineAddTask should not use deprecated TouchableWithoutFeedback');
+
+      // 7. Non-overlapping TaskRow indicators and metadata date protection
+      assert.match(taskRowSrc, /content:\s*\{[^}]*overflow:\s*['"]hidden['"]/, 'TaskRow content must clip overflowing labels');
+      assert.match(taskRowSrc, /metadata:\s*\{[^}]*flexShrink:\s*0/, 'TaskRow metadata date must not shrink or be pushed');
+      assert.match(taskRowSrc, /boardType === 'expenses'[\s\S]*?maxWidth:\s*['"]100%['"]/, 'TaskRow expenses container must have maxWidth 100% to prevent date overlap');
+    });
+
+    test('Calendar firstDayOfWeek alignment per language specification across CalendarScreen, TaskDetailsModal, and InlineAddTask', () => {
+      const { getFirstDayOfWeek } = require('../src/utils/filters');
+
+      // Exact specification mapping:
+      // English (en) -> Sunday (0)
+      // Russian (ru) -> Monday (1)
+      // Spanish (es) -> Monday (1)
+      // Chinese (zh) -> Monday (1)
+      // Japanese (ja) -> Sunday (0)
+      // Hindi (hi) -> Sunday (0)
+      // French (fr) -> Monday (1)
+      // German (de) -> Monday (1)
+      // Italian (it) -> Monday (1)
+      // Korean (ko) -> Sunday (0)
+      const expectedDays = {
+        en: 0,
+        ru: 1,
+        es: 1,
+        zh: 1,
+        ja: 0,
+        hi: 0,
+        fr: 1,
+        de: 1,
+        it: 1,
+        ko: 0,
+      };
+
+      for (const [lang, expectedDay] of Object.entries(expectedDays)) {
+        assert.strictEqual(
+          getFirstDayOfWeek(lang),
+          expectedDay,
+          `Language '${lang}' must have firstDay=${expectedDay} (${expectedDay === 1 ? 'Monday' : 'Sunday'})`
+        );
+      }
+
+      // Verify calendars in CalendarScreen, TaskDetailsModal, and InlineAddTask use getFirstDayOfWeek
+      const calScreenSrc = fs.readFileSync(path.resolve('src/screens/CalendarScreen.js'), 'utf8');
+      assert.match(calScreenSrc, /firstDay=\{getFirstDayOfWeek\(i18n\.language\)\}/, 'CalendarScreen must pass getFirstDayOfWeek to Calendar');
+
+      const taskDetailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+      assert.match(taskDetailsSrc, /firstDay=\{getFirstDayOfWeek\(i18n\.language\)\}/, 'TaskDetailsModal must pass getFirstDayOfWeek to Calendar');
+
+      const inlineAddSrc = fs.readFileSync(path.resolve('src/components/InlineAddTask.js'), 'utf8');
+      assert.match(inlineAddSrc, /firstDay=\{getFirstDayOfWeek\(i18n\.language\)\}/, 'InlineAddTask must pass getFirstDayOfWeek to Calendar');
     });
   });
 });

@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "भुगतान और बिल बोर्ड",
   "No payment boards yet": "अभी कोई भुगतान बोर्ड नहीं है",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "आवर्ती बिल, बजट और नियत तारीख रिमाइंडर प्रबंधित करने के लिए टास्क में खर्च और बिल बोर्ड बनाएं।",
-  "Configure payment board settings": "भुगतान बोर्ड सेटिंग्स कॉन्फ़िगर करें"
+  "Configure payment board settings": "भुगतान बोर्ड सेटिंग्स कॉन्फ़िगर करें",
+  "Currency symbol and formatting for this board": "इस बोर्ड के लिए मुद्रा प्रतीक और प्रारूप",
+  "Luggage Category": "सामान की श्रेणी",
+  "Luggage Type": "सामान का प्रकार",
+  "Media Category & Rating": "श्रेणी और रेटिंग",
+  "Books": "किताबें",
+  "Movies/TV": "फ़िल्में/टीवी",
+  "Courses": "पाठ्यक्रम",
+  "Type currency code e.g. USD, EUR, $": "मुद्रा कोड दर्ज करें जैसे USD, EUR, $",
+  "Converted total": "परिवर्तित कुल"
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal as RNModal, StyleSheet, ScrollView, TextInput, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, TouchableOpacity, Modal as RNModal, StyleSheet, ScrollView, TextInput, Pressable, Keyboard } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 const IconChevronDown = ({ color }) => (
@@ -72,7 +72,7 @@ const CustomDropdown = ({
       
       <RNModal visible={isOpen} transparent animationType="fade">
         <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setIsOpen(false)}>
-          <TouchableWithoutFeedback>
+          <Pressable onPress={(e) => e?.stopPropagation && e.stopPropagation()}>
             <View style={[styles.modalMenu, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
               {label && isHorizontal && (
                  <Text style={[styles.modalMenuTitle, { color: colors.textSecondary }]}>{label}</Text>
@@ -110,7 +110,7 @@ const CustomDropdown = ({
                 })}
               </ScrollView>
             </View>
-          </TouchableWithoutFeedback>
+          </Pressable>
         </TouchableOpacity>
       </RNModal>
     </View>

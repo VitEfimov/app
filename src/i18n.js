@@ -19,6 +19,8 @@ dayjs.extend(localeData);
 
 export const RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'];
 
+export { getFirstDayOfWeek, MONDAY_FIRST_LANGUAGES } from './utils/filters';
+
 export function isRtlLanguage(langCode) {
   if (!langCode || typeof langCode !== 'string') return false;
   return RTL_LANGUAGES.includes(langCode.toLowerCase().split(/[-_]/)[0]);
@@ -94,6 +96,11 @@ const setupCalendarLocale = (langCode) => {
       dayNamesShort: getDays('ddd'),
       today: i18n.t('Today', { lng: langCode })
     };
+  }
+  if (langCode === 'zh-cn') {
+    LocaleConfig.locales['zh'] = LocaleConfig.locales['zh-cn'];
+  } else if (langCode === 'zh') {
+    LocaleConfig.locales['zh-cn'] = LocaleConfig.locales['zh'];
   }
   LocaleConfig.defaultLocale = langCode;
 };

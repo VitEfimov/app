@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { A11yHelper } from '../utils/a11yHelper';
 import { HapticHelper } from '../utils/hapticHelper';
-import { extractTaskAmountFromTitle, formatCurrency, isPriceBoardType, resolveCurrencyCode } from '../utils/currencyHelper';
+import { extractTaskAmountFromTitle, formatCurrency, isPriceBoardType, resolveCurrencyCode, convertCurrency, getCachedTaskCurrency } from '../utils/currencyHelper';
 import { computeHabitStats, toggleHabitCompletionForDate } from '../utils/habitHelper';
 
 const inlineEditingListeners = new Set();
@@ -163,10 +163,15 @@ const INVALID_DUE_DATE_INFO = Object.freeze({
   shortDateStr: '',
 });
 
+export function clearDueDateCache() {
+  DUE_DATE_CACHE.clear();
+}
+
 function getCachedDueDateInfo(rawDueDate) {
   if (!rawDueDate) return INVALID_DUE_DATE_INFO;
   const currentYear = new Date().getFullYear();
-  const cacheKey = `${currentYear}_${rawDueDate}`;
+  const currentLocale = dayjs.locale() || 'en';
+  const cacheKey = `${currentLocale}_${currentYear}_${rawDueDate}`;
   const cached = DUE_DATE_CACHE.get(cacheKey);
   if (cached) return cached;
 
@@ -326,10 +331,17 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
     return effectiveCurrencyCode || 'USD';
   }, [boardCurrencies, rawTaskBoardId, currencyCode, i18n?.language, deviceCurrencyCode, effectiveCurrencyCode]);
 
+  const taskCurrency = getCachedTaskCurrency(task, boardType);
+  const taskCurrencyCode = taskCurrency && taskCurrency !== 'auto' ? taskCurrency : rowCurrencyCode;
+  const hasDifferentCurrency = taskCurrencyCode !== rowCurrencyCode;
+
   const itemQty = task?.itemQuantity !== undefined && !isNaN(Number(task.itemQuantity)) ? Math.max(1, Number(task.itemQuantity)) : 1;
   const unitPrice = getCachedTaskAmount(task, boardType);
-  const unitPriceFormatted = unitPrice > 0 ? formatCurrency(unitPrice, rowCurrencyCode) : null;
-  const itemTotalFormatted = unitPrice > 0 ? formatCurrency(itemQty * unitPrice, rowCurrencyCode) : null;
+  const unitPriceFormatted = unitPrice > 0 ? formatCurrency(unitPrice, taskCurrencyCode) : null;
+  const itemTotalFormatted = unitPrice > 0 ? formatCurrency(itemQty * unitPrice, taskCurrencyCode) : null;
+  const convertedTotalFormatted = (unitPrice > 0 && hasDifferentCurrency)
+    ? formatCurrency(convertCurrency(itemQty * unitPrice, taskCurrencyCode, rowCurrencyCode), rowCurrencyCode)
+    : null;
 
   const habitStats = useMemo(() => {
     if (boardType !== 'habits' || !task) return null;
@@ -596,6 +608,32 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
     }));
   }, [getEffectiveHabitCategory, task?.id, task?._id, dispatch]);
 
+  const handleCyclePackingCategory = useCallback((e) => {
+    if (!task) return;
+    if (e && e.stopPropagation) e.stopPropagation();
+    const cycle = ['Carry-On', 'Checked Bag', 'Backpack', 'Essentials'];
+    const current = task.itemCategory || 'Carry-On';
+    const nextIdx = (cycle.indexOf(current) + 1) % cycle.length;
+    const nextCategory = cycle[nextIdx];
+    dispatch(updateTask({
+      taskId: task.id || task._id,
+      itemCategory: nextCategory
+    }));
+  }, [task, dispatch]);
+
+  const handleCycleMediaCategory = useCallback((e) => {
+    if (!task) return;
+    if (e && e.stopPropagation) e.stopPropagation();
+    const cycle = ['Books', 'Movies/TV', 'Courses'];
+    const current = task.itemCategory || 'Books';
+    const nextIdx = (cycle.indexOf(current) + 1) % cycle.length;
+    const nextCategory = cycle[nextIdx];
+    dispatch(updateTask({
+      taskId: task.id || task._id,
+      itemCategory: nextCategory
+    }));
+  }, [task, dispatch]);
+
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case 'high': return '#B3261E';
@@ -766,7 +804,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
         </View>
 
         {/* Indicators under task name: Reminder/time, Category badge, Recurring, Notes, Subtasks */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 10, paddingHorizontal: 4, flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8, paddingHorizontal: 4, flexWrap: 'wrap', maxWidth: '100%' }}>
           {/* Due Time / Reminder: Shows due time with Alarm icon if reminder set, or Clock icon if no reminder */}
           {task.time && task.time.trim() !== '' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -800,8 +838,8 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
 
           {/* Interactive controls for specialized list types */}
           {(boardType === 'grocery' || boardType === 'shopping') && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', borderRadius: 10, paddingHorizontal: 3, paddingVertical: 1, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB', gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', maxWidth: '100%' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', borderRadius: 10, paddingHorizontal: 3, paddingVertical: 1, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB', gap: 2, flexShrink: 0 }}>
                 <TouchableOpacity
                   onPress={(e) => {
                     e.stopPropagation();
@@ -830,25 +868,35 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
               </View>
 
               {unitPrice > 0 ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B9811A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B9811A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 4, maxWidth: '100%', flexWrap: 'wrap' }}>
                   <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981' }}>
                     {itemQty > 1 ? `${unitPriceFormatted} ${t('ea') || 'ea'} · ${itemTotalFormatted}` : unitPriceFormatted}
                   </Text>
+                  {hasDifferentCurrency && convertedTotalFormatted ? (
+                    <Text style={{ fontSize: 10, color: colors.textSecondary, fontWeight: '500' }}>
+                      (≈ {convertedTotalFormatted})
+                    </Text>
+                  ) : null}
                 </View>
               ) : null}
             </View>
           )}
 
           {boardType === 'expenses' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', maxWidth: '100%' }}>
               {unitPrice > 0 ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: task.completed ? '#10B9811A' : '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: task.completed ? '#10B9811A' : '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 4, maxWidth: '100%', flexWrap: 'wrap' }}>
                   <Text style={{ fontSize: 11, fontWeight: 'bold', color: task.completed ? '#10B981' : '#EF4444' }}>
                     {unitPriceFormatted}
                   </Text>
+                  {hasDifferentCurrency && convertedTotalFormatted ? (
+                    <Text style={{ fontSize: 10, color: colors.textSecondary, fontWeight: '500' }}>
+                      (≈ {convertedTotalFormatted})
+                    </Text>
+                  ) : null}
                 </View>
               ) : null}
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: task.completed ? '#10B9811A' : '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: task.completed ? '#10B9811A' : '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, flexShrink: 0 }}>
                 <Text style={{ fontSize: 10, fontWeight: '600', color: task.completed ? '#10B981' : '#D97706' }}>
                   {task.completed ? (t('Paid Bills') || 'Paid') : (t('Bills Due') || 'Due')}
                 </Text>
@@ -857,17 +905,21 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
           )}
 
           {boardType === 'packing' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#3B82F61A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: '#3B82F6' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', maxWidth: '100%' }}>
+              <TouchableOpacity
+                onPress={handleCyclePackingCategory}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#3B82F61A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, maxWidth: '100%' }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#3B82F6' }} numberOfLines={1} ellipsizeMode="tail">
                   🎒 {t(task.itemCategory || 'Carry-On') || (task.itemCategory || 'Carry-On')}
                 </Text>
-              </View>
+              </TouchableOpacity>
             </View>
           )}
 
           {boardType === 'habits' && habitStats && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', maxWidth: '100%' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2 }}>
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
                   🔥 {habitStats.currentStreak} {t('days') || 'd'}{habitStats.freezeActive ? ' ❄️' : ''}
@@ -949,11 +1001,15 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
                 ))}
               </View>
               {task.itemCategory ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#8B5CF61A', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6 }}>
+                <TouchableOpacity
+                  onPress={handleCycleMediaCategory}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#8B5CF61A', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6 }}
+                >
                   <Text style={{ fontSize: 10, fontWeight: '600', color: '#8B5CF6' }}>
                     {t(task.itemCategory) || task.itemCategory}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ) : null}
               {task.itemProgress ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard || '#F3F4F6', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
@@ -1007,7 +1063,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
           accessibilityRole="button"
           accessibilityLabel={`${t('Due') || 'Due'}: ${dueDateInfo.shortDateStr}`}
         >
-          <Text style={[styles.date, { color: colors.textPrimary }]}>
+          <Text style={[styles.date, { color: colors.textPrimary }]} numberOfLines={1}>
             {dueDateInfo.shortDateStr}
           </Text>
         </TouchableOpacity>
@@ -1125,6 +1181,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     justifyContent: 'center',
     marginRight: 10,
+    overflow: 'hidden',
   },
   taskNameBox: {
     flex: 1,
@@ -1155,6 +1212,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     minWidth: 46,
+    flexShrink: 0,
+    marginLeft: 6,
   },
   metadataStack: {
     alignItems: 'flex-end',

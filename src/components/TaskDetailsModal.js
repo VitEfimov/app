@@ -17,6 +17,7 @@ if (Platform.OS !== 'web') {
 import { updateTask, deleteTask, updateRecurringSeries, deleteRecurringSeries } from '../features/taskSlice';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useTheme, hexToRgba } from '../styles/ThemeContext';
+import { getFirstDayOfWeek } from '../utils/filters';
 import dayjs from 'dayjs';
 import * as Localization from 'expo-localization';
 import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
@@ -35,7 +36,7 @@ import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { SecurityLockHelper } from '../utils/securityLockHelper';
 import { A11yHelper } from '../utils/a11yHelper';
-import { extractTaskAmountFromTitle, getCurrencyMeta, isPriceBoardType, parseLocalizedNumber, resolveCurrencyCode } from '../utils/currencyHelper';
+import { extractTaskAmountFromTitle, getCurrencyMeta, isPriceBoardType, parseLocalizedNumber, resolveCurrencyCode, extractTaskAmountAndCurrency, convertCurrency, formatCurrency, CURRENCIES, SYMBOL_TO_CURRENCY_CODE } from '../utils/currencyHelper';
 import { computeHabitStats, isHabitTask, normalizeHabitSchedule } from '../utils/habitHelper';
 
 const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style }, ref) => {
@@ -253,6 +254,10 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
   const [repeatStartDate, setRepeatStartDate] = useState('');
   const [repeatEndDate, setRepeatEndDate] = useState('');
   const [itemPriceInput, setItemPriceInput] = useState('');
+  const [itemCategoryState, setItemCategoryState] = useState('');
+  const [itemRatingState, setItemRatingState] = useState(0);
+  const [itemCurrencyState, setItemCurrencyState] = useState('');
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [habitSchedule, setHabitSchedule] = useState({ preset: 'daily', daysOfWeek: [0, 1, 2, 3, 4, 5, 6] });
   const [habitCompletedDatesState, setHabitCompletedDatesState] = useState([]);
   const [confirmConfig, setConfirmConfig] = useState({ isVisible: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', isDestructive: false, secondaryIsDestructive: false, secondaryConfirmText: null, onSecondaryConfirm: null, hideCancel: false, cancelText: '' });
@@ -472,6 +477,12 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
       setReminder(initialReminderVal);
       setIsAlarm(initialAlarmVal);
       setKeepNotificationAllDay(initialKeepNotificationVal);
+      const initialCategoryVal = task.itemCategory || (selectedBoardType === 'packing' ? 'Carry-On' : selectedBoardType === 'media' ? 'Books' : '');
+      const initialRatingVal = Number(task.itemRating) || 0;
+      const initialCurrencyVal = task.itemCurrency || '';
+      setItemCategoryState(initialCategoryVal);
+      setItemRatingState(initialRatingVal);
+      setItemCurrencyState(initialCurrencyVal);
       setItemPriceInput(initialPriceStr);
       setHabitSchedule(initialHabitSchedule);
       setHabitCompletedDatesState(initialHabitDates);
@@ -493,6 +504,9 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
         isAlarm: initialAlarmVal,
         keepNotificationAllDay: initialKeepNotificationVal,
         itemPriceInput: initialPriceStr,
+        itemCategory: initialCategoryVal,
+        itemRating: initialRatingVal,
+        itemCurrency: initialCurrencyVal,
         habitScheduleJson: JSON.stringify(initialHabitSchedule),
         habitCompletedDatesJson: JSON.stringify(initialHabitDates),
       };
@@ -653,6 +667,9 @@ useEffect(() => {
     if (isAlarm !== snap.isAlarm) return true;
     if (keepNotificationAllDay !== snap.keepNotificationAllDay) return true;
     if (itemPriceInput !== snap.itemPriceInput) return true;
+    if (itemCategoryState !== snap.itemCategory) return true;
+    if (itemRatingState !== snap.itemRating) return true;
+    if (itemCurrencyState !== snap.itemCurrency) return true;
     if (JSON.stringify(habitSchedule) !== snap.habitScheduleJson) return true;
     if (JSON.stringify(habitCompletedDatesState) !== snap.habitCompletedDatesJson) return true;
 
@@ -765,9 +782,22 @@ useEffect(() => {
       }
     }
 
+    if (snap && itemCategoryState !== snap.itemCategory) {
+      updates.itemCategory = itemCategoryState;
+    }
+    if (snap && itemRatingState !== snap.itemRating) {
+      updates.itemRating = itemRatingState;
+    }
+    if (snap && itemCurrencyState !== snap.itemCurrency) {
+      updates.itemCurrency = itemCurrencyState;
+    }
+
     const effectivePrice = updates.itemPrice !== undefined
       ? updates.itemPrice
       : (task.itemPrice !== undefined ? task.itemPrice : undefined);
+    const effectiveCurrency = updates.itemCurrency !== undefined
+      ? updates.itemCurrency
+      : (task.itemCurrency !== undefined ? task.itemCurrency : undefined);
     const effectiveQuantity = updates.itemQuantity !== undefined
       ? updates.itemQuantity
       : (task.itemQuantity !== undefined ? task.itemQuantity : undefined);
@@ -813,8 +843,10 @@ useEffect(() => {
           subtasks, 
           description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments },
           itemPrice: effectivePrice,
+          itemCurrency: effectiveCurrency,
           itemQuantity: effectiveQuantity,
-          itemCategory: effectiveCategory
+          itemCategory: effectiveCategory,
+          itemRating: updates.itemRating !== undefined ? updates.itemRating : task.itemRating
         }, 
         { ...repeatConfig, startDate: effectiveStartDate, endDate: effectiveEndDate }
       );
@@ -862,8 +894,10 @@ useEffect(() => {
             subtasks, 
             description: { text: currentNotes, img: attachments.length > 0 && attachments[0].type === 'image' ? attachments[0].uri : '', url: '', attachments },
             itemPrice: effectivePrice,
+            itemCurrency: effectiveCurrency,
             itemQuantity: effectiveQuantity,
-            itemCategory: effectiveCategory
+            itemCategory: effectiveCategory,
+            itemRating: updates.itemRating !== undefined ? updates.itemRating : task.itemRating
           }, 
           { ...repeatConfig, startDate: effectiveStartDate, endDate: effectiveEndDate }
         );
@@ -896,8 +930,10 @@ useEffect(() => {
             repeatStartDate: effectiveStartDate,
             repeatEndDate: effectiveEndDate,
             itemPrice: effectivePrice,
+            itemCurrency: effectiveCurrency,
             itemQuantity: effectiveQuantity,
-            itemCategory: effectiveCategory
+            itemCategory: effectiveCategory,
+            itemRating: updates.itemRating !== undefined ? updates.itemRating : task.itemRating
           }
         }));
       }
@@ -1614,37 +1650,166 @@ useEffect(() => {
               </TouchableOpacity>
             </View>
 
-            {showPriceEditor && (
-              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#10B9811A', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>{modalCurrencyMeta.symbol}</Text>
+            {showPriceEditor && (() => {
+              const effectiveTaskCurrencyCode = itemCurrencyState || modalCurrencyCode;
+              const effectiveTaskCurrencyMeta = getCurrencyMeta(effectiveTaskCurrencyCode);
+              const parsedPriceNum = parseLocalizedNumber(itemPriceInput);
+              const isDifferentCurrencyFromBoard = effectiveTaskCurrencyCode !== modalCurrencyCode;
+              const convertedBoardAmount = isDifferentCurrencyFromBoard && !isNaN(parsedPriceNum) && parsedPriceNum > 0
+                ? convertCurrency(parsedPriceNum, effectiveTaskCurrencyCode, modalCurrencyCode)
+                : null;
+
+              return (
+                <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => setShowCurrencyModal(true)}
+                        accessible={true}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Change currency, current ${effectiveTaskCurrencyCode}`}
+                        style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: '#10B9811A', borderWidth: 1, borderColor: '#10B98140', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>{effectiveTaskCurrencyMeta.symbol}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setShowCurrencyModal(true)}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>
+                          {t('Price') || 'Price'} ({effectiveTaskCurrencyMeta.code})
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard, borderRadius: 10, borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', paddingHorizontal: 10, minWidth: 110, height: 36 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginRight: 4 }}>
+                        {effectiveTaskCurrencyMeta.symbol}
+                      </Text>
+                      <TextInput
+                        testID="task_details_price_input"
+                        value={itemPriceInput}
+                        onChangeText={(txt) => {
+                          const detected = extractTaskAmountAndCurrency(txt);
+                          if (detected.currency) {
+                            setItemCurrencyState(detected.currency);
+                          }
+                          if (detected.amount > 0 && txt.match(/[$€£¥₽₹₩₴₺₸]|USD|EUR|RUB/i)) {
+                            setItemPriceInput(String(detected.amount));
+                          } else {
+                            setItemPriceInput(txt);
+                          }
+                        }}
+                        placeholder={(() => {
+                          const detected = extractTaskAmountFromTitle(taskName, { allowBareTrailing: true, boardType: selectedBoardType });
+                          return detected > 0 ? String(detected) : '0.00';
+                        })()}
+                        placeholderTextColor={colors.textSecondary}
+                        keyboardType="default"
+                        style={{ flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary, paddingVertical: 4, textAlign: 'right' }}
+                      />
+                      {itemPriceInput.length > 0 && (
+                        <TouchableOpacity onPress={() => setItemPriceInput('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 6 }}>
+                          <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '700' }}>×</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>
-                    {t('Price') || 'Price'} ({modalCurrencyMeta.code})
+                  {isDifferentCurrencyFromBoard && convertedBoardAmount !== null && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981' }}>
+                        ≈ {formatCurrency(convertedBoardAmount, modalCurrencyCode)} ({t('Converted total') || 'Converted total'})
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+
+            {selectedBoardType === 'packing' && (
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                    🧳 {t('Luggage Category') || 'Luggage Category'}
+                  </Text>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#3B82F6' }}>
+                    {t(itemCategoryState || 'Carry-On') || (itemCategoryState || 'Carry-On')}
                   </Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard, borderRadius: 10, borderWidth: 1, borderColor: colors.borderColor || '#E5E5EA', paddingHorizontal: 10, minWidth: 110, height: 36 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginRight: 4 }}>
-                    {modalCurrencyMeta.symbol}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {['Carry-On', 'Checked Bag', 'Backpack', 'Essentials'].map((cat) => {
+                    const isSel = (itemCategoryState || 'Carry-On') === cat;
+                    const icon = cat === 'Carry-On' ? '🎒' : cat === 'Checked Bag' ? '🧳' : cat === 'Backpack' ? '🎒' : '⭐';
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        onPress={() => setItemCategoryState(cat)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 10,
+                          backgroundColor: isSel ? '#3B82F6' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
+                          borderWidth: 1,
+                          borderColor: isSel ? '#3B82F6' : (isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'))
+                        }}
+                      >
+                        <Text style={{ fontSize: 12 }}>{icon}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: isSel ? '700' : '500', color: isSel ? '#FFFFFF' : colors.textPrimary }}>
+                          {t(cat) || cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {selectedBoardType === 'media' && (
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), gap: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                    🎬 {t('Media Category & Rating') || 'Media Category & Rating'}
                   </Text>
-                  <TextInput
-                    testID="task_details_price_input"
-                    value={itemPriceInput}
-                    onChangeText={setItemPriceInput}
-                    placeholder={(() => {
-                      const detected = extractTaskAmountFromTitle(taskName, { allowBareTrailing: true, boardType: selectedBoardType });
-                      return detected > 0 ? String(detected) : '0.00';
-                    })()}
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="decimal-pad"
-                    style={{ flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary, paddingVertical: 4, textAlign: 'right' }}
-                  />
-                  {itemPriceInput.length > 0 && (
-                    <TouchableOpacity onPress={() => setItemPriceInput('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 6 }}>
-                      <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '700' }}>×</Text>
-                    </TouchableOpacity>
-                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity
+                        key={star}
+                        onPress={() => setItemRatingState(prev => prev === star ? 0 : star)}
+                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                      >
+                        <Text style={{ fontSize: 18, color: star <= (itemRatingState || 0) ? '#F59E0B' : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)') }}>
+                          ★
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {['Books', 'Movies/TV', 'Courses'].map((cat) => {
+                    const isSel = (itemCategoryState || 'Books') === cat;
+                    const icon = cat === 'Books' ? '📚' : cat === 'Movies/TV' ? '🎬' : '🎓';
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        onPress={() => setItemCategoryState(cat)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 10,
+                          backgroundColor: isSel ? '#8B5CF6' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
+                          borderWidth: 1,
+                          borderColor: isSel ? '#8B5CF6' : (isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'))
+                        }}
+                      >
+                        <Text style={{ fontSize: 12 }}>{icon}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: isSel ? '700' : '500', color: isSel ? '#FFFFFF' : colors.textPrimary }}>
+                          {t(cat) || cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -2390,7 +2555,7 @@ useEffect(() => {
                   <Calendar
                     key={`${activeCalendarDate}-${i18n.language}`}
                     markingType={'custom'}
-                    firstDay={i18n.language === 'en' ? 0 : 1}
+                    firstDay={getFirstDayOfWeek(i18n.language)}
                     current={activeCalendarDate}
                     onDayPress={(day) => handleDateSelect(day.dateString)}
                     markedDates={getCalendarMarkedDates()}
@@ -2603,6 +2768,114 @@ useEffect(() => {
           }}
         />
       )}
+
+      {/* Quick Currency Selector Modal */}
+      <Modal
+        visible={showCurrencyModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCurrencyModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCurrencyModal(false)}
+        >
+          <View
+            style={{
+              width: '88%',
+              maxWidth: 380,
+              backgroundColor: colors.bgCard || '#FFFFFF',
+              borderRadius: 18,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: colors.borderColor || '#E5E7EB',
+              elevation: 10,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              alignSelf: 'center',
+              marginBottom: 'auto',
+              marginTop: 'auto',
+            }}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary }}>
+                {t('Currency') || 'Currency'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowCurrencyModal(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ padding: 4 }}
+              >
+                <Text style={{ fontSize: 16, color: colors.textSecondary, fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={{
+                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                borderWidth: 1,
+                borderColor: colors.borderColor || '#E5E7EB',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                fontSize: 14,
+                fontWeight: '600',
+                color: colors.textPrimary,
+                marginBottom: 12,
+              }}
+              placeholder={t('Type currency code e.g. USD, EUR, $') || 'USD, EUR, RUB, $...'}
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="characters"
+              onChangeText={(txt) => {
+                const cleaned = txt.trim().toUpperCase();
+                const matched = SYMBOL_TO_CURRENCY_CODE[cleaned] || (CURRENCIES[cleaned] ? cleaned : null);
+                if (matched) {
+                  setItemCurrencyState(matched);
+                  setShowCurrencyModal(false);
+                }
+              }}
+            />
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {['USD', 'EUR', 'RUB', 'UAH', 'GBP', 'KZT', 'TRY', 'CNY', 'JPY', 'INR', 'KRW'].map((code) => {
+                const isSel = (itemCurrencyState || modalCurrencyCode) === code;
+                const meta = getCurrencyMeta(code);
+                return (
+                  <TouchableOpacity
+                    key={code}
+                    onPress={() => {
+                      setItemCurrencyState(code);
+                      setShowCurrencyModal(false);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 10,
+                      paddingVertical: 7,
+                      borderRadius: 10,
+                      backgroundColor: isSel ? '#10B981' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
+                      borderWidth: 1,
+                      borderColor: isSel ? '#10B981' : (isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB')),
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: isSel ? '#FFFFFF' : '#10B981' }}>
+                      {meta.symbol}
+                    </Text>
+                    <Text style={{ fontSize: 12, fontWeight: isSel ? '700' : '500', color: isSel ? '#FFFFFF' : colors.textPrimary }}>
+                      {code}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 }, (prev, next) => (

@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "결제 및 청구서 보드",
   "No payment boards yet": "아직 결제 보드가 없습니다",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "할 일에서 '지출 및 청구서' 보드를 생성하여 반복 청구서, 예산, 마감일 알림을 관리하세요.",
-  "Configure payment board settings": "결제 보드 설정 구성"
+  "Configure payment board settings": "결제 보드 설정 구성",
+  "Currency symbol and formatting for this board": "이 보드의 통화 기호 및 서식",
+  "Luggage Category": "수하물 카테고리",
+  "Luggage Type": "수하물 종류",
+  "Media Category & Rating": "카테고리 및 평점",
+  "Books": "도서",
+  "Movies/TV": "영화/TV",
+  "Courses": "강좌",
+  "Type currency code e.g. USD, EUR, $": "통화 코드 입력 (예: USD, EUR, $)",
+  "Converted total": "환산된 총액"
 }

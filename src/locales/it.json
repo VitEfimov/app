@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "Bacheche pagamenti e bollette",
   "No payment boards yet": "Nessuna bacheca pagamenti ancora",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "Crea una bacheca Spese e Bollette in Attività per gestire bollette ricorrenti, budget e promemoria di scadenza.",
-  "Configure payment board settings": "Configura impostazioni bacheca pagamenti"
+  "Configure payment board settings": "Configura impostazioni bacheca pagamenti",
+  "Currency symbol and formatting for this board": "Simbolo di valuta e formattazione per questa bacheca",
+  "Luggage Category": "Categoria bagaglio",
+  "Luggage Type": "Tipo di bagaglio",
+  "Media Category & Rating": "Categoria e valutazione",
+  "Books": "Libri",
+  "Movies/TV": "Film/Serie TV",
+  "Courses": "Corsi",
+  "Type currency code e.g. USD, EUR, $": "Digita il codice valuta es. USD, EUR, $",
+  "Converted total": "Totale convertito"
 }

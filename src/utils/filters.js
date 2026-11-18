@@ -1,7 +1,15 @@
 import dayjs from 'dayjs';
-import isoWeek from 'dayjs/plugin/isoWeek';
+import isoWeek from 'dayjs/plugin/isoWeek.js';
 
 dayjs.extend(isoWeek);
+
+export const MONDAY_FIRST_LANGUAGES = ['ru', 'de', 'fr', 'es', 'it', 'zh', 'uk', 'be', 'pl', 'pt', 'nl', 'sv', 'no', 'da', 'fi', 'cs', 'tr'];
+
+export function getFirstDayOfWeek(langCode) {
+  if (!langCode || typeof langCode !== 'string') return 0;
+  const code = langCode.toLowerCase().split(/[-_]/)[0];
+  return MONDAY_FIRST_LANGUAGES.includes(code) ? 1 : 0;
+}
 
 export function getTaskDateStr(task) {
     if (!task) return '';

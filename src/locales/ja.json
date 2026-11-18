@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "支払い＆請求書ボード",
   "No payment boards yet": "支払いボードはまだありません",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "タスクで「支出＆請求書」ボードを作成して、定期的な請求書、予算、期日リマインダーを管理します。",
-  "Configure payment board settings": "支払いボード設定を構成"
+  "Configure payment board settings": "支払いボード設定を構成",
+  "Currency symbol and formatting for this board": "このボードの通貨記号とフォーマット",
+  "Luggage Category": "荷物のカテゴリ",
+  "Luggage Type": "荷物の種類",
+  "Media Category & Rating": "カテゴリと評価",
+  "Books": "書籍",
+  "Movies/TV": "映画・ドラマ",
+  "Courses": "講座",
+  "Type currency code e.g. USD, EUR, $": "通貨コードを入力（例：USD、EUR、$）",
+  "Converted total": "換算後の合計"
 }

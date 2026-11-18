@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "Zahlungs- & Rechnungsboards",
   "No payment boards yet": "Noch keine Zahlungsboards",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "Erstellen Sie ein Ausgaben- & Rechnungsboard in Aufgaben, um wiederkehrende Rechnungen, Budgets und Fälligkeitserinnerungen zu verwalten.",
-  "Configure payment board settings": "Zahlungsboard-Einstellungen konfigurieren"
+  "Configure payment board settings": "Zahlungsboard-Einstellungen konfigurieren",
+  "Currency symbol and formatting for this board": "Währungssymbol und Formatierung für dieses Board",
+  "Luggage Category": "Gepäckkategorie",
+  "Luggage Type": "Gepäckart",
+  "Media Category & Rating": "Kategorie & Bewertung",
+  "Books": "Bücher",
+  "Movies/TV": "Filme/Serien",
+  "Courses": "Kurse",
+  "Type currency code e.g. USD, EUR, $": "Währungscode eingeben z. B. USD, EUR, $",
+  "Converted total": "Umgerechneter Betrag"
 }

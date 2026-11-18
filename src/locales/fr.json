@@ -890,5 +890,14 @@
   "Payment & Bills Boards": "Tableaux de paiements et factures",
   "No payment boards yet": "Aucun tableau de paiement pour l'instant",
   "Create an Expenses & Bills board in Tasks to manage recurring bills, budgets, and due date reminders.": "Créez un tableau Dépenses et Factures dans Tâches pour gérer les factures récurrentes, les budgets et les rappels.",
-  "Configure payment board settings": "Configurer les paramètres du tableau de paiements"
+  "Configure payment board settings": "Configurer les paramètres du tableau de paiements",
+  "Currency symbol and formatting for this board": "Symbole de devise et formatage pour ce tableau",
+  "Luggage Category": "Catégorie de bagage",
+  "Luggage Type": "Type de bagage",
+  "Media Category & Rating": "Catégorie et note",
+  "Books": "Livres",
+  "Movies/TV": "Films/Séries",
+  "Courses": "Cours",
+  "Type currency code e.g. USD, EUR, $": "Tapez le code de devise ex. USD, EUR, $",
+  "Converted total": "Total converti"
 }
