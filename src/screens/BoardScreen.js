@@ -266,6 +266,7 @@ export default function BoardScreen({ route, navigation }) {
   const [isMoveBoardVisible, setMoveBoardVisible] = useState(false);
   const [sortConfig, setSortConfig] = useState({});
   const [selectionMode, setSelectionMode] = useState({ isActive: false, sectionId: null, selectedTaskIds: [] });
+  const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [listFilterCategory, setListFilterCategory] = useState('All');
   const [expensesPeriodFilter, setExpensesPeriodFilter] = useState('month');
   const boardExpensesSettings = useSelector(state => state.themeReducer?.boardExpensesSettings || {});
@@ -373,15 +374,67 @@ export default function BoardScreen({ route, navigation }) {
   }, [sectionOptionsConfig.isVisible, boardOptionsConfig.isVisible, paymentSettingsBoard]);
 
   useEffect(() => {
-    if (route?.params?.editTaskId) {
-      const t = tasks.find(tsk => tsk.id === route.params.editTaskId);
-      if (t) {
-         setSelectedTask(t);
-         setDetailsVisible(true);
-      }
-      navigation.setParams({ editTaskId: undefined });
+    const targetTaskId = route?.params?.editTaskId || route?.params?.taskId || route?.params?.focusTaskId;
+    const targetBoardId = route?.params?.boardId;
+
+    if (!targetTaskId) return;
+
+    // If tasks have not yet hydrated, wait for tasks to be populated before clearing params
+    if (!tasks || tasks.length === 0) {
+      return;
     }
-  }, [route?.params?.editTaskId, tasks, navigation]);
+
+    const t = tasks.find(tsk => tsk && (String(tsk.id) === String(targetTaskId) || String(tsk._id) === String(targetTaskId)));
+
+    if (t) {
+      // 1. Open the board with the task: switch active board if needed
+      const taskBoardId = targetBoardId || t.boardId || t.board_id || 'main';
+      if (activeBoardId !== taskBoardId) {
+        dispatch(setActiveBoardId(taskBoardId));
+      }
+
+      // 2. Focus on task: uncollapse the section containing the task so it is visible
+      const thresholds = getDateThresholds(dayjs());
+      const hasDate = !!(t.completionDate || t.dateString || t.dueDate || t.date);
+      const dateStr = getTaskDateStr(t);
+      const targetSection = t.completed ? 'completed' : classifyTaskDate(dateStr, thresholds, hasDate);
+
+      setCollapsedSections(prev => {
+        if (!prev.includes(targetSection)) return prev;
+        const next = prev.filter(s => s !== targetSection);
+        currentSessionCollapsedSections = next;
+        return next;
+      });
+
+      // Expand section pagination limit so the task is rendered
+      setSectionVisibleCounts(prev => ({
+        ...prev,
+        [targetSection]: Math.max(prev[targetSection] || INITIAL_SECTION_PAGE_SIZE, 60),
+      }));
+
+      // 3. Highlight and focus on the task in the list
+      setHighlightedTaskId(String(t.id || t._id));
+      const highlightTimer = setTimeout(() => {
+        setHighlightedTaskId(null);
+      }, 4000);
+
+      // 4. Open task details modal with 150ms gesture transition buffer
+      const modalTimer = setTimeout(() => {
+        setSelectedTask(t);
+        setDetailsVisible(true);
+      }, 150);
+
+      navigation.setParams({ editTaskId: undefined, taskId: undefined, focusTaskId: undefined, boardId: undefined });
+
+      return () => {
+        clearTimeout(highlightTimer);
+        clearTimeout(modalTimer);
+      };
+    } else {
+      // Task was not found in loaded tasks array after hydration
+      navigation.setParams({ editTaskId: undefined, taskId: undefined, focusTaskId: undefined, boardId: undefined });
+    }
+  }, [route?.params?.editTaskId, route?.params?.taskId, route?.params?.focusTaskId, route?.params?.boardId, tasks, activeBoardId, dispatch, navigation]);
 
   const boardIdsKey = useMemo(() => {
     return (boards || []).map(b => b?.id || b?._id).join(',');
@@ -1309,6 +1362,7 @@ export default function BoardScreen({ route, navigation }) {
           hideBoardBadge={true}
           isSelectionMode={selectionMode.isActive}
           isSelected={selectedTaskIdsSet.has(task.id) || selectedTaskIdsSet.has(task._id)}
+          isHighlighted={Boolean(highlightedTaskId && (String(task.id) === String(highlightedTaskId) || String(task._id) === String(highlightedTaskId)))}
           onToggleSelect={handleToggleSelectTask}
           onPressSnooze={handleSnoozePress}
           onPressMore={isListBoard ? undefined : handleQuickMenuPress}
@@ -1317,7 +1371,7 @@ export default function BoardScreen({ route, navigation }) {
       );
     }
     return null;
-  }, [renderSectionHeader, renderSectionFooter, renderShowMoreRow, activeBoard?.type, selectionMode.isActive, selectedTaskIdsSet, handleToggleSelectTask, handleSnoozePress, handleQuickMenuPress, handleTaskPress]);
+  }, [renderSectionHeader, renderSectionFooter, renderShowMoreRow, activeBoard?.type, selectionMode.isActive, selectedTaskIdsSet, highlightedTaskId, handleToggleSelectTask, handleSnoozePress, handleQuickMenuPress, handleTaskPress]);
 
   const flashListExtraData = useMemo(() => ({
     activeBoardId,
@@ -1332,7 +1386,8 @@ export default function BoardScreen({ route, navigation }) {
     expensesPeriodFilter,
     listFilterCategory,
     isNarrow: windowWidth < 300,
-  }), [activeBoardId, activeAddSectionId, collapsedSections, selectionMode.isActive, selectedTaskIdsSet, mode, isDark, colors.bgMain, colors.textPrimary, expensesPeriodFilter, listFilterCategory, windowWidth]);
+    highlightedTaskId,
+  }), [activeBoardId, activeAddSectionId, collapsedSections, selectionMode.isActive, selectedTaskIdsSet, mode, isDark, colors.bgMain, colors.textPrimary, expensesPeriodFilter, listFilterCategory, windowWidth, highlightedTaskId]);
 
   const flashListRef = useRef(null);
   const flatListRef = useRef(null);

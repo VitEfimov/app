@@ -62,7 +62,7 @@ class AlarmActivity : Activity() {
         val titleView = findViewById<TextView>(titleId)
         titleView?.text = taskName
         
-        titleView?.setOnClickListener {
+        val openTaskAction = {
             AlarmAudioManager.stopAlarmSound(this)
             if (keepAllDay) {
                 AlarmActionReceiver.postSilentPersistentReminder(this, requestCode, taskName, taskId)
@@ -91,10 +91,16 @@ class AlarmActivity : Activity() {
             }
             finish()
         }
+
+        titleView?.setOnClickListener { openTaskAction() }
         
+        val nameView = findViewById<TextView>(nameId)
         val dateFormat = SimpleDateFormat("EEE, MMM d • hh:mm a", Locale.getDefault())
         val currentDateTime = dateFormat.format(Date())
-        findViewById<TextView>(nameId)?.text = currentDateTime
+        nameView?.text = currentDateTime
+        nameView?.setOnClickListener { openTaskAction() }
+
+        findViewById<android.view.View>(android.R.id.content)?.setOnClickListener { openTaskAction() }
 
         findViewById<Button>(dismissBtnId)?.setOnClickListener {
             AlarmAudioManager.stopAlarmSound(this)

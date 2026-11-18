@@ -223,13 +223,24 @@ function InitApp() {
       const interval = setInterval(() => {
         attempts++;
         if (navigationRef.isReady()) {
-          const { type, taskId, automationType, actionIdentifier } = pendingNotificationPayload;
+          const { type, taskId, boardId, automationType, actionIdentifier } = pendingNotificationPayload;
           setPendingNotificationPayload(null);
           clearInterval(interval);
 
           if (type === 'task' && taskId) {
             if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER || actionIdentifier === 'reschedule') {
-              navigationRef.navigate('Board', { editTaskId: taskId });
+              if (boardId) {
+                const { setActiveBoardId } = require('./src/features/userSlice');
+                dispatch(setActiveBoardId(boardId));
+              }
+              try {
+                navigationRef.navigate('MainTabs', {
+                  screen: 'Board',
+                  params: { editTaskId: taskId, boardId: boardId || 'main', focusTaskId: taskId }
+                });
+              } catch (e) {
+                navigationRef.navigate('Board', { editTaskId: taskId, boardId: boardId || 'main', focusTaskId: taskId });
+              }
             }
           } else if (type === 'automation' || automationType) {
             const targetSection = automationType === 'summary' ? 'missed' : 'today';
@@ -556,19 +567,28 @@ function InitApp() {
   }, [dispatch]);
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(async response => {
+    let lastHandledResponseId = null;
+
+    const handleNotificationResponse = async (response) => {
+      if (!response || !response.notification) return;
+      const responseId = response.notification?.request?.identifier;
       const actionIdentifier = response.actionIdentifier;
       const data = response.notification.request.content.data || {};
       const taskId = data.taskId;
       const isAutomation = data.isAutomation;
       const automationType = data.automationType;
+
+      if (responseId && actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+        if (lastHandledResponseId === responseId) return;
+        lastHandledResponseId = responseId;
+      }
       
       // Dismiss the notification from the system tray since Android doesn't always do this automatically for background actions
-      if (response.notification?.request?.identifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+      if (responseId && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
         const isPersistent = !!(data.keepNotificationAllDay);
         if (!isPersistent || actionIdentifier === 'complete_task') {
           try {
-            await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+            await Notifications.dismissNotificationAsync(responseId);
           } catch (err) {
             console.warn("Failed to dismiss notification", err);
           }
@@ -583,7 +603,11 @@ function InitApp() {
         } else {
           const targetSection = automationType === 'summary' ? 'missed' : 'today';
           if (navigationRef.isReady()) {
-            navigationRef.navigate('Board', { sectionId: targetSection });
+            try {
+              navigationRef.navigate('MainTabs', { screen: 'Board', params: { sectionId: targetSection } });
+            } catch (e) {
+              navigationRef.navigate('Board', { sectionId: targetSection });
+            }
           } else {
             setPendingNotificationPayload({ type: 'automation', automationType, actionIdentifier });
           }
@@ -594,7 +618,7 @@ function InitApp() {
       if (taskId) {
         const state = store.getState();
         let tasks = state.taskReducer?.tasks || [];
-        let task = tasks.find(t => t && String(t.id) === String(taskId));
+        let task = tasks.find(t => t && (String(t.id) === String(taskId) || String(t._id) === String(taskId)));
         
         if (!task) {
           const { getTaskStorageKey } = require('./src/features/taskSlice');
@@ -603,22 +627,33 @@ function InitApp() {
           if (tasksJson) {
             try {
               const parsedTasks = JSON.parse(tasksJson);
-              task = parsedTasks.find(t => t && String(t.id) === String(taskId));
+              task = parsedTasks.find(t => t && (String(t.id) === String(taskId) || String(t._id) === String(taskId)));
             } catch (e) {}
           }
         }
         
+        const taskBoardId = task?.boardId || task?.board_id || data.boardId || 'main';
         const taskName = task?.taskname || task?.name || response.notification.request.content.body || response.notification.request.content.title || 'Task';
         const isAlarm = task?.isAlarm || false;
 
         if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER || actionIdentifier === 'reschedule') {
+          const { setActiveBoardId } = require('./src/features/userSlice');
+          dispatch(setActiveBoardId(taskBoardId));
+
           if (isLocked) {
-            setPendingNotificationPayload({ type: 'task', taskId, actionIdentifier });
+            setPendingNotificationPayload({ type: 'task', taskId, boardId: taskBoardId, actionIdentifier });
           } else {
             if (navigationRef.isReady()) {
-              navigationRef.navigate('Board', { editTaskId: taskId });
+              try {
+                navigationRef.navigate('MainTabs', {
+                  screen: 'Board',
+                  params: { editTaskId: taskId, boardId: taskBoardId, focusTaskId: taskId }
+                });
+              } catch (e) {
+                navigationRef.navigate('Board', { editTaskId: taskId, boardId: taskBoardId, focusTaskId: taskId });
+              }
             } else {
-              setPendingNotificationPayload({ type: 'task', taskId, actionIdentifier });
+              setPendingNotificationPayload({ type: 'task', taskId, boardId: taskBoardId, actionIdentifier });
             }
           }
         } else if (actionIdentifier === 'complete_task') {
@@ -627,9 +662,9 @@ function InitApp() {
             const { cancelAlarm } = require('./modules/expo-task-alarm');
             cancelAlarm(taskId);
           } catch (e) {}
-          if (response.notification?.request?.identifier) {
+          if (responseId) {
             try {
-              await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+              await Notifications.dismissNotificationAsync(responseId);
             } catch (e) {}
           }
         } else if (actionIdentifier === 'snooze') {
@@ -637,9 +672,9 @@ function InitApp() {
             const { cancelAlarm } = require('./modules/expo-task-alarm');
             cancelAlarm(taskId);
           } catch (e) {}
-          if (response.notification?.request?.identifier) {
+          if (responseId) {
             try {
-              await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+              await Notifications.dismissNotificationAsync(responseId);
             } catch (e) {}
           }
           const themeState = store.getState().themeReducer || {};
@@ -674,7 +709,18 @@ function InitApp() {
           }
         }
       }
+    };
+
+    // Cold-start notification response check (app launched from killed state by tapping notification)
+    Notifications.getLastNotificationResponseAsync().then(initialResponse => {
+      if (initialResponse && initialResponse.notification) {
+        handleNotificationResponse(initialResponse);
+      }
+    }).catch(err => {
+      console.warn("Failed to retrieve initial notification response:", err);
     });
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
     return () => subscription.remove();
   }, [dispatch, isUnlocked]);
 

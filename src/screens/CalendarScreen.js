@@ -792,9 +792,9 @@ export default function CalendarScreen({ navigation, route }) {
   );
 
   const renderDetailTaskPane = () => (
-    <View style={[styles.dayTaskListCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+    <View style={[styles.dayTaskListCard, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6'), borderColor: colors.borderColor }]}>
       {/* Header row: Tasks for Oct 26, 2026 ... */}
-      <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor }]}>
+      <View style={[styles.taskListHeader, { borderBottomColor: colors.borderColor, backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
         <Text style={[styles.taskListTitle, { color: colors.textPrimary }]}>
           {t('Tasks for')} {dayjs(selectedDate).format('MMM D, YYYY')}
         </Text>
@@ -815,7 +815,7 @@ export default function CalendarScreen({ navigation, route }) {
         groupedTasks.map((group, groupIndex) => (
           <View key={group.id} style={styles.categorySectionGroup}>
             {/* Category Header: 🟠 DCFGH */}
-            <View style={[styles.categorySectionHeader, { borderBottomColor: colors.borderColor }]}>
+            <View style={[styles.categorySectionHeader, { borderBottomColor: colors.borderColor, backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
               <View style={[styles.categoryHeaderDot, { backgroundColor: group.color }]} />
               <Text style={[styles.categoryHeaderText, { color: colors.textSecondary }]}>
                 {group.title.toUpperCase()}
@@ -832,7 +832,7 @@ export default function CalendarScreen({ navigation, route }) {
                   key={task.id || task._id}
                   style={[
                     styles.taskRowWrapper,
-                    { borderBottomColor: colors.borderColor },
+                    { borderBottomColor: colors.borderColor, backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') },
                     isLastTaskOverall && { borderBottomWidth: 0 }
                   ]}
                 >
@@ -857,7 +857,7 @@ export default function CalendarScreen({ navigation, route }) {
           </View>
         ))
       ) : (
-        <View style={styles.emptyContainer}>
+        <View style={[styles.emptyContainer, { backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             {t('No tasks scheduled for this day.') || 'No tasks scheduled for this day.'}
           </Text>
@@ -865,7 +865,7 @@ export default function CalendarScreen({ navigation, route }) {
       )}
 
       {/* Bottom + Add task */}
-      <View style={[styles.inlineAddWrapper, { borderTopColor: colors.borderColor }]}>
+      <View style={[styles.inlineAddWrapper, { borderTopColor: colors.borderColor, backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6') }]}>
         <InlineAddTask
           sectionId={selectedDate}
           hideUnderline={true}

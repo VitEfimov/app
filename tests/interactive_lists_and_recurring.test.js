@@ -2244,6 +2244,100 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.strictEqual(hydratedState.boards.some(b => b.id === 'payments_with_tasks'), true);
     });
   });
+
+  describe('Notification & Alarm Deep Linking, Board Switching & Task Focus Engine', () => {
+    test('App.js handles notification response, extracts boardId, switches board and routes with focusTaskId', () => {
+      const appJsSrc = fs.readFileSync(path.resolve('App.js'), 'utf8');
+      
+      // Cold-start notification listener
+      assert.match(appJsSrc, /Notifications\.getLastNotificationResponseAsync\(\)/, 'Must check for cold-start notification response on mount');
+      
+      // Board extraction & switching
+      assert.match(appJsSrc, /taskBoardId = task\?\.boardId \|\| task\?\.board_id \|\| data\.boardId \|\| 'main'/, 'Must extract task boardId or fallback to main');
+      assert.match(appJsSrc, /dispatch\(setActiveBoardId\(taskBoardId\)\)/, 'Must dispatch setActiveBoardId with task boardId');
+      
+      // Target navigation params
+      assert.match(appJsSrc, /params:\s*\{\s*editTaskId:\s*taskId,\s*boardId:\s*taskBoardId,\s*focusTaskId:\s*taskId\s*\}/, 'Must pass editTaskId, boardId and focusTaskId to Board screen');
+      
+      // PIN unlock queued notification preserves boardId and switches board
+      assert.match(appJsSrc, /boardId: taskBoardId/, 'Must preserve boardId in pendingNotificationPayload');
+      assert.match(appJsSrc, /dispatch\(setActiveBoardId\(boardId\)\)/, 'Must switch activeBoardId when unlocked with pending payload');
+      
+      // Response deduplication
+      assert.match(appJsSrc, /lastHandledResponseId = responseId/, 'Must track lastHandledResponseId to avoid double triggers');
+    });
+
+    test('BoardScreen uncollapses target section, switches activeBoardId, expands pagination, and highlights task', () => {
+      const boardScreenSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      
+      // Target ID extraction
+      assert.match(boardScreenSrc, /route\?\.params\?\.editTaskId \|\| route\?\.params\?\.taskId \|\| route\?\.params\?\.focusTaskId/, 'Must support editTaskId, taskId or focusTaskId');
+      
+      // Hydration guard: does not wipe params prematurely before tasks load
+      assert.match(boardScreenSrc, /if \(!tasks \|\| tasks\.length === 0\) \{\s*return;\s*\}/, 'Must wait for tasks to hydrate before evaluating route params');
+      
+      // Switch active board if different
+      assert.match(boardScreenSrc, /if \(activeBoardId !== taskBoardId\) \{\s*dispatch\(setActiveBoardId\(taskBoardId\)\);\s*\}/, 'Must switch board if task belongs to another board');
+      
+      // Uncollapse target section
+      assert.match(boardScreenSrc, /setCollapsedSections\(prev => \{/, 'Must update collapsedSections to show hidden task');
+      assert.match(boardScreenSrc, /prev\.filter\(s => s !== targetSection\)/, 'Must remove target section from collapsedSections');
+      
+      // Expand section pagination
+      assert.match(boardScreenSrc, /setSectionVisibleCounts\(prev => \(\{/, 'Must increase sectionVisibleCounts to ensure row is rendered');
+      
+      // Highlight state & TaskRow prop
+      assert.match(boardScreenSrc, /const \[highlightedTaskId, setHighlightedTaskId\] = useState\(null\)/, 'Must track highlightedTaskId');
+      assert.match(boardScreenSrc, /isHighlighted=\{Boolean\(highlightedTaskId && \(String\(task\.id\) === String\(highlightedTaskId\) \|\| String\(task\._id\) === String\(highlightedTaskId\)\)\)\}/, 'Must pass isHighlighted to TaskRow');
+      assert.match(boardScreenSrc, /flashListExtraData = useMemo\(\(\) => \(\{[\s\S]*?highlightedTaskId,[\s\S]*?\}\)/, 'Must include highlightedTaskId in FlashList extraData');
+    });
+
+    test('TaskRow memoization and styling responds to isHighlighted prop', () => {
+      const taskRowSrc = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
+      
+      // areTaskRowPropsEqual checks isHighlighted
+      assert.match(taskRowSrc, /prev\.isHighlighted === next\.isHighlighted/, 'areTaskRowPropsEqual must compare isHighlighted');
+      
+      // TaskRowInner receives isHighlighted
+      assert.match(taskRowSrc, /isHighlighted = false/, 'TaskRowInner must declare isHighlighted prop');
+      
+      // Styling applies highlight border and background tint
+      assert.match(taskRowSrc, /isHighlighted\s*\?\s*`\$\{colors\.primary \|\| '#8E24AA'\}26`/, 'Must tint row background when highlighted');
+      assert.match(taskRowSrc, /isHighlighted && \{\s*borderWidth: 1\.5,\s*borderColor: colors\.primary \|\| '#8E24AA'/, 'Must apply highlight border when isHighlighted is true');
+    });
+
+    test('AlarmActivity enables tap anywhere on screen to trigger openTaskAction with URI deep link', () => {
+      const alarmActivitySrc = fs.readFileSync(path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/AlarmActivity.kt'), 'utf8');
+      
+      // Defines openTaskAction
+      assert.match(alarmActivitySrc, /val openTaskAction = \{/, 'Must define reusable openTaskAction closure');
+      
+      // Tapping background/root content triggers openTaskAction
+      assert.match(alarmActivitySrc, /findViewById<android\.view\.View>\(android\.R\.id\.content\)\?\.setOnClickListener \{ openTaskAction\(\) \}/, 'Root view tap must open task');
+      
+      // Tapping title or date triggers openTaskAction
+      assert.match(alarmActivitySrc, /titleView\?\.setOnClickListener \{ openTaskAction\(\) \}/, 'Title view tap must open task');
+      assert.match(alarmActivitySrc, /nameView\?\.setOnClickListener \{ openTaskAction\(\) \}/, 'Date/time view tap must open task');
+      
+      // Deep link URI
+      assert.match(alarmActivitySrc, /taskmanager:\/\/board\?editTaskId=\$safeTaskId/, 'Must deep link to board with editTaskId');
+    });
+
+    test('CalendarScreen task pane background matches BoardScreen and TaskRow colors.bgMain', () => {
+      const calSrc = fs.readFileSync(path.resolve('src/screens/CalendarScreen.js'), 'utf8');
+      
+      // dayTaskListCard background must use colors.bgMain to match BoardScreen
+      assert.match(calSrc, /styles\.dayTaskListCard,\s*\{\s*backgroundColor:\s*colors\.bgMain/, 'dayTaskListCard must use colors.bgMain instead of colors.bgCard');
+      
+      // taskListHeader and taskRowWrapper use colors.bgMain
+      assert.match(calSrc, /styles\.taskListHeader,\s*\{\s*borderBottomColor:\s*colors\.borderColor,\s*backgroundColor:\s*colors\.bgMain/, 'taskListHeader must use colors.bgMain');
+      assert.match(calSrc, /styles\.taskRowWrapper,\s*\{\s*borderBottomColor:\s*colors\.borderColor,\s*backgroundColor:\s*colors\.bgMain/, 'taskRowWrapper must use colors.bgMain');
+      assert.match(calSrc, /styles\.inlineAddWrapper,\s*\{\s*borderTopColor:\s*colors\.borderColor,\s*backgroundColor:\s*colors\.bgMain/, 'inlineAddWrapper must use colors.bgMain');
+
+      const taskRowSrc = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
+      assert.match(taskRowSrc, /backgroundColor\s*\|\|\s*colors\.bgMain/, 'TaskRow must use colors.bgMain for default background');
+    });
+  });
 });
 
 

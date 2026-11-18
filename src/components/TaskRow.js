@@ -231,6 +231,8 @@ function areTaskRowPropsEqual(prev, next) {
     prev.sectionId === next.sectionId &&
     prev.isSelectionMode === next.isSelectionMode &&
     prev.isSelected === next.isSelected &&
+    prev.isHighlighted === next.isHighlighted &&
+    prev.backgroundColor === next.backgroundColor &&
     prev.hideDate === next.hideDate &&
     prev.hideBoardBadge === next.hideBoardBadge &&
     prev.hideUnderline === next.hideUnderline &&
@@ -245,7 +247,7 @@ function areTaskRowPropsEqual(prev, next) {
   );
 }
 
-const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, onToggleSelect, onPressSnooze, onPressMore, boardTypeProp, testIDPrefix = "" }) {
+const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, isHighlighted = false, backgroundColor, onToggleSelect, onPressSnooze, onPressMore, boardTypeProp, testIDPrefix = "" }) {
   const dispatch = useDispatch();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
@@ -639,9 +641,17 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
         styles.container,
         {
           borderBottomColor: colors.borderColor,
-          backgroundColor: colors.bgMain || (isDark ? '#141419' : '#FAF9F6')
+          backgroundColor: isHighlighted
+            ? `${colors.primary || '#8E24AA'}26`
+            : (backgroundColor || colors.bgMain || (isDark ? '#141419' : '#FAF9F6'))
         },
-        hideUnderline && { borderBottomWidth: 0 }
+        hideUnderline && { borderBottomWidth: 0 },
+        isHighlighted && {
+          borderWidth: 1.5,
+          borderColor: colors.primary || '#8E24AA',
+          borderRadius: 8,
+          marginVertical: 2,
+        }
       ]}
       onLongPress={handleLongPress}
       onPress={() => {
