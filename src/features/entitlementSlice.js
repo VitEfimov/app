@@ -12,8 +12,7 @@ const initialState = {
     'advancedStatistics',
     'premiumThemes',
     'cloudSync',
-    'androidAuto',
-    'calendarSync'
+    'androidAuto'
   ]
 };
 

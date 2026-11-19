@@ -2,11 +2,68 @@ import { Platform } from 'react-native';
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
+import {
+  DAILY_CALENDAR_SYNC_HOURS,
+  DAILY_CALENDAR_SYNC_SLOTS,
+  CALENDAR_SYNC_STATE_KEY,
+  formatLocalDateKey,
+  getDailySyncSlotsForDate,
+  getMostRecentDueSyncSlot,
+  getNextScheduledSyncTime,
+  isScheduledCalendarSyncDue,
+} from './calendarSyncSchedule';
+
+export {
+  DAILY_CALENDAR_SYNC_HOURS,
+  DAILY_CALENDAR_SYNC_SLOTS,
+  CALENDAR_SYNC_STATE_KEY,
+  formatLocalDateKey,
+  getDailySyncSlotsForDate,
+  getMostRecentDueSyncSlot,
+  getNextScheduledSyncTime,
+  isScheduledCalendarSyncDue,
+};
 
 export const SYNC_PAST_DAYS = 30;
 export const SYNC_FUTURE_DAYS = 90;
 const TOMBSTONES_STORAGE_KEY = 'calendar_deleted_tombstones';
 const TOMBSTONE_TTL_MS = 15 * 60 * 1000; // 15-minute TTL to prevent resurrection
+
+/**
+ * Reads persisted 3x/day calendar sync schedule state from storage.
+ */
+export const getCalendarSyncScheduleStateAsync = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(CALENDAR_SYNC_STATE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        lastSyncedSlotKey: parsed?.lastSyncedSlotKey || null,
+        lastSyncedAt: parsed?.lastSyncedAt || null,
+        lastSyncSummary: parsed?.lastSyncSummary || null,
+      };
+    }
+  } catch (e) {}
+  return { lastSyncedSlotKey: null, lastSyncedAt: null, lastSyncSummary: null };
+};
+
+/**
+ * Marks the current due scheduled sync slot (08:00, 12:00, or 17:00) as completed
+ * and persists the timestamp and summary.
+ */
+export const markCalendarSyncCompletedAsync = async (summary = null, nowLike = new Date()) => {
+  const now = nowLike instanceof Date ? nowLike : new Date(nowLike);
+  const dueSlot = getMostRecentDueSyncSlot(now);
+  const nextState = {
+    lastSyncedSlotKey: dueSlot.slotKey,
+    lastSyncedAt: now.toISOString(),
+    lastSyncSummary: summary,
+  };
+  try {
+    await AsyncStorage.setItem(CALENDAR_SYNC_STATE_KEY, JSON.stringify(nextState));
+  } catch (e) {}
+  return nextState;
+};
 
 // In-memory cache for zero-latency lookups
 let inMemoryTombstones = new Map();
@@ -129,7 +186,17 @@ export const getWritableCalendarsAsync = async () => {
     if (!hasPermission) return [];
 
     const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
-    return calendars.filter(cal => cal.allowsModifications !== false && cal.isPrimary !== undefined);
+    const writable = (calendars || []).filter(cal => cal && cal.allowsModifications !== false);
+    return writable.sort((a, b) => {
+      const score = (c) => {
+        let s = 0;
+        if (c.isPrimary) s += 4;
+        if (c.source?.type === 'com.google' || c.source?.name?.includes('@') || c.ownerAccount?.includes('@')) s += 2;
+        if (c.source?.isLocalAccount || c.source?.type === 'LOCAL') s += 1;
+        return s;
+      };
+      return score(b) - score(a);
+    });
   } catch (error) {
     console.warn('Error getting calendars:', error);
     return [];
@@ -234,11 +301,17 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
   }
 
   if (!startDate || isNaN(startDate.getTime())) {
-    const dayStart = dayjs(rawDate).startOf('day');
-    const dayEnd = dayjs(rawDate).endOf('day');
-    if (!dayStart.isValid()) return null;
-    startDate = dayStart.toDate();
-    endDate = dayEnd.toDate();
+    if (Platform.OS === 'android') {
+      const [y, m, d] = rawDate.split('-').map(Number);
+      startDate = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+      endDate = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0));
+    } else {
+      const dayStart = dayjs(rawDate).startOf('day');
+      const dayEnd = dayjs(rawDate).endOf('day');
+      if (!dayStart.isValid()) return null;
+      startDate = dayStart.toDate();
+      endDate = dayEnd.toDate();
+    }
     allDay = true;
   }
 
@@ -270,7 +343,7 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
     availability: Calendar.Availability.BUSY,
   };
 
-  if (allDay) {
+  if (allDay && Platform.OS === 'android') {
     details.timeZone = 'UTC';
     details.endTimeZone = 'UTC';
   }
@@ -379,11 +452,14 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}) => 
             }
             if (eventId) {
               const idString = String(eventId);
-              eventMap[task.id] = idString;
+              const taskKey = task.id || task._id;
+              if (taskKey) {
+                eventMap[taskKey] = idString;
+              }
               syncedCount++;
             }
           } catch (e) {
-            console.warn(`Failed batch sync for task ${task.id}:`, e);
+            console.warn(`Failed batch sync for task ${task.id || task._id}:`, e);
           }
         }
       }
@@ -470,7 +546,8 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
         const taskCalId = String(task.calendarEventId);
         if (!activeNativeIds.has(taskCalId)) {
           // Native event no longer exists in calendar -> Ghost deletion detected!
-          deletedTaskIds.push(task.id);
+          const tid = task.id || task._id;
+          if (tid) deletedTaskIds.push(tid);
         }
       }
     });
@@ -524,8 +601,9 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
       // Check if already mapped to a task
       const existingLinkedTask = taskByCalEventId.get(eventCalId);
       if (existingLinkedTask) {
+        const linkedTaskId = existingLinkedTask.id || existingLinkedTask._id;
         // Skip if task was marked for deletion
-        if (deletedTaskIds.includes(existingLinkedTask.id)) continue;
+        if (deletedTaskIds.includes(linkedTaskId)) continue;
 
         const titleChanged = existingLinkedTask.taskname !== cleanTitle;
         const dateChanged = (existingLinkedTask.dateString || existingLinkedTask.completionDate) !== dateStr;
@@ -534,7 +612,7 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
 
         if (titleChanged || dateChanged || timeChanged || completionChanged) {
           updatedTasks.push({
-            taskId: existingLinkedTask.id,
+            taskId: linkedTaskId,
             name: cleanTitle,
             completionDate: dateStr,
             time: timeStr,
@@ -549,9 +627,10 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
       const matchKey = `${cleanTitle.toLowerCase()}_${dateStr}`;
       const unlinkedMatch = taskByNameAndDate.get(matchKey);
       if (unlinkedMatch && !unlinkedMatch.calendarEventId) {
-        if (!deletedTaskIds.includes(unlinkedMatch.id)) {
+        const unlinkedId = unlinkedMatch.id || unlinkedMatch._id;
+        if (!deletedTaskIds.includes(unlinkedId)) {
           updatedTasks.push({
-            taskId: unlinkedMatch.id,
+            taskId: unlinkedId,
             calendarEventId: eventCalId
           });
           taskByCalEventId.set(eventCalId, unlinkedMatch);

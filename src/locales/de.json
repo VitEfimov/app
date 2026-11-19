@@ -899,5 +899,11 @@
   "Movies/TV": "Filme/Serien",
   "Courses": "Kurse",
   "Type currency code e.g. USD, EUR, $": "Währungscode eingeben z. B. USD, EUR, $",
-  "Converted total": "Umgerechneter Betrag"
+  "Converted total": "Umgerechneter Betrag",
+  "Syncing...": "Synchronisiere...",
+  "Automatic Sync Active": "Automatische Synchronisierung aktiv",
+  "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes": "Synchronisiert 3x täglich (08:00, 12:00, 17:00) und bei Änderungen",
+  "Last synced": "Zuletzt synchronisiert",
+  "Next scheduled sync": "Nächste geplante Synchronisierung",
+  "Device calendar sync is available on Android and iOS.": "Die Gerätekalender-Synchronisierung ist für Android und iOS verfügbar."
 }

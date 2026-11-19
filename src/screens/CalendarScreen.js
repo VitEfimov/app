@@ -33,7 +33,7 @@ import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import CreateBoardModal from '../components/CreateBoardModal';
 import CalendarDayOptionsModal from '../components/calendar/CalendarDayOptionsModal';
 import YearPickerModal, { parseCalendarHeaderDate } from '../components/YearPickerModal';
-import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks } from '../features/taskSlice';
+import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, batchSyncCalendarTasks } from '../features/taskSlice';
 import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
 import { getBoardColor } from '../utils/boardColors';
@@ -79,6 +79,15 @@ const IconSubtasksLines = ({ color = '#888', size = 14 }) => (
   </Svg>
 );
 
+const IconSync = ({ color = '#000', size = 18 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <Path d="M3 3v5h5" />
+    <Path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+    <Path d="M16 16h5v5" />
+  </Svg>
+);
+
 export default function CalendarScreen({ navigation, route }) {
   const { colors, isDark, mode } = useTheme();
   const { t, i18n } = useTranslation();
@@ -89,6 +98,7 @@ export default function CalendarScreen({ navigation, route }) {
   const boards = useSelector(state => state.userReducer?.boards || []);
   const jumpToTodayTrigger = useSelector(state => state.themeReducer?.jumpToTodayTrigger);
   const isGoogleDrawerOpen = useSelector(state => state.themeReducer?.isGoogleDrawerOpen || false);
+  const calendarSyncEnabled = useSelector(state => state.themeReducer?.calendarSyncEnabled || false);
   const isPremium = useSelector(state => state.entitlementReducer?.isPremium);
 
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
@@ -100,6 +110,22 @@ export default function CalendarScreen({ navigation, route }) {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isInlineAddActive, setIsInlineAddActive] = useState(false);
   const [isYearPickerVisible, setIsYearPickerVisible] = useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+
+  const handleQuickCalendarSync = async () => {
+    if (isSyncingCalendar) return;
+    setIsSyncingCalendar(true);
+    try {
+      const res = await dispatch(batchSyncCalendarTasks());
+      const exported = res?.exportedCount || 0;
+      const imported = res?.importedCount || 0;
+      if (showToast) {
+        showToast(`${t('Calendar Synced') || 'Calendar Synced'} (${exported} ↑ / ${imported} ↓)`);
+      }
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
 
   // Set focus if passed via navigation params
   useEffect(() => {
@@ -571,6 +597,20 @@ export default function CalendarScreen({ navigation, route }) {
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {calendarSyncEnabled && Platform.OS !== 'web' && (
+            <TouchableOpacity
+              testID="calendar_quick_sync_btn"
+              activeOpacity={0.75}
+              onPress={handleQuickCalendarSync}
+              disabled={isSyncingCalendar}
+              style={[styles.headerIconCircle, { backgroundColor: colors.bgCard, borderColor: colors.borderColor, opacity: isSyncingCalendar ? 0.5 : 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('Synchronize Calendar Now') || 'Synchronize Calendar Now'}
+            >
+              <IconSync color={primaryAccent} size={18} />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={handleToggleTheme}

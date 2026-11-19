@@ -899,5 +899,11 @@
   "Movies/TV": "영화/TV",
   "Courses": "강좌",
   "Type currency code e.g. USD, EUR, $": "통화 코드 입력 (예: USD, EUR, $)",
-  "Converted total": "환산된 총액"
+  "Converted total": "환산된 총액",
+  "Syncing...": "동기화 중...",
+  "Automatic Sync Active": "자동 동기화 활성화됨",
+  "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes": "매일 3회(오전 8:00, 오후 12:00, 오후 5:00) 및 변경 시 자동 동기화",
+  "Last synced": "마지막 동기화",
+  "Next scheduled sync": "다음 예약 동기화",
+  "Device calendar sync is available on Android and iOS.": "기기 캘린더 동기화는 Android 및 iOS에서 사용할 수 있습니다."
 }

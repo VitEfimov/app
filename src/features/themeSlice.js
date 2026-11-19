@@ -162,6 +162,7 @@ const initialState = {
   calendarSyncEnabled: loaded?.calendarSyncEnabled || false,
   calendarAlarmsEnabled: loaded?.calendarAlarmsEnabled || false,
   selectedCalendarId: loaded?.selectedCalendarId || null,
+  lastCalendarSyncAt: loaded?.lastCalendarSyncAt || null,
 
   // Per-Board Automations Map
   boardAutomations: loaded?.boardAutomations || {},
@@ -377,6 +378,9 @@ const themeSlice = createSlice({
     setSelectedCalendarId: (state, action) => {
       state.selectedCalendarId = action.payload;
     },
+    setLastCalendarSyncAt: (state, action) => {
+      state.lastCalendarSyncAt = action.payload;
+    },
     setBlockScreenshots: (state, action) => {
       state.blockScreenshots = action.payload;
     },
@@ -469,7 +473,7 @@ export const {
   setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setBiometricUnlockEnabled, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
-  setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId,
+  setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setLastCalendarSyncAt,
   setBlockScreenshots, setCurrencyCode, setBoardCurrency, setHabitStreakMode, setBoardExpensesSettings,
   setGoogleDrawerOpen, triggerJumpToToday
 } = themeSlice.actions;

@@ -899,5 +899,11 @@
   "Movies/TV": "फ़िल्में/टीवी",
   "Courses": "पाठ्यक्रम",
   "Type currency code e.g. USD, EUR, $": "मुद्रा कोड दर्ज करें जैसे USD, EUR, $",
-  "Converted total": "परिवर्तित कुल"
+  "Converted total": "परिवर्तित कुल",
+  "Syncing...": "सिंक हो रहा है...",
+  "Automatic Sync Active": "ऑटोमैटिक सिंक सक्रिय है",
+  "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes": "दिन में 3 बार (सुबह 8:00, दोपहर 12:00, शाम 5:00) और बदलाव पर ऑटो-सिंक",
+  "Last synced": "अंतिम सिंक",
+  "Next scheduled sync": "अगला निर्धारित सिंक",
+  "Device calendar sync is available on Android and iOS.": "डिवाइस कैलेंडर सिंक Android और iOS पर उपलब्ध है।"
 }

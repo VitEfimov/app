@@ -195,7 +195,46 @@ function InitApp() {
   const appPin = useSelector(state => state.themeReducer?.appPin);
   const blockScreenshots = useSelector(state => state.themeReducer?.blockScreenshots);
   const vibrationEnabled = useSelector(state => state.themeReducer?.vibrationEnabled);
+  const calendarSyncEnabled = useSelector(state => state.themeReducer?.calendarSyncEnabled);
   const lastBackgroundTimestampRef = useRef(null);
+
+  // Automatic 3x/day scheduled calendar sync timer (8:00 AM, 12:00 PM, 5:00 PM) while app is active
+  useEffect(() => {
+    if (!isHydrated || !calendarSyncEnabled || Platform.OS === 'web') return;
+
+    let timerId = null;
+    let isCancelled = false;
+
+    registerBackgroundFetchAsync().catch(() => {});
+
+    const scheduleNextSlot = () => {
+      if (isCancelled) return;
+      const { getNextScheduledSyncTime } = require('./src/utils/calendarSync');
+      const nextSlot = getNextScheduledSyncTime(new Date());
+      const delayMs = Math.max(1000, nextSlot.time.getTime() - Date.now());
+      // Cap setTimeout to 24h max safe window and re-evaluate cleanly
+      const cappedDelay = Math.min(delayMs, 24 * 60 * 60 * 1000);
+
+      timerId = setTimeout(async () => {
+        if (isCancelled) return;
+        try {
+          const { performScheduledCalendarSync } = require('./src/features/taskSlice');
+          await dispatch(performScheduledCalendarSync(true));
+        } catch (err) {
+          console.warn('Scheduled foreground calendar sync error:', err);
+        } finally {
+          scheduleNextSlot();
+        }
+      }, cappedDelay);
+    };
+
+    scheduleNextSlot();
+
+    return () => {
+      isCancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [isHydrated, calendarSyncEnabled, dispatch]);
 
   // Sync global haptic engine with user's vibration preference
   useEffect(() => {
@@ -405,8 +444,15 @@ function InitApp() {
         // Fetch/sync latest tasks with remote DB
         await dispatch(fetchTasks());
         try {
-          const { rolloverHabitTasks } = require('./src/features/taskSlice');
+          const { rolloverHabitTasks, performScheduledCalendarSync, performForegroundCalendarSync } = require('./src/features/taskSlice');
           await dispatch(rolloverHabitTasks());
+          // Catch up any missed 8am / 12pm / 5pm calendar sync slot on startup, or run fast differential sync
+          if (store.getState().themeReducer?.calendarSyncEnabled && Platform.OS !== 'web') {
+            const schedRes = await dispatch(performScheduledCalendarSync(false));
+            if (!schedRes?.ran) {
+              dispatch(performForegroundCalendarSync()).catch(() => {});
+            }
+          }
         } catch (e) {}
       } catch (e) {
         console.error("Initialization failed", e);
@@ -530,9 +576,17 @@ function InitApp() {
         const currentTheme = store.getState().themeReducer;
         const shouldBlockScreenshots = !!(currentTheme?.blockScreenshots || (currentTheme?.appPin && !isUnlocked));
         setScreenSecurityAsync(shouldBlockScreenshots);
-        const { processAutoManageTasks, performForegroundCalendarSync } = require('./src/features/taskSlice');
-        // 1. Silent Foreground Differential Calendar Sync (0-button real-time sync)
-        dispatch(performForegroundCalendarSync()).catch(() => {});
+        const { processAutoManageTasks, performForegroundCalendarSync, performScheduledCalendarSync } = require('./src/features/taskSlice');
+        // 1. Scheduled 3x/day calendar sync catch-up (8am, 12pm, 5pm) + Hybrid foreground differential sync
+        dispatch(performScheduledCalendarSync(false))
+          .then((schedRes) => {
+            if (!schedRes?.ran) {
+              dispatch(performForegroundCalendarSync()).catch(() => {});
+            }
+          })
+          .catch(() => {
+            dispatch(performForegroundCalendarSync()).catch(() => {});
+          });
         // 2. Auto-manage overdue/completed tasks
         await dispatch(processAutoManageTasks());
 

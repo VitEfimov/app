@@ -6,7 +6,8 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
-import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, addTombstoneAsync } from '../utils/calendarSync';
+import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, addTombstoneAsync, getCalendarSyncScheduleStateAsync, markCalendarSyncCompletedAsync, isScheduledCalendarSyncDue } from '../utils/calendarSync';
+import { setLastCalendarSyncAt } from './themeSlice';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import { sanitizeId, sanitizeForStorage } from '../utils/securitySanitizer';
 import { computeHabitRolloverUpdates } from '../utils/habitHelper';
@@ -746,8 +747,8 @@ export const addTask = (payload) => async (dispatch, getState) => {
         }
     }
 
-    // 3. Non-blocking bi-directional write to native calendar (PRO)
-    if (isPremium && themeState?.calendarSyncEnabled && payload?.task?.completionDate) {
+    // 3. Non-blocking bi-directional write to native Google / device calendar
+    if (themeState?.calendarSyncEnabled && payload?.task?.completionDate) {
         syncTaskToCalendarAsync(payload.task, themeState)
             .then(calEventId => {
                 if (calEventId) {
@@ -830,8 +831,8 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
         }, 0);
     }
 
-    // 3. Non-blocking background push to native calendar (PRO)
-    if (isPremium && themeState?.calendarSyncEnabled && Array.isArray(payload?.tasks)) {
+    // 3. Non-blocking background push to native Google / device calendar
+    if (themeState?.calendarSyncEnabled && Array.isArray(payload?.tasks)) {
         setTimeout(async () => {
             const calUpdates = [];
             for (const task of payload.tasks) {
@@ -956,6 +957,13 @@ export const deleteTasksByBoard = (payload) => async (dispatch, getState) => {
     let targetId = payload?.boardId || (typeof payload === 'string' ? payload : null);
     const affected = targetId ? tasks.filter(t => t && String(t.boardId || t.board_id) === String(targetId)) : [];
 
+    // Record tombstones for any linked calendar events before deletion
+    for (const t of affected) {
+        if (t?.calendarEventId) {
+            addTombstoneAsync(t.calendarEventId);
+        }
+    }
+
     // 1. Optimistic UI update
     dispatch(deleteTasksByBoardSync(payload));
 
@@ -963,12 +971,15 @@ export const deleteTasksByBoard = (payload) => async (dispatch, getState) => {
     persistTasksToStorage(newTasks, getState);
     syncRecurringAutomations(getState);
 
-    // 2. Background async cancellation of OS notifications
+    // 2. Background async cancellation of OS notifications & calendar events
     if (affected.length > 0) {
         setTimeout(async () => {
             for (const t of affected) {
                 try {
                     await cancelNotification(t.notificationId, t.id);
+                    if (t.calendarEventId) {
+                        await removeTaskFromCalendarAsync(t.calendarEventId);
+                    }
                 } catch (e) {}
             }
         }, 0);
@@ -1043,8 +1054,7 @@ export const updateTask = (payload) => async (dispatch, getState) => {
         }
     }
 
-    const isPremium = state.entitlementReducer?.isPremium;
-    if (isPremium && state.themeReducer?.calendarSyncEnabled && updatedTask) {
+    if (state.themeReducer?.calendarSyncEnabled && updatedTask) {
         try {
             if (updatedTask.completed) {
                 await syncTaskToCalendarAsync(updatedTask, state.themeReducer);
@@ -1090,7 +1100,6 @@ export const updateMultipleTasks = (payload) => async (dispatch, getState) => {
 
     // 2. Non-blocking background notification & calendar sync for updated tasks
     const updatedTasks = allTasks.filter(t => t && idSet.has(String(t.id)));
-    const isPremium = state.entitlementReducer?.isPremium;
     const themeState = state.themeReducer;
 
     setTimeout(async () => {
@@ -1100,7 +1109,7 @@ export const updateMultipleTasks = (payload) => async (dispatch, getState) => {
                 if (ut.completed) {
                     await cancelNotification(ut.notificationId, ut.id);
                 }
-                if (isPremium && themeState?.calendarSyncEnabled) {
+                if (themeState?.calendarSyncEnabled) {
                     if (ut.completed) {
                         await syncTaskToCalendarAsync(ut, themeState);
                     } else if (ut.completionDate) {
@@ -1143,14 +1152,11 @@ let lastSyncCompletedTimestamp = 0;
 
 /**
  * Foreground differential calendar sync triggered on AppState active or interval.
+ * Open to all users whenever calendarSyncEnabled is active.
  * Includes concurrency mutex, 10s cooldown throttle, and cloud DB deletion harmonization.
  */
 export const performForegroundCalendarSync = (force = false) => async (dispatch, getState) => {
     const state = getState();
-    const isPremium = state.entitlementReducer?.isPremium;
-    if (!isPremium) {
-        return { hasChanges: false, totalSynced: 0 };
-    }
     const themeState = state.themeReducer;
     if (!themeState?.calendarSyncEnabled || Platform.OS === 'web') {
         return { hasChanges: false, totalSynced: 0 };
@@ -1190,7 +1196,9 @@ export const performForegroundCalendarSync = (force = false) => async (dispatch,
             }
         }
 
+        const nowIso = new Date().toISOString();
         lastSyncCompletedTimestamp = Date.now();
+        dispatch(setLastCalendarSyncAt(nowIso));
         return {
             hasChanges,
             importedCount,
@@ -1206,32 +1214,44 @@ export const performForegroundCalendarSync = (force = false) => async (dispatch,
 };
 
 export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
-    try {
-        const state = getState();
-        const isPremium = state.entitlementReducer?.isPremium;
-        if (!isPremium) {
-            return {
-                exportedCount: 0,
-                importedCount: 0,
-                deletedCount: 0,
-                totalSynced: 0
-            };
-        }
-        const tasks = state.taskReducer.tasks || [];
-        const themeState = state.themeReducer || {};
+    const state = getState();
+    const themeState = state.themeReducer || {};
+    if (!themeState?.calendarSyncEnabled || Platform.OS === 'web') {
+        return {
+            exportedCount: 0,
+            importedCount: 0,
+            deletedCount: 0,
+            totalSynced: 0
+        };
+    }
+    if (isCalendarSyncInProgress) {
+        return {
+            exportedCount: 0,
+            importedCount: 0,
+            deletedCount: 0,
+            totalSynced: 0,
+            inProgress: true
+        };
+    }
 
-        // 1. Export local tasks to Google Calendar
+    isCalendarSyncInProgress = true;
+    try {
+        const tasks = state.taskReducer.tasks || [];
+
+        // 1. Export local tasks to Google / device calendar
         const { syncedCount = 0, eventMap = {} } = await syncAllTasksToCalendarAsync(tasks, themeState);
 
         // Merge newly created/updated eventMap IDs into tasks before differential sync so they are recognized
         const tasksWithUpdatedEventIds = tasks.map(t => {
-            if (t && eventMap && eventMap[t.id]) {
-                return { ...t, calendarEventId: eventMap[t.id] };
+            if (!t) return t;
+            const tid = t.id || t._id;
+            if (tid && eventMap && eventMap[tid]) {
+                return { ...t, calendarEventId: eventMap[tid] };
             }
             return t;
         });
 
-        // 2. Differential sync from Google Calendar to local tasks
+        // 2. Differential sync from Google / device calendar to local tasks
         const { newTasks = [], updatedTasks = [], deletedTaskIds = [], importedCount = 0, deletedCount = 0 } = 
             await performDifferentialCalendarSyncAsync(themeState, tasksWithUpdatedEventIds);
 
@@ -1245,6 +1265,7 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
 
         // 4. Persist to storage once
         persistTasksToStorage(getState().taskReducer.tasks, getState);
+        syncRecurringAutomations(getState);
 
         // 5. Harmonize with remote DB
         const dbSyncEnabled = themeState?.dbSyncEnabled !== false && Platform.OS !== 'web';
@@ -1254,12 +1275,19 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
             }
         }
 
-        return {
+        const summary = {
             exportedCount: syncedCount || 0,
             importedCount: importedCount || 0,
             deletedCount: deletedCount || 0,
             totalSynced: (syncedCount || 0) + (importedCount || 0) + (deletedCount || 0)
         };
+
+        const nowDate = new Date();
+        lastSyncCompletedTimestamp = nowDate.getTime();
+        await markCalendarSyncCompletedAsync(summary, nowDate);
+        dispatch(setLastCalendarSyncAt(nowDate.toISOString()));
+
+        return summary;
     } catch (error) {
         console.warn('batchSyncCalendarTasks error:', error);
         return {
@@ -1269,6 +1297,45 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
             totalSynced: 0,
             error: error.message
         };
+    } finally {
+        isCalendarSyncInProgress = false;
+    }
+};
+
+/**
+ * Checks whether a 3x/day scheduled calendar sync slot (08:00, 12:00, 17:00) is due
+ * and runs a full bi-directional calendar sync if due (or when forced).
+ */
+export const performScheduledCalendarSync = (force = false) => async (dispatch, getState) => {
+    const state = getState();
+    const themeState = state.themeReducer;
+    if (!themeState?.calendarSyncEnabled || Platform.OS === 'web') {
+        return { ran: false, totalSynced: 0 };
+    }
+
+    try {
+        const scheduleState = await getCalendarSyncScheduleStateAsync();
+        const dueInfo = isScheduledCalendarSyncDue(scheduleState.lastSyncedSlotKey, new Date());
+
+        if (!force && !dueInfo.isDue) {
+            return {
+                ran: false,
+                dueSlotKey: dueInfo.dueSlotKey,
+                nextSyncTime: dueInfo.nextSyncTime,
+                totalSynced: 0
+            };
+        }
+
+        const result = await dispatch(batchSyncCalendarTasks());
+        return {
+            ran: !result?.inProgress,
+            dueSlotKey: dueInfo.dueSlotKey,
+            nextSyncTime: dueInfo.nextSyncTime,
+            ...result
+        };
+    } catch (error) {
+        console.warn('performScheduledCalendarSync error:', error);
+        return { ran: false, totalSynced: 0, error: error.message };
     }
 };
 
@@ -1293,6 +1360,12 @@ export const deleteRecurringSeries = (payload) => async (dispatch, getState) => 
         return false;
     }) : [];
 
+    for (const t of affected) {
+        if (t?.calendarEventId) {
+            addTombstoneAsync(t.calendarEventId);
+        }
+    }
+
     // 1. Optimistic UI update: Remove series tasks from Redux state immediately
     dispatch(deleteRecurringSeriesSync(payload));
 
@@ -1301,12 +1374,15 @@ export const deleteRecurringSeries = (payload) => async (dispatch, getState) => 
     persistTasksToStorage(tasks, getState);
     syncRecurringAutomations(getState);
 
-    // 3. Background async cancellation of OS notifications
+    // 3. Background async cancellation of OS notifications & linked calendar events
     if (affected.length > 0) {
         setTimeout(async () => {
             for (const t of affected) {
                 try {
                     await cancelNotification(t.notificationId, t.id);
+                    if (t.calendarEventId) {
+                        await removeTaskFromCalendarAsync(t.calendarEventId);
+                    }
                 } catch (e) {}
             }
         }, 0);

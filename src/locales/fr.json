@@ -899,5 +899,11 @@
   "Movies/TV": "Films/Séries",
   "Courses": "Cours",
   "Type currency code e.g. USD, EUR, $": "Tapez le code de devise ex. USD, EUR, $",
-  "Converted total": "Total converti"
+  "Converted total": "Total converti",
+  "Syncing...": "Synchronisation...",
+  "Automatic Sync Active": "Synchronisation automatique active",
+  "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes": "Synchronisation auto 3x/jour (08h00, 12h00, 17h00) et à chaque modification",
+  "Last synced": "Dernière synchronisation",
+  "Next scheduled sync": "Prochaine synchronisation prévue",
+  "Device calendar sync is available on Android and iOS.": "La synchronisation du calendrier de l'appareil est disponible sur Android et iOS."
 }

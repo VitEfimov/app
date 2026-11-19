@@ -774,14 +774,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 901, `English locale must contain 901 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 907, `English locale must contain 907 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        901,
-        `Language ${lang} has ${count} keys, expected 901 (matching EN)`
+        907,
+        `Language ${lang} has ${count} keys, expected 907 (matching EN)`
       );
     }
   });
@@ -2504,6 +2504,100 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       const inlineAddSrc = fs.readFileSync(path.resolve('src/components/InlineAddTask.js'), 'utf8');
       assert.match(inlineAddSrc, /firstDay=\{getFirstDayOfWeek\(i18n\.language\)\}/, 'InlineAddTask must pass getFirstDayOfWeek to Calendar');
+    });
+
+    test('Calendar Sync 3x/Day Scheduler (08:00, 12:00, 17:00) computes exact due slots, next sync times, and rollover boundaries', () => {
+      const {
+        DAILY_CALENDAR_SYNC_HOURS,
+        DAILY_CALENDAR_SYNC_SLOTS,
+        getDailySyncSlotsForDate,
+        getMostRecentDueSyncSlot,
+        getNextScheduledSyncTime,
+        isScheduledCalendarSyncDue,
+      } = require('../src/utils/calendarSyncSchedule');
+
+      assert.deepStrictEqual(DAILY_CALENDAR_SYNC_HOURS, [8, 12, 17], 'Daily sync hours must be 8am, 12pm (noon), and 5pm');
+      assert.deepStrictEqual(DAILY_CALENDAR_SYNC_SLOTS, ['08:00', '12:00', '17:00']);
+
+      // 1. Before 8:00 AM -> most recent due is yesterday 17:00, next sync is today 08:00
+      const earlyMorning = new Date(2026, 10, 19, 6, 30, 0, 0); // Nov 19, 2026 06:30
+      assert.strictEqual(getMostRecentDueSyncSlot(earlyMorning).slotKey, '2026-11-18@17:00');
+      assert.strictEqual(getNextScheduledSyncTime(earlyMorning).slotKey, '2026-11-19@08:00');
+
+      // 2. Exact 8:00 AM boundary -> due is today 08:00, next is today 12:00
+      const at8am = new Date(2026, 10, 19, 8, 0, 0, 0);
+      const dueAt8am = isScheduledCalendarSyncDue('2026-11-18@17:00', at8am);
+      assert.strictEqual(dueAt8am.isDue, true);
+      assert.strictEqual(dueAt8am.dueSlotKey, '2026-11-19@08:00');
+      assert.strictEqual(dueAt8am.nextSlotKey, '2026-11-19@12:00');
+
+      // 3. Mid-morning 10:15 AM -> already synced 08:00 means NOT due; missed 08:00 means DUE
+      const at1015am = new Date(2026, 10, 19, 10, 15, 0, 0);
+      assert.strictEqual(isScheduledCalendarSyncDue('2026-11-19@08:00', at1015am).isDue, false);
+      assert.strictEqual(isScheduledCalendarSyncDue('2026-11-18@17:00', at1015am).isDue, true);
+
+      // 4. Exact 12:00 PM noon -> due is today 12:00, next is today 17:00
+      const atNoon = new Date(2026, 10, 19, 12, 0, 0, 0);
+      const dueAtNoon = isScheduledCalendarSyncDue('2026-11-19@08:00', atNoon);
+      assert.strictEqual(dueAtNoon.isDue, true);
+      assert.strictEqual(dueAtNoon.dueSlotKey, '2026-11-19@12:00');
+      assert.strictEqual(dueAtNoon.nextSlotKey, '2026-11-19@17:00');
+
+      // 5. Exact 5:00 PM -> due is today 17:00, next rolls over to tomorrow 08:00
+      const at5pm = new Date(2026, 10, 19, 17, 0, 0, 0);
+      const dueAt5pm = isScheduledCalendarSyncDue('2026-11-19@12:00', at5pm);
+      assert.strictEqual(dueAt5pm.isDue, true);
+      assert.strictEqual(dueAt5pm.dueSlotKey, '2026-11-19@17:00');
+      assert.strictEqual(dueAt5pm.nextSlotKey, '2026-11-20@08:00');
+
+      // 6. Month-end rollover (Nov 30, 18:00 -> Dec 1, 08:00)
+      const monthEndEvening = new Date(2026, 10, 30, 18, 0, 0, 0);
+      assert.strictEqual(getNextScheduledSyncTime(monthEndEvening).slotKey, '2026-12-01@08:00');
+
+      // 7. First-ever sync (null lastSyncedSlotKey) is always due
+      assert.strictEqual(isScheduledCalendarSyncDue(null, at1015am).isDue, true);
+      assert.strictEqual(getDailySyncSlotsForDate(at8am).length, 3);
+    });
+
+    test('Open Google & Device Calendar Synchronization: unlocked from premium gate and wired across app', () => {
+      // 1. entitlementSlice no longer gates calendarSync as premium
+      const entSrc = fs.readFileSync(path.resolve('src/features/entitlementSlice.js'), 'utf8');
+      assert.ok(!entSrc.includes("'calendarSync'"), 'calendarSync must be removed from premiumFeatures');
+
+      // 2. taskSlice runs calendar sync without isPremium checks and exports performScheduledCalendarSync
+      const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
+      assert.ok(!/isPremium\s*&&\s*(?:state\.)?theme(?:State|Reducer)\??\.calendarSyncEnabled/.test(taskSliceSrc), 'taskSlice must not gate calendarSyncEnabled behind isPremium');
+      assert.match(taskSliceSrc, /export const performScheduledCalendarSync/, 'taskSlice must export performScheduledCalendarSync');
+      assert.match(taskSliceSrc, /markCalendarSyncCompletedAsync/, 'batchSyncCalendarTasks must mark scheduled sync slot completed');
+
+      // 3. backgroundTasks uses CryptoStorage, removes isPremium gate, and executes scheduled 3x/day sync
+      const bgSrc = fs.readFileSync(path.resolve('src/utils/backgroundTasks.js'), 'utf8');
+      assert.match(bgSrc, /CryptoStorage\.getItem/, 'backgroundTasks must read encrypted storage via CryptoStorage');
+      assert.ok(!bgSrc.includes('isPremium && themeState.calendarSyncEnabled'), 'backgroundTasks must not gate calendar sync on isPremium');
+      assert.match(bgSrc, /runHeadlessCalendarSyncIfDueAsync/, 'backgroundTasks must run scheduled headless calendar sync');
+      assert.match(bgSrc, /isScheduledCalendarSyncDue/, 'backgroundTasks must evaluate 3x/day sync slots');
+
+      // 4. calendarSync allows writable calendars without Android-only isPrimary !== undefined bug
+      const calSyncSrc = fs.readFileSync(path.resolve('src/utils/calendarSync.js'), 'utf8');
+      assert.ok(!calSyncSrc.includes('cal.isPrimary !== undefined'), 'getWritableCalendarsAsync must not filter out iOS/local calendars with undefined isPrimary');
+      assert.match(calSyncSrc, /from '\.\/calendarSyncSchedule'/, 'calendarSync must import scheduling utilities');
+      assert.match(calSyncSrc, /export\s*\{[\s\S]*DAILY_CALENDAR_SYNC_HOURS[\s\S]*\}/, 'calendarSync must re-export scheduling utilities');
+
+      // 5. SettingsScreen exposes Google & Device Calendar UI without premium lock
+      const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
+      assert.match(settingsSrc, /settings_calendar_sync_switch/, 'SettingsScreen must expose Calendar Sync switch');
+      assert.match(settingsSrc, /settings_sync_calendar_now_btn/, 'SettingsScreen must expose Sync Now button');
+      assert.match(settingsSrc, /handleToggleCalendarSync/, 'SettingsScreen must wire handleToggleCalendarSync');
+      assert.match(settingsSrc, /Auto-syncs 3x daily \(8:00 AM, 12:00 PM, 5:00 PM\)/, 'SettingsScreen must clearly show 3x daily sync schedule');
+
+      // 6. App.js schedules exact foreground 3x/day timer + resume catch-up
+      const appSrc = fs.readFileSync(path.resolve('App.js'), 'utf8');
+      assert.match(appSrc, /getNextScheduledSyncTime/, 'App.js must schedule foreground exact sync slot timer');
+      assert.match(appSrc, /performScheduledCalendarSync/, 'App.js must dispatch performScheduledCalendarSync on startup, timer, and resume');
+
+      // 7. CalendarScreen exposes quick sync button when enabled
+      const calScreenSrc = fs.readFileSync(path.resolve('src/screens/CalendarScreen.js'), 'utf8');
+      assert.match(calScreenSrc, /calendar_quick_sync_btn/, 'CalendarScreen must render quick sync button when calendar sync is enabled');
     });
   });
 });
