@@ -58,13 +58,17 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
     }
 
     // 1. Export local tasks with due dates to Google / device calendar
-    const { syncedCount = 0, eventMap = {} } = await syncAllTasksToCalendarAsync(tasks, themeState);
+    const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(tasks, themeState);
 
     let currentList = (tasks || []).map(t => {
       if (!t) return t;
       const tid = t.id || t._id;
-      if (tid && eventMap && eventMap[tid] && t.calendarEventId !== eventMap[tid]) {
-        return { ...t, calendarEventId: eventMap[tid] };
+      if (tid && eventMap && eventMap[tid]) {
+        return {
+          ...t,
+          calendarEventId: eventMap[tid],
+          ...(hashMap[tid] ? { calendarSyncHash: hashMap[tid] } : {}),
+        };
       }
       return t;
     });

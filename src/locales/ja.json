@@ -905,5 +905,7 @@
   "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes": "1日3回（8:00、12:00、17:00）および変更時に自動同期します",
   "Last synced": "最終同期",
   "Next scheduled sync": "次回の定期同期",
-  "Device calendar sync is available on Android and iOS.": "デバイスカレンダーとの同期は Android および iOS で利用できます。"
+  "Device calendar sync is available on Android and iOS.": "デバイスカレンダーとの同期は Android および iOS で利用できます。",
+  "Version": "バージョン",
+  "Debugger & System Logs unlocked": "デバッガーとシステムログのロックを解除しました"
 }

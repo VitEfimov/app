@@ -2,11 +2,21 @@ import { Platform } from 'react-native';
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
+import { DevLogger } from './logger';
 import {
   DAILY_CALENDAR_SYNC_HOURS,
   DAILY_CALENDAR_SYNC_SLOTS,
   CALENDAR_SYNC_STATE_KEY,
+  SYNC_PAST_DAYS,
+  SYNC_FUTURE_DAYS,
+  SYNC_CHUNK_DAYS,
+  MAX_EVENTS_PER_SYNC_BATCH,
+  MAX_IMPORTS_PER_SYNC,
   formatLocalDateKey,
+  extractTaskDateKey,
+  isDateStrInSyncWindow,
+  buildSyncWindowChunks,
+  getTaskCalendarFingerprint,
   getDailySyncSlotsForDate,
   getMostRecentDueSyncSlot,
   getNextScheduledSyncTime,
@@ -17,17 +27,83 @@ export {
   DAILY_CALENDAR_SYNC_HOURS,
   DAILY_CALENDAR_SYNC_SLOTS,
   CALENDAR_SYNC_STATE_KEY,
+  SYNC_PAST_DAYS,
+  SYNC_FUTURE_DAYS,
+  SYNC_CHUNK_DAYS,
+  MAX_EVENTS_PER_SYNC_BATCH,
+  MAX_IMPORTS_PER_SYNC,
   formatLocalDateKey,
+  extractTaskDateKey,
+  isDateStrInSyncWindow,
+  buildSyncWindowChunks,
+  getTaskCalendarFingerprint,
   getDailySyncSlotsForDate,
   getMostRecentDueSyncSlot,
   getNextScheduledSyncTime,
   isScheduledCalendarSyncDue,
 };
 
-export const SYNC_PAST_DAYS = 30;
-export const SYNC_FUTURE_DAYS = 90;
 const TOMBSTONES_STORAGE_KEY = 'calendar_deleted_tombstones';
 const TOMBSTONE_TTL_MS = 15 * 60 * 1000; // 15-minute TTL to prevent resurrection
+const WRITABLE_ACCESS_LEVELS = new Set(['owner', 'root', 'editor', 'contributor']);
+
+// Strict sequential queue for ALL native expo-calendar calls.
+// Prevents concurrent native calls from racing on Android CalendarModule's shared SimpleDateFormat
+// and prevents overlapping ContentResolver CursorWindow bursts.
+let calendarNativeQueue = Promise.resolve();
+export const enqueueCalendarOp = (fn) => {
+  const run = calendarNativeQueue.then(fn, fn);
+  calendarNativeQueue = run.catch(() => {});
+  return run;
+};
+
+const sleepMs = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// On Android, passing numeric epoch ms to expo-calendar bypasses CalendarModule's
+// unpatched shared SimpleDateFormat.parse() (which is thread-unsafe & locale-sensitive).
+// On iOS, keep Date objects as expected by EventKit.
+const toNativeCalendarDate = (date) => {
+  if (Platform.OS === 'android' && date instanceof Date) {
+    return date.getTime();
+  }
+  return date;
+};
+
+const toNativeEventDetails = (details) => {
+  if (!details || Platform.OS !== 'android') return details;
+  return {
+    ...details,
+    startDate: toNativeCalendarDate(details.startDate),
+    endDate: toNativeCalendarDate(details.endDate),
+  };
+};
+
+const sanitizeCalendarText = (value, maxLen = 200) => {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .trim()
+    .slice(0, maxLen);
+};
+
+const isValidNativeCalendarId = (id) => {
+  if (id === null || id === undefined) return false;
+  const str = String(id).trim();
+  if (!str) return false;
+  if (Platform.OS === 'android') {
+    return /^\d+$/.test(str);
+  }
+  return true;
+};
+
+const isCalendarWritable = (cal) => {
+  if (!cal || !isValidNativeCalendarId(cal.id)) return false;
+  if (cal.allowsModifications === false) return false;
+  if (Platform.OS === 'android' && cal.accessLevel) {
+    return WRITABLE_ACCESS_LEVELS.has(String(cal.accessLevel).toLowerCase());
+  }
+  return cal.allowsModifications !== false;
+};
 
 /**
  * Reads persisted 3x/day calendar sync schedule state from storage.
@@ -135,6 +211,7 @@ export const parseCalendarEventDate = (event) => {
   }
 
   const startDay = dayjs(event.startDate);
+  if (!startDay.isValid()) return { dateStr: '', timeStr: '' };
   return {
     dateStr: startDay.format('YYYY-MM-DD'),
     timeStr: startDay.format('HH:mm')
@@ -147,8 +224,8 @@ export const parseCalendarEventDate = (event) => {
 export const checkCalendarPermissionsAsync = async () => {
   if (Platform.OS === 'web') return false;
   try {
-    const { status } = await Calendar.getCalendarPermissionsAsync();
-    return status === 'granted';
+    const res = await Calendar.getCalendarPermissionsAsync();
+    return res?.status === 'granted';
   } catch (error) {
     console.warn('Error checking calendar permissions:', error);
     return false;
@@ -161,7 +238,8 @@ export const checkCalendarPermissionsAsync = async () => {
 export const requestCalendarPermissionsAsync = async () => {
   if (Platform.OS === 'web') return false;
   try {
-    const { status } = await Calendar.requestCalendarPermissionsAsync();
+    const res = await Calendar.requestCalendarPermissionsAsync();
+    const status = res?.status;
     if (Platform.OS === 'ios' && status === 'granted') {
       try {
         await Calendar.requestRemindersPermissionsAsync();
@@ -185,8 +263,10 @@ export const getWritableCalendarsAsync = async () => {
     const hasPermission = await checkCalendarPermissionsAsync();
     if (!hasPermission) return [];
 
-    const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
-    const writable = (calendars || []).filter(cal => cal && cal.allowsModifications !== false);
+    const calendars = await enqueueCalendarOp(() =>
+      Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT)
+    );
+    const writable = (calendars || []).filter(isCalendarWritable);
     return writable.sort((a, b) => {
       const score = (c) => {
         let s = 0;
@@ -198,6 +278,7 @@ export const getWritableCalendarsAsync = async () => {
       return score(b) - score(a);
     });
   } catch (error) {
+    DevLogger.warn('[CalendarSync] Error getting calendars', error?.message || String(error));
     console.warn('Error getting calendars:', error);
     return [];
   }
@@ -212,38 +293,40 @@ export const getTargetCalendarIdAsync = async (preferredCalendarId = null) => {
     const hasPermission = await checkCalendarPermissionsAsync();
     if (!hasPermission) return null;
 
-    const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+    const calendars = await enqueueCalendarOp(() =>
+      Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT)
+    );
     if (!calendars || calendars.length === 0) return null;
+
+    const writableCalendars = calendars.filter(isCalendarWritable);
+    if (writableCalendars.length === 0) return null;
 
     // 1. If preferred ID is provided and exists among writable calendars
     if (preferredCalendarId) {
-      const match = calendars.find(c => String(c.id) === String(preferredCalendarId) && c.allowsModifications !== false);
-      if (match) return match.id;
+      const match = writableCalendars.find(c => String(c.id) === String(preferredCalendarId));
+      if (match) return String(match.id);
     }
 
     // 2. On iOS, default calendar is usually available
     if (Platform.OS === 'ios') {
       try {
-        const defaultCal = await Calendar.getDefaultCalendarAsync();
-        if (defaultCal && defaultCal.allowsModifications !== false) {
-          return defaultCal.id;
+        const defaultCal = await enqueueCalendarOp(() => Calendar.getDefaultCalendarAsync());
+        if (defaultCal && isCalendarWritable(defaultCal)) {
+          return String(defaultCal.id);
         }
       } catch (e) {}
     }
 
     // 3. On Android or fallback: find primary Google calendar or primary account
-    const primaryGoogle = calendars.find(
-      c => c.allowsModifications !== false &&
-           (c.isPrimary || c.source?.name?.includes('@') || c.source?.type === 'com.google' || c.ownerAccount?.includes('@'))
+    const primaryGoogle = writableCalendars.find(
+      c => c.isPrimary || c.source?.name?.includes('@') || c.source?.type === 'com.google' || c.ownerAccount?.includes('@')
     );
-    if (primaryGoogle) return primaryGoogle.id;
+    if (primaryGoogle) return String(primaryGoogle.id);
 
     // 4. Any writable calendar
-    const anyWritable = calendars.find(c => c.allowsModifications !== false);
-    if (anyWritable) return anyWritable.id;
-
-    return null;
+    return String(writableCalendars[0].id);
   } catch (error) {
+    DevLogger.warn('[CalendarSync] Error resolving target calendar ID', error?.message || String(error));
     console.warn('Error resolving target calendar ID:', error);
     return null;
   }
@@ -254,7 +337,7 @@ export const getTargetCalendarIdAsync = async (preferredCalendarId = null) => {
  */
 const getAlarmOffsetMinutes = (reminder) => {
   if (!reminder || reminder === 'None') return null;
-  const rem = reminder.toLowerCase();
+  const rem = String(reminder).toLowerCase();
   if (rem.includes('15 min')) return -15;
   if (rem.includes('30 min')) return -30;
   if (rem.includes('1 hr') || rem.includes('1 hour')) return -60;
@@ -264,23 +347,20 @@ const getAlarmOffsetMinutes = (reminder) => {
 };
 
 /**
- * Constructs event details from a task and calendar settings
+ * Constructs sanitized event details from a task and calendar settings
  */
 export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
   if (!task || !task.completionDate) return null;
 
-  let rawDate = task.dateString;
-  if (!rawDate && typeof task.completionDate === 'string') {
-    rawDate = task.completionDate.split('T')[0];
-  } else if (!rawDate && task.completionDate) {
-    rawDate = dayjs(task.completionDate).format('YYYY-MM-DD');
-  }
-
+  let rawDate = extractTaskDateKey(task);
   if (!rawDate || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
     const parsed = dayjs(task.completionDate);
     if (!parsed.isValid()) return null;
     rawDate = parsed.format('YYYY-MM-DD');
   }
+
+  const [y, m, d] = rawDate.split('-').map(Number);
+  if (!y || !m || !d || y < 1970 || y > 2100) return null;
 
   const rawTime = typeof task.time === 'string' ? task.time.trim() : '';
   const timeRegex = /^([01]?\d|2[0-3]):([0-5]\d)/;
@@ -302,7 +382,6 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
 
   if (!startDate || isNaN(startDate.getTime())) {
     if (Platform.OS === 'android') {
-      const [y, m, d] = rawDate.split('-').map(Number);
       startDate = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
       endDate = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0));
     } else {
@@ -315,7 +394,7 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
     allDay = true;
   }
 
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate.getTime() < startDate.getTime()) {
     return null;
   }
 
@@ -323,16 +402,16 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
   const alarms = [];
   if (calendarAlarmsEnabled && task.reminder && task.reminder !== 'None') {
     const offset = getAlarmOffsetMinutes(task.reminder);
-    if (offset !== null) {
+    if (typeof offset === 'number' && !isNaN(offset)) {
       alarms.push({ relativeOffset: offset });
     }
   }
 
   const cleanDescription = task.description?.text
-    ? String(task.description.text).replace(/<[^>]+>/g, '').trim()
+    ? sanitizeCalendarText(String(task.description.text).replace(/<[^>]+>/g, ''), 1800)
     : '';
 
-  const cleanTitle = (task.taskname ? String(task.taskname).trim() : 'Task') || 'Task';
+  const cleanTitle = sanitizeCalendarText(task.taskname, 200) || 'Task';
 
   const details = {
     title: task.completed ? `✓ ${cleanTitle}` : cleanTitle,
@@ -340,8 +419,12 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
     endDate,
     allDay,
     notes: cleanDescription ? `${cleanDescription}\n\n[Synced from TaskFlow]` : '[Synced from TaskFlow]',
-    availability: Calendar.Availability.BUSY,
   };
+
+  // On iOS, attach standard availability; on Android, let CalendarProvider use its calendar default
+  if (Platform.OS === 'ios' && Calendar?.Availability?.BUSY) {
+    details.availability = Calendar.Availability.BUSY;
+  }
 
   if (allDay && Platform.OS === 'android') {
     details.timeZone = 'UTC';
@@ -366,19 +449,20 @@ export const syncTaskToCalendarAsync = async (task, settings = {}) => {
 
   try {
     const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
-    if (!calendarId) return null;
+    if (!calendarId || !isValidNativeCalendarId(calendarId)) return null;
 
     const eventDetails = buildEventDetails(task, calendarAlarmsEnabled);
     if (!eventDetails) return null;
+    const nativeDetails = toNativeEventDetails(eventDetails);
 
     // If task already has a calendar event ID, try to update it
     if (task.calendarEventId) {
-      const eventIdStr = String(task.calendarEventId);
+      const eventIdStr = String(task.calendarEventId).trim();
       const isNumericId = /^\d+$/.test(eventIdStr);
       const canUpdate = Platform.OS === 'android' ? isNumericId : !!eventIdStr;
       if (canUpdate) {
         try {
-          await Calendar.updateEventAsync(eventIdStr, eventDetails);
+          await enqueueCalendarOp(() => Calendar.updateEventAsync(eventIdStr, nativeDetails));
           return eventIdStr;
         } catch (updateErr) {
           // Event might have been deleted from calendar externally; recreate below
@@ -386,10 +470,13 @@ export const syncTaskToCalendarAsync = async (task, settings = {}) => {
       }
     }
 
-    // Create new event
-    const newEventId = await Calendar.createEventAsync(String(calendarId), eventDetails);
+    // Create new event sequentially
+    const newEventId = await enqueueCalendarOp(() =>
+      Calendar.createEventAsync(String(calendarId), nativeDetails)
+    );
     return newEventId ? String(newEventId) : null;
   } catch (error) {
+    DevLogger.warn(`[CalendarSync] Failed to sync task "${task?.taskname}"`, error?.message || String(error));
     console.warn(`Failed to sync task "${task.taskname}" to calendar:`, error);
     return null;
   }
@@ -400,83 +487,121 @@ export const syncTaskToCalendarAsync = async (task, settings = {}) => {
  */
 export const removeTaskFromCalendarAsync = async (calendarEventId) => {
   if (Platform.OS === 'web' || !calendarEventId) return;
-  const idStr = String(calendarEventId);
+  const idStr = String(calendarEventId).trim();
   if (Platform.OS === 'android' && !/^\d+$/.test(idStr)) return;
   try {
-    await Calendar.deleteEventAsync(idStr);
+    await enqueueCalendarOp(() => Calendar.deleteEventAsync(idStr));
   } catch (error) {
     // Silently ignore if already removed
   }
 };
 
 /**
- * Batch sync multiple tasks to device calendar (exports tasks to calendar)
+ * Crash-safe batch export of local tasks to Google / device calendar.
+ * - Scoped to the active rolling sync window [-SYNC_PAST_DAYS, +SYNC_FUTURE_DAYS]
+ * - Skips already-synced tasks whose calendar fingerprint hasn't changed
+ * - Caps writes per batch (MAX_EVENTS_PER_SYNC_BATCH) with event-loop/GC yields
+ * - Runs every native call sequentially through enqueueCalendarOp
  */
 export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}) => {
-  if (Platform.OS === 'web') return { syncedCount: 0, eventMap: {} };
+  if (Platform.OS === 'web') return { syncedCount: 0, eventMap: {}, hashMap: {} };
   const { calendarSyncEnabled, calendarAlarmsEnabled, selectedCalendarId } = settings;
-  if (!calendarSyncEnabled) return { syncedCount: 0, eventMap: {} };
+  if (!calendarSyncEnabled) return { syncedCount: 0, eventMap: {}, hashMap: {} };
 
   try {
     const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
-    if (!calendarId) return { syncedCount: 0, eventMap: {} };
+    if (!calendarId || !isValidNativeCalendarId(calendarId)) {
+      return { syncedCount: 0, eventMap: {}, hashMap: {} };
+    }
 
     const stringCalendarId = String(calendarId);
     const eventMap = {};
+    const hashMap = {};
     let syncedCount = 0;
-    let index = 0;
+    let opsExecuted = 0;
+    const now = new Date();
+
+    DevLogger.log('[CalendarSync] Starting window-scoped batch export', {
+      totalTasks: tasks.length,
+      calendarId: stringCalendarId,
+    });
 
     for (const task of tasks) {
-      if (task && task.completionDate && !task.completed) {
-        index++;
-        if (index % 3 === 0) {
-          // Yield to JS event loop so UI thread stays responsive and does not freeze
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
+      if (opsExecuted >= MAX_EVENTS_PER_SYNC_BATCH) {
+        DevLogger.log('[CalendarSync] Reached safe batch export cap', { cap: MAX_EVENTS_PER_SYNC_BATCH });
+        break;
+      }
+      if (!task || !task.completionDate || task.completed) continue;
 
-        const eventDetails = buildEventDetails(task, calendarAlarmsEnabled);
-        if (eventDetails) {
+      const dateKey = extractTaskDateKey(task);
+      if (!isDateStrInSyncWindow(dateKey, now, SYNC_PAST_DAYS, SYNC_FUTURE_DAYS)) {
+        continue;
+      }
+
+      const taskKey = task.id || task._id;
+      if (!taskKey) continue;
+
+      const fingerprint = getTaskCalendarFingerprint(task, calendarAlarmsEnabled);
+      const existingEventId = task.calendarEventId ? String(task.calendarEventId).trim() : null;
+      const isValidExistingId = existingEventId && (Platform.OS === 'android' ? /^\d+$/.test(existingEventId) : true);
+
+      // Skip already-synced tasks whose content has not changed (avoids unnecessary native writes & cursor leaks)
+      if (isValidExistingId && task.calendarSyncHash && task.calendarSyncHash === fingerprint) {
+        continue;
+      }
+
+      const eventDetails = buildEventDetails(task, calendarAlarmsEnabled);
+      if (!eventDetails) continue;
+      const nativeDetails = toNativeEventDetails(eventDetails);
+
+      opsExecuted++;
+      if (opsExecuted % 5 === 0) {
+        // Yield cleanly to UI thread and allow Android native GC/Cursor finalizers to reclaim memory
+        await sleepMs(30);
+      }
+
+      try {
+        let eventId = isValidExistingId ? existingEventId : null;
+        if (eventId) {
           try {
-            let eventId = task.calendarEventId ? String(task.calendarEventId) : null;
-            const isNumericId = eventId && /^\d+$/.test(eventId);
-            const canUpdate = Platform.OS === 'android' ? isNumericId : !!eventId;
-
-            if (canUpdate) {
-              try {
-                await Calendar.updateEventAsync(eventId, eventDetails);
-              } catch (e) {
-                eventId = await Calendar.createEventAsync(stringCalendarId, eventDetails);
-              }
-            } else {
-              eventId = await Calendar.createEventAsync(stringCalendarId, eventDetails);
-            }
-            if (eventId) {
-              const idString = String(eventId);
-              const taskKey = task.id || task._id;
-              if (taskKey) {
-                eventMap[taskKey] = idString;
-              }
-              syncedCount++;
-            }
+            await enqueueCalendarOp(() => Calendar.updateEventAsync(eventId, nativeDetails));
           } catch (e) {
-            console.warn(`Failed batch sync for task ${task.id || task._id}:`, e);
+            eventId = await enqueueCalendarOp(() =>
+              Calendar.createEventAsync(stringCalendarId, nativeDetails)
+            );
           }
+        } else {
+          eventId = await enqueueCalendarOp(() =>
+            Calendar.createEventAsync(stringCalendarId, nativeDetails)
+          );
         }
+
+        if (eventId) {
+          const idString = String(eventId);
+          eventMap[taskKey] = idString;
+          hashMap[taskKey] = fingerprint;
+          syncedCount++;
+        }
+      } catch (e) {
+        DevLogger.warn(`[CalendarSync] Failed batch sync for task ${taskKey}`, e?.message || String(e));
+        console.warn(`Failed batch sync for task ${taskKey}:`, e);
       }
     }
 
-    return { syncedCount, eventMap };
+    return { syncedCount, eventMap, hashMap };
   } catch (error) {
+    DevLogger.error('[CalendarSync] Failed to batch sync tasks to calendar', error?.message || String(error));
     console.warn('Failed to batch sync tasks to calendar:', error);
-    return { syncedCount: 0, eventMap: {} };
+    return { syncedCount: 0, eventMap: {}, hashMap: {} };
   }
 };
 
 /**
- * Performs Foreground Differential Synchronization with device/Google calendar.
+ * Performs Chunked Differential Synchronization with device/Google calendar.
  * Implements:
- * 1. Strict Rolling Time Horizon [Today - 30 days, Today + 90 days]
- * 2. Window-Scoped Ghost Deletion Detection (prevents false-wiping out-of-boundary tasks)
+ * 1. Chunked 14-day native queries across [Today - SYNC_PAST_DAYS, Today + SYNC_FUTURE_DAYS]
+ *    (prevents Android CalendarModule CursorWindow leaks & OOM on busy Google Calendars)
+ * 2. Window-Scoped Ghost Deletion Detection (only runs when all chunks succeeded!)
  * 3. Tombstone Ledger check (prevents zombie resurrection)
  * 4. UTC All-Day Date Normalization (eliminates Android -1 day time shift)
  */
@@ -496,61 +621,69 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
     }
 
     const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
-    if (!calendarId) {
+    if (!calendarId || !isValidNativeCalendarId(calendarId)) {
       return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
     }
 
-    // 1. Strict Rolling Time Window: [Today - 30 days, Today + 90 days]
-    const windowStart = dayjs().subtract(SYNC_PAST_DAYS, 'day').startOf('day');
-    const windowEnd = dayjs().add(SYNC_FUTURE_DAYS, 'day').endOf('day');
-
-    let calendarEvents = [];
-    try {
-      calendarEvents = await Calendar.getEventsAsync([String(calendarId)], windowStart.toDate(), windowEnd.toDate());
-    } catch (e) {
-      console.warn('Calendar.getEventsAsync error:', e);
-      return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
-    }
-    
-    // Collect active native IDs and map
+    // 1. Chunked 14-day queries across rolling horizon [Today - 14 days, Today + 60 days]
+    const now = new Date();
+    const chunks = buildSyncWindowChunks(now, SYNC_PAST_DAYS, SYNC_FUTURE_DAYS, SYNC_CHUNK_DAYS);
     const activeNativeEventMap = new Map();
     const activeNativeIds = new Set();
-    (calendarEvents || []).forEach(event => {
-      if (event && event.id && String(event.status || '').toLowerCase() !== 'canceled') {
-        const idStr = String(event.id);
-        activeNativeIds.add(idStr);
-        activeNativeEventMap.set(idStr, event);
+    let allChunksSucceeded = true;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      try {
+        const chunkEvents = await enqueueCalendarOp(() =>
+          Calendar.getEventsAsync(
+            [String(calendarId)],
+            toNativeCalendarDate(chunk.start),
+            toNativeCalendarDate(chunk.end)
+          )
+        );
+        (chunkEvents || []).forEach(event => {
+          if (event && event.id && String(event.status || '').toLowerCase() !== 'canceled') {
+            const idStr = String(event.id);
+            activeNativeIds.add(idStr);
+            if (!activeNativeEventMap.has(idStr)) {
+              activeNativeEventMap.set(idStr, event);
+            }
+          }
+        });
+      } catch (chunkErr) {
+        allChunksSucceeded = false;
+        DevLogger.warn(`[CalendarSync] Chunk ${i + 1}/${chunks.length} getEventsAsync failed`, chunkErr?.message || String(chunkErr));
+        console.warn('Calendar.getEventsAsync chunk error:', chunkErr);
       }
-    });
+
+      if (i < chunks.length - 1) {
+        await sleepMs(50);
+      }
+    }
 
     // Load active tombstone IDs (recently deleted in TaskFlow)
     const tombstones = await getTombstonesAsync();
 
     // 2. Window-Scoped Ghost Deletion Detection:
-    // Only evaluate tasks whose completionDate falls strictly within [windowStart, windowEnd].
-    // Tasks scheduled outside the window are protected from false deletion.
+    // ONLY evaluate deletions if all chunks succeeded so a transient read failure never deletes tasks.
     const deletedTaskIds = [];
-    (existingTasks || []).forEach(task => {
-      if (!task || !task.calendarEventId) return;
+    if (allChunksSucceeded) {
+      (existingTasks || []).forEach(task => {
+        if (!task || !task.calendarEventId) return;
 
-      const taskDateStr = task.dateString || (typeof task.completionDate === 'string' ? task.completionDate.split('T')[0] : (task.completionDate ? dayjs(task.completionDate).format('YYYY-MM-DD') : null));
-      if (!taskDateStr) return;
+        const taskDateStr = extractTaskDateKey(task);
+        if (!taskDateStr) return;
 
-      const taskDay = dayjs(taskDateStr);
-      if (!taskDay.isValid()) return;
-
-      const isInWindow = (taskDay.isSame(windowStart, 'day') || taskDay.isAfter(windowStart, 'day')) &&
-                         (taskDay.isSame(windowEnd, 'day') || taskDay.isBefore(windowEnd, 'day'));
-
-      if (isInWindow) {
-        const taskCalId = String(task.calendarEventId);
-        if (!activeNativeIds.has(taskCalId)) {
-          // Native event no longer exists in calendar -> Ghost deletion detected!
-          const tid = task.id || task._id;
-          if (tid) deletedTaskIds.push(tid);
+        if (isDateStrInSyncWindow(taskDateStr, now, SYNC_PAST_DAYS, SYNC_FUTURE_DAYS)) {
+          const taskCalId = String(task.calendarEventId);
+          if (!activeNativeIds.has(taskCalId)) {
+            const tid = task.id || task._id;
+            if (tid) deletedTaskIds.push(tid);
+          }
         }
-      }
-    });
+      });
+    }
 
     // 3. Process Active Native Events (Updates & Imports)
     const taskByCalEventId = new Map();
@@ -561,7 +694,7 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
       if (t.calendarEventId) {
         taskByCalEventId.set(String(t.calendarEventId), t);
       }
-      const dateKey = t.dateString || (t.completionDate ? (typeof t.completionDate === 'string' ? t.completionDate.split('T')[0] : dayjs(t.completionDate).format('YYYY-MM-DD')) : '');
+      const dateKey = extractTaskDateKey(t);
       const taskTitle = typeof t.taskname === 'string' ? t.taskname.trim().toLowerCase() : (t.taskname ? String(t.taskname).trim().toLowerCase() : '');
       if (taskTitle && dateKey) {
         const key = `${taskTitle}_${dateKey}`;
@@ -575,38 +708,39 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
 
     for (const [eventCalId, event] of activeNativeEventMap.entries()) {
       counter++;
-      if (counter % 5 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+      if (counter % 10 === 0) {
+        await sleepMs(0);
       }
 
       if (!event.title) continue;
 
       // Anti-Resurrection Guard: If user recently deleted this task in TaskFlow,
-      // do not re-import it as a new task. Asynchronously purge the orphaned native event.
+      // do not re-import it as a new task.
       if (tombstones.has(eventCalId)) {
-        try {
-          Calendar.deleteEventAsync(eventCalId).catch(() => {});
-        } catch (e) {}
+        removeTaskFromCalendarAsync(eventCalId).catch(() => {});
         continue;
       }
 
-      const isCompleted = event.title.startsWith('✓ ');
-      const cleanTitle = event.title.replace(/^✓\s*/, '').trim() || 'Calendar Event';
+      const rawTitle = sanitizeCalendarText(event.title, 200);
+      if (!rawTitle) continue;
+      const isCompleted = rawTitle.startsWith('✓ ');
+      const cleanTitle = rawTitle.replace(/^✓\s*/, '').trim() || 'Calendar Event';
       const { dateStr, timeStr } = parseCalendarEventDate(event);
-      
-      const cleanNotes = (event.notes || '')
-        .replace(/\[Synced from TaskFlow\]/g, '')
-        .trim();
+      if (!dateStr) continue;
+
+      const cleanNotes = sanitizeCalendarText(
+        String(event.notes || '').replace(/\[Synced from TaskFlow\]/g, ''),
+        1800
+      );
 
       // Check if already mapped to a task
       const existingLinkedTask = taskByCalEventId.get(eventCalId);
       if (existingLinkedTask) {
         const linkedTaskId = existingLinkedTask.id || existingLinkedTask._id;
-        // Skip if task was marked for deletion
         if (deletedTaskIds.includes(linkedTaskId)) continue;
 
         const titleChanged = existingLinkedTask.taskname !== cleanTitle;
-        const dateChanged = (existingLinkedTask.dateString || existingLinkedTask.completionDate) !== dateStr;
+        const dateChanged = extractTaskDateKey(existingLinkedTask) !== dateStr;
         const timeChanged = (existingLinkedTask.time || '') !== timeStr;
         const completionChanged = isCompleted && !existingLinkedTask.completed;
 
@@ -638,11 +772,16 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
         }
       }
 
+      // Guard max newly imported tasks per sync to protect memory on huge shared calendars
+      if (newTasks.length >= MAX_IMPORTS_PER_SYNC) {
+        continue;
+      }
+
       // New event from Google Calendar / Native Calendar -> Import into TaskFlow
       const nowIso = new Date().toISOString();
       const uniqueId = `cal_${eventCalId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      newTasks.push({
+      const importedTask = {
         id: uniqueId,
         taskname: cleanTitle,
         completionDate: dateStr,
@@ -664,7 +803,10 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
         },
         createdAt: nowIso,
         lastUpdatedDate: nowIso
-      });
+      };
+      importedTask.calendarSyncHash = getTaskCalendarFingerprint(importedTask, Boolean(settings?.calendarAlarmsEnabled));
+
+      newTasks.push(importedTask);
       taskByCalEventId.set(eventCalId, { id: uniqueId });
     }
 
@@ -679,6 +821,7 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
       deletedCount: deletedTaskIds.length
     };
   } catch (error) {
+    DevLogger.error('[CalendarSync] Failed differential sync', error?.message || String(error));
     console.warn('Failed to differential sync events from calendar:', error);
     return { hasChanges: false, newTasks: [], updatedTasks: [], deletedTaskIds: [], importedCount: 0, deletedCount: 0 };
   }

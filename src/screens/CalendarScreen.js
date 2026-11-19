@@ -122,6 +122,8 @@ export default function CalendarScreen({ navigation, route }) {
       if (showToast) {
         showToast(`${t('Calendar Synced') || 'Calendar Synced'} (${exported} ↑ / ${imported} ↓)`);
       }
+    } catch (err) {
+      console.warn('Quick calendar sync error:', err);
     } finally {
       setIsSyncingCalendar(false);
     }

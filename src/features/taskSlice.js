@@ -527,20 +527,23 @@ const taskSlice = createSlice({
             state.pendingCleanupTaskIds = [];
         },
         batchCalendarSyncComplete(state, action) {
-            const { eventMap, newTasks, updatedTasks, deletedTaskIds } = action.payload || {};
+            const { eventMap, hashMap, newTasks, updatedTasks, deletedTaskIds } = action.payload || {};
             
             // 0. Remove ghost-deleted tasks identified by differential sync
             if (Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
                 const delSet = new Set(deletedTaskIds.map(String));
-                state.tasks = state.tasks.filter(t => t && !delSet.has(String(t.id)));
+                state.tasks = state.tasks.filter(t => t && !delSet.has(String(t.id || t._id)));
             }
 
-            // 1. Update calendarEventIds from eventMap
+            // 1. Update calendarEventIds & fingerprints from eventMap/hashMap
             if (eventMap && typeof eventMap === 'object') {
                 Object.entries(eventMap).forEach(([tId, calId]) => {
-                    const task = state.tasks.find(t => String(t.id) === String(tId));
+                    const task = state.tasks.find(t => t && String(t.id || t._id) === String(tId));
                     if (task) {
                         task.calendarEventId = calId;
+                        if (hashMap && hashMap[tId]) {
+                            task.calendarSyncHash = hashMap[tId];
+                        }
                     }
                 });
             }
@@ -548,9 +551,10 @@ const taskSlice = createSlice({
             // 2. Update existing tasks with updates from calendar
             if (Array.isArray(updatedTasks) && updatedTasks.length > 0) {
                 updatedTasks.forEach(u => {
-                    const task = state.tasks.find(t => String(t.id) === String(u.taskId));
+                    const task = state.tasks.find(t => t && String(t.id || t._id) === String(u.taskId));
                     if (task) {
                         if (u.calendarEventId !== undefined) task.calendarEventId = u.calendarEventId;
+                        if (u.calendarSyncHash !== undefined) task.calendarSyncHash = u.calendarSyncHash;
                         if (u.name !== undefined) task.taskname = u.name;
                         if (u.completionDate !== undefined) {
                             task.completionDate = u.completionDate;
@@ -1239,14 +1243,18 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
         const tasks = state.taskReducer.tasks || [];
 
         // 1. Export local tasks to Google / device calendar
-        const { syncedCount = 0, eventMap = {} } = await syncAllTasksToCalendarAsync(tasks, themeState);
+        const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(tasks, themeState);
 
-        // Merge newly created/updated eventMap IDs into tasks before differential sync so they are recognized
+        // Merge newly created/updated eventMap IDs & hashes into tasks before differential sync so they are recognized
         const tasksWithUpdatedEventIds = tasks.map(t => {
             if (!t) return t;
             const tid = t.id || t._id;
             if (tid && eventMap && eventMap[tid]) {
-                return { ...t, calendarEventId: eventMap[tid] };
+                return {
+                    ...t,
+                    calendarEventId: eventMap[tid],
+                    ...(hashMap[tid] ? { calendarSyncHash: hashMap[tid] } : {})
+                };
             }
             return t;
         });
@@ -1258,6 +1266,7 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
         // 3. Atomically update Redux in ONE single dispatch
         dispatch(batchCalendarSyncComplete({
             eventMap,
+            hashMap,
             newTasks,
             updatedTasks,
             deletedTaskIds

@@ -905,5 +905,7 @@
   "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes": "Sincronizzazione auto 3 volte al giorno (08:00, 12:00, 17:00) e alle modifiche",
   "Last synced": "Ultima sincronizzazione",
   "Next scheduled sync": "Prossima sincronizzazione programmata",
-  "Device calendar sync is available on Android and iOS.": "La sincronizzazione con il calendario del dispositivo è disponibile su Android e iOS."
+  "Device calendar sync is available on Android and iOS.": "La sincronizzazione con il calendario del dispositivo è disponibile su Android e iOS.",
+  "Version": "Versione",
+  "Debugger & System Logs unlocked": "Debugger e log di sistema sbloccati"
 }

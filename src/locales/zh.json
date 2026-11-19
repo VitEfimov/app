@@ -905,5 +905,7 @@
   "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes": "每天自动同步3次（08:00、12:00、17:00）并在修改时同步",
   "Last synced": "上次同步",
   "Next scheduled sync": "下次计划同步",
-  "Device calendar sync is available on Android and iOS.": "设备日历同步仅适用于 Android 和 iOS。"
+  "Device calendar sync is available on Android and iOS.": "设备日历同步仅适用于 Android 和 iOS。",
+  "Version": "版本",
+  "Debugger & System Logs unlocked": "已解锁调试器与系统日志"
 }

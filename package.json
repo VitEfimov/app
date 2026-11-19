@@ -57,9 +57,17 @@
     "wavefile": "^11.0.0"
   },
   "scripts": {
+    "postinstall": "node scripts/patch-expo-calendar.js",
+    "patch:calendar": "node scripts/patch-expo-calendar.js",
+    "version:sync": "node scripts/update-version.js",
+    "setup:hooks": "git config core.hooksPath .githooks",
+    "prestart": "node scripts/update-version.js",
     "start": "expo start",
+    "preandroid": "node scripts/update-version.js && node scripts/patch-expo-calendar.js",
     "android": "expo run:android",
+    "preios": "node scripts/update-version.js",
     "ios": "expo run:ios",
+    "preweb": "node scripts/update-version.js",
     "web": "npx cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --web",
     "clean": "node -e \"['.expo','dist','test-results','playwright-report','bundle.txt','modal_debug.png','screen.png'].forEach(f => { try { fs.rmSync(f, {recursive: true, force: true}); } catch(e){} })\"",
     "test": "node --test tests/last_changes.test.js tests/interactive_lists_and_recurring.test.js",

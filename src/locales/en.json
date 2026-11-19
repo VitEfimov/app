@@ -905,5 +905,7 @@
   "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes": "Auto-syncs 3x daily (8:00 AM, 12:00 PM, 5:00 PM) & on changes",
   "Last synced": "Last synced",
   "Next scheduled sync": "Next scheduled sync",
-  "Device calendar sync is available on Android and iOS.": "Device calendar sync is available on Android and iOS."
+  "Device calendar sync is available on Android and iOS.": "Device calendar sync is available on Android and iOS.",
+  "Version": "Version",
+  "Debugger & System Logs unlocked": "Debugger & System Logs unlocked"
 }

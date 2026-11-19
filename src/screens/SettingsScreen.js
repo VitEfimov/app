@@ -10,6 +10,8 @@ import dayjs from 'dayjs';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
 import { toggleDevPremium } from '../features/entitlementSlice';
 import { useTheme } from '../styles/ThemeContext';
+import { useToast } from '../styles/ToastContext';
+import { formatAppVersionDisplay, recordDebugUnlockTap, DEBUG_UNLOCK_TAP_COUNT, DEBUG_UNLOCK_WINDOW_MS } from '../utils/appVersion';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import ThemeSettingsModal from '../components/ThemeSettingsModal';
 import ChooseLanguageModal from '../components/ChooseLanguageModal';
@@ -28,6 +30,7 @@ import { BiometricHelper } from '../utils/biometricHelper';
 import { CryptoStorage } from '../utils/cryptoStorage';
 import { A11yHelper } from '../utils/a11yHelper';
 import { ResponsiveHelper } from '../utils/responsiveHelper';
+import { DevLogger } from '../utils/logger';
 
 const SOUND_ASSETS = {
   'pisk.mp3': require('../../assets/audio/pisk.mp3'),
@@ -257,6 +260,7 @@ export default function SettingsScreen({ navigation }) {
   const { width: windowWidth } = useWindowDimensions();
   const dispatch = useDispatch();
   const { colors, isDark, mode } = useTheme();
+  const { showToast } = useToast() || {};
   const { t, i18n } = useTranslation();
 
   const theme = useSelector(state => state.themeReducer);
@@ -273,18 +277,44 @@ export default function SettingsScreen({ navigation }) {
   const [isNotificationsExpanded, setIsNotificationsExpanded] = useState(true);
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   const [isMoreExpanded, setIsMoreExpanded] = useState(true);
+  const [isDebuggerUnlocked, setIsDebuggerUnlocked] = useState(false);
+  const versionTapTimestampsRef = useRef([]);
+  const appVersionDisplay = formatAppVersionDisplay();
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [deviceCalendars, setDeviceCalendars] = useState([]);
   const [isCalendarPickerOpen, setCalendarPickerOpen] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const isSyncingCalendarRef = useRef(false);
   const [lastSyncedAtState, setLastSyncedAtState] = useState(null);
+
+  const handleVersionPress = () => {
+    if (isDebuggerUnlocked) return;
+    const res = recordDebugUnlockTap(
+      versionTapTimestampsRef.current,
+      Date.now(),
+      DEBUG_UNLOCK_TAP_COUNT,
+      DEBUG_UNLOCK_WINDOW_MS
+    );
+    versionTapTimestampsRef.current = res.timestamps;
+    if (res.unlocked) {
+      if (Platform.OS !== 'web' && LayoutAnimation?.configureNext) {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
+      setIsDebuggerUnlocked(true);
+      if (showToast) {
+        showToast(t('Debugger & System Logs unlocked') || 'Debugger & System Logs unlocked');
+      }
+    }
+  };
 
   useEffect(() => {
     if (theme.calendarSyncEnabled && Platform.OS !== 'web') {
-      getWritableCalendarsAsync().then(cals => {
-        setDeviceCalendars(cals || []);
-      }).catch(() => {});
+      if (!isSyncingCalendarRef.current) {
+        getWritableCalendarsAsync().then(cals => {
+          setDeviceCalendars(cals || []);
+        }).catch(() => {});
+      }
       getCalendarSyncScheduleStateAsync().then(st => {
         if (st?.lastSyncedAt) setLastSyncedAtState(st.lastSyncedAt);
       }).catch(() => {});
@@ -305,31 +335,44 @@ export default function SettingsScreen({ navigation }) {
     }
 
     if (enabled) {
-      const hasPerm = await checkCalendarPermissionsAsync();
-      if (!hasPerm) {
-        const granted = await requestCalendarPermissionsAsync();
-        if (!granted) {
-          setConfirmConfig({
-            isVisible: true,
-            title: t('Calendar Permission Required') || 'Calendar Permission Required',
-            message: t('Please allow calendar permissions to synchronize your tasks with Google & device calendars.') || 'Please allow calendar permissions to synchronize your tasks with Google & device calendars.',
-            confirmText: t('OK') || 'OK',
-            hideCancel: true,
-            onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
-          });
-          return;
-        }
-      }
-      dispatch(setCalendarSyncEnabled(true));
-      registerBackgroundFetchAsync().catch(() => {});
-      const cals = await getWritableCalendarsAsync();
-      setDeviceCalendars(cals || []);
+      if (isSyncingCalendarRef.current) return;
+      isSyncingCalendarRef.current = true;
       setIsSyncingCalendar(true);
       try {
+        const hasPerm = await checkCalendarPermissionsAsync();
+        if (!hasPerm) {
+          const granted = await requestCalendarPermissionsAsync();
+          if (!granted) {
+            setConfirmConfig({
+              isVisible: true,
+              title: t('Calendar Permission Required') || 'Calendar Permission Required',
+              message: t('Please allow calendar permissions to synchronize your tasks with Google & device calendars.') || 'Please allow calendar permissions to synchronize your tasks with Google & device calendars.',
+              confirmText: t('OK') || 'OK',
+              hideCancel: true,
+              onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+            });
+            return;
+          }
+        }
+        dispatch(setCalendarSyncEnabled(true));
+        registerBackgroundFetchAsync().catch(() => {});
+        const cals = await getWritableCalendarsAsync();
+        setDeviceCalendars(cals || []);
         await dispatch(batchSyncCalendarTasks());
         const st = await getCalendarSyncScheduleStateAsync();
         if (st?.lastSyncedAt) setLastSyncedAtState(st.lastSyncedAt);
+      } catch (err) {
+        DevLogger.error('[SettingsScreen] handleToggleCalendarSync failed', err?.message || String(err));
+        setConfirmConfig({
+          isVisible: true,
+          title: t('Google & Device Calendar') || 'Google & Device Calendar',
+          message: err?.message || t('Something went wrong. Please try again.') || 'Something went wrong. Please try again.',
+          confirmText: t('OK') || 'OK',
+          hideCancel: true,
+          onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+        });
       } finally {
+        isSyncingCalendarRef.current = false;
         setIsSyncingCalendar(false);
       }
     } else {
@@ -351,6 +394,8 @@ export default function SettingsScreen({ navigation }) {
       return;
     }
 
+    if (isSyncingCalendarRef.current) return;
+    isSyncingCalendarRef.current = true;
     setIsSyncingCalendar(true);
     try {
       const hasPerm = await checkCalendarPermissionsAsync();
@@ -385,7 +430,18 @@ export default function SettingsScreen({ navigation }) {
         hideCancel: true,
         onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
       });
+    } catch (err) {
+      DevLogger.error('[SettingsScreen] handleManualCalendarSync failed', err?.message || String(err));
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Google & Device Calendar') || 'Google & Device Calendar',
+        message: err?.message || t('Something went wrong. Please try again.') || 'Something went wrong. Please try again.',
+        confirmText: t('OK') || 'OK',
+        hideCancel: true,
+        onConfirm: () => setConfirmConfig(prev => ({ ...prev, isVisible: false }))
+      });
     } finally {
+      isSyncingCalendarRef.current = false;
       setIsSyncingCalendar(false);
     }
   };
@@ -1790,23 +1846,48 @@ export default function SettingsScreen({ navigation }) {
               <IconChevronRight color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+            {isDebuggerUnlocked && (
+              <>
+                <View style={[styles.divider, { marginLeft: 16, backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+                <TouchableOpacity
+                  testID="settings_debugger_btn"
+                  activeOpacity={0.75}
+                  onPress={() => navigation.navigate('DevLogs')}
+                  style={styles.cardItemRow}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                      {t('Debugger & System Logs') || 'Debugger & System Logs'}
+                    </Text>
+                    <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                      {t('Diagnose notifications, alarms, scheduler & logs') || 'Diagnose notifications, alarms, scheduler & logs'}
+                    </Text>
+                  </View>
+                  <IconChevronRight color={colors.textSecondary} />
+                </TouchableOpacity>
+              </>
+            )}
+
+            <View style={[styles.divider, { marginLeft: 16, backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
             <TouchableOpacity
-              testID="settings_debugger_btn"
-              activeOpacity={0.75}
-              onPress={() => navigation.navigate('DevLogs')}
+              testID="settings_version_row"
+              activeOpacity={0.7}
+              onPress={handleVersionPress}
               style={styles.cardItemRow}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('Version') || 'Version'} ${appVersionDisplay}`}
             >
               <View style={{ flex: 1 }}>
                 <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                  {t('Debugger & System Logs') || 'Debugger & System Logs'}
-                </Text>
-                <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                  {t('Diagnose notifications, alarms, scheduler & logs') || 'Diagnose notifications, alarms, scheduler & logs'}
+                  {t('Version') || 'Version'}
                 </Text>
               </View>
-              <IconChevronRight color={colors.textSecondary} />
+              <Text testID="settings_version_text" style={[styles.itemValueText, { color: colors.textSecondary }]}>
+                {appVersionDisplay}
+              </Text>
             </TouchableOpacity>
           </View>
         )}

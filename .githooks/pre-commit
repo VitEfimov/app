@@ -1,0 +1,6 @@
+#!/bin/sh
+# Auto-upgrade app version (commit count + random build number) on every commit
+if command -v node >/dev/null 2>&1; then
+  node scripts/update-version.js --next && git add src/versionInfo.js
+fi
+exit 0

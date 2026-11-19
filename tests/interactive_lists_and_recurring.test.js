@@ -774,14 +774,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 907, `English locale must contain 907 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 909, `English locale must contain 909 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        907,
-        `Language ${lang} has ${count} keys, expected 907 (matching EN)`
+        909,
+        `Language ${lang} has ${count} keys, expected 909 (matching EN)`
       );
     }
   });
@@ -2607,6 +2607,158 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.ok(typeof iosPlist.NSRemindersFullAccessUsageDescription === 'string' && iosPlist.NSRemindersFullAccessUsageDescription.length > 0, 'app.json must declare NSRemindersFullAccessUsageDescription for iOS 17+');
       assert.ok(Array.isArray(appJson?.expo?.plugins) && appJson.expo.plugins.includes('expo-background-fetch'), 'app.json plugins must include expo-background-fetch');
       assert.match(calSyncSrc, /toLowerCase\(\)\s*!==\s*'canceled'/, 'calendarSync must check canceled event status case-insensitively for iOS & Android');
+    });
+
+    test('Settings More section: hidden Debugger unlocked via 10 taps on commit-upgraded Version within 10 seconds', () => {
+      const {
+        DEBUG_UNLOCK_TAP_COUNT,
+        DEBUG_UNLOCK_WINDOW_MS,
+        getAppVersionInfo,
+        formatAppVersionDisplay,
+        recordDebugUnlockTap,
+      } = require('../src/utils/appVersion');
+
+      assert.strictEqual(DEBUG_UNLOCK_TAP_COUNT, 10, 'Must require exactly 10 taps');
+      assert.strictEqual(DEBUG_UNLOCK_WINDOW_MS, 10000, 'Must enforce a 10-second sliding window');
+
+      // 1. Version metadata & display format
+      const info = getAppVersionInfo();
+      assert.ok(info.commitCount >= 1, 'commitCount must be populated from git history');
+      assert.ok(info.buildRandom >= 1000 && info.buildRandom <= 9999, 'buildRandom must be a 4-digit random number');
+      const display = formatAppVersionDisplay(info);
+      assert.match(display, /^\d+\.\d+\.\d+\s+\(\d{4}\)$/, `Display version "${display}" must match major.minor.commits (random)`);
+
+      // 2. 10 taps within 10 seconds unlocks on tap 10
+      let timestamps = [];
+      const baseTime = 100000;
+      for (let i = 1; i <= 9; i++) {
+        const r = recordDebugUnlockTap(timestamps, baseTime + i * 500);
+        assert.strictEqual(r.unlocked, false, `Tap ${i} must not unlock yet`);
+        assert.strictEqual(r.remainingTaps, 10 - i);
+        timestamps = r.timestamps;
+      }
+      const tenth = recordDebugUnlockTap(timestamps, baseTime + 5000);
+      assert.strictEqual(tenth.unlocked, true, '10th tap within 10s must unlock debugger');
+      assert.strictEqual(tenth.remainingTaps, 0);
+      assert.deepStrictEqual(tenth.timestamps, [], 'Buffer should reset upon unlock');
+
+      // 3. Taps older than 10 seconds expire from the sliding window
+      let slowTaps = [];
+      for (let i = 0; i < 6; i++) {
+        slowTaps = recordDebugUnlockTap(slowTaps, baseTime + i * 500).timestamps;
+      }
+      // Pause > 10 seconds after the first 6 taps -> they expire!
+      let resAfterPause = null;
+      for (let i = 0; i < 5; i++) {
+        resAfterPause = recordDebugUnlockTap(slowTaps, baseTime + 15000 + i * 500);
+        slowTaps = resAfterPause.timestamps;
+      }
+      assert.strictEqual(resAfterPause.unlocked, false, 'Expired taps older than 10s must not count toward unlock');
+      assert.strictEqual(resAfterPause.tapCount, 5);
+
+      // 4. SettingsScreen hides Debugger by default and wires Version row tap handler
+      const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
+      assert.match(settingsSrc, /const \[isDebuggerUnlocked,\s*setIsDebuggerUnlocked\] = useState\(false\)/, 'Debugger must be hidden by default');
+      assert.match(settingsSrc, /\{isDebuggerUnlocked && \([\s\S]*settings_debugger_btn/, 'Debugger row must only render when unlocked');
+      assert.match(settingsSrc, /testID="settings_version_row"[\s\S]*onPress=\{handleVersionPress\}/, 'Version row must trigger handleVersionPress');
+
+      // 5. Commit auto-upgrade script & hooks exist
+      assert.ok(fs.existsSync(path.resolve('scripts/update-version.js')), 'scripts/update-version.js must exist');
+      assert.ok(fs.existsSync(path.resolve('.githooks/pre-commit')), '.githooks/pre-commit must exist');
+      const pkg = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+      assert.ok(pkg.scripts['version:sync'], 'package.json must have version:sync script');
+      assert.ok(pkg.scripts['prestart'] && pkg.scripts['preweb'], 'package.json must auto-sync version before start/web');
+    });
+
+    test('Calendar Sync Android crash-safety: chunked reads, window-scoped deduped writes, sequential queue & native patch', () => {
+      const {
+        SYNC_PAST_DAYS,
+        SYNC_FUTURE_DAYS,
+        SYNC_CHUNK_DAYS,
+        MAX_EVENTS_PER_SYNC_BATCH,
+        MAX_IMPORTS_PER_SYNC,
+        extractTaskDateKey,
+        isDateStrInSyncWindow,
+        buildSyncWindowChunks,
+        getTaskCalendarFingerprint,
+      } = require('../src/utils/calendarSyncSchedule');
+
+      // 1. Safe bounded defaults
+      assert.strictEqual(SYNC_PAST_DAYS, 14);
+      assert.strictEqual(SYNC_FUTURE_DAYS, 60);
+      assert.strictEqual(SYNC_CHUNK_DAYS, 14);
+      assert.ok(MAX_EVENTS_PER_SYNC_BATCH <= 50, 'Batch export cap must prevent Android cursor blasts');
+      assert.ok(MAX_IMPORTS_PER_SYNC <= 200, 'Import cap must bound memory on huge calendars');
+
+      // 2. Date key extraction & rolling sync window bounds
+      const refNow = new Date(2026, 10, 19, 12, 0, 0, 0); // 2026-11-19
+      assert.strictEqual(extractTaskDateKey({ dateString: '2026-11-19' }), '2026-11-19');
+      assert.strictEqual(extractTaskDateKey({ completionDate: '2026-11-25T10:30:00.000Z' }), '2026-11-25');
+      assert.strictEqual(extractTaskDateKey(null), '');
+
+      assert.strictEqual(isDateStrInSyncWindow('2026-11-19', refNow), true);
+      assert.strictEqual(isDateStrInSyncWindow('2026-11-05', refNow), true, 'Exactly 14 days ago is inside window');
+      assert.strictEqual(isDateStrInSyncWindow('2026-11-04', refNow), false, '15 days ago is outside window');
+      assert.strictEqual(isDateStrInSyncWindow('2027-01-18', refNow), true, '60 days ahead is inside window');
+      assert.strictEqual(isDateStrInSyncWindow('2027-06-01', refNow), false, 'Far-future recurring task is outside window');
+      assert.strictEqual(isDateStrInSyncWindow('invalid-date', refNow), false);
+
+      // 3. Chunked window slices cover [-14d, +60d] in 14-day chunks without gaps
+      const chunks = buildSyncWindowChunks(refNow, 14, 60, 14);
+      assert.strictEqual(chunks.length, 6, '75-day span (-14..+60 inclusive) splits into 6 chunks of <=14 days');
+      for (const ch of chunks) {
+        assert.ok(ch.start instanceof Date && ch.end instanceof Date);
+        assert.ok(ch.end.getTime() > ch.start.getTime());
+        const spanDays = (ch.end.getTime() - ch.start.getTime()) / (24 * 60 * 60 * 1000);
+        assert.ok(spanDays <= 14.1, `Chunk span must be <= 14 days, got ${spanDays}`);
+      }
+
+      // 4. Deterministic fingerprint detects changes and matches identical tasks
+      const tA = { id: '1', taskname: 'Dentist', completionDate: '2026-11-20', time: '09:00', reminder: '15 min', description: { text: 'Clinic' } };
+      const tB = { ...tA };
+      const tC = { ...tA, time: '10:00' };
+      assert.strictEqual(getTaskCalendarFingerprint(tA, true), getTaskCalendarFingerprint(tB, true));
+      assert.notStrictEqual(getTaskCalendarFingerprint(tA, true), getTaskCalendarFingerprint(tC, true));
+      assert.notStrictEqual(getTaskCalendarFingerprint(tA, true), getTaskCalendarFingerprint(tA, false));
+
+      // 5. calendarSync.js enforces sequential queue, Android epoch dates, chunked reads, caps & hash skip
+      const calSyncSrc = fs.readFileSync(path.resolve('src/utils/calendarSync.js'), 'utf8');
+      assert.match(calSyncSrc, /export const enqueueCalendarOp/, 'calendarSync must serialize all native calls via enqueueCalendarOp');
+      assert.match(calSyncSrc, /toNativeCalendarDate/, 'calendarSync must pass epoch ms on Android to bypass unpatched SimpleDateFormat');
+      assert.match(calSyncSrc, /buildSyncWindowChunks/, 'performDifferentialCalendarSyncAsync must query in chunks');
+      assert.match(calSyncSrc, /MAX_EVENTS_PER_SYNC_BATCH/, 'syncAllTasksToCalendarAsync must enforce batch write cap');
+      assert.match(calSyncSrc, /MAX_IMPORTS_PER_SYNC/, 'performDifferentialCalendarSyncAsync must enforce import cap');
+      assert.match(calSyncSrc, /task\.calendarSyncHash\s*===\s*fingerprint/, 'syncAllTasksToCalendarAsync must skip unchanged tasks');
+      assert.match(calSyncSrc, /if\s*\(allChunksSucceeded\)/, 'ghost deletion detection must only run when all chunks succeeded');
+
+      // 6. SettingsScreen & CalendarScreen guard re-entrancy & catch all sync errors safely
+      const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
+      assert.match(settingsSrc, /isSyncingCalendarRef\s*=\s*useRef\(false\)/, 'SettingsScreen must track active calendar sync via ref');
+      assert.match(settingsSrc, /handleToggleCalendarSync[\s\S]*?catch\s*\(err\)[\s\S]*?finally\s*\{[\s\S]*?isSyncingCalendarRef\.current\s*=\s*false/, 'handleToggleCalendarSync must wrap entire body in try/catch/finally');
+      assert.match(settingsSrc, /handleManualCalendarSync[\s\S]*?catch\s*\(err\)[\s\S]*?finally\s*\{[\s\S]*?isSyncingCalendarRef\.current\s*=\s*false/, 'handleManualCalendarSync must wrap entire body in try/catch/finally');
+
+      // 7. Native Android expo-calendar patch script exists, is wired into package.json, and applied cleanly
+      assert.ok(fs.existsSync(path.resolve('scripts/patch-expo-calendar.js')), 'scripts/patch-expo-calendar.js must exist');
+      const pkg = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+      assert.match(pkg.scripts.postinstall || '', /patch-expo-calendar\.js/, 'package.json postinstall must apply expo-calendar patch');
+      assert.match(pkg.scripts.preandroid || '', /patch-expo-calendar\.js/, 'package.json preandroid must apply expo-calendar patch');
+
+      const calKtPath = path.resolve('node_modules/expo-calendar/android/src/main/java/expo/modules/calendar/CalendarModule.kt');
+      if (fs.existsSync(calKtPath)) {
+        const calKt = fs.readFileSync(calKtPath, 'utf8');
+        assert.match(calKt, /SupervisorJob\(\)\s*\+\s*Dispatchers\.Default/, 'CalendarModule.kt must use SupervisorJob()');
+        assert.match(calKt, /ThreadLocal<SimpleDateFormat>/, 'CalendarModule.kt must use ThreadLocal SimpleDateFormat');
+        assert.match(calKt, /CalendarContract\.Reminders\.query\([\s\S]*?CalendarContract\.Reminders\.MINUTES[\s\S]*?\)\?\.use\s*\{\s*cursor\s*->/, 'serializeAlarms must close Reminders cursor via ?.use');
+        assert.match(calKt, /CalendarContract\.Reminders\.query\([\s\S]*?CalendarContract\.Reminders\._ID[\s\S]*?\)\?\.use\s*\{\s*cursor\s*->/, 'removeRemindersForEvent must close Reminders cursor via ?.use');
+        assert.match(calKt, /catch\s*\(e:\s*Throwable\)/, 'launchAsyncWithModuleScope must catch Throwable to prevent native process crash');
+        assert.match(calKt, /cursor\.getString\(index\)\s*\?:\s*""/, 'stringFromCursor must handle NULL DB cells safely');
+      }
+
+      const mappersKtPath = path.resolve('node_modules/expo-calendar/android/src/main/java/expo/modules/calendar/JsValuesMappers.kt');
+      if (fs.existsSync(mappersKtPath)) {
+        const mappersKt = fs.readFileSync(mappersKtPath, 'utf8');
+        assert.match(mappersKt, /availabilityId\.trim\(\)\.toIntOrNull\(\)/, 'JsValuesMappers.kt must parse availability IDs safely with toIntOrNull()');
+      }
     });
   });
 });
