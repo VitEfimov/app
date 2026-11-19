@@ -516,7 +516,7 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
     const activeNativeEventMap = new Map();
     const activeNativeIds = new Set();
     (calendarEvents || []).forEach(event => {
-      if (event && event.id && event.status !== 'CANCELED') {
+      if (event && event.id && String(event.status || '').toLowerCase() !== 'canceled') {
         const idStr = String(event.id);
         activeNativeIds.add(idStr);
         activeNativeEventMap.set(idStr, event);

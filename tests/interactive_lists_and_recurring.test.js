@@ -2598,6 +2598,15 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       // 7. CalendarScreen exposes quick sync button when enabled
       const calScreenSrc = fs.readFileSync(path.resolve('src/screens/CalendarScreen.js'), 'utf8');
       assert.match(calScreenSrc, /calendar_quick_sync_btn/, 'CalendarScreen must render quick sync button when calendar sync is enabled');
+
+      // 8. iOS compatibility: UIBackgroundModes fetch, iOS 17+ FullAccess permissions, expo-background-fetch plugin, case-insensitive canceled check
+      const appJson = JSON.parse(fs.readFileSync(path.resolve('app.json'), 'utf8'));
+      const iosPlist = appJson?.expo?.ios?.infoPlist || {};
+      assert.ok(Array.isArray(iosPlist.UIBackgroundModes) && iosPlist.UIBackgroundModes.includes('fetch'), 'app.json ios.infoPlist must include UIBackgroundModes: ["fetch"]');
+      assert.ok(typeof iosPlist.NSCalendarsFullAccessUsageDescription === 'string' && iosPlist.NSCalendarsFullAccessUsageDescription.length > 0, 'app.json must declare NSCalendarsFullAccessUsageDescription for iOS 17+');
+      assert.ok(typeof iosPlist.NSRemindersFullAccessUsageDescription === 'string' && iosPlist.NSRemindersFullAccessUsageDescription.length > 0, 'app.json must declare NSRemindersFullAccessUsageDescription for iOS 17+');
+      assert.ok(Array.isArray(appJson?.expo?.plugins) && appJson.expo.plugins.includes('expo-background-fetch'), 'app.json plugins must include expo-background-fetch');
+      assert.match(calSyncSrc, /toLowerCase\(\)\s*!==\s*'canceled'/, 'calendarSync must check canceled event status case-insensitively for iOS & Android');
     });
   });
 });

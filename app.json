@@ -20,7 +20,12 @@
       "bundleIdentifier": "com.vitvalef.taskcalendar",
       "infoPlist": {
         "NSRemindersUsageDescription": "TaskCalendar needs access to your reminders to sync tasks.",
-        "NSCalendarsUsageDescription": "TaskCalendar needs access to your calendar to sync tasks."
+        "NSRemindersFullAccessUsageDescription": "TaskCalendar needs access to your reminders to sync tasks.",
+        "NSCalendarsUsageDescription": "TaskCalendar needs access to your calendar to sync tasks.",
+        "NSCalendarsFullAccessUsageDescription": "TaskCalendar needs access to your calendar to sync tasks.",
+        "UIBackgroundModes": [
+          "fetch"
+        ]
       }
     },
     "android": {
@@ -122,9 +127,11 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "TaskFlow needs access to your calendar to sync tasks."
+          "calendarPermission": "TaskCalendar needs access to your calendar to sync tasks.",
+          "remindersPermission": "TaskCalendar needs access to your reminders to sync tasks."
         }
-      ]
+      ],
+      "expo-background-fetch"
     ]
   }
 }
