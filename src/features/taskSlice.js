@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
-import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, addTombstoneAsync, getCalendarSyncScheduleStateAsync, markCalendarSyncCompletedAsync, isScheduledCalendarSyncDue } from '../utils/calendarSync';
+import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, fetchCalendarWindowEventsAsync, buildTaskDeduplicationPlan, extractTaskDateKey, isDateStrInSyncWindow, getTaskCalendarFingerprint, MAX_EVENTS_PER_SYNC_BATCH, addTombstoneAsync, getCalendarSyncScheduleStateAsync, markCalendarSyncCompletedAsync, isScheduledCalendarSyncDue } from '../utils/calendarSync';
 import { setLastCalendarSyncAt } from './themeSlice';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import { sanitizeId, sanitizeForStorage } from '../utils/securitySanitizer';
@@ -97,10 +97,30 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
         try {
             const response = await axios.get('/api/tasks', { withCredentials: true });
             if (Array.isArray(response.data)) {
+                const localMetaById = new Map();
+                localTasks.forEach(lt => {
+                    if (!lt) return;
+                    const lid = lt.id || lt._id;
+                    if (lid) localMetaById.set(String(lid), lt);
+                });
+
                 const remoteTasks = response.data.map(t => {
                     const updated = { ...t };
                     if (!updated.id && updated._id) updated.id = updated._id;
                     if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
+                    // Preserve device-local calendar & notification sync metadata if remote DB omits it
+                    const cachedLocal = localMetaById.get(String(updated.id || updated._id));
+                    if (cachedLocal) {
+                        if (!updated.calendarEventId && cachedLocal.calendarEventId) {
+                            updated.calendarEventId = cachedLocal.calendarEventId;
+                        }
+                        if (!updated.calendarSyncHash && cachedLocal.calendarSyncHash) {
+                            updated.calendarSyncHash = cachedLocal.calendarSyncHash;
+                        }
+                        if (!updated.notificationId && cachedLocal.notificationId) {
+                            updated.notificationId = cachedLocal.notificationId;
+                        }
+                    }
                     return updated;
                 });
 
@@ -590,10 +610,12 @@ const taskSlice = createSlice({
                     const updated = { ...t };
                     if (!updated.id && updated._id) updated.id = updated._id;
                     if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
-                    if (updated.completionDate) {
-                        updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
-                    } else {
-                        updated.dateString = null;
+                    if (!updated.dateString || !/^\d{4}-\d{2}-\d{2}$/.test(String(updated.dateString))) {
+                        if (updated.completionDate) {
+                            updated.dateString = typeof updated.completionDate === 'string' ? updated.completionDate.split('T')[0] : dayjs(updated.completionDate).format('YYYY-MM-DD');
+                        } else {
+                            updated.dateString = null;
+                        }
                     }
                     return updated;
                 });
@@ -753,10 +775,15 @@ export const addTask = (payload) => async (dispatch, getState) => {
 
     // 3. Non-blocking bi-directional write to native Google / device calendar
     if (themeState?.calendarSyncEnabled && payload?.task?.completionDate) {
+        const effId = payload.task.id || payload.task._id;
         syncTaskToCalendarAsync(payload.task, themeState)
             .then(calEventId => {
-                if (calEventId) {
-                    dispatch(updateTaskSync({ taskId: payload.task.id, calendarEventId: calEventId }));
+                if (calEventId && effId) {
+                    dispatch(updateTaskSync({
+                        taskId: effId,
+                        calendarEventId: calEventId,
+                        calendarSyncHash: getTaskCalendarFingerprint(payload.task, Boolean(themeState?.calendarAlarmsEnabled))
+                    }));
                     persistTasksToStorage(getState().taskReducer.tasks, getState);
                 }
             })
@@ -835,19 +862,30 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
         }, 0);
     }
 
-    // 3. Non-blocking background push to native Google / device calendar
+    // 3. Non-blocking background push to native Google / device calendar (scoped to rolling sync window)
     if (themeState?.calendarSyncEnabled && Array.isArray(payload?.tasks)) {
         setTimeout(async () => {
             const calUpdates = [];
+            const now = new Date();
+            let pushedCount = 0;
             for (const task of payload.tasks) {
-                if (task && task.completionDate) {
-                    try {
-                        const calEventId = await syncTaskToCalendarAsync(task, themeState);
-                        if (calEventId) {
-                            calUpdates.push({ taskId: task.id, calendarEventId: calEventId });
-                        }
-                    } catch (calErr) {}
-                }
+                if (pushedCount >= MAX_EVENTS_PER_SYNC_BATCH) break;
+                if (!task || task.completed) continue;
+                const dateKey = extractTaskDateKey(task);
+                if (!dateKey || !isDateStrInSyncWindow(dateKey, now)) continue;
+                const tid = task.id || task._id;
+                if (!tid) continue;
+                try {
+                    const calEventId = await syncTaskToCalendarAsync(task, themeState);
+                    if (calEventId) {
+                        calUpdates.push({
+                            taskId: tid,
+                            calendarEventId: calEventId,
+                            calendarSyncHash: getTaskCalendarFingerprint(task, Boolean(themeState?.calendarAlarmsEnabled)),
+                        });
+                        pushedCount++;
+                    }
+                } catch (calErr) {}
             }
             if (calUpdates.length > 0) {
                 dispatch(updateMultipleTasksSync({ updates: calUpdates }));
@@ -1242,34 +1280,68 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
     try {
         const tasks = state.taskReducer.tasks || [];
 
-        // 1. Export local tasks to Google / device calendar
-        const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(tasks, themeState);
+        // 0. Prefetch Google / device calendar window ONCE (safe 14-day chunks)
+        //    so export can match & link existing calendar events instead of duplicating them.
+        const prefetchedWindow = await fetchCalendarWindowEventsAsync(themeState);
 
-        // Merge newly created/updated eventMap IDs & hashes into tasks before differential sync so they are recognized
+        // 0b. Deduplicate any previously imported 'main' calendar copies that duplicate tasks on
+        //     other boards (payments, birthdays, events, etc.) BEFORE exporting.
+        const dedupPlan = buildTaskDeduplicationPlan(tasks);
+        const dupIdSet = new Set(dedupPlan.duplicateTaskIds.map(String));
+        const transferMap = new Map(dedupPlan.linkTransfers.map(tr => [String(tr.taskId), tr.calendarEventId]));
+
+        const tasksBeforeExport = tasks
+            .filter(t => {
+                if (!t) return false;
+                const tid = t.id || t._id;
+                return !tid || !dupIdSet.has(String(tid));
+            })
+            .map(t => {
+                const tid = t.id || t._id;
+                if (tid && transferMap.has(String(tid))) {
+                    return { ...t, calendarEventId: transferMap.get(String(tid)) };
+                }
+                return t;
+            });
+
+        // 1. Export/link local tasks to Google / device calendar (reusing prefetchedWindow)
+        const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(
+            tasksBeforeExport,
+            themeState,
+            prefetchedWindow
+        );
+
+        // Merge newly linked/created eventMap IDs & hashes into tasks before differential sync
         const tasksWithUpdatedEventIds = tasks.map(t => {
             if (!t) return t;
             const tid = t.id || t._id;
-            if (tid && eventMap && eventMap[tid]) {
+            const nextCalId = (tid && eventMap && eventMap[tid]) || (tid && transferMap.get(String(tid))) || t.calendarEventId;
+            const nextHash = (tid && hashMap && hashMap[tid]) || t.calendarSyncHash;
+            if (nextCalId !== t.calendarEventId || nextHash !== t.calendarSyncHash) {
                 return {
                     ...t,
-                    calendarEventId: eventMap[tid],
-                    ...(hashMap[tid] ? { calendarSyncHash: hashMap[tid] } : {})
+                    ...(nextCalId ? { calendarEventId: nextCalId } : {}),
+                    ...(nextHash ? { calendarSyncHash: nextHash } : {})
                 };
             }
             return t;
         });
 
-        // 2. Differential sync from Google / device calendar to local tasks
+        // 2. Differential sync from Google / device calendar to local tasks (reusing prefetchedWindow)
         const { newTasks = [], updatedTasks = [], deletedTaskIds = [], importedCount = 0, deletedCount = 0 } = 
-            await performDifferentialCalendarSyncAsync(themeState, tasksWithUpdatedEventIds);
+            await performDifferentialCalendarSyncAsync(themeState, tasksWithUpdatedEventIds, prefetchedWindow);
+
+        // Merge pre-export link transfers & duplicate removals with differential sync results
+        const mergedDeletedIds = Array.from(new Set([...dedupPlan.duplicateTaskIds, ...deletedTaskIds].map(String)));
+        const mergedUpdatedTasks = [...dedupPlan.linkTransfers, ...updatedTasks];
 
         // 3. Atomically update Redux in ONE single dispatch
         dispatch(batchCalendarSyncComplete({
             eventMap,
             hashMap,
             newTasks,
-            updatedTasks,
-            deletedTaskIds
+            updatedTasks: mergedUpdatedTasks,
+            deletedTaskIds: mergedDeletedIds
         }));
 
         // 4. Persist to storage once
@@ -1278,8 +1350,8 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
 
         // 5. Harmonize with remote DB
         const dbSyncEnabled = themeState?.dbSyncEnabled !== false && Platform.OS !== 'web';
-        if (state.userReducer?.isAuthenticated && dbSyncEnabled && Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
-            for (const delId of deletedTaskIds) {
+        if (state.userReducer?.isAuthenticated && dbSyncEnabled && mergedDeletedIds.length > 0) {
+            for (const delId of mergedDeletedIds) {
                 dispatch(deleteTaskAsync(delId));
             }
         }
@@ -1287,8 +1359,8 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
         const summary = {
             exportedCount: syncedCount || 0,
             importedCount: importedCount || 0,
-            deletedCount: deletedCount || 0,
-            totalSynced: (syncedCount || 0) + (importedCount || 0) + (deletedCount || 0)
+            deletedCount: mergedDeletedIds.length,
+            totalSynced: (syncedCount || 0) + (importedCount || 0) + mergedDeletedIds.length
         };
 
         const nowDate = new Date();

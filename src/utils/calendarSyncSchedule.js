@@ -32,21 +32,215 @@ export function formatLocalDateKey(dateLike = new Date()) {
 }
 
 /**
- * Extracts a normalized 'YYYY-MM-DD' date string from a task object.
+ * Extracts a normalized 'YYYY-MM-DD' date string from a task object across all supported date fields.
  */
 export function extractTaskDateKey(task) {
   if (!task) return '';
-  if (typeof task.dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(task.dateString)) {
-    return task.dateString;
-  }
-  if (typeof task.completionDate === 'string') {
-    const part = task.completionDate.split('T')[0];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
-  }
-  if (task.completionDate) {
-    return formatLocalDateKey(task.completionDate);
+  const candidates = [task.dateString, task.completionDate, task.dueDate, task.date];
+  for (const val of candidates) {
+    if (!val) continue;
+    if (typeof val === 'string') {
+      const part = val.split('T')[0].trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+    }
+    const formatted = formatLocalDateKey(val);
+    if (formatted) return formatted;
   }
   return '';
+}
+
+/**
+ * Normalizes a task or calendar event title for cross-board duplicate detection.
+ * Strips completion checkmarks, control characters, collapses whitespace, and lowercases.
+ */
+export function normalizeCalendarTitle(title) {
+  if (title === null || title === undefined) return '';
+  return String(title)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/^[✓✔☑]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200)
+    .toLowerCase();
+}
+
+export function getTaskMatchTitle(task) {
+  if (!task) return '';
+  return normalizeCalendarTitle(task.taskname || task.name || '');
+}
+
+export function isMainBoardId(boardId) {
+  if (!boardId) return true;
+  const s = String(boardId).trim().toLowerCase();
+  return s === '' || s === 'main' || s === 'tasks';
+}
+
+export function shiftDateKeyByDays(dateKey, deltaDays) {
+  if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return '';
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const shifted = new Date(y, m - 1, d + deltaDays, 12, 0, 0, 0);
+  return formatLocalDateKey(shifted);
+}
+
+/**
+ * Sorts candidate tasks matching the same (title, date) so authoritative tasks
+ * (user-created tasks and tasks on specialized boards like payments, birthdays, events)
+ * always win over calendar-imported copies on 'main'.
+ */
+function compareTaskAuthority(a, b) {
+  const aImported = a?.syncedFromCalendar === true ? 1 : 0;
+  const bImported = b?.syncedFromCalendar === true ? 1 : 0;
+  if (aImported !== bImported) return aImported - bImported;
+
+  const aMain = isMainBoardId(a?.boardId || a?.board_id) ? 1 : 0;
+  const bMain = isMainBoardId(b?.boardId || b?.board_id) ? 1 : 0;
+  if (aMain !== bMain) return aMain - bMain;
+
+  const aLinked = a?.calendarEventId ? 0 : 1;
+  const bLinked = b?.calendarEventId ? 0 : 1;
+  return aLinked - bLinked;
+}
+
+/**
+ * Scans existing tasks across ALL boards and identifies duplicate `syncedFromCalendar`
+ * copies on the 'main' board that duplicate an existing task on another board
+ * (e.g. payments, birthdays, events) or a native task on 'main'.
+ */
+export function buildTaskDeduplicationPlan(existingTasks = []) {
+  const groups = new Map();
+  for (const t of existingTasks || []) {
+    if (!t) continue;
+    const title = getTaskMatchTitle(t);
+    const dateKey = extractTaskDateKey(t);
+    if (!title || !dateKey) continue;
+    const key = `${title}_${dateKey}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  }
+
+  const duplicateTaskIds = [];
+  const linkTransfers = [];
+  const orphanCalendarEventIds = [];
+
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+
+    const sorted = [...group].sort(compareTaskAuthority);
+    const authoritative = sorted[0];
+    const authId = authoritative.id || authoritative._id;
+    let authCalId = authoritative.calendarEventId ? String(authoritative.calendarEventId).trim() : null;
+
+    for (let i = 1; i < sorted.length; i++) {
+      const candidate = sorted[i];
+      const candId = candidate.id || candidate._id;
+      const candBoardId = candidate.boardId || candidate.board_id;
+      const isCalendarImport = candidate.syncedFromCalendar === true || (candId && String(candId).startsWith('cal_'));
+
+      // Only auto-remove calendar-imported duplicates on the main board;
+      // never delete two distinct user-created tasks.
+      if (!isCalendarImport || !isMainBoardId(candBoardId)) continue;
+
+      if (candId) {
+        duplicateTaskIds.push(candId);
+      }
+
+      const candCalId = candidate.calendarEventId ? String(candidate.calendarEventId).trim() : null;
+      if (candCalId) {
+        if (!authCalId && authId) {
+          authCalId = candCalId;
+          linkTransfers.push({ taskId: authId, calendarEventId: candCalId });
+        } else if (authCalId && candCalId !== authCalId) {
+          orphanCalendarEventIds.push(candCalId);
+        }
+      }
+    }
+  }
+
+  return { duplicateTaskIds, linkTransfers, orphanCalendarEventIds };
+}
+
+/**
+ * Builds a multi-entry cross-board task lookup index for differential calendar sync.
+ */
+export function buildTaskCalendarIndex(existingTasks = []) {
+  const byCalEventId = new Map();
+  const byNameAndDate = new Map();
+
+  const sortedTasks = [...(existingTasks || [])].filter(Boolean).sort(compareTaskAuthority);
+
+  for (const t of sortedTasks) {
+    if (t.calendarEventId) {
+      const calId = String(t.calendarEventId).trim();
+      if (calId && !byCalEventId.has(calId)) {
+        byCalEventId.set(calId, t);
+      }
+    }
+    const title = getTaskMatchTitle(t);
+    const dateKey = extractTaskDateKey(t);
+    if (title && dateKey) {
+      const key = `${title}_${dateKey}`;
+      if (!byNameAndDate.has(key)) byNameAndDate.set(key, []);
+      byNameAndDate.get(key).push(t);
+    }
+  }
+
+  return { byCalEventId, byNameAndDate };
+}
+
+/**
+ * Matches a native Google/Device calendar event against ALL tasks across ALL boards
+ * (payments, birthdays, events, main, etc.) so existing board tasks are never duplicated onto 'main'.
+ */
+export function findMatchingTaskForCalendarEvent(eventMeta, taskIndex, deletedIdSet = new Set()) {
+  const { eventCalId, cleanTitle, dateStr, isFromTaskFlow = false } = eventMeta || {};
+  const idStr = eventCalId ? String(eventCalId).trim() : '';
+
+  // 1. Direct calendarEventId link across any board
+  if (idStr && taskIndex.byCalEventId.has(idStr)) {
+    const linked = taskIndex.byCalEventId.get(idStr);
+    const linkedId = linked?.id || linked?._id;
+    if (linked && (!linkedId || !deletedIdSet.has(String(linkedId)))) {
+      return { matchType: 'linked', task: linked };
+    }
+  }
+
+  const normTitle = normalizeCalendarTitle(cleanTitle);
+  if (!normTitle || !dateStr) {
+    return { matchType: 'none', task: null };
+  }
+
+  const matchInDateKey = (targetDateKey) => {
+    const key = `${normTitle}_${targetDateKey}`;
+    const candidates = (taskIndex.byNameAndDate.get(key) || []).filter(t => {
+      const tid = t?.id || t?._id;
+      return t && (!tid || !deletedIdSet.has(String(tid)));
+    });
+    if (candidates.length === 0) return null;
+
+    // Prefer an unlinked matching task (on payments/birthdays/events/main) to bind calendarEventId in place
+    const unlinked = candidates.find(t => !t.calendarEventId);
+    if (unlinked) {
+      return { matchType: 'unlinked', task: unlinked };
+    }
+    // Otherwise a matching task already exists on some board (possibly linked to another duplicate event)
+    return { matchType: 'already_exists', task: candidates[0] };
+  };
+
+  // 2. Exact (normalizedTitle, date) across ALL boards
+  const exact = matchInDateKey(dateStr);
+  if (exact) return exact;
+
+  // 3. Timezone boundary fallback (±1 day) ONLY for events originally exported by TaskFlow
+  if (isFromTaskFlow) {
+    for (const delta of [-1, 1]) {
+      const adjDate = shiftDateKeyByDays(dateStr, delta);
+      if (!adjDate) continue;
+      const shifted = matchInDateKey(adjDate);
+      if (shifted) return shifted;
+    }
+  }
+
+  return { matchType: 'none', task: null };
 }
 
 /**

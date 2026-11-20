@@ -2760,6 +2760,111 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
         assert.match(mappersKt, /availabilityId\.trim\(\)\.toIntOrNull\(\)/, 'JsValuesMappers.kt must parse availability IDs safely with toIntOrNull()');
       }
     });
+
+    test('Cross-board Calendar Sync Deduplication: tasks on payments/birthdays/events never duplicate onto Main board', () => {
+      const {
+        normalizeCalendarTitle,
+        extractTaskDateKey,
+        buildTaskDeduplicationPlan,
+        buildTaskCalendarIndex,
+        findMatchingTaskForCalendarEvent,
+      } = require('../src/utils/calendarSyncSchedule');
+
+      // 1. Title normalization & multi-field date extraction
+      assert.strictEqual(normalizeCalendarTitle('✓  Toyota   Finance $550 '), 'toyota finance $550');
+      assert.strictEqual(extractTaskDateKey({ dueDate: '2026-11-27' }), '2026-11-27');
+      assert.strictEqual(extractTaskDateKey({ date: '2026-12-01' }), '2026-12-01');
+
+      // 2. Existing tasks across payments, birthdays, and previously duplicated main copies
+      const existingTasks = [
+        { id: 'pay_1', taskname: 'Toyota Finance $550', dateString: '2026-11-27', boardId: 'payments', calendarEventId: '202' },
+        { id: 'cal_101_dup', taskname: 'Toyota Finance $550', dateString: '2026-11-27', boardId: 'main', syncedFromCalendar: true, calendarEventId: '101' },
+        { id: 'bday_1', taskname: "Mom's Birthday", dateString: '2026-11-29', boardId: 'birthdays' }, // unlinked!
+        { id: 'cal_102_dup', taskname: "Mom's Birthday", dateString: '2026-11-29', boardId: 'main', syncedFromCalendar: true, calendarEventId: '102' },
+        { id: 'user_main_1', taskname: 'Buy Groceries', dateString: '2026-11-20', boardId: 'main' },
+        { id: 'user_main_2', taskname: 'Buy Groceries', dateString: '2026-11-20', boardId: 'main' }, // two user-created tasks -> never auto-deleted!
+      ];
+
+      const plan = buildTaskDeduplicationPlan(existingTasks);
+      assert.deepStrictEqual(
+        plan.duplicateTaskIds.sort(),
+        ['cal_101_dup', 'cal_102_dup'],
+        'Must remove ONLY syncedFromCalendar duplicates on main that duplicate payments/birthdays tasks'
+      );
+      assert.deepStrictEqual(
+        plan.linkTransfers,
+        [{ taskId: 'bday_1', calendarEventId: '102' }],
+        'Must transfer calendarEventId from removed main duplicate to the unlinked birthdays task'
+      );
+      assert.deepStrictEqual(
+        plan.orphanCalendarEventIds,
+        ['101'],
+        'Must identify orphan extra calendarEventId 101 (distinct from payments task event 202)'
+      );
+
+      // 3. Cross-board event matching prevents importing duplicates onto main even when task is already linked
+      const cleanTasks = [
+        { id: 'pay_1', taskname: 'Toyota Finance $550', dateString: '2026-11-27', boardId: 'payments', calendarEventId: '202' },
+        { id: 'bday_1', taskname: "Mom's Birthday", dateString: '2026-11-29', boardId: 'birthdays' },
+        { id: 'evt_1', taskname: 'Dentist Visit', dateString: '2026-11-30', boardId: 'events', calendarEventId: '303' },
+      ];
+      const idx = buildTaskCalendarIndex(cleanTasks);
+
+      // Case A: Exact ID match on payments board
+      const mLinked = findMatchingTaskForCalendarEvent(
+        { eventCalId: '202', cleanTitle: 'Toyota Finance $550', dateStr: '2026-11-27', isFromTaskFlow: true },
+        idx
+      );
+      assert.strictEqual(mLinked.matchType, 'linked');
+      assert.strictEqual(mLinked.task.id, 'pay_1');
+
+      // Case B: Duplicate Google Calendar event (different eventCalId '101') for ALREADY-LINKED payments task
+      const mAlreadyExists = findMatchingTaskForCalendarEvent(
+        { eventCalId: '101', cleanTitle: 'Toyota   finance $550', dateStr: '2026-11-27', isFromTaskFlow: true },
+        idx
+      );
+      assert.strictEqual(mAlreadyExists.matchType, 'already_exists', 'Must NOT fall through and duplicate onto main!');
+      assert.strictEqual(mAlreadyExists.task.id, 'pay_1');
+
+      // Case C: Unlinked task on birthdays board matches Google Calendar event -> links in place on birthdays!
+      const mUnlinked = findMatchingTaskForCalendarEvent(
+        { eventCalId: '404', cleanTitle: "Mom's Birthday", dateStr: '2026-11-29', isFromTaskFlow: false },
+        idx
+      );
+      assert.strictEqual(mUnlinked.matchType, 'unlinked');
+      assert.strictEqual(mUnlinked.task.id, 'bday_1');
+      assert.strictEqual(mUnlinked.task.boardId, 'birthdays');
+
+      // Case D: TaskFlow-exported event shifted by 1 day due to timezone boundary still matches events board task
+      const mTzShift = findMatchingTaskForCalendarEvent(
+        { eventCalId: '999', cleanTitle: 'Dentist Visit', dateStr: '2026-11-29', isFromTaskFlow: true },
+        idx
+      );
+      assert.strictEqual(mTzShift.matchType, 'already_exists');
+      assert.strictEqual(mTzShift.task.id, 'evt_1');
+
+      // Case E: Genuinely new Google Calendar event not present on ANY board -> matchType 'none' (imports to main)
+      const mNew = findMatchingTaskForCalendarEvent(
+        { eventCalId: '505', cleanTitle: 'Flight to Rome', dateStr: '2026-12-10', isFromTaskFlow: false },
+        idx
+      );
+      assert.strictEqual(mNew.matchType, 'none');
+
+      // 4. Verify calendarSync.js, taskSlice.js, and backgroundTasks.js wire single-fetch + dedup-before-export + metadata preservation
+      const calSyncSrc = fs.readFileSync(path.resolve('src/utils/calendarSync.js'), 'utf8');
+      assert.match(calSyncSrc, /export const fetchCalendarWindowEventsAsync/, 'calendarSync must export fetchCalendarWindowEventsAsync');
+      assert.match(calSyncSrc, /match\.matchType === 'already_exists'/, 'performDifferentialCalendarSyncAsync must skip already_exists matches across all boards');
+      assert.match(calSyncSrc, /existingNativeByTitleDate/, 'syncAllTasksToCalendarAsync must link existing Google Calendar events before creating new ones');
+
+      const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
+      assert.match(taskSliceSrc, /fetchCalendarWindowEventsAsync\(themeState\)/, 'batchSyncCalendarTasks must prefetch calendar window once before export');
+      assert.match(taskSliceSrc, /buildTaskDeduplicationPlan\(tasks\)/, 'batchSyncCalendarTasks must deduplicate main copies before export');
+      assert.match(taskSliceSrc, /cachedLocal\.calendarEventId/, 'fetchTasks must preserve local calendarEventId across remote DB sync');
+
+      const bgSrc = fs.readFileSync(path.resolve('src/utils/backgroundTasks.js'), 'utf8');
+      assert.match(bgSrc, /fetchCalendarWindowEventsAsync\(themeState\)/, 'backgroundTasks must prefetch calendar window once');
+      assert.match(bgSrc, /buildTaskDeduplicationPlan\(tasks\)/, 'backgroundTasks must deduplicate main copies before export');
+    });
   });
 });
 

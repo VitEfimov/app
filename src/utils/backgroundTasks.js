@@ -43,6 +43,8 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
 
   try {
     const {
+      fetchCalendarWindowEventsAsync,
+      buildTaskDeduplicationPlan,
       syncAllTasksToCalendarAsync,
       performDifferentialCalendarSyncAsync,
       getCalendarSyncScheduleStateAsync,
@@ -57,30 +59,57 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
       return { ran: false, tasks, nextSyncTime: dueInfo.nextSyncTime };
     }
 
-    // 1. Export local tasks with due dates to Google / device calendar
-    const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(tasks, themeState);
+    // 0. Prefetch calendar window ONCE & deduplicate previously imported main duplicates
+    const prefetchedWindow = await fetchCalendarWindowEventsAsync(themeState);
+    const dedupPlan = buildTaskDeduplicationPlan(tasks);
+    const dupIdSet = new Set(dedupPlan.duplicateTaskIds.map(String));
+    const transferMap = new Map(dedupPlan.linkTransfers.map(tr => [String(tr.taskId), tr.calendarEventId]));
+
+    const tasksBeforeExport = (tasks || [])
+      .filter(t => {
+        if (!t) return false;
+        const tid = t.id || t._id;
+        return !tid || !dupIdSet.has(String(tid));
+      })
+      .map(t => {
+        const tid = t.id || t._id;
+        if (tid && transferMap.has(String(tid))) {
+          return { ...t, calendarEventId: transferMap.get(String(tid)) };
+        }
+        return t;
+      });
+
+    // 1. Export/link local tasks with due dates to Google / device calendar
+    const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(
+      tasksBeforeExport,
+      themeState,
+      prefetchedWindow
+    );
 
     let currentList = (tasks || []).map(t => {
       if (!t) return t;
       const tid = t.id || t._id;
-      if (tid && eventMap && eventMap[tid]) {
+      const nextCalId = (tid && eventMap && eventMap[tid]) || (tid && transferMap.get(String(tid))) || t.calendarEventId;
+      const nextHash = (tid && hashMap && hashMap[tid]) || t.calendarSyncHash;
+      if (nextCalId !== t.calendarEventId || nextHash !== t.calendarSyncHash) {
         return {
           ...t,
-          calendarEventId: eventMap[tid],
-          ...(hashMap[tid] ? { calendarSyncHash: hashMap[tid] } : {}),
+          ...(nextCalId ? { calendarEventId: nextCalId } : {}),
+          ...(nextHash ? { calendarSyncHash: nextHash } : {}),
         };
       }
       return t;
     });
 
-    // 2. Differential sync from Google / device calendar back to local tasks
-    const diffResult = await performDifferentialCalendarSyncAsync(themeState, currentList);
-    const hasEventMapChanges = Object.keys(eventMap || {}).length > 0;
+    // 2. Differential sync from Google / device calendar back to local tasks (reusing prefetchedWindow)
+    const diffResult = await performDifferentialCalendarSyncAsync(themeState, currentList, prefetchedWindow);
+    const hasEventMapChanges = Object.keys(eventMap || {}).length > 0 || dedupPlan.duplicateTaskIds.length > 0 || dedupPlan.linkTransfers.length > 0;
 
     if (diffResult && diffResult.hasChanges) {
-      const { deletedTaskIds, updatedTasks, newTasks } = diffResult;
-      if (Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
-        const delSet = new Set(deletedTaskIds.map(String));
+      const { deletedTaskIds = [], updatedTasks = [], newTasks = [] } = diffResult;
+      const mergedDeletedIds = Array.from(new Set([...dedupPlan.duplicateTaskIds, ...deletedTaskIds].map(String)));
+      if (mergedDeletedIds.length > 0) {
+        const delSet = new Set(mergedDeletedIds);
         currentList = currentList.filter(t => t && !delSet.has(String(t.id || t._id)));
       }
       if (Array.isArray(updatedTasks) && updatedTasks.length > 0) {
@@ -95,6 +124,7 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
             if (u.time !== undefined) item.time = u.time;
             if (u.completed !== undefined) item.completed = u.completed;
             if (u.calendarEventId !== undefined) item.calendarEventId = u.calendarEventId;
+            if (u.calendarSyncHash !== undefined) item.calendarSyncHash = u.calendarSyncHash;
             if (u.description !== undefined) item.description = u.description;
           }
         });
@@ -103,6 +133,9 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
         const { sortTasksChronologically } = require('./binaryInsert');
         currentList = sortTasksChronologically([...currentList, ...newTasks]);
       }
+    } else if (dedupPlan.duplicateTaskIds.length > 0) {
+      const delSet = new Set(dedupPlan.duplicateTaskIds.map(String));
+      currentList = currentList.filter(t => t && !delSet.has(String(t.id || t._id)));
     }
 
     if (hasEventMapChanges || (diffResult && diffResult.hasChanges)) {
