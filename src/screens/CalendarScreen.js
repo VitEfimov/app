@@ -19,6 +19,7 @@ import { Calendar } from 'react-native-calendars';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { getFirstDayOfWeek } from '../utils/filters';
+import { isQuickListBoardType } from '../utils/calendarSyncSchedule';
 import Modal from 'react-native-modal';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 
@@ -420,6 +421,28 @@ export default function CalendarScreen({ navigation, route }) {
     );
   }, [selectedDate, todayStr, colors, isDark]);
 
+  // Exclude pure undated Quick List boards from the Calendar tab completely
+  const quickListBoardIdSet = useMemo(() => {
+    const set = new Set();
+    (boards || []).forEach(b => {
+      if (b && isQuickListBoardType(b)) {
+        if (b.id) set.add(String(b.id));
+        if (b._id) set.add(String(b._id));
+        if (b.name) set.add(String(b.name).toLowerCase());
+      }
+    });
+    return set;
+  }, [boards]);
+
+  const isTaskOnQuickListBoard = useCallback((task) => {
+    if (!task) return false;
+    if (task.isQuickListItem) return true;
+    const rawBId = task.boardId || task.board_id;
+    if (!rawBId) return false;
+    const s = String(rawBId);
+    return quickListBoardIdSet.has(s) || quickListBoardIdSet.has(s.toLowerCase());
+  }, [quickListBoardIdSet]);
+
   // Prepare marked dates with category-colored dots (cached for peak stress performance)
   const markedDates = useMemo(() => {
     const marks = {};
@@ -438,9 +461,10 @@ export default function CalendarScreen({ navigation, route }) {
       }
     });
 
+    const calendarEligibleTasks = tasks.filter(t => t && !isTaskOnQuickListBoard(t));
     const tasksToMark = filterBoardId
-      ? tasks.filter(t => t && String(t.boardId || 'main') === String(filterBoardId))
-      : tasks;
+      ? calendarEligibleTasks.filter(t => String(t.boardId || 'main') === String(filterBoardId))
+      : calendarEligibleTasks;
 
     tasksToMark.forEach(task => {
       if (!task) return;
@@ -487,13 +511,13 @@ export default function CalendarScreen({ navigation, route }) {
     }
 
     return finalMarks;
-  }, [tasks, boards, selectedDate, filterBoardId]);
+  }, [tasks, boards, selectedDate, filterBoardId, isTaskOnQuickListBoard]);
 
   // Get tasks for selected date
   const selectedTasks = useMemo(() => {
     if (!Array.isArray(tasks)) return [];
     let filteredTasks = tasks.filter(task => {
-      if (!task) return false;
+      if (!task || isTaskOnQuickListBoard(task)) return false;
       let d = task.dateString;
       if (!d && task.completionDate) {
         try {
@@ -528,7 +552,7 @@ export default function CalendarScreen({ navigation, route }) {
 
       return String(b.id || b._id || '').localeCompare(String(a.id || a._id || ''));
     });
-  }, [tasks, selectedDate, filterBoardId, searchQuery, sortConfig]);
+  }, [tasks, selectedDate, filterBoardId, searchQuery, sortConfig, isTaskOnQuickListBoard]);
 
   const activeBoard = useMemo(() => {
     if (!filterBoardId) return null;

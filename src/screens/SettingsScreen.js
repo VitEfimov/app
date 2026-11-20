@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks, toggleBoardCalendarSync } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
 import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
-import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync, getCalendarSyncScheduleStateAsync, getNextScheduledSyncTime, isBoardCalendarSyncEnabled, getBoardCalendarSyncKey } from '../utils/calendarSync';
+import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync, getCalendarSyncScheduleStateAsync, getNextScheduledSyncTime, isBoardCalendarSyncEnabled, getBoardCalendarSyncKey, isCalendarSyncSupportedForBoard } from '../utils/calendarSync';
 import { getBoardColor } from '../utils/boardColors';
 import { registerBackgroundFetchAsync } from '../utils/backgroundTasks';
 import dayjs from 'dayjs';
@@ -1250,9 +1250,10 @@ export default function SettingsScreen({ navigation }) {
 
               {/* Per-Board Calendar Sync Selection */}
               {(() => {
-                const boardList = Array.isArray(boards) && boards.length > 0
+                const rawBoards = Array.isArray(boards) && boards.length > 0
                   ? boards
                   : [{ id: 'main', name: 'Main', type: 'standard' }];
+                const boardList = rawBoards.filter(b => isCalendarSyncSupportedForBoard(b));
                 const syncedCount = boardList.filter(b => isBoardCalendarSyncEnabled(b, theme.boardCalendarSync)).length;
                 return (
                   <>

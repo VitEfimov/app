@@ -913,5 +913,13 @@
   "Choose which boards sync with your calendar": "Выберите, какие доски синхронизировать с календарём",
   "Enable Google Calendar Sync in Settings first": "Сначала включите синхронизацию календаря в Настройках",
   "Synced to calendar": "Синхронизируется с календарём",
-  "Local only": "Только локально"
+  "Local only": "Только локально",
+  "Quick List": "Быстрый список",
+  "Fast Checklist": "Чек-лист",
+  "Fast checklist with inline items like subtasks — no dates, no calendar clutter.": "Быстрый чек-лист как подзадачи — без дат и без лишнего в календаре.",
+  "Add item": "Добавить пункт",
+  "Clear completed": "Очистить выполненные",
+  "List item...": "Пункт списка...",
+  "Tap + Add item to start your quick list": "Нажмите «+ Добавить пункт», чтобы начать список",
+  "Completed items cleared": "Выполненные пункты очищены"
 }

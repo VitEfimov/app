@@ -15,11 +15,12 @@ const IconCalendar = ({ color = '#6246EA' }) => (
   </Svg>
 );
 
-const IconBoard = ({ color = '#6246EA' }) => (
+const IconQuickList = ({ color = '#6246EA' }) => (
   <Svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <Rect x="4" y="3" width="16" height="18" rx="2" />
-    <Line x1="9" y1="3" x2="9" y2="21" />
-    <Line x1="15" y1="3" x2="15" y2="21" />
+    <Path d="M9 6h11M9 12h11M9 18h11" />
+    <Path d="M3.5 6l1.5 1.5L7.5 5" />
+    <Circle cx="5" cy="12" r="1.5" />
+    <Circle cx="5" cy="18" r="1.5" />
   </Svg>
 );
 
@@ -143,10 +144,10 @@ export default function CreateBoardModal({
     },
     {
       id: 'simple_list',
-      title: t('Board') || 'Board',
-      badge: t('Section-based') || 'Section-based',
-      desc: t('Organize tasks into sections and move them as you go.') || 'Organize tasks into sections and move them as you go.',
-      Icon: IconBoard,
+      title: t('Quick List') || 'Quick List',
+      badge: t('Fast Checklist') || 'Fast Checklist',
+      desc: t('Fast checklist with inline items like subtasks — no dates, no calendar clutter.') || 'Fast checklist with inline items like subtasks — no dates, no calendar clutter.',
+      Icon: IconQuickList,
     },
     {
       id: 'birthdays',

@@ -13,6 +13,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import MoveBoardModal from '../components/MoveBoardModal';
 import CreateBoardModal from '../components/CreateBoardModal';
 import InlineAddTask from '../components/InlineAddTask';
+import QuickListBoard from '../components/QuickListBoard';
 import AutoManageSettings from '../components/AutoManageSettings';
 import PaymentBoardSettingsModal from '../components/PaymentBoardSettingsModal';
 import Modal from 'react-native-modal';
@@ -23,7 +24,7 @@ import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTask, addMultipleTasks, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk, rolloverHabitTasks, toggleBoardCalendarSync } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency, setHabitStreakMode } from '../features/themeSlice';
-import { isBoardCalendarSyncEnabled, getBoardCalendarSyncKey } from '../utils/calendarSyncSchedule';
+import { isBoardCalendarSyncEnabled, getBoardCalendarSyncKey, isQuickListBoardType, isCalendarSyncSupportedForBoard } from '../utils/calendarSyncSchedule';
 import { useTaskRowConfig } from '../components/TaskRowConfigContext';
 import { formatCurrency, resolveCurrencyCode, CURRENCY_OPTION_CODES, getCurrencyMeta, isPriceBoardType, convertCurrency, getCachedTaskCurrency } from '../utils/currencyHelper';
 import { computeHabitStats } from '../utils/habitHelper';
@@ -1839,6 +1840,56 @@ export default function BoardScreen({ route, navigation }) {
     return null;
   }, [activeBoard, activeBoard?.type, activeCurrencyCode, boardTasks, colors.bgCard, colors.borderColor, colors.primary, colors.textPrimary, colors.textSecondary, dispatch, expensesPeriodFilter, getTaskAmount, habitStreakMode, isDark, listFilterCategory, showToast, t, windowWidth]);
 
+  const isQuickListBoard = isQuickListBoardType(activeBoard);
+
+  const handleQuickListAddItem = useCallback(() => {
+    const targetBoardId = activeBoard?.id || activeBoard?._id || activeBoardId || 'main';
+    const newId = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const nowIso = new Date().toISOString();
+    dispatch(addTask({
+      task: {
+        id: newId,
+        boardId: targetBoardId,
+        taskname: '',
+        creationDate: nowIso,
+        createdAt: nowIso,
+        lastUpdatedDate: null,
+        completionDate: null,
+        dateString: null,
+        priority: 'none',
+        completed: false,
+        reminder: 'None',
+        isAlarm: false,
+        isQuickListItem: true,
+        description: { text: '', img: '', url: '' },
+      }
+    }));
+    return newId;
+  }, [activeBoard, activeBoardId, dispatch]);
+
+  const handleQuickListUpdateText = useCallback((itemId, text) => {
+    if (!itemId) return;
+    dispatch(updateTask({ taskId: itemId, name: text, skipReschedule: true }));
+  }, [dispatch]);
+
+  const handleQuickListToggle = useCallback((itemId, completed) => {
+    if (!itemId) return;
+    dispatch(updateTask({ taskId: itemId, completed: Boolean(completed), skipReschedule: true }));
+  }, [dispatch]);
+
+  const handleQuickListDelete = useCallback((itemId) => {
+    if (!itemId) return;
+    dispatch(deleteTask({ taskId: itemId }));
+  }, [dispatch]);
+
+  const handleQuickListClearCompleted = useCallback((ids) => {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    dispatch(deleteMultipleTasks({ taskIds: ids }));
+    if (showToast) {
+      showToast(t('Completed items cleared') || 'Completed items cleared');
+    }
+  }, [dispatch, showToast, t]);
+
   return (
     <ScreenErrorBoundary screenName="BoardScreen">
       <KeyboardAvoidingView 
@@ -1956,7 +2007,20 @@ export default function BoardScreen({ route, navigation }) {
           </ScrollView>
         </View>
 
-      {useFabricFlashList ? (
+      {isQuickListBoard ? (
+        <QuickListBoard
+          board={activeBoard}
+          boardColor={getBoardColor(activeBoard, boards)}
+          tasks={boardTasks}
+          colors={colors}
+          isDark={isDark}
+          onAddItem={handleQuickListAddItem}
+          onUpdateItemText={handleQuickListUpdateText}
+          onToggleItem={handleQuickListToggle}
+          onDeleteItem={handleQuickListDelete}
+          onClearCompleted={handleQuickListClearCompleted}
+        />
+      ) : useFabricFlashList ? (
         <FabricFlashList
           ref={flashListRef}
           key={activeBoardId}
@@ -2282,7 +2346,7 @@ export default function BoardScreen({ route, navigation }) {
             </ScrollView>
           </View>
 
-          {boardOptionsConfig.board && (() => {
+          {boardOptionsConfig.board && isCalendarSyncSupportedForBoard(boardOptionsConfig.board) && (() => {
             const targetBoard = boardOptionsConfig.board;
             const boardKey = getBoardCalendarSyncKey(targetBoard);
             const isSynced = isBoardCalendarSyncEnabled(targetBoard, boardCalendarSync);

@@ -913,5 +913,13 @@
   "Choose which boards sync with your calendar": "Elige qué tableros sincronizar con tu calendario",
   "Enable Google Calendar Sync in Settings first": "Activa primero la sincronización del calendario en Ajustes",
   "Synced to calendar": "Sincronizado con el calendario",
-  "Local only": "Solo local"
+  "Local only": "Solo local",
+  "Quick List": "Lista rápida",
+  "Fast Checklist": "Lista ágil",
+  "Fast checklist with inline items like subtasks — no dates, no calendar clutter.": "Lista rápida con elementos en línea como subtareas — sin fechas ni calendario.",
+  "Add item": "Añadir elemento",
+  "Clear completed": "Limpiar completados",
+  "List item...": "Elemento de la lista...",
+  "Tap + Add item to start your quick list": "Toca + Añadir elemento para empezar tu lista rápida",
+  "Completed items cleared": "Elementos completados eliminados"
 }

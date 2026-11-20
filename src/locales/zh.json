@@ -913,5 +913,13 @@
   "Choose which boards sync with your calendar": "选择要与日历同步的看板",
   "Enable Google Calendar Sync in Settings first": "请先在设置中开启 Google 日历同步",
   "Synced to calendar": "已同步至日历",
-  "Local only": "仅本地保存"
+  "Local only": "仅本地保存",
+  "Quick List": "快速清单",
+  "Fast Checklist": "快捷勾选",
+  "Fast checklist with inline items like subtasks — no dates, no calendar clutter.": "像子任务一样的行内快速清单 — 无日期、不占用日历。",
+  "Add item": "添加项目",
+  "Clear completed": "清除已完成",
+  "List item...": "清单项目...",
+  "Tap + Add item to start your quick list": "点击“+ 添加项目”开始快速清单",
+  "Completed items cleared": "已清除完成的项目"
 }

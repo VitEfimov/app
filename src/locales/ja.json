@@ -913,5 +913,13 @@
   "Choose which boards sync with your calendar": "カレンダーと同期するボードを選択してください",
   "Enable Google Calendar Sync in Settings first": "先に設定でGoogleカレンダー同期を有効にしてください",
   "Synced to calendar": "カレンダーと同期中",
-  "Local only": "ローカルのみ"
+  "Local only": "ローカルのみ",
+  "Quick List": "クイックリスト",
+  "Fast Checklist": "シンプルチェック",
+  "Fast checklist with inline items like subtasks — no dates, no calendar clutter.": "サブタスクのように素早く書けるチェックリスト — 日付なし・カレンダー非表示。",
+  "Add item": "項目を追加",
+  "Clear completed": "完了済みを削除",
+  "List item...": "リスト項目...",
+  "Tap + Add item to start your quick list": "「+ 項目を追加」をタップしてリストを開始",
+  "Completed items cleared": "完了済みの項目を削除しました"
 }

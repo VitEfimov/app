@@ -913,5 +913,13 @@
   "Choose which boards sync with your calendar": "캘린더와 동기화할 보드를 선택하세요",
   "Enable Google Calendar Sync in Settings first": "먼저 설정에서 Google 캘린더 동기화를 켜주세요",
   "Synced to calendar": "캘린더에 동기화됨",
-  "Local only": "로컬 전용"
+  "Local only": "로컬 전용",
+  "Quick List": "빠른 목록",
+  "Fast Checklist": "간편 체크리스트",
+  "Fast checklist with inline items like subtasks — no dates, no calendar clutter.": "하위 작업처럼 빠르게 입력하는 체크리스트 — 날짜 없음, 캘린더 미표시.",
+  "Add item": "항목 추가",
+  "Clear completed": "완료 항목 지우기",
+  "List item...": "목록 항목...",
+  "Tap + Add item to start your quick list": "+ 항목 추가를 눌러 빠른 목록을 시작하세요",
+  "Completed items cleared": "완료된 항목을 지웠습니다"
 }

@@ -913,5 +913,13 @@
   "Choose which boards sync with your calendar": "चुनें कि कौन से बोर्ड कैलेंडर के साथ सिंक हों",
   "Enable Google Calendar Sync in Settings first": "पहले सेटिंग्स में Google कैलेंडर सिंक सक्षम करें",
   "Synced to calendar": "कैलेंडर से सिंक किया गया",
-  "Local only": "केवल स्थानीय"
+  "Local only": "केवल स्थानीय",
+  "Quick List": "क्विक लिस्ट",
+  "Fast Checklist": "तेज़ चेकलिस्ट",
+  "Fast checklist with inline items like subtasks — no dates, no calendar clutter.": "सबटास्क जैसी इनलाइन चेकलिस्ट — बिना तारीख और बिना कैलेंडर भीड़ के।",
+  "Add item": "आइटम जोड़ें",
+  "Clear completed": "पूर्ण आइटम हटाएं",
+  "List item...": "सूची आइटम...",
+  "Tap + Add item to start your quick list": "अपनी क्विक लिस्ट शुरू करने के लिए + आइटम जोड़ें टैप करें",
+  "Completed items cleared": "पूर्ण आइटम हटा दिए गए"
 }

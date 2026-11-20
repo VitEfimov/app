@@ -1532,7 +1532,7 @@ describe('GDPR Data Portability, Right to Erasure & Privacy Compliance', () => {
     }
 
     const enKeys = Object.keys(loadedLocales['en']);
-    assert.strictEqual(enKeys.length, 915, 'English locale must contain exactly 915 keys');
+    assert.strictEqual(enKeys.length, 923, 'English locale must contain exactly 923 keys');
     assert.strictEqual(loadedLocales['ru']['Not available on this device'], 'Недоступно на этом устройстве');
     assert.strictEqual(loadedLocales['ko']['Purple'], '보라');
     assert.strictEqual(loadedLocales['ru']['Purple'], 'Пурпурный');

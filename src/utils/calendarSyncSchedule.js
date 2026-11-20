@@ -20,16 +20,35 @@ export const MAX_IMPORTS_PER_SYNC = 150;
 
 // Smart default calendar sync policy by board type:
 // - Date-driven boards (standard/Main, events/birthdays, expenses/payments) sync ON by default.
-// - Checklists & trackers (grocery, books/media, travel/packing, habits, simple lists) sync OFF by default.
+// - Checklists & trackers (grocery, books/media, travel/packing, habits) sync OFF by default (toggleable).
+// - Quick List (simple_list / quick_list) is a pure undated checklist — ALWAYS excluded from calendar & sync.
 export const CALENDAR_SYNC_AUTO_BOARD_TYPES = ['standard', 'birthdays', 'events', 'expenses'];
-export const CALENDAR_SYNC_OFF_BOARD_TYPES = ['grocery', 'shopping', 'media', 'packing', 'habits', 'simple_list'];
+export const CALENDAR_SYNC_OFF_BOARD_TYPES = ['grocery', 'shopping', 'media', 'packing', 'habits', 'simple_list', 'quick_list'];
+export const QUICK_LIST_BOARD_TYPES = ['simple_list', 'quick_list'];
 const CALENDAR_SYNC_OFF_BOARD_TYPE_SET = new Set(CALENDAR_SYNC_OFF_BOARD_TYPES);
+const QUICK_LIST_BOARD_TYPE_SET = new Set(QUICK_LIST_BOARD_TYPES);
+
+export function isQuickListBoardType(boardOrType) {
+  if (!boardOrType) return false;
+  const rawType = typeof boardOrType === 'object' ? boardOrType.type : boardOrType;
+  if (typeof rawType !== 'string') return false;
+  return QUICK_LIST_BOARD_TYPE_SET.has(rawType.trim().toLowerCase());
+}
+
+/**
+ * Returns false for pure undated Quick List boards which never participate in Calendar or Google Calendar Sync.
+ */
+export function isCalendarSyncSupportedForBoard(board) {
+  if (!board) return true;
+  return !isQuickListBoardType(board);
+}
 
 /**
  * Returns the default calendar sync state for a board based on its board type.
  */
 export function getDefaultBoardCalendarSync(board) {
   if (!board) return true;
+  if (!isCalendarSyncSupportedForBoard(board)) return false;
   const rawType = typeof board.type === 'string' ? board.type.trim().toLowerCase() : '';
   if (rawType && CALENDAR_SYNC_OFF_BOARD_TYPE_SET.has(rawType)) {
     return false;
@@ -52,8 +71,12 @@ export function getBoardCalendarSyncKey(boardOrId) {
  * Returns whether calendar sync is currently enabled for a given board,
  * honoring explicit per-board overrides in `boardCalendarSync` and falling back
  * to the board type's smart default.
+ * Always returns false for Quick List boards.
  */
 export function isBoardCalendarSyncEnabled(board, boardCalendarSync = {}) {
+  if (!isCalendarSyncSupportedForBoard(board)) {
+    return false;
+  }
   const overrides = boardCalendarSync && typeof boardCalendarSync === 'object' ? boardCalendarSync : {};
   const canonicalKey = getBoardCalendarSyncKey(board);
 

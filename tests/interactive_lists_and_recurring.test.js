@@ -774,14 +774,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 915, `English locale must contain 915 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 923, `English locale must contain 923 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        915,
-        `Language ${lang} has ${count} keys, expected 915 (matching EN)`
+        923,
+        `Language ${lang} has ${count} keys, expected 923 (matching EN)`
       );
     }
   });
@@ -2940,6 +2940,61 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(settingsSrc, /settings_synced_boards_toggle/, 'SettingsScreen must render Synced Boards accordion inside Google & Device Calendar card');
       assert.match(settingsSrc, /settings_board_cal_sync_/, 'SettingsScreen must render per-board switches');
       assert.match(settingsSrc, /toggleBoardCalendarSync/, 'SettingsScreen must dispatch toggleBoardCalendarSync');
+    });
+
+    test('Quick List Board (replaces simple_list): inline subtask-style checklist, stays in place on check, hidden from Calendar & Calendar Sync', () => {
+      const {
+        isQuickListBoardType,
+        isCalendarSyncSupportedForBoard,
+        isBoardCalendarSyncEnabled,
+        isTaskEligibleForCalendarSync,
+      } = require('../src/utils/calendarSyncSchedule');
+
+      const quickBoard = { id: 'b_ql', name: 'Quick Notes', type: 'simple_list' };
+      const boards = [
+        { id: 'main', name: 'Main', type: 'standard' },
+        quickBoard,
+      ];
+
+      // 1. Quick List board type detection & hard exclusion from Calendar Sync (even if an override existed)
+      assert.strictEqual(isQuickListBoardType(quickBoard), true);
+      assert.strictEqual(isQuickListBoardType('quick_list'), true);
+      assert.strictEqual(isQuickListBoardType('standard'), false);
+      assert.strictEqual(isCalendarSyncSupportedForBoard(quickBoard), false, 'Quick List must never support Calendar Sync');
+      assert.strictEqual(isBoardCalendarSyncEnabled(quickBoard, { b_ql: true }), false, 'Quick List must stay OFF even if stale override is true');
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 'q1', boardId: 'b_ql' }, boards, { b_ql: true }), false);
+
+      // 2. CreateBoardModal replaces 'Board' template with 'Quick List'
+      const createModalSrc = fs.readFileSync(path.resolve('src/components/CreateBoardModal.js'), 'utf8');
+      assert.match(createModalSrc, /id:\s*'simple_list'[\s\S]*?Quick List[\s\S]*?Fast Checklist/, 'CreateBoardModal must replace simple_list template with Quick List');
+
+      // 3. QuickListBoard implements pure inline subtask-style checklist (checkbox, inline TextInput, × delete, + Add item, Clear completed, never opens TaskDetailsModal)
+      const qlSrc = fs.readFileSync(path.resolve('src/components/QuickListBoard.js'), 'utf8');
+      assert.match(qlSrc, /export function sortQuickListItems/, 'QuickListBoard must export stable sortQuickListItems');
+      assert.match(qlSrc, /quick_list_clear_completed_btn/, 'QuickListBoard must provide Clear completed button');
+      assert.match(qlSrc, /quick_list_add_item_btn/, 'QuickListBoard must provide + Add item button');
+      assert.match(qlSrc, /textDecorationLine:\s*'line-through'/, 'Checked Quick List items must stay in place with strikethrough');
+      assert.match(qlSrc, /onSubmitEditing=\{handleSubmit\}/, 'Pressing Enter must save and add next inline item');
+      assert.match(qlSrc, /colors\.primaryContainer/, 'QuickListBoard must use Material You primaryContainer token');
+      assert.match(qlSrc, /colors\.onPrimaryContainer/, 'QuickListBoard must use Material You onPrimaryContainer token');
+      assert.match(qlSrc, /colors\.errorContainer/, 'QuickListBoard must use Material You errorContainer token');
+      assert.match(qlSrc, /colors\.surfaceContainerHighest/, 'QuickListBoard must use Material You surfaceContainerHighest token');
+      assert.ok(!qlSrc.includes('TaskDetailsModal'), 'QuickListBoard must never open TaskDetailsModal');
+
+      // 4. BoardScreen renders QuickListBoard for simple_list, creates undated items, and hides Calendar Sync switch in long-tap menu
+      const boardScreenSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      assert.match(boardScreenSrc, /isQuickListBoard\s*\?\s*\(\s*<QuickListBoard/, 'BoardScreen must render QuickListBoard for Quick List boards');
+      assert.match(boardScreenSrc, /completionDate:\s*null,\s*dateString:\s*null[\s\S]*?isQuickListItem:\s*true/, 'Quick List items must be created undated');
+      assert.match(boardScreenSrc, /isCalendarSyncSupportedForBoard\(boardOptionsConfig\.board\)/, 'BoardScreen long-tap menu must hide Calendar Sync switch for Quick List');
+
+      // 5. CalendarScreen & SettingsScreen completely exclude Quick List boards
+      const calScreenSrc = fs.readFileSync(path.resolve('src/screens/CalendarScreen.js'), 'utf8');
+      assert.match(calScreenSrc, /quickListBoardIdSet/, 'CalendarScreen must exclude Quick List board tasks');
+      assert.match(calScreenSrc, /!isTaskOnQuickListBoard\(t\)/, 'CalendarScreen markedDates must skip Quick List items');
+      assert.match(calScreenSrc, /if\s*\(!task\s*\|\|\s*isTaskOnQuickListBoard\(task\)\)\s*return false/, 'CalendarScreen selectedTasks must skip Quick List items');
+
+      const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
+      assert.match(settingsSrc, /rawBoards\.filter\(b => isCalendarSyncSupportedForBoard\(b\)\)/, 'SettingsScreen Synced Boards list must exclude Quick List boards');
     });
   });
 });
