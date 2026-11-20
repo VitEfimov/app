@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TouchableWithoutFeedback, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions, LayoutAnimation, UIManager } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks, toggleBoardCalendarSync } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
@@ -1964,24 +1964,26 @@ export default function SettingsScreen({ navigation }) {
 
             <View style={[styles.divider, { marginLeft: 16, backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
-            <TouchableOpacity
+            <TouchableWithoutFeedback
               testID="settings_version_row"
-              activeOpacity={0.7}
               onPress={handleVersionPress}
-              style={styles.cardItemRow}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('Version') || 'Version'} ${appVersionDisplay}`}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                  {t('Version') || 'Version'}
+              <View
+                style={[
+                  styles.cardItemRow,
+                  Platform.OS === 'web' && { cursor: 'default', userSelect: 'none' },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                    {t('Version') || 'Version'}
+                  </Text>
+                </View>
+                <Text testID="settings_version_text" style={[styles.itemValueText, { color: colors.textSecondary }]}>
+                  {appVersionDisplay}
                 </Text>
               </View>
-              <Text testID="settings_version_text" style={[styles.itemValueText, { color: colors.textSecondary }]}>
-                {appVersionDisplay}
-              </Text>
-            </TouchableOpacity>
+            </TouchableWithoutFeedback>
           </View>
         )}
       </ScrollView>

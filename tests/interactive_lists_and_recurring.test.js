@@ -2609,7 +2609,7 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(calSyncSrc, /toLowerCase\(\)\s*!==\s*'canceled'/, 'calendarSync must check canceled event status case-insensitively for iOS & Android');
     });
 
-    test('Settings More section: hidden Debugger unlocked via 10 taps on commit-upgraded Version within 10 seconds', () => {
+    test('Settings More section: hidden Debugger unlocked via 20 taps on commit-upgraded Version within 10 seconds', () => {
       const {
         DEBUG_UNLOCK_TAP_COUNT,
         DEBUG_UNLOCK_WINDOW_MS,
@@ -2618,7 +2618,7 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
         recordDebugUnlockTap,
       } = require('../src/utils/appVersion');
 
-      assert.strictEqual(DEBUG_UNLOCK_TAP_COUNT, 10, 'Must require exactly 10 taps');
+      assert.strictEqual(DEBUG_UNLOCK_TAP_COUNT, 20, 'Must require exactly 20 taps');
       assert.strictEqual(DEBUG_UNLOCK_WINDOW_MS, 10000, 'Must enforce a 10-second sliding window');
 
       // 1. Version metadata & display format
@@ -2628,33 +2628,33 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const display = formatAppVersionDisplay(info);
       assert.match(display, /^\d+\.\d+\.\d+\s+\(\d{4}\)$/, `Display version "${display}" must match major.minor.commits (random)`);
 
-      // 2. 10 taps within 10 seconds unlocks on tap 10
+      // 2. 20 taps within 10 seconds unlocks on tap 20
       let timestamps = [];
       const baseTime = 100000;
-      for (let i = 1; i <= 9; i++) {
-        const r = recordDebugUnlockTap(timestamps, baseTime + i * 500);
+      for (let i = 1; i <= 19; i++) {
+        const r = recordDebugUnlockTap(timestamps, baseTime + i * 200);
         assert.strictEqual(r.unlocked, false, `Tap ${i} must not unlock yet`);
-        assert.strictEqual(r.remainingTaps, 10 - i);
+        assert.strictEqual(r.remainingTaps, 20 - i);
         timestamps = r.timestamps;
       }
-      const tenth = recordDebugUnlockTap(timestamps, baseTime + 5000);
-      assert.strictEqual(tenth.unlocked, true, '10th tap within 10s must unlock debugger');
-      assert.strictEqual(tenth.remainingTaps, 0);
-      assert.deepStrictEqual(tenth.timestamps, [], 'Buffer should reset upon unlock');
+      const twentieth = recordDebugUnlockTap(timestamps, baseTime + 4000);
+      assert.strictEqual(twentieth.unlocked, true, '20th tap within 10s must unlock debugger');
+      assert.strictEqual(twentieth.remainingTaps, 0);
+      assert.deepStrictEqual(twentieth.timestamps, [], 'Buffer should reset upon unlock');
 
       // 3. Taps older than 10 seconds expire from the sliding window
       let slowTaps = [];
-      for (let i = 0; i < 6; i++) {
-        slowTaps = recordDebugUnlockTap(slowTaps, baseTime + i * 500).timestamps;
+      for (let i = 0; i < 12; i++) {
+        slowTaps = recordDebugUnlockTap(slowTaps, baseTime + i * 200).timestamps;
       }
-      // Pause > 10 seconds after the first 6 taps -> they expire!
+      // Pause > 10 seconds after the first 12 taps -> they expire!
       let resAfterPause = null;
-      for (let i = 0; i < 5; i++) {
-        resAfterPause = recordDebugUnlockTap(slowTaps, baseTime + 15000 + i * 500);
+      for (let i = 0; i < 9; i++) {
+        resAfterPause = recordDebugUnlockTap(slowTaps, baseTime + 15000 + i * 200);
         slowTaps = resAfterPause.timestamps;
       }
       assert.strictEqual(resAfterPause.unlocked, false, 'Expired taps older than 10s must not count toward unlock');
-      assert.strictEqual(resAfterPause.tapCount, 5);
+      assert.strictEqual(resAfterPause.tapCount, 9);
 
       // 4. SettingsScreen hides Debugger by default and wires Version row tap handler
       const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');

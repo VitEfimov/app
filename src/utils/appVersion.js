@@ -1,6 +1,6 @@
 import { APP_VERSION_INFO } from '../versionInfo.js';
 
-export const DEBUG_UNLOCK_TAP_COUNT = 10;
+export const DEBUG_UNLOCK_TAP_COUNT = 20;
 export const DEBUG_UNLOCK_WINDOW_MS = 10000; // 10 seconds
 
 /**
@@ -30,7 +30,7 @@ export function formatAppVersionDisplay(info = getAppVersionInfo()) {
 
 /**
  * Pure sliding-window tap tracker for unlocking Debugger & System Logs.
- * Requires `requiredTaps` (10) taps within `windowMs` (10,000 ms = 10 seconds).
+ * Requires `requiredTaps` (20) taps within `windowMs` (10,000 ms = 10 seconds).
  */
 export function recordDebugUnlockTap(
   tapTimestamps = [],
