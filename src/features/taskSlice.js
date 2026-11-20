@@ -6,8 +6,8 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
-import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, fetchCalendarWindowEventsAsync, buildTaskDeduplicationPlan, extractTaskDateKey, isDateStrInSyncWindow, getTaskCalendarFingerprint, MAX_EVENTS_PER_SYNC_BATCH, addTombstoneAsync, getCalendarSyncScheduleStateAsync, markCalendarSyncCompletedAsync, isScheduledCalendarSyncDue } from '../utils/calendarSync';
-import { setLastCalendarSyncAt } from './themeSlice';
+import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, removeBoardEventsFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, fetchCalendarWindowEventsAsync, buildTaskDeduplicationPlan, extractTaskDateKey, isDateStrInSyncWindow, getTaskCalendarFingerprint, isTaskEligibleForCalendarSync, resolveTaskBoard, getBoardCalendarSyncKey, MAX_EVENTS_PER_SYNC_BATCH, addTombstoneAsync, getCalendarSyncScheduleStateAsync, markCalendarSyncCompletedAsync, isScheduledCalendarSyncDue } from '../utils/calendarSync';
+import { setLastCalendarSyncAt, setBoardCalendarSync } from './themeSlice';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import { sanitizeId, sanitizeForStorage } from '../utils/securitySanitizer';
 import { computeHabitRolloverUpdates } from '../utils/habitHelper';
@@ -547,12 +547,23 @@ const taskSlice = createSlice({
             state.pendingCleanupTaskIds = [];
         },
         batchCalendarSyncComplete(state, action) {
-            const { eventMap, hashMap, newTasks, updatedTasks, deletedTaskIds } = action.payload || {};
+            const { eventMap, hashMap, newTasks, updatedTasks, deletedTaskIds, clearedEventTaskIds } = action.payload || {};
             
-            // 0. Remove ghost-deleted tasks identified by differential sync
+            // 0. Remove ghost-deleted tasks or duplicate imported copies identified by differential sync
             if (Array.isArray(deletedTaskIds) && deletedTaskIds.length > 0) {
                 const delSet = new Set(deletedTaskIds.map(String));
                 state.tasks = state.tasks.filter(t => t && !delSet.has(String(t.id || t._id)));
+            }
+
+            // 0b. Clear calendar links for tasks on boards whose calendar sync is OFF (keep tasks intact!)
+            if (Array.isArray(clearedEventTaskIds) && clearedEventTaskIds.length > 0) {
+                const clearSet = new Set(clearedEventTaskIds.map(String));
+                state.tasks.forEach(t => {
+                    if (t && clearSet.has(String(t.id || t._id))) {
+                        t.calendarEventId = null;
+                        t.calendarSyncHash = null;
+                    }
+                });
             }
 
             // 1. Update calendarEventIds & fingerprints from eventMap/hashMap
@@ -773,8 +784,13 @@ export const addTask = (payload) => async (dispatch, getState) => {
         }
     }
 
-    // 3. Non-blocking bi-directional write to native Google / device calendar
-    if (themeState?.calendarSyncEnabled && payload?.task?.completionDate) {
+    // 3. Non-blocking bi-directional write to native Google / device calendar (only for synced boards)
+    const boards = state.userReducer?.boards || [];
+    if (
+        themeState?.calendarSyncEnabled &&
+        payload?.task?.completionDate &&
+        isTaskEligibleForCalendarSync(payload.task, boards, themeState?.boardCalendarSync)
+    ) {
         const effId = payload.task.id || payload.task._id;
         syncTaskToCalendarAsync(payload.task, themeState)
             .then(calEventId => {
@@ -862,7 +878,8 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
         }, 0);
     }
 
-    // 3. Non-blocking background push to native Google / device calendar (scoped to rolling sync window)
+    // 3. Non-blocking background push to native Google / device calendar (scoped to rolling sync window & synced boards)
+    const boardsForBatch = state.userReducer?.boards || [];
     if (themeState?.calendarSyncEnabled && Array.isArray(payload?.tasks)) {
         setTimeout(async () => {
             const calUpdates = [];
@@ -871,6 +888,7 @@ export const addMultipleTasks = (payload) => async (dispatch, getState) => {
             for (const task of payload.tasks) {
                 if (pushedCount >= MAX_EVENTS_PER_SYNC_BATCH) break;
                 if (!task || task.completed) continue;
+                if (!isTaskEligibleForCalendarSync(task, boardsForBatch, themeState?.boardCalendarSync)) continue;
                 const dateKey = extractTaskDateKey(task);
                 if (!dateKey || !isDateStrInSyncWindow(dateKey, now)) continue;
                 const tid = task.id || task._id;
@@ -1097,17 +1115,32 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     }
 
     if (state.themeReducer?.calendarSyncEnabled && updatedTask) {
+        const boardsForUpdate = state.userReducer?.boards || [];
+        const boardEligible = isTaskEligibleForCalendarSync(updatedTask, boardsForUpdate, state.themeReducer?.boardCalendarSync);
+        const effUpdatedId = updatedTask.id || updatedTask._id;
         try {
-            if (updatedTask.completed) {
+            if (!boardEligible) {
+                // Task lives on (or was just moved to) an unsynced board -> remove old TaskFlow calendar event
+                if (updatedTask.calendarEventId && !updatedTask.syncedFromCalendar) {
+                    await addTombstoneAsync(updatedTask.calendarEventId);
+                    await removeTaskFromCalendarAsync(updatedTask.calendarEventId);
+                    dispatch(updateTaskSync({ taskId: effUpdatedId, calendarEventId: null, calendarSyncHash: null }));
+                }
+            } else if (updatedTask.completed) {
                 await syncTaskToCalendarAsync(updatedTask, state.themeReducer);
             } else if (updatedTask.completionDate) {
                 const newCalId = await syncTaskToCalendarAsync(updatedTask, state.themeReducer);
                 if (newCalId && newCalId !== updatedTask.calendarEventId) {
-                    dispatch(updateTaskSync({ taskId: updatedTask.id, calendarEventId: newCalId }));
+                    dispatch(updateTaskSync({
+                        taskId: effUpdatedId,
+                        calendarEventId: newCalId,
+                        calendarSyncHash: getTaskCalendarFingerprint(updatedTask, Boolean(state.themeReducer?.calendarAlarmsEnabled))
+                    }));
                 }
             } else if (!updatedTask.completionDate && updatedTask.calendarEventId) {
+                await addTombstoneAsync(updatedTask.calendarEventId);
                 await removeTaskFromCalendarAsync(updatedTask.calendarEventId);
-                dispatch(updateTaskSync({ taskId: updatedTask.id, calendarEventId: null }));
+                dispatch(updateTaskSync({ taskId: effUpdatedId, calendarEventId: null, calendarSyncHash: null }));
             }
         } catch (e) {
             console.warn('Calendar sync error on updateTask:', e);
@@ -1141,27 +1174,41 @@ export const updateMultipleTasks = (payload) => async (dispatch, getState) => {
     syncRecurringAutomations(getState);
 
     // 2. Non-blocking background notification & calendar sync for updated tasks
-    const updatedTasks = allTasks.filter(t => t && idSet.has(String(t.id)));
+    const updatedTasks = allTasks.filter(t => t && idSet.has(String(t.id || t._id)));
     const themeState = state.themeReducer;
+    const boardsForMulti = state.userReducer?.boards || [];
 
     setTimeout(async () => {
         const calUpdates = [];
         for (const ut of updatedTasks) {
             try {
+                const effId = ut.id || ut._id;
                 if (ut.completed) {
-                    await cancelNotification(ut.notificationId, ut.id);
+                    await cancelNotification(ut.notificationId, effId);
                 }
                 if (themeState?.calendarSyncEnabled) {
-                    if (ut.completed) {
+                    const boardEligible = isTaskEligibleForCalendarSync(ut, boardsForMulti, themeState?.boardCalendarSync);
+                    if (!boardEligible) {
+                        if (ut.calendarEventId && !ut.syncedFromCalendar) {
+                            await addTombstoneAsync(ut.calendarEventId);
+                            await removeTaskFromCalendarAsync(ut.calendarEventId);
+                            calUpdates.push({ taskId: effId, calendarEventId: null, calendarSyncHash: null });
+                        }
+                    } else if (ut.completed) {
                         await syncTaskToCalendarAsync(ut, themeState);
                     } else if (ut.completionDate) {
                         const newCalId = await syncTaskToCalendarAsync(ut, themeState);
                         if (newCalId && newCalId !== ut.calendarEventId) {
-                            calUpdates.push({ taskId: ut.id, calendarEventId: newCalId });
+                            calUpdates.push({
+                                taskId: effId,
+                                calendarEventId: newCalId,
+                                calendarSyncHash: getTaskCalendarFingerprint(ut, Boolean(themeState?.calendarAlarmsEnabled))
+                            });
                         }
                     } else if (!ut.completionDate && ut.calendarEventId) {
+                        await addTombstoneAsync(ut.calendarEventId);
                         await removeTaskFromCalendarAsync(ut.calendarEventId);
-                        calUpdates.push({ taskId: ut.id, calendarEventId: null });
+                        calUpdates.push({ taskId: effId, calendarEventId: null, calendarSyncHash: null });
                     }
                 }
             } catch (e) {}
@@ -1215,14 +1262,16 @@ export const performForegroundCalendarSync = (force = false) => async (dispatch,
     isCalendarSyncInProgress = true;
     try {
         const currentTasks = state.taskReducer.tasks || [];
-        const diffResult = await performDifferentialCalendarSyncAsync(themeState, currentTasks);
-        const { hasChanges, newTasks, updatedTasks, deletedTaskIds, importedCount = 0, deletedCount = 0 } = diffResult;
+        const boards = state.userReducer?.boards || [];
+        const diffResult = await performDifferentialCalendarSyncAsync(themeState, currentTasks, null, boards);
+        const { hasChanges, newTasks, updatedTasks, deletedTaskIds, clearedEventTaskIds = [], importedCount = 0, deletedCount = 0 } = diffResult;
 
         if (hasChanges) {
             dispatch(batchCalendarSyncComplete({
                 newTasks,
                 updatedTasks,
-                deletedTaskIds
+                deletedTaskIds,
+                clearedEventTaskIds
             }));
 
             const remainingTasks = getState().taskReducer.tasks;
@@ -1279,6 +1328,7 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
     isCalendarSyncInProgress = true;
     try {
         const tasks = state.taskReducer.tasks || [];
+        const boards = state.userReducer?.boards || [];
 
         // 0. Prefetch Google / device calendar window ONCE (safe 14-day chunks)
         //    so export can match & link existing calendar events instead of duplicating them.
@@ -1304,17 +1354,29 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
                 return t;
             });
 
-        // 1. Export/link local tasks to Google / device calendar (reusing prefetchedWindow)
-        const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(
+        // 1. Export/link eligible board tasks & remove old [Synced from TaskFlow] events for unsynced boards
+        const {
+            syncedCount = 0,
+            removedCount = 0,
+            eventMap = {},
+            hashMap = {},
+            clearedEventTaskIds: exportClearedIds = []
+        } = await syncAllTasksToCalendarAsync(
             tasksBeforeExport,
             themeState,
-            prefetchedWindow
+            prefetchedWindow,
+            boards
         );
 
-        // Merge newly linked/created eventMap IDs & hashes into tasks before differential sync
+        const exportClearedSet = new Set((exportClearedIds || []).map(String));
+
+        // Merge newly linked/created eventMap IDs & cleared unsynced links before differential sync
         const tasksWithUpdatedEventIds = tasks.map(t => {
             if (!t) return t;
             const tid = t.id || t._id;
+            if (tid && exportClearedSet.has(String(tid))) {
+                return { ...t, calendarEventId: null, calendarSyncHash: null };
+            }
             const nextCalId = (tid && eventMap && eventMap[tid]) || (tid && transferMap.get(String(tid))) || t.calendarEventId;
             const nextHash = (tid && hashMap && hashMap[tid]) || t.calendarSyncHash;
             if (nextCalId !== t.calendarEventId || nextHash !== t.calendarSyncHash) {
@@ -1328,11 +1390,17 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
         });
 
         // 2. Differential sync from Google / device calendar to local tasks (reusing prefetchedWindow)
-        const { newTasks = [], updatedTasks = [], deletedTaskIds = [], importedCount = 0, deletedCount = 0 } = 
-            await performDifferentialCalendarSyncAsync(themeState, tasksWithUpdatedEventIds, prefetchedWindow);
+        const {
+            newTasks = [],
+            updatedTasks = [],
+            deletedTaskIds = [],
+            clearedEventTaskIds: diffClearedIds = [],
+            importedCount = 0
+        } = await performDifferentialCalendarSyncAsync(themeState, tasksWithUpdatedEventIds, prefetchedWindow, boards);
 
-        // Merge pre-export link transfers & duplicate removals with differential sync results
+        // Merge pre-export link transfers, cleared unsynced board links & duplicate removals
         const mergedDeletedIds = Array.from(new Set([...dedupPlan.duplicateTaskIds, ...deletedTaskIds].map(String)));
+        const mergedClearedIds = Array.from(new Set([...(exportClearedIds || []), ...(diffClearedIds || [])].map(String)));
         const mergedUpdatedTasks = [...dedupPlan.linkTransfers, ...updatedTasks];
 
         // 3. Atomically update Redux in ONE single dispatch
@@ -1341,7 +1409,8 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
             hashMap,
             newTasks,
             updatedTasks: mergedUpdatedTasks,
-            deletedTaskIds: mergedDeletedIds
+            deletedTaskIds: mergedDeletedIds,
+            clearedEventTaskIds: mergedClearedIds
         }));
 
         // 4. Persist to storage once
@@ -1359,8 +1428,9 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
         const summary = {
             exportedCount: syncedCount || 0,
             importedCount: importedCount || 0,
+            removedCount: removedCount || 0,
             deletedCount: mergedDeletedIds.length,
-            totalSynced: (syncedCount || 0) + (importedCount || 0) + mergedDeletedIds.length
+            totalSynced: (syncedCount || 0) + (importedCount || 0) + mergedDeletedIds.length + (removedCount || 0)
         };
 
         const nowDate = new Date();
@@ -1417,6 +1487,59 @@ export const performScheduledCalendarSync = (force = false) => async (dispatch, 
     } catch (error) {
         console.warn('performScheduledCalendarSync error:', error);
         return { ran: false, totalSynced: 0, error: error.message };
+    }
+};
+
+/**
+ * Toggles Google / Device Calendar synchronization for a single board (from Board Long-Tap menu or Settings).
+ * - Immediately updates & persists the per-board override in themeReducer.boardCalendarSync.
+ * - When turned OFF: automatically removes previously exported [Synced from TaskFlow] events
+ *   for that board from Google Calendar while keeping every task intact in the app.
+ * - When turned ON: syncs eligible tasks on that board within the rolling sync window to Google Calendar.
+ */
+export const toggleBoardCalendarSync = ({ boardId, enabled }) => async (dispatch, getState) => {
+    const canonicalKey = getBoardCalendarSyncKey(boardId);
+    dispatch(setBoardCalendarSync({ boardId: canonicalKey, enabled: Boolean(enabled) }));
+
+    const state = getState();
+    const themeState = state.themeReducer || {};
+    if (Platform.OS === 'web' || !themeState.calendarSyncEnabled) {
+        return { boardId: canonicalKey, enabled: Boolean(enabled), syncedCount: 0, removedCount: 0 };
+    }
+
+    const boards = state.userReducer?.boards || [];
+    const allTasks = state.taskReducer?.tasks || [];
+    const boardTasks = allTasks.filter(t => {
+        if (!t) return false;
+        const ownerBoard = resolveTaskBoard(t, boards);
+        return getBoardCalendarSyncKey(ownerBoard) === canonicalKey;
+    });
+
+    try {
+        if (!enabled) {
+            const { removedCount = 0, clearedEventTaskIds = [] } = await removeBoardEventsFromCalendarAsync(boardTasks, themeState);
+            if (clearedEventTaskIds.length > 0) {
+                dispatch(batchCalendarSyncComplete({ clearedEventTaskIds }));
+                persistTasksToStorage(getState().taskReducer.tasks, getState);
+            }
+            return { boardId: canonicalKey, enabled: false, syncedCount: 0, removedCount };
+        } else {
+            const prefetchedWindow = await fetchCalendarWindowEventsAsync(themeState);
+            const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(
+                boardTasks,
+                themeState,
+                prefetchedWindow,
+                boards
+            );
+            if (Object.keys(eventMap).length > 0) {
+                dispatch(batchCalendarSyncComplete({ eventMap, hashMap }));
+                persistTasksToStorage(getState().taskReducer.tasks, getState);
+            }
+            return { boardId: canonicalKey, enabled: true, syncedCount, removedCount: 0 };
+        }
+    } catch (error) {
+        console.warn('toggleBoardCalendarSync error:', error);
+        return { boardId: canonicalKey, enabled: Boolean(enabled), syncedCount: 0, removedCount: 0, error: error.message };
     }
 };
 

@@ -907,5 +907,11 @@
   "Next scheduled sync": "Próxima sincronización programada",
   "Device calendar sync is available on Android and iOS.": "La sincronización con el calendario del dispositivo está disponible en Android e iOS.",
   "Version": "Versión",
-  "Debugger & System Logs unlocked": "Depurador y registros del sistema desbloqueados"
+  "Debugger & System Logs unlocked": "Depurador y registros del sistema desbloqueados",
+  "Sync with Google Calendar": "Sincronizar con Google Calendar",
+  "Synced Boards": "Tableros sincronizados",
+  "Choose which boards sync with your calendar": "Elige qué tableros sincronizar con tu calendario",
+  "Enable Google Calendar Sync in Settings first": "Activa primero la sincronización del calendario en Ajustes",
+  "Synced to calendar": "Sincronizado con el calendario",
+  "Local only": "Solo local"
 }

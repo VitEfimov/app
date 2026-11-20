@@ -907,5 +907,11 @@
   "Next scheduled sync": "अगला निर्धारित सिंक",
   "Device calendar sync is available on Android and iOS.": "डिवाइस कैलेंडर सिंक Android और iOS पर उपलब्ध है।",
   "Version": "संस्करण",
-  "Debugger & System Logs unlocked": "डीबगर और सिस्टम लॉग अनलॉक हो गए"
+  "Debugger & System Logs unlocked": "डीबगर और सिस्टम लॉग अनलॉक हो गए",
+  "Sync with Google Calendar": "Google कैलेंडर से सिंक करें",
+  "Synced Boards": "सिंक किए गए बोर्ड",
+  "Choose which boards sync with your calendar": "चुनें कि कौन से बोर्ड कैलेंडर के साथ सिंक हों",
+  "Enable Google Calendar Sync in Settings first": "पहले सेटिंग्स में Google कैलेंडर सिंक सक्षम करें",
+  "Synced to calendar": "कैलेंडर से सिंक किया गया",
+  "Local only": "केवल स्थानीय"
 }

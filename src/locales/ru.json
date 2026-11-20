@@ -907,5 +907,11 @@
   "Next scheduled sync": "Следующая синхронизация",
   "Device calendar sync is available on Android and iOS.": "Синхронизация с календарём устройства доступна на Android и iOS.",
   "Version": "Версия",
-  "Debugger & System Logs unlocked": "Отладчик и системные логи открыты"
+  "Debugger & System Logs unlocked": "Отладчик и системные логи открыты",
+  "Sync with Google Calendar": "Синхронизировать с Google Календарём",
+  "Synced Boards": "Синхронизируемые доски",
+  "Choose which boards sync with your calendar": "Выберите, какие доски синхронизировать с календарём",
+  "Enable Google Calendar Sync in Settings first": "Сначала включите синхронизацию календаря в Настройках",
+  "Synced to calendar": "Синхронизируется с календарём",
+  "Local only": "Только локально"
 }

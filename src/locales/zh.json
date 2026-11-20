@@ -907,5 +907,11 @@
   "Next scheduled sync": "下次计划同步",
   "Device calendar sync is available on Android and iOS.": "设备日历同步仅适用于 Android 和 iOS。",
   "Version": "版本",
-  "Debugger & System Logs unlocked": "已解锁调试器与系统日志"
+  "Debugger & System Logs unlocked": "已解锁调试器与系统日志",
+  "Sync with Google Calendar": "同步到 Google 日历",
+  "Synced Boards": "已同步看板",
+  "Choose which boards sync with your calendar": "选择要与日历同步的看板",
+  "Enable Google Calendar Sync in Settings first": "请先在设置中开启 Google 日历同步",
+  "Synced to calendar": "已同步至日历",
+  "Local only": "仅本地保存"
 }

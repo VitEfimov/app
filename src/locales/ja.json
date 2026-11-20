@@ -907,5 +907,11 @@
   "Next scheduled sync": "次回の定期同期",
   "Device calendar sync is available on Android and iOS.": "デバイスカレンダーとの同期は Android および iOS で利用できます。",
   "Version": "バージョン",
-  "Debugger & System Logs unlocked": "デバッガーとシステムログのロックを解除しました"
+  "Debugger & System Logs unlocked": "デバッガーとシステムログのロックを解除しました",
+  "Sync with Google Calendar": "Googleカレンダーと同期",
+  "Synced Boards": "同期対象のボード",
+  "Choose which boards sync with your calendar": "カレンダーと同期するボードを選択してください",
+  "Enable Google Calendar Sync in Settings first": "先に設定でGoogleカレンダー同期を有効にしてください",
+  "Synced to calendar": "カレンダーと同期中",
+  "Local only": "ローカルのみ"
 }

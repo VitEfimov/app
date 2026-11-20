@@ -163,6 +163,7 @@ const initialState = {
   calendarAlarmsEnabled: loaded?.calendarAlarmsEnabled || false,
   selectedCalendarId: loaded?.selectedCalendarId || null,
   lastCalendarSyncAt: loaded?.lastCalendarSyncAt || null,
+  boardCalendarSync: loaded?.boardCalendarSync || {},
 
   // Per-Board Automations Map
   boardAutomations: loaded?.boardAutomations || {},
@@ -381,6 +382,15 @@ const themeSlice = createSlice({
     setLastCalendarSyncAt: (state, action) => {
       state.lastCalendarSyncAt = action.payload;
     },
+    setBoardCalendarSync: (state, action) => {
+      const { boardId, enabled } = action.payload || {};
+      if (!boardId) return;
+      if (!state.boardCalendarSync) state.boardCalendarSync = {};
+      const key = (String(boardId).toLowerCase() === 'main' || String(boardId).toLowerCase() === 'tasks')
+        ? 'main'
+        : String(boardId);
+      state.boardCalendarSync[key] = Boolean(enabled);
+    },
     setBlockScreenshots: (state, action) => {
       state.blockScreenshots = action.payload;
     },
@@ -473,7 +483,7 @@ export const {
   setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setBiometricUnlockEnabled, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
-  setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setLastCalendarSyncAt,
+  setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setLastCalendarSyncAt, setBoardCalendarSync,
   setBlockScreenshots, setCurrencyCode, setBoardCurrency, setHabitStreakMode, setBoardExpensesSettings,
   setGoogleDrawerOpen, triggerJumpToToday
 } = themeSlice.actions;

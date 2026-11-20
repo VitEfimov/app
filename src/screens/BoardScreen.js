@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler, Switch } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
@@ -20,9 +20,10 @@ import getFilters, { isTaskToday, isTaskMissed, getTaskDateStr, isTaskUpcoming, 
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
-import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTask, addMultipleTasks, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk, rolloverHabitTasks } from '../features/taskSlice';
+import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTask, addMultipleTasks, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk, rolloverHabitTasks, toggleBoardCalendarSync } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
 import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency, setHabitStreakMode } from '../features/themeSlice';
+import { isBoardCalendarSyncEnabled, getBoardCalendarSyncKey } from '../utils/calendarSyncSchedule';
 import { useTaskRowConfig } from '../components/TaskRowConfigContext';
 import { formatCurrency, resolveCurrencyCode, CURRENCY_OPTION_CODES, getCurrencyMeta, isPriceBoardType, convertCurrency, getCachedTaskCurrency } from '../utils/currencyHelper';
 import { computeHabitStats } from '../utils/habitHelper';
@@ -253,6 +254,8 @@ export default function BoardScreen({ route, navigation }) {
     );
   };
   const isGoogleDrawerOpen = useSelector(state => state.themeReducer?.isGoogleDrawerOpen || false);
+  const calendarSyncEnabled = useSelector(state => state.themeReducer?.calendarSyncEnabled || false);
+  const boardCalendarSync = useSelector(state => state.themeReducer?.boardCalendarSync || {});
   const tasks = useSelector(state => state.taskReducer.tasks || []);
   const boards = useSelector(state => state.userReducer.boards || [{ id: 'main', name: 'Main' }]);
   const activeBoardId = useSelector(state => state.userReducer.activeBoardId || 'main');
@@ -2278,7 +2281,45 @@ export default function BoardScreen({ route, navigation }) {
               )}
             </ScrollView>
           </View>
-          
+
+          {boardOptionsConfig.board && (() => {
+            const targetBoard = boardOptionsConfig.board;
+            const boardKey = getBoardCalendarSyncKey(targetBoard);
+            const isSynced = isBoardCalendarSyncEnabled(targetBoard, boardCalendarSync);
+            return (
+              <View style={[styles.optionBtn, { borderBottomColor: colors.borderColor, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }]}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={[styles.optionText, { color: colors.textPrimary, fontWeight: '600' }]}>
+                    {t('Sync with Google Calendar') || 'Sync with Google Calendar'}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                    {!calendarSyncEnabled
+                      ? (t('Enable Google Calendar Sync in Settings first') || 'Enable Google Calendar Sync in Settings first')
+                      : (isSynced
+                          ? (t('Synced to calendar') || 'Synced to calendar')
+                          : (t('Local only') || 'Local only'))}
+                  </Text>
+                </View>
+                <Switch
+                  testID="board_options_calendar_sync_switch"
+                  value={isSynced}
+                  onValueChange={(val) => {
+                    dispatch(toggleBoardCalendarSync({ boardId: boardKey, enabled: val }));
+                    if (showToast) {
+                      showToast(val
+                        ? (t('Synced to calendar') || 'Synced to calendar')
+                        : (t('Local only') || 'Local only'));
+                    }
+                  }}
+                  trackColor={{ false: colors.borderColor || '#CCC', true: colors.primary }}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: isSynced }}
+                  accessibilityLabel={t('Sync with Google Calendar') || 'Sync with Google Calendar'}
+                />
+              </View>
+            );
+          })()}
+
           {isPremium && (
             <TouchableOpacity 
               accessible={true} accessibilityRole="button" accessibilityLabel="Board automations" 

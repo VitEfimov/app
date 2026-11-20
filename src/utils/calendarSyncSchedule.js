@@ -18,6 +18,124 @@ export const SYNC_CHUNK_DAYS = 14;
 export const MAX_EVENTS_PER_SYNC_BATCH = 50;
 export const MAX_IMPORTS_PER_SYNC = 150;
 
+// Smart default calendar sync policy by board type:
+// - Date-driven boards (standard/Main, events/birthdays, expenses/payments) sync ON by default.
+// - Checklists & trackers (grocery, books/media, travel/packing, habits, simple lists) sync OFF by default.
+export const CALENDAR_SYNC_AUTO_BOARD_TYPES = ['standard', 'birthdays', 'events', 'expenses'];
+export const CALENDAR_SYNC_OFF_BOARD_TYPES = ['grocery', 'shopping', 'media', 'packing', 'habits', 'simple_list'];
+const CALENDAR_SYNC_OFF_BOARD_TYPE_SET = new Set(CALENDAR_SYNC_OFF_BOARD_TYPES);
+
+/**
+ * Returns the default calendar sync state for a board based on its board type.
+ */
+export function getDefaultBoardCalendarSync(board) {
+  if (!board) return true;
+  const rawType = typeof board.type === 'string' ? board.type.trim().toLowerCase() : '';
+  if (rawType && CALENDAR_SYNC_OFF_BOARD_TYPE_SET.has(rawType)) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Resolves the canonical key used to store a board's calendar sync override in themeReducer.boardCalendarSync.
+ */
+export function getBoardCalendarSyncKey(boardOrId) {
+  if (!boardOrId) return 'main';
+  const rawId = typeof boardOrId === 'object' ? (boardOrId.id || boardOrId._id || 'main') : boardOrId;
+  const str = String(rawId || 'main').trim();
+  if (!str || str.toLowerCase() === 'main' || str.toLowerCase() === 'tasks') return 'main';
+  return str;
+}
+
+/**
+ * Returns whether calendar sync is currently enabled for a given board,
+ * honoring explicit per-board overrides in `boardCalendarSync` and falling back
+ * to the board type's smart default.
+ */
+export function isBoardCalendarSyncEnabled(board, boardCalendarSync = {}) {
+  const overrides = boardCalendarSync && typeof boardCalendarSync === 'object' ? boardCalendarSync : {};
+  const canonicalKey = getBoardCalendarSyncKey(board);
+
+  if (Object.prototype.hasOwnProperty.call(overrides, canonicalKey) && typeof overrides[canonicalKey] === 'boolean') {
+    return overrides[canonicalKey];
+  }
+
+  if (board && typeof board === 'object') {
+    const rawId = board.id !== undefined && board.id !== null ? String(board.id) : null;
+    const rawMongoId = board._id !== undefined && board._id !== null ? String(board._id) : null;
+    if (rawId && Object.prototype.hasOwnProperty.call(overrides, rawId) && typeof overrides[rawId] === 'boolean') {
+      return overrides[rawId];
+    }
+    if (rawMongoId && Object.prototype.hasOwnProperty.call(overrides, rawMongoId) && typeof overrides[rawMongoId] === 'boolean') {
+      return overrides[rawMongoId];
+    }
+  }
+
+  return getDefaultBoardCalendarSync(board);
+}
+
+/**
+ * Resolves the board object that owns a task.
+ */
+export function resolveTaskBoard(task, boards = []) {
+  const list = Array.isArray(boards) ? boards : [];
+  const mainBoard =
+    list.find(b => b && (String(b.id || b._id || '').toLowerCase() === 'main' || String(b.name || '').toLowerCase() === 'main')) ||
+    list[0] ||
+    { id: 'main', name: 'Main', type: 'standard' };
+
+  if (!task) return mainBoard;
+  const rawBId = task.boardId || task.board_id;
+  if (!rawBId || isMainBoardId(rawBId)) {
+    return mainBoard;
+  }
+
+  const targetStr = String(rawBId);
+  const targetLower = targetStr.toLowerCase();
+  const matched = list.find(b =>
+    b && (
+      String(b.id) === targetStr ||
+      (b._id && String(b._id) === targetStr) ||
+      (b.name && String(b.name).toLowerCase() === targetLower)
+    )
+  );
+  return matched || { id: targetStr, name: targetStr, type: 'standard' };
+}
+
+/**
+ * Returns true if the task's owning board is enabled for Google / Device Calendar sync.
+ */
+export function isTaskEligibleForCalendarSync(task, boards = [], boardCalendarSync = {}) {
+  if (!task) return false;
+  const board = resolveTaskBoard(task, boards);
+  return isBoardCalendarSyncEnabled(board, boardCalendarSync);
+}
+
+/**
+ * Determines which board newly imported external Google Calendar events should land on.
+ * Prefers 'main' if enabled; otherwise chooses the first calendar-synced board (falling back to 'main').
+ */
+export function getImportTargetBoardId(boards = [], boardCalendarSync = {}) {
+  const list = Array.isArray(boards) && boards.length > 0
+    ? boards
+    : [{ id: 'main', name: 'Main', type: 'standard' }];
+
+  const mainBoard =
+    list.find(b => b && (String(b.id || b._id || '').toLowerCase() === 'main' || String(b.name || '').toLowerCase() === 'main')) ||
+    { id: 'main', name: 'Main', type: 'standard' };
+
+  if (isBoardCalendarSyncEnabled(mainBoard, boardCalendarSync)) {
+    return 'main';
+  }
+
+  const firstSynced = list.find(b => b && isBoardCalendarSyncEnabled(b, boardCalendarSync));
+  if (firstSynced) {
+    return String(firstSynced.id || firstSynced._id || 'main');
+  }
+  return 'main';
+}
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }

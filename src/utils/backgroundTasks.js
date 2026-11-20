@@ -36,7 +36,7 @@ async function resolveActiveTaskStorageKeyAsync() {
  * Performs headless bi-directional calendar sync if enabled and a scheduled
  * 3x/day sync slot (08:00, 12:00, 17:00) is due.
  */
-export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], taskKey = 'tasks_guest', now = new Date()) {
+export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], taskKey = 'tasks_guest', now = new Date(), boards = []) {
   if (Platform.OS === 'web' || !themeState?.calendarSyncEnabled) {
     return { ran: false, tasks };
   }
@@ -79,16 +79,28 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
         return t;
       });
 
-    // 1. Export/link local tasks with due dates to Google / device calendar
-    const { syncedCount = 0, eventMap = {}, hashMap = {} } = await syncAllTasksToCalendarAsync(
+    // 1. Export/link eligible board tasks & remove old [Synced from TaskFlow] events for unsynced boards
+    const {
+      syncedCount = 0,
+      removedCount = 0,
+      eventMap = {},
+      hashMap = {},
+      clearedEventTaskIds: exportClearedIds = [],
+    } = await syncAllTasksToCalendarAsync(
       tasksBeforeExport,
       themeState,
-      prefetchedWindow
+      prefetchedWindow,
+      boards
     );
+
+    const exportClearedSet = new Set((exportClearedIds || []).map(String));
 
     let currentList = (tasks || []).map(t => {
       if (!t) return t;
       const tid = t.id || t._id;
+      if (tid && exportClearedSet.has(String(tid))) {
+        return { ...t, calendarEventId: null, calendarSyncHash: null };
+      }
       const nextCalId = (tid && eventMap && eventMap[tid]) || (tid && transferMap.get(String(tid))) || t.calendarEventId;
       const nextHash = (tid && hashMap && hashMap[tid]) || t.calendarSyncHash;
       if (nextCalId !== t.calendarEventId || nextHash !== t.calendarSyncHash) {
@@ -102,15 +114,23 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
     });
 
     // 2. Differential sync from Google / device calendar back to local tasks (reusing prefetchedWindow)
-    const diffResult = await performDifferentialCalendarSyncAsync(themeState, currentList, prefetchedWindow);
-    const hasEventMapChanges = Object.keys(eventMap || {}).length > 0 || dedupPlan.duplicateTaskIds.length > 0 || dedupPlan.linkTransfers.length > 0;
+    const diffResult = await performDifferentialCalendarSyncAsync(themeState, currentList, prefetchedWindow, boards);
+    const hasEventMapChanges =
+      Object.keys(eventMap || {}).length > 0 ||
+      dedupPlan.duplicateTaskIds.length > 0 ||
+      dedupPlan.linkTransfers.length > 0 ||
+      exportClearedIds.length > 0;
 
     if (diffResult && diffResult.hasChanges) {
-      const { deletedTaskIds = [], updatedTasks = [], newTasks = [] } = diffResult;
+      const { deletedTaskIds = [], clearedEventTaskIds: diffClearedIds = [], updatedTasks = [], newTasks = [] } = diffResult;
       const mergedDeletedIds = Array.from(new Set([...dedupPlan.duplicateTaskIds, ...deletedTaskIds].map(String)));
       if (mergedDeletedIds.length > 0) {
         const delSet = new Set(mergedDeletedIds);
         currentList = currentList.filter(t => t && !delSet.has(String(t.id || t._id)));
+      }
+      if (Array.isArray(diffClearedIds) && diffClearedIds.length > 0) {
+        const diffClearSet = new Set(diffClearedIds.map(String));
+        currentList = currentList.map(t => (t && diffClearSet.has(String(t.id || t._id))) ? { ...t, calendarEventId: null, calendarSyncHash: null } : t);
       }
       if (Array.isArray(updatedTasks) && updatedTasks.length > 0) {
         updatedTasks.forEach(u => {
@@ -146,6 +166,7 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
       slotKey: dueInfo.dueSlotKey,
       exportedCount: syncedCount || 0,
       importedCount: diffResult?.importedCount || 0,
+      removedCount: removedCount || 0,
       deletedCount: diffResult?.deletedCount || 0,
     };
 
@@ -177,10 +198,20 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
     if (themeJson) {
       const themeState = JSON.parse(themeJson);
       let tasks = tasksJson ? JSON.parse(tasksJson) : [];
+      let boards = [{ id: 'main', name: 'Main', type: 'standard' }];
+      try {
+        const boardsJson = await CryptoStorage.getItem('boards');
+        if (boardsJson) {
+          const parsedBoards = JSON.parse(boardsJson);
+          if (Array.isArray(parsedBoards) && parsedBoards.length > 0) {
+            boards = parsedBoards;
+          }
+        }
+      } catch (e) {}
 
       // Headless 3x/day scheduled calendar sync (08:00, 12:00, 17:00) - open to all users
       if (themeState.calendarSyncEnabled) {
-        const syncRes = await runHeadlessCalendarSyncIfDueAsync(themeState, tasks, activeTaskKey);
+        const syncRes = await runHeadlessCalendarSyncIfDueAsync(themeState, tasks, activeTaskKey, new Date(), boards);
         if (syncRes && Array.isArray(syncRes.tasks)) {
           tasks = syncRes.tasks;
         }

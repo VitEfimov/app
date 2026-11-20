@@ -774,14 +774,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 909, `English locale must contain 909 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 915, `English locale must contain 915 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        909,
-        `Language ${lang} has ${count} keys, expected 909 (matching EN)`
+        915,
+        `Language ${lang} has ${count} keys, expected 915 (matching EN)`
       );
     }
   });
@@ -2864,6 +2864,82 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const bgSrc = fs.readFileSync(path.resolve('src/utils/backgroundTasks.js'), 'utf8');
       assert.match(bgSrc, /fetchCalendarWindowEventsAsync\(themeState\)/, 'backgroundTasks must prefetch calendar window once');
       assert.match(bgSrc, /buildTaskDeduplicationPlan\(tasks\)/, 'backgroundTasks must deduplicate main copies before export');
+    });
+
+    test('Per-board Calendar Sync Policy: smart defaults, long-tap & Settings toggles, and automatic removal of unsynced board events', () => {
+      const {
+        getDefaultBoardCalendarSync,
+        isBoardCalendarSyncEnabled,
+        isTaskEligibleForCalendarSync,
+        getImportTargetBoardId,
+        getBoardCalendarSyncKey,
+      } = require('../src/utils/calendarSyncSchedule');
+
+      const boards = [
+        { id: 'main', name: 'Main', type: 'standard' },
+        { id: 'b_events', name: 'Birthdays', type: 'birthdays' },
+        { id: 'b_pay', name: 'Payments', type: 'expenses' },
+        { id: 'b_groc', name: 'Grocery', type: 'grocery' },
+        { id: 'b_books', name: 'Books', type: 'media' },
+        { id: 'b_travel', name: 'Travel', type: 'packing' },
+        { id: 'b_habits', name: 'Habits', type: 'habits' },
+        { id: 'b_list', name: 'Notes List', type: 'simple_list' },
+      ];
+
+      // 1. Smart defaults ON for standard/Main, birthdays/Events, expenses/Payments
+      assert.strictEqual(getDefaultBoardCalendarSync(boards[0]), true, 'Main/standard defaults ON');
+      assert.strictEqual(getDefaultBoardCalendarSync(boards[1]), true, 'Events/birthdays defaults ON');
+      assert.strictEqual(getDefaultBoardCalendarSync(boards[2]), true, 'Payments/expenses defaults ON');
+
+      // 2. Smart defaults OFF for Grocery, Books/Media, Travel/Packing, Habits, Simple List
+      assert.strictEqual(getDefaultBoardCalendarSync(boards[3]), false, 'Grocery defaults OFF');
+      assert.strictEqual(getDefaultBoardCalendarSync(boards[4]), false, 'Books/media defaults OFF');
+      assert.strictEqual(getDefaultBoardCalendarSync(boards[5]), false, 'Travel/packing defaults OFF');
+      assert.strictEqual(getDefaultBoardCalendarSync(boards[6]), false, 'Habits defaults OFF');
+      assert.strictEqual(getDefaultBoardCalendarSync(boards[7]), false, 'Simple List defaults OFF');
+
+      // 3. Task eligibility respects defaults and explicit per-board overrides
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 't1', boardId: 'b_pay' }, boards, {}), true);
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 't2', boardId: 'b_groc' }, boards, {}), false);
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 't3', boardId: 'b_books' }, boards, {}), false);
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 't4', boardId: 'b_habits' }, boards, {}), false);
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 't5', boardId: 'b_travel' }, boards, {}), false);
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 't6', boardId: 'b_list' }, boards, {}), false);
+
+      // User toggles Habits ON and Payments OFF via long-tap or Settings
+      const overrides = { b_habits: true, b_pay: false, main: false };
+      assert.strictEqual(isBoardCalendarSyncEnabled(boards[6], overrides), true, 'Habits override ON must work');
+      assert.strictEqual(isBoardCalendarSyncEnabled(boards[2], overrides), false, 'Payments override OFF must work');
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 't4', boardId: 'b_habits' }, boards, overrides), true);
+      assert.strictEqual(isTaskEligibleForCalendarSync({ id: 't1', boardId: 'b_pay' }, boards, overrides), false);
+      assert.strictEqual(getBoardCalendarSyncKey({ id: 'tasks' }), 'main');
+
+      // 4. Import target falls back to first synced board when Main is toggled OFF
+      assert.strictEqual(getImportTargetBoardId(boards, {}), 'main');
+      assert.strictEqual(getImportTargetBoardId(boards, { main: false }), 'b_events');
+
+      // 5. Code wiring across themeSlice, calendarSync, taskSlice, backgroundTasks, BoardScreen, and SettingsScreen
+      const themeSrc = fs.readFileSync(path.resolve('src/features/themeSlice.js'), 'utf8');
+      assert.match(themeSrc, /boardCalendarSync:/, 'themeSlice must persist boardCalendarSync map');
+      assert.match(themeSrc, /setBoardCalendarSync:/, 'themeSlice must export setBoardCalendarSync reducer');
+
+      const calSyncSrc = fs.readFileSync(path.resolve('src/utils/calendarSync.js'), 'utf8');
+      assert.match(calSyncSrc, /export const removeBoardEventsFromCalendarAsync/, 'calendarSync must export removeBoardEventsFromCalendarAsync');
+      assert.match(calSyncSrc, /isTaskEligibleForCalendarSync\(task,\s*boards,\s*boardCalendarSync\)/, 'syncAllTasksToCalendarAsync must enforce per-board sync eligibility and clean up unsynced events');
+      assert.match(calSyncSrc, /clearedEventTaskIds/, 'calendarSync must return clearedEventTaskIds to unlink unsynced board tasks without deleting them');
+
+      const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
+      assert.match(taskSliceSrc, /export const toggleBoardCalendarSync/, 'taskSlice must export toggleBoardCalendarSync thunk');
+      assert.match(taskSliceSrc, /clearedEventTaskIds/, 'batchCalendarSyncComplete must handle clearedEventTaskIds');
+
+      const boardScreenSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      assert.match(boardScreenSrc, /board_options_calendar_sync_switch/, 'BoardScreen long-tap menu must render per-board calendar sync Switch');
+      assert.match(boardScreenSrc, /toggleBoardCalendarSync/, 'BoardScreen must dispatch toggleBoardCalendarSync');
+
+      const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
+      assert.match(settingsSrc, /settings_synced_boards_toggle/, 'SettingsScreen must render Synced Boards accordion inside Google & Device Calendar card');
+      assert.match(settingsSrc, /settings_board_cal_sync_/, 'SettingsScreen must render per-board switches');
+      assert.match(settingsSrc, /toggleBoardCalendarSync/, 'SettingsScreen must dispatch toggleBoardCalendarSync');
     });
   });
 });

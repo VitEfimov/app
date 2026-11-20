@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Switch, Platform, useWindowDimensions, LayoutAnimation, UIManager } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { clearTasks, updateTask, batchSyncCalendarTasks } from '../features/taskSlice';
+import { clearTasks, updateTask, batchSyncCalendarTasks, toggleBoardCalendarSync } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
 import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
-import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync, getCalendarSyncScheduleStateAsync, getNextScheduledSyncTime } from '../utils/calendarSync';
+import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync, getCalendarSyncScheduleStateAsync, getNextScheduledSyncTime, isBoardCalendarSyncEnabled, getBoardCalendarSyncKey } from '../utils/calendarSync';
+import { getBoardColor } from '../utils/boardColors';
 import { registerBackgroundFetchAsync } from '../utils/backgroundTasks';
 import dayjs from 'dayjs';
 import { togglePomodoroSettings } from '../features/pomodoroSlice';
@@ -284,6 +285,7 @@ export default function SettingsScreen({ navigation }) {
   const [isImporting, setIsImporting] = useState(false);
   const [deviceCalendars, setDeviceCalendars] = useState([]);
   const [isCalendarPickerOpen, setCalendarPickerOpen] = useState(false);
+  const [isSyncedBoardsOpen, setSyncedBoardsOpen] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const isSyncingCalendarRef = useRef(false);
   const [lastSyncedAtState, setLastSyncedAtState] = useState(null);
@@ -1243,6 +1245,96 @@ export default function SettingsScreen({ navigation }) {
                   accessibilityLabel={t('Calendar Alarms (Reminders)') || 'Calendar Alarms (Reminders)'}
                 />
               </View>
+
+              <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
+
+              {/* Per-Board Calendar Sync Selection */}
+              {(() => {
+                const boardList = Array.isArray(boards) && boards.length > 0
+                  ? boards
+                  : [{ id: 'main', name: 'Main', type: 'standard' }];
+                const syncedCount = boardList.filter(b => isBoardCalendarSyncEnabled(b, theme.boardCalendarSync)).length;
+                return (
+                  <>
+                    <TouchableOpacity
+                      testID="settings_synced_boards_toggle"
+                      activeOpacity={0.75}
+                      onPress={() => setSyncedBoardsOpen(!isSyncedBoardsOpen)}
+                      style={styles.cardItemRow}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: isSyncedBoardsOpen }}
+                      accessibilityLabel={t('Synced Boards') || 'Synced Boards'}
+                    >
+                      <View style={{ flex: 1, marginLeft: 52, marginRight: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                            {t('Synced Boards') || 'Synced Boards'}
+                          </Text>
+                          <View style={{ backgroundColor: isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.10)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                              {syncedCount} / {boardList.length}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                          {t('Choose which boards sync with your calendar') || 'Choose which boards sync with your calendar'}
+                        </Text>
+                      </View>
+                      <IconChevronDown color={colors.textSecondary} isExpanded={isSyncedBoardsOpen} />
+                    </TouchableOpacity>
+
+                    {isSyncedBoardsOpen && (
+                      <View style={[styles.expandedSubOptions, { paddingLeft: 52, paddingRight: 16, paddingBottom: 10 }]}>
+                        {boardList.map((b, idx) => {
+                          const boardKey = getBoardCalendarSyncKey(b);
+                          const isBoardOn = isBoardCalendarSyncEnabled(b, theme.boardCalendarSync);
+                          const dotColor = getBoardColor(b, boardList);
+                          const displayName = b.name === 'Main' ? (t('Main') || 'Main') : b.name;
+                          return (
+                            <View
+                              key={`board_cal_sync_${boardKey}_${idx}`}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingVertical: 8,
+                                borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
+                                borderTopColor: colors.borderColor || '#E5E7EB',
+                              }}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+                                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dotColor, marginRight: 10 }} />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>
+                                    {displayName}
+                                  </Text>
+                                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                                    {isBoardOn
+                                      ? (t('Synced to calendar') || 'Synced to calendar')
+                                      : (t('Local only') || 'Local only')}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Switch
+                                testID={`settings_board_cal_sync_${boardKey}`}
+                                value={isBoardOn}
+                                onValueChange={(val) => {
+                                  dispatch(toggleBoardCalendarSync({ boardId: boardKey, enabled: val }));
+                                }}
+                                trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+                                accessibilityRole="switch"
+                                accessibilityState={{ checked: isBoardOn }}
+                                accessibilityLabel={`${displayName} - ${t('Sync with Google Calendar') || 'Sync with Google Calendar'}`}
+                              />
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </>
+                );
+              })()}
 
               <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
