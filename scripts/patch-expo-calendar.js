@@ -301,6 +301,18 @@ const calendarModulePatches = [
     }`,
   },
   {
+    name: 'find-events-overlap-bounds',
+    marker: '(${CalendarContract.Instances.END} >= ${eStartDate.timeInMillis})',
+    target: `    var selection =
+      "((\${CalendarContract.Instances.BEGIN} >= \${eStartDate.timeInMillis}) " +
+        "AND (\${CalendarContract.Instances.END} <= \${eEndDate.timeInMillis}) " +
+        "AND (\${CalendarContract.Instances.VISIBLE} = 1) "`,
+    replacement: `    var selection =
+      "((\${CalendarContract.Instances.END} >= \${eStartDate.timeInMillis}) " +
+        "AND (\${CalendarContract.Instances.BEGIN} <= \${eEndDate.timeInMillis}) " +
+        "AND (\${CalendarContract.Instances.VISIBLE} = 1) "`,
+  },
+  {
     name: 'null-safe-string-from-cursor',
     marker: 'cursor.getString(index) ?: ""',
     target: `  private fun stringFromCursor(cursor: Cursor, columnName: String): String {

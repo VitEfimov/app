@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler, Switch } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { computeAndroidKeyboardPadding } from '../utils/keyboardLayout';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
@@ -193,6 +195,99 @@ let currentSessionCollapsedSections = [...DEFAULT_COLLAPSED_SECTIONS];
 
 export default function BoardScreen({ route, navigation }) {
   const { width: windowWidth } = useWindowDimensions();
+  const safeAreaInsets = useContext(SafeAreaInsetsContext);
+  const topInset = safeAreaInsets?.top || 0;
+  const topInsetRef = useRef(topInset);
+  topInsetRef.current = topInset;
+
+  const boardRootRef = useRef(null);
+  const boardRootHeightRef = useRef(0);
+  const closedBoardHeightRef = useRef(0);
+  const baselineYRef = useRef(null);
+  const activeKeyboardRef = useRef(null);
+  const [androidKeyboardPadding, setAndroidKeyboardPadding] = useState(0);
+
+  const syncAndroidKeyboardPadding = useCallback(() => {
+    if (Platform.OS !== 'android') return;
+    const kb = activeKeyboardRef.current;
+    if (!kb || !kb.height) {
+      setAndroidKeyboardPadding((prev) => (prev === 0 ? prev : 0));
+      return;
+    }
+    const applyPadding = (measuredY, measuredHeight) => {
+      const height = measuredHeight > 0 ? measuredHeight : boardRootHeightRef.current;
+      const next = computeAndroidKeyboardPadding({
+        topInset: topInsetRef.current,
+        containerHeight: height,
+        closedContainerHeight: closedBoardHeightRef.current,
+        measuredY,
+        baselineY: baselineYRef.current,
+        keyboardScreenY: kb.screenY,
+        keyboardHeight: kb.height,
+      });
+      setAndroidKeyboardPadding((prev) => (prev === next ? prev : next));
+    };
+
+    if (boardRootRef.current && typeof boardRootRef.current.measureInWindow === 'function') {
+      boardRootRef.current.measureInWindow((_x, y, _w, h) => {
+        if (!activeKeyboardRef.current) return;
+        applyPadding(y, h);
+      });
+    } else {
+      applyPadding(null, boardRootHeightRef.current);
+    }
+  }, []);
+
+  const handleBoardRootLayout = useCallback((event) => {
+    const layoutHeight = event?.nativeEvent?.layout?.height || 0;
+    boardRootHeightRef.current = layoutHeight;
+    if (Platform.OS !== 'android') return;
+    if (!activeKeyboardRef.current) {
+      if (layoutHeight > 0) {
+        closedBoardHeightRef.current = layoutHeight;
+      }
+      if (boardRootRef.current && typeof boardRootRef.current.measureInWindow === 'function') {
+        boardRootRef.current.measureInWindow((_x, y) => {
+          if (!activeKeyboardRef.current && typeof y === 'number' && !Number.isNaN(y)) {
+            baselineYRef.current = y;
+          }
+        });
+      }
+    } else {
+      syncAndroidKeyboardPadding();
+    }
+  }, [syncAndroidKeyboardPadding]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    let settleTimer = null;
+    const showSub = Keyboard.addListener('keyboardDidShow', (event) => {
+      const coords = event?.endCoordinates || {};
+      activeKeyboardRef.current = {
+        screenY: coords.screenY || 0,
+        height: coords.height || 0,
+      };
+      syncAndroidKeyboardPadding();
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        syncAndroidKeyboardPadding();
+      }, 80);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      activeKeyboardRef.current = null;
+      if (settleTimer) {
+        clearTimeout(settleTimer);
+        settleTimer = null;
+      }
+      setAndroidKeyboardPadding((prev) => (prev === 0 ? prev : 0));
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      if (settleTimer) clearTimeout(settleTimer);
+    };
+  }, [syncAndroidKeyboardPadding]);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeAddSectionId, setActiveAddSectionId] = useState(null);
   
@@ -1890,13 +1985,8 @@ export default function BoardScreen({ route, navigation }) {
     }
   }, [dispatch, showToast, t]);
 
-  return (
-    <ScreenErrorBoundary screenName="BoardScreen">
-      <KeyboardAvoidingView 
-        style={{ flex: 1, backgroundColor: colors.bgMain }} 
-        behavior="padding"
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
-      >
+  const boardBody = (
+    <>
         <View 
           style={[styles.container, { backgroundColor: colors.bgMain }, ResponsiveHelper.getCenteredContainerStyle(windowWidth, 880)]}
           {...A11yHelper.getModalFocusTrapProps(isAnyModalOpen)}
@@ -2670,9 +2760,34 @@ export default function BoardScreen({ route, navigation }) {
           navigation.navigate('Settings');
         }}
       />
-    </KeyboardAvoidingView>
-  </ScreenErrorBoundary>
-);
+    </>
+  );
+
+  return (
+    <ScreenErrorBoundary screenName="BoardScreen">
+      {Platform.OS === 'ios' ? (
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: colors.bgMain }}
+          behavior="padding"
+          keyboardVerticalOffset={topInset}
+        >
+          {boardBody}
+        </KeyboardAvoidingView>
+      ) : (
+        <View
+          ref={boardRootRef}
+          onLayout={handleBoardRootLayout}
+          style={{
+            flex: 1,
+            backgroundColor: colors.bgMain,
+            paddingBottom: Platform.OS === 'android' ? androidKeyboardPadding : 0,
+          }}
+        >
+          {boardBody}
+        </View>
+      )}
+    </ScreenErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({

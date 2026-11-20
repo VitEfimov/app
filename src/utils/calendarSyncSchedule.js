@@ -17,6 +17,7 @@ export const SYNC_FUTURE_DAYS = 60;
 export const SYNC_CHUNK_DAYS = 14;
 export const MAX_EVENTS_PER_SYNC_BATCH = 50;
 export const MAX_IMPORTS_PER_SYNC = 150;
+export const RECENT_TASK_GHOST_GRACE_MS = 2 * 60 * 1000; // 2-minute write propagation grace window
 
 // Smart default calendar sync policy by board type:
 // - Date-driven boards (standard/Main, events/birthdays, expenses/payments) sync ON by default.
@@ -403,8 +404,12 @@ export function isDateStrInSyncWindow(
 }
 
 /**
- * Splits [now - pastDays, now + futureDays] into small chunkDays slices so Android's
- * native CalendarContract.Instances query never leaks hundreds of CursorWindows at once.
+ * Splits [now - pastDays, now + futureDays] into overlapping <=chunkDays slices so Android's
+ * native CalendarContract.Instances query:
+ *  1. Never leaks hundreds of CursorWindows at once (each chunk <= chunkDays), AND
+ *  2. Strictly contains every UTC all-day event [D 00:00Z .. (D+1) 00:00Z] across all
+ *     timezones (UTC-12..UTC+14) including Today (offset = 0) and every chunk boundary,
+ *     working around expo-calendar Android's strict `BEGIN >= start AND END <= end` SQL filter.
  */
 export function buildSyncWindowChunks(
   nowLike = new Date(),
@@ -416,16 +421,72 @@ export function buildSyncWindowChunks(
   const y = now.getFullYear();
   const m = now.getMonth();
   const d = now.getDate();
-  const safeChunk = Math.max(1, Number(chunkDays) || 14);
+  const safeChunk = Math.max(3, Number(chunkDays) || 14);
+  // Pad outer bounds by ±1 full local day and overlap adjacent chunks by 2 days
+  // so every day D in [-pastDays, +futureDays] has a chunk covering [D-1 00:00 .. D+1 23:59:59.999].
+  const startBound = -pastDays - 1;
+  const endBound = futureDays + 1;
+  const step = Math.max(1, safeChunk - 2);
   const chunks = [];
 
-  for (let offset = -pastDays; offset <= futureDays; offset += safeChunk) {
-    const sliceEndOffset = Math.min(futureDays, offset + safeChunk - 1);
+  for (let offset = startBound; offset <= endBound; offset += step) {
+    const sliceEndOffset = Math.min(endBound, offset + safeChunk - 1);
     const start = new Date(y, m, d + offset, 0, 0, 0, 0);
     const end = new Date(y, m, d + sliceEndOffset, 23, 59, 59, 999);
     chunks.push({ start, end });
+    if (sliceEndOffset >= endBound) break;
   }
   return chunks;
+}
+
+/**
+ * Returns true if a task was created or updated within `graceMs` so native CalendarProvider /
+ * Google SyncAdapter propagation lag can never cause false ghost-deletion of a freshly added task.
+ */
+export function isTaskRecentlyCreatedOrUpdated(
+  task,
+  nowMs = Date.now(),
+  graceMs = RECENT_TASK_GHOST_GRACE_MS
+) {
+  if (!task) return false;
+  const candidates = [task.lastUpdatedDate, task.creationDate, task.createdAt];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const ts = typeof raw === 'number' ? raw : Date.parse(raw);
+    if (!Number.isNaN(ts) && ts <= nowMs + 60000 && (nowMs - ts) < graceMs) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Orders tasks for batch calendar export so that:
+ *  1. Unlinked tasks from Today onward (Today, Tomorrow, Upcoming) export FIRST
+ *  2. Linked Today+ tasks needing updates export second
+ *  3. Past/missed tasks inside the rolling window export last
+ * Prevents older missed tasks from starving Today/Tomorrow under MAX_EVENTS_PER_SYNC_BATCH.
+ */
+export function prioritizeTasksForCalendarExport(tasks = [], nowLike = new Date()) {
+  const todayKey = formatLocalDateKey(nowLike);
+  const rank = (task) => {
+    const dateKey = extractTaskDateKey(task);
+    const isTodayOrFuture = Boolean(dateKey && (!todayKey || dateKey >= todayKey));
+    const isUnlinked = !task?.calendarEventId;
+    if (isTodayOrFuture && isUnlinked) return 0;
+    if (isTodayOrFuture) return 1;
+    if (isUnlinked) return 2;
+    return 3;
+  };
+  return [...(tasks || [])].filter(Boolean).sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    const da = extractTaskDateKey(a) || '9999-12-31';
+    const db = extractTaskDateKey(b) || '9999-12-31';
+    if (da !== db) return da.localeCompare(db);
+    return String(a.id || a._id || '').localeCompare(String(b.id || b._id || ''));
+  });
 }
 
 /**

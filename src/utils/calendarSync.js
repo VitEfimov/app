@@ -12,6 +12,7 @@ import {
   SYNC_CHUNK_DAYS,
   MAX_EVENTS_PER_SYNC_BATCH,
   MAX_IMPORTS_PER_SYNC,
+  RECENT_TASK_GHOST_GRACE_MS,
   CALENDAR_SYNC_AUTO_BOARD_TYPES,
   CALENDAR_SYNC_OFF_BOARD_TYPES,
   QUICK_LIST_BOARD_TYPES,
@@ -34,6 +35,8 @@ import {
   findMatchingTaskForCalendarEvent,
   isDateStrInSyncWindow,
   buildSyncWindowChunks,
+  isTaskRecentlyCreatedOrUpdated,
+  prioritizeTasksForCalendarExport,
   getTaskCalendarFingerprint,
   getDailySyncSlotsForDate,
   getMostRecentDueSyncSlot,
@@ -50,6 +53,7 @@ export {
   SYNC_CHUNK_DAYS,
   MAX_EVENTS_PER_SYNC_BATCH,
   MAX_IMPORTS_PER_SYNC,
+  RECENT_TASK_GHOST_GRACE_MS,
   CALENDAR_SYNC_AUTO_BOARD_TYPES,
   CALENDAR_SYNC_OFF_BOARD_TYPES,
   QUICK_LIST_BOARD_TYPES,
@@ -72,6 +76,8 @@ export {
   findMatchingTaskForCalendarEvent,
   isDateStrInSyncWindow,
   buildSyncWindowChunks,
+  isTaskRecentlyCreatedOrUpdated,
+  prioritizeTasksForCalendarExport,
   getTaskCalendarFingerprint,
   getDailySyncSlotsForDate,
   getMostRecentDueSyncSlot,
@@ -83,14 +89,50 @@ const TOMBSTONES_STORAGE_KEY = 'calendar_deleted_tombstones';
 const TOMBSTONE_TTL_MS = 15 * 60 * 1000; // 15-minute TTL to prevent resurrection
 const WRITABLE_ACCESS_LEVELS = new Set(['owner', 'root', 'editor', 'contributor']);
 
-// Strict sequential queue for ALL native expo-calendar calls.
-// Prevents concurrent native calls from racing on Android CalendarModule's shared SimpleDateFormat
-// and prevents overlapping ContentResolver CursorWindow bursts.
-let calendarNativeQueue = Promise.resolve();
-export const enqueueCalendarOp = (fn) => {
-  const run = calendarNativeQueue.then(fn, fn);
-  calendarNativeQueue = run.catch(() => {});
-  return run;
+// Strict sequential queue for ALL native expo-calendar calls with a high-priority lane
+// for immediate user writes (addTask / updateTask / deleteTask) so adding Today/Tomorrow
+// tasks never stalls behind multi-chunk background reads while preserving 100% single-op
+// serialization on Android CalendarModule.
+const urgentCalendarOps = [];
+const normalCalendarOps = [];
+let calendarQueueRunning = false;
+
+const drainCalendarQueue = () => {
+  if (calendarQueueRunning) return;
+  const nextItem = urgentCalendarOps.shift() || normalCalendarOps.shift();
+  if (!nextItem) return;
+  calendarQueueRunning = true;
+  Promise.resolve()
+    .then(() => nextItem.fn())
+    .then(
+      (val) => {
+        calendarQueueRunning = false;
+        nextItem.resolve(val);
+        drainCalendarQueue();
+      },
+      (err) => {
+        calendarQueueRunning = false;
+        nextItem.reject(err);
+        drainCalendarQueue();
+      }
+    );
+};
+
+export const enqueueCalendarOp = (fn, options = {}) => {
+  const priority = options?.priority === 'high' ? 'high' : 'normal';
+  return new Promise((resolve, reject) => {
+    const queue = priority === 'high' ? urgentCalendarOps : normalCalendarOps;
+    queue.push({ fn, resolve, reject });
+    drainCalendarQueue();
+  });
+};
+
+// Short-lived cache for resolved target calendar ID so immediate addTask/updateTask writes
+// do not wait on redundant getCalendarsAsync round-trips.
+let cachedTargetCalendar = { prefKey: null, calendarId: null, resolvedAt: 0 };
+const TARGET_CALENDAR_CACHE_TTL_MS = 60 * 1000;
+const invalidateTargetCalendarCache = () => {
+  cachedTargetCalendar = { prefKey: null, calendarId: null, resolvedAt: 0 };
 };
 
 const sleepMs = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -323,44 +365,70 @@ export const getWritableCalendarsAsync = async () => {
 /**
  * Determines the target calendar ID (preferred, primary Google account, or default)
  */
-export const getTargetCalendarIdAsync = async (preferredCalendarId = null) => {
+export const getTargetCalendarIdAsync = async (preferredCalendarId = null, options = {}) => {
   if (Platform.OS === 'web') return null;
+  const prefKey = preferredCalendarId ? String(preferredCalendarId) : '__default__';
+  const nowMs = Date.now();
+  if (
+    !options?.bypassCache &&
+    cachedTargetCalendar.calendarId &&
+    cachedTargetCalendar.prefKey === prefKey &&
+    (nowMs - cachedTargetCalendar.resolvedAt) < TARGET_CALENDAR_CACHE_TTL_MS
+  ) {
+    return cachedTargetCalendar.calendarId;
+  }
+
   try {
     const hasPermission = await checkCalendarPermissionsAsync();
     if (!hasPermission) return null;
 
-    const calendars = await enqueueCalendarOp(() =>
-      Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT)
+    const calendars = await enqueueCalendarOp(
+      () => Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT),
+      { priority: options?.priority }
     );
     if (!calendars || calendars.length === 0) return null;
 
     const writableCalendars = calendars.filter(isCalendarWritable);
     if (writableCalendars.length === 0) return null;
 
+    let resolvedId = null;
+
     // 1. If preferred ID is provided and exists among writable calendars
     if (preferredCalendarId) {
       const match = writableCalendars.find(c => String(c.id) === String(preferredCalendarId));
-      if (match) return String(match.id);
+      if (match) resolvedId = String(match.id);
     }
 
     // 2. On iOS, default calendar is usually available
-    if (Platform.OS === 'ios') {
+    if (!resolvedId && Platform.OS === 'ios') {
       try {
-        const defaultCal = await enqueueCalendarOp(() => Calendar.getDefaultCalendarAsync());
+        const defaultCal = await enqueueCalendarOp(
+          () => Calendar.getDefaultCalendarAsync(),
+          { priority: options?.priority }
+        );
         if (defaultCal && isCalendarWritable(defaultCal)) {
-          return String(defaultCal.id);
+          resolvedId = String(defaultCal.id);
         }
       } catch (e) {}
     }
 
     // 3. On Android or fallback: find primary Google calendar or primary account
-    const primaryGoogle = writableCalendars.find(
-      c => c.isPrimary || c.source?.name?.includes('@') || c.source?.type === 'com.google' || c.ownerAccount?.includes('@')
-    );
-    if (primaryGoogle) return String(primaryGoogle.id);
+    if (!resolvedId) {
+      const primaryGoogle = writableCalendars.find(
+        c => c.isPrimary || c.source?.name?.includes('@') || c.source?.type === 'com.google' || c.ownerAccount?.includes('@')
+      );
+      if (primaryGoogle) resolvedId = String(primaryGoogle.id);
+    }
 
     // 4. Any writable calendar
-    return String(writableCalendars[0].id);
+    if (!resolvedId) {
+      resolvedId = String(writableCalendars[0].id);
+    }
+
+    if (resolvedId) {
+      cachedTargetCalendar = { prefKey, calendarId: resolvedId, resolvedAt: Date.now() };
+    }
+    return resolvedId;
   } catch (error) {
     DevLogger.warn('[CalendarSync] Error resolving target calendar ID', error?.message || String(error));
     console.warn('Error resolving target calendar ID:', error);
@@ -386,11 +454,11 @@ const getAlarmOffsetMinutes = (reminder) => {
  * Constructs sanitized event details from a task and calendar settings
  */
 export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
-  if (!task || !task.completionDate) return null;
+  if (!task || (!task.completionDate && !task.dateString && !task.dueDate && !task.date)) return null;
 
   let rawDate = extractTaskDateKey(task);
   if (!rawDate || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-    const parsed = dayjs(task.completionDate);
+    const parsed = dayjs(task.completionDate || task.dateString || task.dueDate || task.date);
     if (!parsed.isValid()) return null;
     rawDate = parsed.format('YYYY-MM-DD');
   }
@@ -475,16 +543,18 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
 };
 
 /**
- * Creates or updates an event in device calendar for a given task
+ * Creates or updates an event in device calendar for a given task.
+ * Uses the high-priority queue lane so direct user task additions/updates commit immediately
+ * without waiting behind multi-chunk background reads.
  */
 export const syncTaskToCalendarAsync = async (task, settings = {}) => {
   if (Platform.OS === 'web') return null;
   const { calendarSyncEnabled, calendarAlarmsEnabled, selectedCalendarId } = settings;
   if (!calendarSyncEnabled) return null;
-  if (!task || !task.completionDate) return null;
+  if (!task || (!task.completionDate && !task.dateString && !task.dueDate && !task.date)) return null;
 
   try {
-    const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
+    const calendarId = await getTargetCalendarIdAsync(selectedCalendarId, { priority: 'high' });
     if (!calendarId || !isValidNativeCalendarId(calendarId)) return null;
 
     const eventDetails = buildEventDetails(task, calendarAlarmsEnabled);
@@ -498,7 +568,10 @@ export const syncTaskToCalendarAsync = async (task, settings = {}) => {
       const canUpdate = Platform.OS === 'android' ? isNumericId : !!eventIdStr;
       if (canUpdate) {
         try {
-          await enqueueCalendarOp(() => Calendar.updateEventAsync(eventIdStr, nativeDetails));
+          await enqueueCalendarOp(
+            () => Calendar.updateEventAsync(eventIdStr, nativeDetails),
+            { priority: 'high' }
+          );
           return eventIdStr;
         } catch (updateErr) {
           // Event might have been deleted from calendar externally; recreate below
@@ -506,15 +579,54 @@ export const syncTaskToCalendarAsync = async (task, settings = {}) => {
       }
     }
 
-    // Create new event sequentially
-    const newEventId = await enqueueCalendarOp(() =>
-      Calendar.createEventAsync(String(calendarId), nativeDetails)
-    );
-    return newEventId ? String(newEventId) : null;
+    // Create new event sequentially on the high-priority lane
+    try {
+      const newEventId = await enqueueCalendarOp(
+        () => Calendar.createEventAsync(String(calendarId), nativeDetails),
+        { priority: 'high' }
+      );
+      return newEventId ? String(newEventId) : null;
+    } catch (createErr) {
+      // If cached calendar ID went stale, refresh target calendar once and retry
+      invalidateTargetCalendarCache();
+      const freshCalId = await getTargetCalendarIdAsync(selectedCalendarId, { priority: 'high', bypassCache: true });
+      if (!freshCalId || freshCalId === calendarId) throw createErr;
+      const retryEventId = await enqueueCalendarOp(
+        () => Calendar.createEventAsync(String(freshCalId), nativeDetails),
+        { priority: 'high' }
+      );
+      return retryEventId ? String(retryEventId) : null;
+    }
   } catch (error) {
     DevLogger.warn(`[CalendarSync] Failed to sync task "${task?.taskname}"`, error?.message || String(error));
     console.warn(`Failed to sync task "${task.taskname}" to calendar:`, error);
     return null;
+  }
+};
+
+/**
+ * Verifies directly against the native Calendar Events table (not just Instances) whether
+ * an event ID still exists and is not canceled. Prevents false ghost-deletion if Instances
+ * misses a boundary/all-day/syncing event.
+ */
+export const verifyCalendarEventExistsAsync = async (calendarEventId) => {
+  if (Platform.OS === 'web' || !calendarEventId) return false;
+  const idStr = String(calendarEventId).trim();
+  if (!idStr) return false;
+  if (Platform.OS === 'android' && !/^\d+$/.test(idStr)) return false;
+  if (typeof Calendar.getEventByIdAsync !== 'function') return false;
+  try {
+    const ev = await enqueueCalendarOp(() => Calendar.getEventByIdAsync(idStr));
+    if (!ev || !ev.id) return false;
+    return String(ev.status || '').toLowerCase() !== 'canceled';
+  } catch (err) {
+    const code = String(err?.code || '');
+    const msg = String(err?.message || '').toLowerCase();
+    if (code === 'E_EVENT_NOT_FOUND' || msg.includes('could not be found') || msg.includes('not found')) {
+      return false;
+    }
+    // Fail-safe: never delete a user's task on a transient/permission native error
+    return true;
   }
 };
 
@@ -675,7 +787,8 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}, pre
     const clearedEventTaskIds = [];
     let syncedCount = 0;
     let removedCount = 0;
-    let opsExecuted = 0;
+    let exportsExecuted = 0;
+    let removalsExecuted = 0;
     const now = prefetchedWindow?.now || new Date();
 
     // Build pre-export lookup of existing Google/device calendar events by (normalizedTitle, date)
@@ -707,7 +820,11 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}, pre
       calendarId: stringCalendarId,
     });
 
-    for (const task of tasks) {
+    // Prioritize unlinked Today/Tomorrow/Upcoming tasks FIRST so old missed tasks
+    // and unsynced-board cleanups never starve Today/Tomorrow under MAX_EVENTS_PER_SYNC_BATCH.
+    const orderedTasks = prioritizeTasksForCalendarExport(tasks, now);
+
+    for (const task of orderedTasks) {
       if (!task) continue;
       const taskKey = task.id || task._id;
       if (!taskKey) continue;
@@ -723,9 +840,9 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}, pre
         if (existingEventId) {
           const prefetchedEv = prefetchedWindow?.activeNativeEventMap?.get(existingEventId);
           const safeToDeleteFromCalendar = !task.syncedFromCalendar || (prefetchedEv && isTaskFlowExportedEvent(prefetchedEv));
-          if (isValidExistingId && safeToDeleteFromCalendar) {
-            opsExecuted++;
-            if (opsExecuted % 5 === 0) {
+          if (isValidExistingId && safeToDeleteFromCalendar && removalsExecuted < MAX_EVENTS_PER_SYNC_BATCH) {
+            removalsExecuted++;
+            if (removalsExecuted % 5 === 0) {
               await sleepMs(30);
             }
             try {
@@ -745,9 +862,9 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}, pre
         continue;
       }
 
-      if (opsExecuted >= MAX_EVENTS_PER_SYNC_BATCH) {
+      if (exportsExecuted >= MAX_EVENTS_PER_SYNC_BATCH) {
         DevLogger.log('[CalendarSync] Reached safe batch export cap', { cap: MAX_EVENTS_PER_SYNC_BATCH });
-        break;
+        continue;
       }
       if (task.completed) continue;
 
@@ -794,8 +911,8 @@ export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}, pre
       if (!eventDetails) continue;
       const nativeDetails = toNativeEventDetails(eventDetails);
 
-      opsExecuted++;
-      if (opsExecuted % 5 === 0) {
+      exportsExecuted++;
+      if (exportsExecuted % 5 === 0) {
         // Yield cleanly to UI thread and allow Android native GC/Cursor finalizers to reclaim memory
         await sleepMs(30);
       }
@@ -915,19 +1032,27 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
     const tombstones = await getTombstonesAsync();
 
     // 2. Window-Scoped Ghost Deletion Detection:
-    // ONLY evaluate deletions if all chunks succeeded AND the task's board has calendar sync enabled
-    // (removing old calendar events for an unsynced board must NEVER delete the local tasks!).
+    // ONLY evaluate deletions if all chunks succeeded, the task's board has calendar sync enabled,
+    // the task is past the recent-write propagation grace window, AND direct native verification
+    // via Calendar.getEventByIdAsync confirms the event is genuinely deleted from Google Calendar.
     if (allChunksSucceeded) {
-      effectiveTasks.forEach(task => {
-        if (!task || !task.calendarEventId) return;
-        if (!isTaskEligibleForCalendarSync(task, boards, boardCalendarSync)) return;
+      const nowMs = now instanceof Date ? now.getTime() : Date.now();
+      for (const task of effectiveTasks) {
+        if (!task || !task.calendarEventId) continue;
+        if (!isTaskEligibleForCalendarSync(task, boards, boardCalendarSync)) continue;
+        if (isTaskRecentlyCreatedOrUpdated(task, nowMs)) continue;
 
         const taskDateStr = extractTaskDateKey(task);
-        if (!taskDateStr) return;
+        if (!taskDateStr) continue;
 
         if (isDateStrInSyncWindow(taskDateStr, now, SYNC_PAST_DAYS, SYNC_FUTURE_DAYS)) {
-          const taskCalId = String(task.calendarEventId);
+          const taskCalId = String(task.calendarEventId).trim();
           if (!activeNativeIds.has(taskCalId)) {
+            const stillExists = await verifyCalendarEventExistsAsync(taskCalId);
+            if (stillExists) {
+              activeNativeIds.add(taskCalId);
+              continue;
+            }
             const tid = task.id || task._id;
             if (tid && !deletedIdSet.has(String(tid))) {
               deletedTaskIds.push(tid);
@@ -935,7 +1060,7 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
             }
           }
         }
-      });
+      }
     }
 
     // 3. Process Active Native Events (Updates & Imports) using Cross-Board Index

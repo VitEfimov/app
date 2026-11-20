@@ -242,7 +242,7 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
       taskname: finalTaskName,
       creationDate: new Date().toISOString(),
       lastUpdatedDate: null,
-      completionDate: dayjs(selectedDate).toISOString(),
+      completionDate: dayjs(`${startDateStr}T12:00:00`).toISOString(),
       dateString: startDateStr,
       priority: 'none',
       completed: false,

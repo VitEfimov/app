@@ -2703,14 +2703,23 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.strictEqual(isDateStrInSyncWindow('2027-06-01', refNow), false, 'Far-future recurring task is outside window');
       assert.strictEqual(isDateStrInSyncWindow('invalid-date', refNow), false);
 
-      // 3. Chunked window slices cover [-14d, +60d] in 14-day chunks without gaps
+      // 3. Chunked window slices cover [-14d, +60d] in overlapping <=14-day chunks with ZERO boundary cracks
       const chunks = buildSyncWindowChunks(refNow, 14, 60, 14);
-      assert.strictEqual(chunks.length, 6, '75-day span (-14..+60 inclusive) splits into 6 chunks of <=14 days');
+      assert.ok(chunks.length >= 6 && chunks.length <= 8, `75-day span with ±1d overlap splits into 6-8 chunks, got ${chunks.length}`);
       for (const ch of chunks) {
         assert.ok(ch.start instanceof Date && ch.end instanceof Date);
         assert.ok(ch.end.getTime() > ch.start.getTime());
         const spanDays = (ch.end.getTime() - ch.start.getTime()) / (24 * 60 * 60 * 1000);
         assert.ok(spanDays <= 14.1, `Chunk span must be <= 14 days, got ${spanDays}`);
+      }
+      // Every UTC all-day event [D 00:00Z .. (D+1) 00:00Z] for D in [-14..+60] (including TODAY offset=0 & TOMORROW offset=1)
+      // MUST be strictly contained inside at least one chunk (BEGIN >= start && END <= end) so Android Instances never drops Today!
+      for (let dOff = -14; dOff <= 60; dOff++) {
+        const dayDate = new Date(refNow.getFullYear(), refNow.getMonth(), refNow.getDate() + dOff);
+        const evBegin = Date.UTC(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 0, 0, 0);
+        const evEnd = Date.UTC(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate() + 1, 0, 0, 0);
+        const contained = chunks.some(ch => evBegin >= ch.start.getTime() && evEnd <= ch.end.getTime());
+        assert.strictEqual(contained, true, `All-day UTC event at offset ${dOff} (${dayDate.toISOString().slice(0, 10)}) must be strictly contained in at least one chunk`);
       }
 
       // 4. Deterministic fingerprint detects changes and matches identical tasks
@@ -2995,6 +3004,171 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
       assert.match(settingsSrc, /rawBoards\.filter\(b => isCalendarSyncSupportedForBoard\(b\)\)/, 'SettingsScreen Synced Boards list must exclude Quick List boards');
+    });
+
+    test('Quick List & BoardScreen keyboard layout: exact flush padding with no growing gap, no double-shift, and adjustResize config', () => {
+      const { computeAndroidKeyboardPadding } = require('../src/utils/keyboardLayout');
+
+      // 1. Keyboard closed -> always 0 (immune to RN Android keyboardDidHide screenY bug)
+      assert.strictEqual(
+        computeAndroidKeyboardPadding({
+          topInset: 36,
+          containerHeight: 789,
+          closedContainerHeight: 789,
+          keyboardScreenY: 855,
+          keyboardHeight: 0,
+        }),
+        0,
+        'Hidden keyboard must always yield 0 padding'
+      );
+
+      // 2. Android API <= 34 with adjustResize -> native window already shrank -> 0 padding even if keyboard height shrinks later
+      assert.strictEqual(
+        computeAndroidKeyboardPadding({
+          topInset: 36,
+          containerHeight: 549,
+          closedContainerHeight: 789,
+          measuredY: 0,
+          baselineY: 0,
+          keyboardScreenY: 585,
+          keyboardHeight: 306,
+        }),
+        0,
+        'Native adjustResize shrink must not be double-padded'
+      );
+      assert.strictEqual(
+        computeAndroidKeyboardPadding({
+          topInset: 36,
+          containerHeight: 589,
+          closedContainerHeight: 789,
+          measuredY: 0,
+          baselineY: 0,
+          keyboardScreenY: 545,
+          keyboardHeight: 306,
+        }),
+        0,
+        'Native adjustResize keyboard height variation must remain 0 padding'
+      );
+
+      // 3. Android 15 edge-to-edge (window did not shrink, BottomMenu hidden) -> exact flush overlap (330dp)
+      assert.strictEqual(
+        computeAndroidKeyboardPadding({
+          topInset: 36,
+          containerHeight: 879,
+          closedContainerHeight: 789,
+          measuredY: 36,
+          baselineY: 36,
+          keyboardScreenY: 585,
+          keyboardHeight: 306,
+        }),
+        330,
+        'Android 15 edge-to-edge must compute exact overlap to keyboardScreenY'
+      );
+
+      // 4. Legacy adjustPan APK where Android panned window up by 250dp -> accounts for panDelta (no double-shift)
+      assert.strictEqual(
+        computeAndroidKeyboardPadding({
+          topInset: 36,
+          containerHeight: 855,
+          closedContainerHeight: 789,
+          measuredY: -250,
+          baselineY: 0,
+          keyboardScreenY: 585,
+          keyboardHeight: 306,
+        }),
+        56,
+        'Legacy adjustPan panDelta must prevent double-shifting'
+      );
+
+      // 5. QuickListBoard uses compact bottom padding (no 120dp void below + Add item) and keyboard-aware scroll
+      const qlSrc = fs.readFileSync(path.resolve('src/components/QuickListBoard.js'), 'utf8');
+      assert.match(qlSrc, /scrollContent:\s*\{[\s\S]*?paddingBottom:\s*16/, 'QuickListBoard scrollContent must use compact 16dp bottom padding');
+      assert.doesNotMatch(qlSrc, /paddingBottom:\s*120/, 'QuickListBoard must not leave a 120dp gap below + Add item');
+      assert.match(qlSrc, /onContentSizeChange=\{handleContentSizeChange\}/, 'QuickListBoard must scroll cleanly when new items change content size');
+
+      // 6. BoardScreen removes stale hardcoded 80/90 keyboardVerticalOffset and uses exact SafeArea topInset + computeAndroidKeyboardPadding
+      const boardScreenSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      assert.match(boardScreenSrc, /computeAndroidKeyboardPadding/, 'BoardScreen must use computeAndroidKeyboardPadding on Android');
+      assert.match(boardScreenSrc, /keyboardVerticalOffset=\{topInset\}/, 'BoardScreen iOS KeyboardAvoidingView must use exact topInset');
+      assert.doesNotMatch(boardScreenSrc, /keyboardVerticalOffset=\{Platform\.OS === 'ios' \? 90 : 80\}/, 'BoardScreen must not keep stale 80/90 hardcoded offset');
+
+      // 7. BottomMenu hides while Android software keyboard is open
+      const bottomMenuSrc = fs.readFileSync(path.resolve('src/components/BottomMenu.js'), 'utf8');
+      assert.match(bottomMenuSrc, /keyboardDidShow/, 'BottomMenu must listen to Android keyboardDidShow');
+      assert.match(bottomMenuSrc, /if\s*\(Platform\.OS === 'android' && isKeyboardVisible\)\s*\{\s*return null;/, 'BottomMenu must hide on Android while keyboard is open');
+
+      // 8. app.json & AndroidManifest.xml use resize / adjustResize
+      const appJson = JSON.parse(fs.readFileSync(path.resolve('app.json'), 'utf8'));
+      assert.strictEqual(appJson.expo.android.softwareKeyboardLayoutMode, 'resize', 'app.json must use softwareKeyboardLayoutMode: resize');
+      const manifestSrc = fs.readFileSync(path.resolve('android/app/src/main/AndroidManifest.xml'), 'utf8');
+      assert.match(manifestSrc, /android:windowSoftInputMode="adjustResize"/, 'AndroidManifest.xml must use adjustResize');
+    });
+
+    test('Task addition & calendar sync integrity: Today never ghost-deleted, Tomorrow prioritized & self-healed, calendarSyncHash persisted', () => {
+      const {
+        buildSyncWindowChunks,
+        isTaskRecentlyCreatedOrUpdated,
+        prioritizeTasksForCalendarExport,
+      } = require('../src/utils/calendarSyncSchedule');
+
+      // 1. Overlapping chunks strictly contain Today (Nov 20) & Tomorrow (Nov 21) UTC all-day events
+      const nov20 = new Date(2026, 10, 20, 14, 49, 0);
+      const chunks = buildSyncWindowChunks(nov20, 14, 60, 14);
+      const isContained = (y, m, d) => {
+        const b = Date.UTC(y, m - 1, d, 0, 0, 0);
+        const e = Date.UTC(y, m - 1, d + 1, 0, 0, 0);
+        return chunks.some(c => b >= c.start.getTime() && e <= c.end.getTime());
+      };
+      assert.strictEqual(isContained(2026, 11, 20), true, 'Today (Nov 20) all-day event must be strictly contained in a chunk');
+      assert.strictEqual(isContained(2026, 11, 21), true, 'Tomorrow (Nov 21) all-day event must be strictly contained in a chunk');
+      assert.strictEqual(isContained(2026, 12, 4), true, 'Chunk boundary (Dec 4) all-day event must be strictly contained in a chunk');
+
+      // 2. Recent-creation grace window protects newly added tasks from premature ghost-deletion
+      const nowMs = Date.UTC(2026, 10, 20, 19, 49, 0);
+      assert.strictEqual(
+        isTaskRecentlyCreatedOrUpdated({ creationDate: new Date(nowMs - 30000).toISOString() }, nowMs),
+        true,
+        'Task created 30s ago must be protected from ghost deletion'
+      );
+      assert.strictEqual(
+        isTaskRecentlyCreatedOrUpdated({ creationDate: new Date(nowMs - 10 * 60 * 1000).toISOString() }, nowMs),
+        false,
+        'Task created 10m ago is eligible for verified ghost-deletion checks'
+      );
+
+      // 3. Export prioritization puts unlinked Today & Tomorrow tasks BEFORE 52+ old missed tasks
+      const missedTasks = Array.from({ length: 55 }, (_, i) => ({
+        id: `missed_${i}`,
+        taskname: `Old missed ${i}`,
+        dateString: '2026-11-10',
+        completionDate: '2026-11-10',
+        calendarEventId: `ev_${i}`,
+      }));
+      const todayUnlinked = { id: 'today_1', taskname: 'Test task for calendar', dateString: '2026-11-20', completionDate: '2026-11-20' };
+      const tomorrowUnlinked = { id: 'tom_1', taskname: 'Tomorrow task for calendar', dateString: '2026-11-21', completionDate: '2026-11-21' };
+      const prioritized = prioritizeTasksForCalendarExport([...missedTasks, tomorrowUnlinked, todayUnlinked], nov20);
+      assert.strictEqual(prioritized[0].id, 'today_1', 'Unlinked Today task must export first');
+      assert.strictEqual(prioritized[1].id, 'tom_1', 'Unlinked Tomorrow task must export second (never starved by 55 missed tasks)');
+
+      // 4. taskSlice.js persists calendarSyncHash in updateTaskSync & updateMultipleTasksSync,
+      //    serializes per-task calendar writes, flushes after addTask, and self-heals unlinked tasks on foreground sync
+      const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
+      assert.match(taskSliceSrc, /if\s*\(action\.payload\.calendarSyncHash !== undefined\)\s*task\.calendarSyncHash = action\.payload\.calendarSyncHash;/, 'updateTaskSync must persist calendarSyncHash');
+      assert.match(taskSliceSrc, /if\s*\(patch\.calendarSyncHash !== undefined\)\s*task\.calendarSyncHash = patch\.calendarSyncHash;/, 'updateMultipleTasksSync must persist calendarSyncHash');
+      assert.match(taskSliceSrc, /runSerializedTaskCalendarWrite/, 'taskSlice must serialize per-task calendar writes to prevent add/update duplicate events');
+      assert.match(taskSliceSrc, /await flushPendingTaskSaves\(getState\)/, 'addTask must flush calendarEventId immediately after native write');
+      assert.match(taskSliceSrc, /performForegroundCalendarSync[\s\S]*?unlinkedEligible[\s\S]*?syncAllTasksToCalendarAsync/, 'performForegroundCalendarSync must self-heal and export unlinked eligible local tasks');
+
+      // 5. calendarSync.js verifies native event existence before ghost deletion & prioritizes immediate user writes
+      const calSyncSrc = fs.readFileSync(path.resolve('src/utils/calendarSync.js'), 'utf8');
+      assert.match(calSyncSrc, /verifyCalendarEventExistsAsync/, 'calendarSync must directly verify event deletion via getEventByIdAsync before ghost-deleting any task');
+      assert.match(calSyncSrc, /isTaskRecentlyCreatedOrUpdated/, 'calendarSync must guard recently added/updated tasks from ghost deletion');
+      assert.match(calSyncSrc, /priority:\s*'high'/, 'syncTaskToCalendarAsync must use high-priority queue lane for immediate user writes');
+      assert.match(calSyncSrc, /prioritizeTasksForCalendarExport/, 'syncAllTasksToCalendarAsync must prioritize Today/Tomorrow unlinked exports');
+
+      // 6. patch-expo-calendar.js patches Android CalendarModule.kt findEvents to overlap semantics
+      const patchSrc = fs.readFileSync(path.resolve('scripts/patch-expo-calendar.js'), 'utf8');
+      assert.match(patchSrc, /find-events-overlap-bounds/, 'patch-expo-calendar.js must fix strict containment in Android findEvents');
     });
   });
 });

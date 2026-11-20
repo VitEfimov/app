@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useContext, useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Keyboard } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +35,17 @@ export default function BottomMenu(props) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const contextInsets = useContext(SafeAreaInsetsContext);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Support both React Navigation TabBar props and direct props
   const { state, navigation, activeTab, onTabPress } = props;
@@ -43,6 +54,10 @@ export default function BottomMenu(props) {
     ? Math.max(rawBottomInset, 20)
     : 6 + rawBottomInset;
   const barMinHeight = 60 + bottomPadding;
+
+  if (Platform.OS === 'android' && isKeyboardVisible) {
+    return null;
+  }
 
   const currentRouteName = state 
     ? state.routes[state.index]?.name 

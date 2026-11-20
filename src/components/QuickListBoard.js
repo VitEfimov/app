@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  Keyboard,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
@@ -54,6 +55,7 @@ const QuickListRow = React.memo(({
   placeholder,
   autoFocus,
   inputRefCallback,
+  onFocusItem,
   onToggle,
   onSaveText,
   onSubmitNext,
@@ -180,6 +182,9 @@ const QuickListRow = React.memo(({
         ]}
         value={draftText}
         onChangeText={handleChangeText}
+        onFocus={() => {
+          if (onFocusItem) onFocusItem(itemId);
+        }}
         onBlur={handleBlur}
         onSubmitEditing={handleSubmit}
         placeholder={placeholder}
@@ -224,9 +229,15 @@ export default function QuickListBoard({
   const [focusItemId, setFocusItemId] = useState(null);
   const inputRefs = useRef(new Map());
   const scrollRef = useRef(null);
+  const focusedItemIdRef = useRef(null);
+  const pendingScrollToEndRef = useRef(false);
+  const lastItemIdRef = useRef(null);
 
   const orderedItems = useMemo(() => sortQuickListItems(tasks), [tasks]);
   const totalCount = orderedItems.length;
+  lastItemIdRef.current = totalCount > 0
+    ? String(orderedItems[totalCount - 1].id || orderedItems[totalCount - 1]._id)
+    : null;
   const completedItems = useMemo(
     () => orderedItems.filter(it => Boolean(it.completed)),
     [orderedItems]
@@ -249,6 +260,12 @@ export default function QuickListBoard({
     }
   }, []);
 
+  const scrollListToEnd = useCallback(() => {
+    if (scrollRef.current && typeof scrollRef.current.scrollToEnd === 'function') {
+      scrollRef.current.scrollToEnd({ animated: true });
+    }
+  }, []);
+
   useEffect(() => {
     if (!focusItemId) return;
     const timer = setTimeout(() => {
@@ -256,21 +273,62 @@ export default function QuickListBoard({
       if (input && typeof input.focus === 'function') {
         input.focus();
       }
-      if (scrollRef.current && typeof scrollRef.current.scrollToEnd === 'function') {
-        scrollRef.current.scrollToEnd({ animated: true });
-      }
+      scrollListToEnd();
       setFocusItemId(null);
     }, 60);
     return () => clearTimeout(timer);
-  }, [focusItemId, orderedItems.length]);
+  }, [focusItemId, orderedItems.length, scrollListToEnd]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let scrollTimer = null;
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const sub = Keyboard.addListener(showEvent, () => {
+      const focusedId = focusedItemIdRef.current;
+      if (pendingScrollToEndRef.current || (focusedId && focusedId === lastItemIdRef.current)) {
+        if (scrollTimer) clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          pendingScrollToEndRef.current = false;
+          scrollListToEnd();
+        }, 120);
+      }
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      pendingScrollToEndRef.current = false;
+      focusedItemIdRef.current = null;
+      if (scrollTimer) {
+        clearTimeout(scrollTimer);
+        scrollTimer = null;
+      }
+    });
+    return () => {
+      sub.remove();
+      hideSub.remove();
+      if (scrollTimer) clearTimeout(scrollTimer);
+    };
+  }, [scrollListToEnd]);
+
+  const handleFocusItem = useCallback((itemId) => {
+    focusedItemIdRef.current = String(itemId);
+  }, []);
 
   const handleAddNewItem = useCallback(() => {
     HapticHelper.trigger('light');
     const createdId = onAddItem();
     if (createdId) {
-      setFocusItemId(String(createdId));
+      const idStr = String(createdId);
+      focusedItemIdRef.current = idStr;
+      pendingScrollToEndRef.current = true;
+      setFocusItemId(idStr);
     }
   }, [onAddItem]);
+
+  const handleContentSizeChange = useCallback(() => {
+    if (pendingScrollToEndRef.current) {
+      pendingScrollToEndRef.current = false;
+      scrollListToEnd();
+    }
+  }, [scrollListToEnd]);
 
   const handleBlurEmpty = useCallback((itemId) => {
     onDeleteItem(itemId);
@@ -289,6 +347,7 @@ export default function QuickListBoard({
       testID="quick_list_board_container"
       style={styles.scroll}
       contentContainerStyle={styles.scrollContent}
+      onContentSizeChange={handleContentSizeChange}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
@@ -375,6 +434,7 @@ export default function QuickListBoard({
                 placeholder={t('List item...') || 'List item...'}
                 autoFocus={focusItemId === itemId}
                 inputRefCallback={registerInputRef}
+                onFocusItem={handleFocusItem}
                 onToggle={onToggleItem}
                 onSaveText={onUpdateItemText}
                 onSubmitNext={handleAddNewItem}
@@ -413,7 +473,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
-    paddingBottom: 120,
+    paddingBottom: 16,
   },
   summaryCard: {
     borderRadius: 14,

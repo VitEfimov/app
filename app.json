@@ -37,7 +37,7 @@
       },
       "package": "com.vitvalef.taskcalendar",
       "backgroundColor": "#121212",
-      "softwareKeyboardLayoutMode": "pan",
+      "softwareKeyboardLayoutMode": "resize",
       "allowBackup": false,
       "permissions": [
         "VIBRATE",
