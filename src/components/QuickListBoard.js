@@ -129,7 +129,7 @@ const QuickListRow = React.memo(({
     }
     const trimmed = draftText.trim();
     if (!trimmed) {
-      onBlurEmpty(itemId);
+      onBlurEmpty(itemId, { fromSubmit: true });
       return;
     }
     if (trimmed !== lastSavedRef.current) {
@@ -190,8 +190,9 @@ const QuickListRow = React.memo(({
         placeholder={placeholder}
         placeholderTextColor={colors.onSurfaceVariant || colors.textSecondary}
         autoFocus={autoFocus}
-        returnKeyType="next"
+        returnKeyType="done"
         blurOnSubmit={false}
+        submitBehavior="submit"
       />
 
       <TouchableOpacity
@@ -230,6 +231,9 @@ export default function QuickListBoard({
   const inputRefs = useRef(new Map());
   const scrollRef = useRef(null);
   const focusedItemIdRef = useRef(null);
+  const pendingFocusIdRef = useRef(null);
+  const suppressFocusBounceUntilRef = useRef(0);
+  const emptyBlurTimersRef = useRef(new Map());
   const pendingScrollToEndRef = useRef(false);
   const lastItemIdRef = useRef(null);
 
@@ -253,10 +257,14 @@ export default function QuickListBoard({
   const progressTrackBg = colors.surfaceContainerHighest || colors.surfaceContainerHigh;
 
   const registerInputRef = useCallback((id, node) => {
+    const idStr = String(id);
     if (node) {
-      inputRefs.current.set(String(id), node);
+      inputRefs.current.set(idStr, node);
+      if (pendingFocusIdRef.current === idStr && typeof node.focus === 'function') {
+        node.focus();
+      }
     } else {
-      inputRefs.current.delete(String(id));
+      inputRefs.current.delete(idStr);
     }
   }, []);
 
@@ -267,15 +275,30 @@ export default function QuickListBoard({
   }, []);
 
   useEffect(() => {
+    return () => {
+      emptyBlurTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+      emptyBlurTimersRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!focusItemId) return;
+    const targetId = String(focusItemId);
+    const immediateInput = inputRefs.current.get(targetId);
+    if (immediateInput && typeof immediateInput.focus === 'function') {
+      immediateInput.focus();
+    }
     const timer = setTimeout(() => {
-      const input = inputRefs.current.get(String(focusItemId));
-      if (input && typeof input.focus === 'function') {
-        input.focus();
+      if (pendingFocusIdRef.current === targetId) {
+        const input = inputRefs.current.get(targetId);
+        if (input && typeof input.focus === 'function') {
+          input.focus();
+        }
+        pendingFocusIdRef.current = null;
       }
       scrollListToEnd();
       setFocusItemId(null);
-    }, 60);
+    }, 45);
     return () => clearTimeout(timer);
   }, [focusItemId, orderedItems.length, scrollListToEnd]);
 
@@ -294,8 +317,18 @@ export default function QuickListBoard({
       }
     });
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      // Prevent Android rootViewRequestFocus() from bouncing focus to the first item when keyboard closes
+      suppressFocusBounceUntilRef.current = Date.now() + 400;
+      pendingFocusIdRef.current = null;
       pendingScrollToEndRef.current = false;
+      const activeId = focusedItemIdRef.current;
       focusedItemIdRef.current = null;
+      if (activeId) {
+        const activeNode = inputRefs.current.get(String(activeId));
+        if (activeNode && typeof activeNode.blur === 'function') {
+          activeNode.blur();
+        }
+      }
       if (scrollTimer) {
         clearTimeout(scrollTimer);
         scrollTimer = null;
@@ -309,7 +342,34 @@ export default function QuickListBoard({
   }, [scrollListToEnd]);
 
   const handleFocusItem = useCallback((itemId) => {
-    focusedItemIdRef.current = String(itemId);
+    const idStr = String(itemId);
+    const now = Date.now();
+    if (now < suppressFocusBounceUntilRef.current) {
+      const targetId = pendingFocusIdRef.current;
+      if (targetId && idStr !== targetId) {
+        // Android wrapped focus to first item before new last row claimed focus -> redirect immediately
+        const targetNode = inputRefs.current.get(targetId);
+        const strayNode = inputRefs.current.get(idStr);
+        if (targetNode && typeof targetNode.focus === 'function') {
+          targetNode.focus();
+        } else if (strayNode && typeof strayNode.blur === 'function') {
+          strayNode.blur();
+        }
+        return;
+      }
+      if (!targetId) {
+        // Keyboard just closed or empty trailing row was dismissed -> block bounce to first task
+        const strayNode = inputRefs.current.get(idStr);
+        if (strayNode && typeof strayNode.blur === 'function') {
+          strayNode.blur();
+        }
+        return;
+      }
+    }
+    if (pendingFocusIdRef.current === idStr) {
+      pendingFocusIdRef.current = null;
+    }
+    focusedItemIdRef.current = idStr;
   }, []);
 
   const handleAddNewItem = useCallback(() => {
@@ -317,7 +377,9 @@ export default function QuickListBoard({
     const createdId = onAddItem();
     if (createdId) {
       const idStr = String(createdId);
+      pendingFocusIdRef.current = idStr;
       focusedItemIdRef.current = idStr;
+      suppressFocusBounceUntilRef.current = Date.now() + 450;
       pendingScrollToEndRef.current = true;
       setFocusItemId(idStr);
     }
@@ -330,8 +392,32 @@ export default function QuickListBoard({
     }
   }, [scrollListToEnd]);
 
-  const handleBlurEmpty = useCallback((itemId) => {
-    onDeleteItem(itemId);
+  const handleBlurEmpty = useCallback((itemId, options = {}) => {
+    const idStr = String(itemId);
+    suppressFocusBounceUntilRef.current = Math.max(suppressFocusBounceUntilRef.current, Date.now() + 400);
+    if (pendingFocusIdRef.current === idStr) {
+      pendingFocusIdRef.current = null;
+    }
+    if (focusedItemIdRef.current === idStr) {
+      focusedItemIdRef.current = null;
+    }
+    const node = inputRefs.current.get(idStr);
+    if (node && typeof node.blur === 'function') {
+      node.blur();
+    }
+    if (options?.fromSubmit) {
+      Keyboard.dismiss();
+    }
+    if (emptyBlurTimersRef.current.has(idStr)) {
+      clearTimeout(emptyBlurTimersRef.current.get(idStr));
+    }
+    // Defer unmounting the empty row until after focus/blur settles so Android ViewGroup
+    // never fires rootViewRequestFocus() onto the first task in the ScrollView.
+    const timerId = setTimeout(() => {
+      emptyBlurTimersRef.current.delete(idStr);
+      onDeleteItem(itemId);
+    }, 45);
+    emptyBlurTimersRef.current.set(idStr, timerId);
   }, [onDeleteItem]);
 
   const handleClearCompleted = useCallback(() => {

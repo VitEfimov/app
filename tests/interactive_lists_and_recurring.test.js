@@ -2867,12 +2867,12 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
       assert.match(taskSliceSrc, /fetchCalendarWindowEventsAsync\(themeState\)/, 'batchSyncCalendarTasks must prefetch calendar window once before export');
-      assert.match(taskSliceSrc, /buildTaskDeduplicationPlan\(tasks\)/, 'batchSyncCalendarTasks must deduplicate main copies before export');
+      assert.match(taskSliceSrc, /buildTaskDeduplicationPlan\(tasks/, 'batchSyncCalendarTasks must deduplicate main copies before export');
       assert.match(taskSliceSrc, /cachedLocal\.calendarEventId/, 'fetchTasks must preserve local calendarEventId across remote DB sync');
 
       const bgSrc = fs.readFileSync(path.resolve('src/utils/backgroundTasks.js'), 'utf8');
       assert.match(bgSrc, /fetchCalendarWindowEventsAsync\(themeState\)/, 'backgroundTasks must prefetch calendar window once');
-      assert.match(bgSrc, /buildTaskDeduplicationPlan\(tasks\)/, 'backgroundTasks must deduplicate main copies before export');
+      assert.match(bgSrc, /buildTaskDeduplicationPlan\(tasks/, 'backgroundTasks must deduplicate main copies before export');
     });
 
     test('Per-board Calendar Sync Policy: smart defaults, long-tap & Settings toggles, and automatic removal of unsynced board events', () => {
@@ -3097,11 +3097,14 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(bottomMenuSrc, /keyboardDidShow/, 'BottomMenu must listen to Android keyboardDidShow');
       assert.match(bottomMenuSrc, /if\s*\(Platform\.OS === 'android' && isKeyboardVisible\)\s*\{\s*return null;/, 'BottomMenu must hide on Android while keyboard is open');
 
-      // 8. app.json & AndroidManifest.xml use resize / adjustResize
+      // 8. app.json uses resize (and generated AndroidManifest.xml matches when prebuilt locally)
       const appJson = JSON.parse(fs.readFileSync(path.resolve('app.json'), 'utf8'));
       assert.strictEqual(appJson.expo.android.softwareKeyboardLayoutMode, 'resize', 'app.json must use softwareKeyboardLayoutMode: resize');
-      const manifestSrc = fs.readFileSync(path.resolve('android/app/src/main/AndroidManifest.xml'), 'utf8');
-      assert.match(manifestSrc, /android:windowSoftInputMode="adjustResize"/, 'AndroidManifest.xml must use adjustResize');
+      const manifestPath = path.resolve('android/app/src/main/AndroidManifest.xml');
+      if (fs.existsSync(manifestPath)) {
+        const manifestSrc = fs.readFileSync(manifestPath, 'utf8');
+        assert.match(manifestSrc, /android:windowSoftInputMode="adjustResize"/, 'AndroidManifest.xml must use adjustResize');
+      }
     });
 
     test('Task addition & calendar sync integrity: Today never ghost-deleted, Tomorrow prioritized & self-healed, calendarSyncHash persisted', () => {
@@ -3169,6 +3172,91 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       // 6. patch-expo-calendar.js patches Android CalendarModule.kt findEvents to overlap semantics
       const patchSrc = fs.readFileSync(path.resolve('scripts/patch-expo-calendar.js'), 'utf8');
       assert.match(patchSrc, /find-events-overlap-bounds/, 'patch-expo-calendar.js must fix strict containment in Android findEvents');
+    });
+
+    test('No duplicate reminders (App + Calendar), cross-board & unsynced board sync cleanup, immediate calendar deletion, and Quick List focus stability', () => {
+      const {
+        buildTaskDeduplicationPlan,
+        buildTaskCalendarIndex,
+        findMatchingTaskForCalendarEvent,
+        getTaskCalendarFingerprint,
+      } = require('../src/utils/calendarSyncSchedule');
+
+      // 1. Fingerprint v2 upgrade & no duplicate calendar alarms
+      const sampleTask = {
+        id: 't1',
+        taskname: 'Call Mom',
+        dateString: '2026-11-20',
+        completionDate: '2026-11-20',
+        time: '15:00',
+        reminder: '15 min before',
+      };
+      const fp = getTaskCalendarFingerprint(sampleTask, false);
+      assert.ok(fp.startsWith('v2|'), 'Fingerprint must use v2 prefix so existing events update once to strip duplicate calendar alarms');
+
+      const calSyncSrc = fs.readFileSync(path.resolve('src/utils/calendarSync.js'), 'utf8');
+      assert.match(calSyncSrc, /alarms,\s*\};/, 'buildEventDetails must always pass explicit alarms array (empty [] by default) so Google Calendar clears HAS_ALARM=0');
+      assert.match(calSyncSrc, /task\.useCalendarAlarmOnly === true && calendarAlarmsEnabled/, 'buildEventDetails must never attach duplicate calendar alarms for standard app reminders');
+
+      const themeSliceSrc = fs.readFileSync(path.resolve('src/features/themeSlice.js'), 'utf8');
+      assert.match(themeSliceSrc, /calendarAlarmsEnabled:\s*false/, 'themeSlice must enforce calendarAlarmsEnabled: false');
+      assert.match(themeSliceSrc, /return\s*\{\s*\.\.\.state,\s*\.\.\.action\.payload,\s*calendarAlarmsEnabled:\s*false\s*\}/, 'hydrateThemeState must keep calendarAlarmsEnabled false');
+
+      const patchSrc = fs.readFileSync(path.resolve('scripts/patch-expo-calendar.js'), 'utf8');
+      assert.match(patchSrc, /explicit-no-alarm-when-empty/, 'patch-expo-calendar.js must set HAS_ALARM=0 when alarms list is empty');
+
+      // 2. Unsynced board items (e.g. Grocery "Coffee 20", "Dishwasher cleaner 15") and cross-date non-Main tasks
+      //    never import onto Main and any existing Main calendar-imported duplicates are removed
+      const boards = [
+        { id: 'main', name: 'Main', type: 'standard' },
+        { id: 'groc_1', name: 'Grocery', type: 'grocery' },
+        { id: 'pay_1', name: 'Payments', type: 'expenses' },
+      ];
+      const existingTasks = [
+        // Undated Grocery items on unsynced Grocery board
+        { id: 'g1', boardId: 'groc_1', taskname: 'Coffee 20', completed: false },
+        { id: 'g2', boardId: 'groc_1', taskname: 'Dishwasher cleaner 15', dateString: '2026-11-18' },
+        // Bogus calendar-imported copies on Main from an older sync
+        { id: 'cal_901', boardId: 'main', taskname: 'Coffee 20', dateString: '2026-11-20', syncedFromCalendar: true, calendarEventId: '901' },
+        { id: 'cal_902', boardId: 'main', taskname: 'Dishwasher cleaner 15', dateString: '2026-11-20', syncedFromCalendar: true, calendarEventId: '902' },
+      ];
+
+      const dedup = buildTaskDeduplicationPlan(existingTasks, boards, {});
+      assert.ok(dedup.duplicateTaskIds.includes('cal_901'), 'Undated Grocery task duplicate on Main must be marked for removal');
+      assert.ok(dedup.duplicateTaskIds.includes('cal_902'), 'Cross-date Grocery task duplicate on Main must be marked for removal');
+      assert.ok(dedup.orphanCalendarEventIds.includes('901'), 'Orphan calendar event 901 for unsynced Grocery task must be removed');
+      assert.ok(dedup.orphanCalendarEventIds.includes('902'), 'Orphan calendar event 902 for unsynced Grocery task must be removed');
+
+      // 3. findMatchingTaskForCalendarEvent matches [Synced from TaskFlow] events by title across unsynced boards
+      const idx = buildTaskCalendarIndex([
+        { id: 'g1', boardId: 'groc_1', taskname: 'Coffee 20', completed: false },
+      ]);
+      const matchRes = findMatchingTaskForCalendarEvent(
+        { eventCalId: '999', cleanTitle: 'Coffee 20', dateStr: '2026-11-20', isFromTaskFlow: true },
+        idx
+      );
+      assert.strictEqual(matchRes.matchType, 'already_exists', '[Synced from TaskFlow] event matching an undated Grocery task must match as already_exists');
+      assert.strictEqual(matchRes.task.id, 'g1');
+
+      // 4. performDifferentialCalendarSyncAsync never imports [Synced from TaskFlow] orphan events onto Main
+      assert.match(calSyncSrc, /if\s*\(isFromTaskFlow\)\s*\{\s*addTombstoneAsync\(eventCalId\)\.catch\(\(\)\s*=>\s*\{\}\);\s*removeTaskFromCalendarAsync\(eventCalId\)\.catch\(\(\)\s*=>\s*\{\}\);\s*continue;\s*\}/, 'Unmatched [Synced from TaskFlow] events must be deleted from Google Calendar and never imported onto Main');
+      assert.match(calSyncSrc, /export const removeTaskEventsFromCalendarImmediateAsync/, 'calendarSync must export removeTaskEventsFromCalendarImmediateAsync');
+
+      // 5. Immediate calendar event deletion on task/board deletion
+      const taskSliceSrc = fs.readFileSync(path.resolve('src/features/taskSlice.js'), 'utf8');
+      assert.match(taskSliceSrc, /deleteTask\s*=\s*\(payload\)\s*=>[\s\S]*?removeTaskEventsFromCalendarImmediateAsync\(\[existingTask\]/, 'deleteTask must immediately remove the task from Google Calendar (0ms delay)');
+      assert.match(taskSliceSrc, /deleteMultipleTasks\s*=\s*\(payload\)\s*=>[\s\S]*?removeTaskEventsFromCalendarImmediateAsync\(existingTasks/, 'deleteMultipleTasks must immediately remove tasks from Google Calendar (0ms delay)');
+      assert.match(taskSliceSrc, /deleteTasksByBoard\s*=\s*\(payload\)\s*=>[\s\S]*?removeBoardEventsFromCalendarAsync\(affected/, 'deleteTasksByBoard must immediately remove all board events from Google Calendar');
+
+      const boardScreenSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
+      assert.match(boardScreenSrc, /dispatch\(deleteTasksByBoard\(\{\s*boardId:\s*targetBoardId,\s*boardName:\s*targetBoardName\s*\}\)\);\s*dispatch\(deleteBoardAsync/, 'BoardScreen must dispatch deleteTasksByBoard BEFORE deleteBoardAsync so tasks are not wiped before calendar deletion');
+
+      // 6. Quick List focus stability: submitBehavior="submit", returnKeyType="done", focus bounce suppression, deferred empty blur
+      const qlSrc = fs.readFileSync(path.resolve('src/components/QuickListBoard.js'), 'utf8');
+      assert.match(qlSrc, /returnKeyType="done"/, 'QuickListRow TextInput must use returnKeyType="done" to prevent Android IME_ACTION_NEXT focus wrap-around to first item');
+      assert.match(qlSrc, /submitBehavior="submit"/, 'QuickListRow TextInput must use submitBehavior="submit" on RN 0.76 Fabric');
+      assert.match(qlSrc, /pendingFocusIdRef/, 'QuickListBoard must track pendingFocusIdRef for instant focus handoff to new last item');
+      assert.match(qlSrc, /suppressFocusBounceUntilRef/, 'QuickListBoard must suppress Android focus bounce to first task on Enter and keyboard close');
     });
   });
 });

@@ -1226,28 +1226,6 @@ export default function SettingsScreen({ navigation }) {
 
               <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
-              {/* Calendar Alarms Toggle */}
-              <View style={styles.cardItemRow}>
-                <View style={{ flex: 1, marginLeft: 52, marginRight: 10 }}>
-                  <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                    {t('Calendar Alarms (Reminders)') || 'Calendar Alarms (Reminders)'}
-                  </Text>
-                  <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-                    {t('Off avoids duplicate alerts; app will send notifications.') || 'Off avoids duplicate alerts; app will send notifications.'}
-                  </Text>
-                </View>
-                <Switch
-                  value={!!theme.calendarAlarmsEnabled}
-                  onValueChange={val => dispatch(setCalendarAlarmsEnabled(val))}
-                  trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: !!theme.calendarAlarmsEnabled }}
-                  accessibilityLabel={t('Calendar Alarms (Reminders)') || 'Calendar Alarms (Reminders)'}
-                />
-              </View>
-
-              <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
-
               {/* Per-Board Calendar Sync Selection */}
               {(() => {
                 const rawBoards = Array.isArray(boards) && boards.length > 0

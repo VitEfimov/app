@@ -159,8 +159,10 @@ const initialState = {
   dbSyncEnabled: loaded?.dbSyncEnabled !== undefined ? loaded.dbSyncEnabled : true,
 
   // Calendar Sync (expo-calendar)
+  // calendarAlarmsEnabled is always false so TaskFlow's own notification/alarm engine
+  // is the single source of truth and Google Calendar never fires duplicate reminders.
   calendarSyncEnabled: loaded?.calendarSyncEnabled || false,
-  calendarAlarmsEnabled: loaded?.calendarAlarmsEnabled || false,
+  calendarAlarmsEnabled: false,
   selectedCalendarId: loaded?.selectedCalendarId || null,
   lastCalendarSyncAt: loaded?.lastCalendarSyncAt || null,
   boardCalendarSync: loaded?.boardCalendarSync || {},
@@ -199,7 +201,7 @@ const themeSlice = createSlice({
       if (action.payload?.androidAutoEnabled !== undefined) {
         try { setNativeAndroidAutoMute(action.payload.androidAutoEnabled); } catch (e) {}
       }
-      return { ...state, ...action.payload };
+      return { ...state, ...action.payload, calendarAlarmsEnabled: false };
     },
     setThemeColor: (state, action) => {
       const { key, value } = action.payload;
@@ -373,8 +375,8 @@ const themeSlice = createSlice({
     setCalendarSyncEnabled: (state, action) => {
       state.calendarSyncEnabled = action.payload;
     },
-    setCalendarAlarmsEnabled: (state, action) => {
-      state.calendarAlarmsEnabled = action.payload;
+    setCalendarAlarmsEnabled: (state) => {
+      state.calendarAlarmsEnabled = false;
     },
     setSelectedCalendarId: (state, action) => {
       state.selectedCalendarId = action.payload;

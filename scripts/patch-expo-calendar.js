@@ -332,6 +332,100 @@ const calendarModulePatches = [
     }
   }`,
   },
+  {
+    name: 'explicit-no-alarm-when-empty',
+    marker: 'details.containsKey("alarms") && details.getList("alarms").isNotEmpty()',
+    target: `    calendarEventBuilder
+      .putEventBoolean(CalendarContract.Events.HAS_ALARM, "alarms", true)
+      .putEventString(CalendarContract.Events.AVAILABILITY, "availability", ::availabilityConstantMatchingString)
+      .putEventString(CalendarContract.Events.TITLE, "title")
+      .putEventString(CalendarContract.Events.DESCRIPTION, "notes")
+      .putEventString(CalendarContract.Events.EVENT_LOCATION, "location")
+      .putEventString(CalendarContract.Events.ORGANIZER, "organizerEmail")
+      .putEventBoolean(CalendarContract.Events.ALL_DAY, "allDay")
+      .putEventBoolean(CalendarContract.Events.GUESTS_CAN_MODIFY, "guestsCanModify")
+      .putEventBoolean(CalendarContract.Events.GUESTS_CAN_INVITE_OTHERS, "guestsCanInviteOthers")
+      .putEventBoolean(CalendarContract.Events.GUESTS_CAN_SEE_GUESTS, "guestsCanSeeGuests")
+      .putEventTimeZone(CalendarContract.Events.EVENT_TIMEZONE, "timeZone")
+      .putEventTimeZone(CalendarContract.Events.EVENT_END_TIMEZONE, "endTimeZone")
+      .putEventString(CalendarContract.Events.ACCESS_LEVEL, "accessLevel", ::accessConstantMatchingString)
+
+    return if (details.containsKey("id")) {
+      val eventID = details.getString("id").toInt()
+      val updateUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventID.toLong())
+      contentResolver.update(updateUri, calendarEventBuilder.build(), null, null)
+      removeRemindersForEvent(eventID)
+      if (details.containsKey("alarms")) {
+        createRemindersForEvent(eventID, details.getList("alarms"))
+      }
+      eventID
+    } else {
+      if (details.containsKey("calendarId")) {
+        val calendar = findCalendarById(details.getString("calendarId"))
+        if (calendar != null) {
+          calendarEventBuilder.put(CalendarContract.Events.CALENDAR_ID, calendar.getString("id")!!.toInt())
+        } else {
+          throw InvalidArgumentException("Couldn't find calendar with given id: " + details.getString("calendarId"))
+        }
+      } else {
+        throw InvalidArgumentException("CalendarId is required.")
+      }
+      val eventsUri = CalendarContract.Events.CONTENT_URI
+      val eventUri = contentResolver.insert(eventsUri, calendarEventBuilder.build())
+        ?: throw EventNotSavedException()
+      val eventID = eventUri.lastPathSegment!!.toInt()
+      if (details.containsKey("alarms")) {
+        createRemindersForEvent(eventID, details.getList("alarms"))
+      }
+      eventID
+    }`,
+    replacement: `    val hasNonEmptyAlarms = details.containsKey("alarms") && details.getList("alarms").isNotEmpty()
+    calendarEventBuilder
+      .put(CalendarContract.Events.HAS_ALARM, if (hasNonEmptyAlarms) 1 else 0)
+      .putEventString(CalendarContract.Events.AVAILABILITY, "availability", ::availabilityConstantMatchingString)
+      .putEventString(CalendarContract.Events.TITLE, "title")
+      .putEventString(CalendarContract.Events.DESCRIPTION, "notes")
+      .putEventString(CalendarContract.Events.EVENT_LOCATION, "location")
+      .putEventString(CalendarContract.Events.ORGANIZER, "organizerEmail")
+      .putEventBoolean(CalendarContract.Events.ALL_DAY, "allDay")
+      .putEventBoolean(CalendarContract.Events.GUESTS_CAN_MODIFY, "guestsCanModify")
+      .putEventBoolean(CalendarContract.Events.GUESTS_CAN_INVITE_OTHERS, "guestsCanInviteOthers")
+      .putEventBoolean(CalendarContract.Events.GUESTS_CAN_SEE_GUESTS, "guestsCanSeeGuests")
+      .putEventTimeZone(CalendarContract.Events.EVENT_TIMEZONE, "timeZone")
+      .putEventTimeZone(CalendarContract.Events.EVENT_END_TIMEZONE, "endTimeZone")
+      .putEventString(CalendarContract.Events.ACCESS_LEVEL, "accessLevel", ::accessConstantMatchingString)
+
+    return if (details.containsKey("id")) {
+      val eventID = details.getString("id").toInt()
+      val updateUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventID.toLong())
+      contentResolver.update(updateUri, calendarEventBuilder.build(), null, null)
+      removeRemindersForEvent(eventID)
+      if (hasNonEmptyAlarms) {
+        createRemindersForEvent(eventID, details.getList("alarms"))
+      }
+      eventID
+    } else {
+      if (details.containsKey("calendarId")) {
+        val calendar = findCalendarById(details.getString("calendarId"))
+        if (calendar != null) {
+          calendarEventBuilder.put(CalendarContract.Events.CALENDAR_ID, calendar.getString("id")!!.toInt())
+        } else {
+          throw InvalidArgumentException("Couldn't find calendar with given id: " + details.getString("calendarId"))
+        }
+      } else {
+        throw InvalidArgumentException("CalendarId is required.")
+      }
+      val eventsUri = CalendarContract.Events.CONTENT_URI
+      val eventUri = contentResolver.insert(eventsUri, calendarEventBuilder.build())
+        ?: throw EventNotSavedException()
+      val eventID = eventUri.lastPathSegment!!.toInt()
+      removeRemindersForEvent(eventID)
+      if (hasNonEmptyAlarms) {
+        createRemindersForEvent(eventID, details.getList("alarms"))
+      }
+      eventID
+    }`,
+  },
 ];
 
 const jsValuesMappersPatches = [

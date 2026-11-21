@@ -246,21 +246,34 @@ function compareTaskAuthority(a, b) {
 /**
  * Scans existing tasks across ALL boards and identifies duplicate `syncedFromCalendar`
  * copies on the 'main' board that duplicate an existing task on another board
- * (e.g. payments, birthdays, events) or a native task on 'main'.
+ * (e.g. payments, birthdays, events, grocery, books, habits, packing) or a native task on 'main'.
  */
-export function buildTaskDeduplicationPlan(existingTasks = []) {
+export function buildTaskDeduplicationPlan(existingTasks = [], boards = [], boardCalendarSync = {}) {
   const groups = new Map();
+  const nonMainByTitle = new Map();
+
   for (const t of existingTasks || []) {
     if (!t) continue;
     const title = getTaskMatchTitle(t);
+    if (!title) continue;
+
+    const bId = t.boardId || t.board_id;
+    const tId = t.id || t._id;
+    const isCalImport = t.syncedFromCalendar === true || (tId && String(tId).startsWith('cal_'));
+    if (!isCalImport && !isMainBoardId(bId)) {
+      if (!nonMainByTitle.has(title)) nonMainByTitle.set(title, []);
+      nonMainByTitle.get(title).push(t);
+    }
+
     const dateKey = extractTaskDateKey(t);
-    if (!title || !dateKey) continue;
+    if (!dateKey) continue;
     const key = `${title}_${dateKey}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(t);
   }
 
   const duplicateTaskIds = [];
+  const duplicateIdSet = new Set();
   const linkTransfers = [];
   const orphanCalendarEventIds = [];
 
@@ -271,6 +284,9 @@ export function buildTaskDeduplicationPlan(existingTasks = []) {
     const authoritative = sorted[0];
     const authId = authoritative.id || authoritative._id;
     let authCalId = authoritative.calendarEventId ? String(authoritative.calendarEventId).trim() : null;
+    const authEligible = Array.isArray(boards) && boards.length > 0
+      ? isTaskEligibleForCalendarSync(authoritative, boards, boardCalendarSync)
+      : true;
 
     for (let i = 1; i < sorted.length; i++) {
       const candidate = sorted[i];
@@ -282,18 +298,58 @@ export function buildTaskDeduplicationPlan(existingTasks = []) {
       // never delete two distinct user-created tasks.
       if (!isCalendarImport || !isMainBoardId(candBoardId)) continue;
 
-      if (candId) {
+      if (candId && !duplicateIdSet.has(String(candId))) {
         duplicateTaskIds.push(candId);
+        duplicateIdSet.add(String(candId));
       }
 
       const candCalId = candidate.calendarEventId ? String(candidate.calendarEventId).trim() : null;
       if (candCalId) {
-        if (!authCalId && authId) {
+        if (!authEligible) {
+          orphanCalendarEventIds.push(candCalId);
+        } else if (!authCalId && authId) {
           authCalId = candCalId;
           linkTransfers.push({ taskId: authId, calendarEventId: candCalId });
         } else if (authCalId && candCalId !== authCalId) {
           orphanCalendarEventIds.push(candCalId);
         }
+      }
+    }
+  }
+
+  // Cross-date / undated non-Main board protection:
+  // If a calendar-imported copy on 'main' has the same normalized title as a user task
+  // on any non-Main board (e.g. Grocery "Coffee 20", "Dishwasher cleaner 15", rolled-over Habits,
+  // Books, Packing, or an unsynced board), remove the bogus Main copy and clean up its event if unsynced.
+  for (const candidate of existingTasks || []) {
+    if (!candidate) continue;
+    const candId = candidate.id || candidate._id;
+    if (!candId || duplicateIdSet.has(String(candId))) continue;
+    const candBoardId = candidate.boardId || candidate.board_id;
+    const isCalendarImport = candidate.syncedFromCalendar === true || String(candId).startsWith('cal_');
+    if (!isCalendarImport || !isMainBoardId(candBoardId)) continue;
+
+    const title = getTaskMatchTitle(candidate);
+    if (!title || !nonMainByTitle.has(title)) continue;
+
+    const owners = nonMainByTitle.get(title).sort(compareTaskAuthority);
+    const owner = owners[0];
+    if (!owner) continue;
+
+    const ownerEligible = Array.isArray(boards) && boards.length > 0
+      ? isTaskEligibleForCalendarSync(owner, boards, boardCalendarSync)
+      : false;
+    const ownerDateKey = extractTaskDateKey(owner);
+    const candDateKey = extractTaskDateKey(candidate);
+
+    // If the non-Main board is unsynced (Grocery, Habits, Books, Packing, or turned OFF)
+    // OR the non-Main task is undated / on the same date, the Main calendar-imported copy is a bogus duplicate
+    if (!ownerEligible || !ownerDateKey || ownerDateKey === candDateKey) {
+      duplicateTaskIds.push(candId);
+      duplicateIdSet.add(String(candId));
+      const candCalId = candidate.calendarEventId ? String(candidate.calendarEventId).trim() : null;
+      if (candCalId) {
+        orphanCalendarEventIds.push(candCalId);
       }
     }
   }
@@ -307,6 +363,7 @@ export function buildTaskDeduplicationPlan(existingTasks = []) {
 export function buildTaskCalendarIndex(existingTasks = []) {
   const byCalEventId = new Map();
   const byNameAndDate = new Map();
+  const byTitleOnly = new Map();
 
   const sortedTasks = [...(existingTasks || [])].filter(Boolean).sort(compareTaskAuthority);
 
@@ -318,6 +375,10 @@ export function buildTaskCalendarIndex(existingTasks = []) {
       }
     }
     const title = getTaskMatchTitle(t);
+    if (title) {
+      if (!byTitleOnly.has(title)) byTitleOnly.set(title, []);
+      byTitleOnly.get(title).push(t);
+    }
     const dateKey = extractTaskDateKey(t);
     if (title && dateKey) {
       const key = `${title}_${dateKey}`;
@@ -326,12 +387,13 @@ export function buildTaskCalendarIndex(existingTasks = []) {
     }
   }
 
-  return { byCalEventId, byNameAndDate };
+  return { byCalEventId, byNameAndDate, byTitleOnly };
 }
 
 /**
  * Matches a native Google/Device calendar event against ALL tasks across ALL boards
- * (payments, birthdays, events, main, etc.) so existing board tasks are never duplicated onto 'main'.
+ * (payments, birthdays, events, grocery, habits, books, packing, main, etc.)
+ * so existing board tasks are never duplicated onto 'main'.
  */
 export function findMatchingTaskForCalendarEvent(eventMeta, taskIndex, deletedIdSet = new Set()) {
   const { eventCalId, cleanTitle, dateStr, isFromTaskFlow = false } = eventMeta || {};
@@ -372,13 +434,26 @@ export function findMatchingTaskForCalendarEvent(eventMeta, taskIndex, deletedId
   const exact = matchInDateKey(dateStr);
   if (exact) return exact;
 
-  // 3. Timezone boundary fallback (±1 day) ONLY for events originally exported by TaskFlow
+  // 3. Timezone boundary fallback (±1 day) and title-across-board fallback for events exported by TaskFlow
   if (isFromTaskFlow) {
     for (const delta of [-1, 1]) {
       const adjDate = shiftDateKeyByDays(dateStr, delta);
       if (!adjDate) continue;
       const shifted = matchInDateKey(adjDate);
       if (shifted) return shifted;
+    }
+
+    // 4. Title-only match across boards for [Synced from TaskFlow] events
+    // (catches undated Grocery/Books/Packing items, rolled-over Habits, or rescheduled tasks)
+    if (taskIndex.byTitleOnly && taskIndex.byTitleOnly.has(normTitle)) {
+      const titleCandidates = (taskIndex.byTitleOnly.get(normTitle) || []).filter(t => {
+        const tid = t?.id || t?._id;
+        return t && !t.syncedFromCalendar && (!tid || !deletedIdSet.has(String(tid)));
+      });
+      if (titleCandidates.length > 0) {
+        const nonMain = titleCandidates.find(t => !isMainBoardId(t.boardId || t.board_id));
+        return { matchType: 'already_exists', task: nonMain || titleCandidates[0] };
+      }
     }
   }
 
@@ -503,7 +578,7 @@ export function getTaskCalendarFingerprint(task, calendarAlarmsEnabled = false) 
     ? String(task.description.text).replace(/<[^>]+>/g, '').trim().slice(0, 200)
     : '';
   const reminder = calendarAlarmsEnabled ? String(task.reminder || 'None') : 'off';
-  return `${title}|${dateKey}|${time}|${completed}|${reminder}|${notes}`;
+  return `v2|${title}|${dateKey}|${time}|${completed}|${reminder}|${notes}`;
 }
 
 /**

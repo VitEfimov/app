@@ -2646,8 +2646,8 @@ export default function BoardScreen({ route, navigation }) {
                       if (activeBoardId === targetBoardId || activeBoard?.id === targetBoardId) {
                         dispatch(setActiveBoardId('main'));
                       }
-                      dispatch(deleteBoardAsync({ id: targetBoardId, _id: board?._id, name: targetBoardName }));
                       dispatch(deleteTasksByBoard({ boardId: targetBoardId, boardName: targetBoardName }));
+                      dispatch(deleteBoardAsync({ id: targetBoardId, _id: board?._id, name: targetBoardName }));
                       setConfirmConfig(prev => ({ ...prev, isVisible: false }));
                     }
                   });

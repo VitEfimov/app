@@ -502,9 +502,11 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
     return null;
   }
 
-  // Alarms: Only attach alarms if user enabled calendar alarms in settings and reminder is set
+  // Alarms: TaskFlow schedules its own rich notifications/alarms via scheduleTaskReminder.
+  // Always pass an explicit empty alarms array (unless task.useCalendarAlarmOnly === true)
+  // so Google/Device Calendar sets HAS_ALARM = 0 and never fires duplicate reminder alerts!
   const alarms = [];
-  if (calendarAlarmsEnabled && task.reminder && task.reminder !== 'None') {
+  if (task.useCalendarAlarmOnly === true && calendarAlarmsEnabled && task.reminder && task.reminder !== 'None') {
     const offset = getAlarmOffsetMinutes(task.reminder);
     if (typeof offset === 'number' && !isNaN(offset)) {
       alarms.push({ relativeOffset: offset });
@@ -523,6 +525,7 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
     endDate,
     allDay,
     notes: cleanDescription ? `${cleanDescription}\n\n[Synced from TaskFlow]` : '[Synced from TaskFlow]',
+    alarms,
   };
 
   // On iOS, attach standard availability; on Android, let CalendarProvider use its calendar default
@@ -533,10 +536,6 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
   if (allDay && Platform.OS === 'android') {
     details.timeZone = 'UTC';
     details.endTimeZone = 'UTC';
-  }
-
-  if (alarms.length > 0) {
-    details.alarms = alarms;
   }
 
   return details;
@@ -631,17 +630,104 @@ export const verifyCalendarEventExistsAsync = async (calendarEventId) => {
 };
 
 /**
- * Removes an event from the device calendar
+ * Removes an event from the device calendar.
+ * Supports high-priority queue lane when triggered directly by user deletion.
  */
-export const removeTaskFromCalendarAsync = async (calendarEventId) => {
+export const removeTaskFromCalendarAsync = async (calendarEventId, options = {}) => {
   if (Platform.OS === 'web' || !calendarEventId) return;
   const idStr = String(calendarEventId).trim();
   if (Platform.OS === 'android' && !/^\d+$/.test(idStr)) return;
   try {
-    await enqueueCalendarOp(() => Calendar.deleteEventAsync(idStr));
+    await enqueueCalendarOp(
+      () => Calendar.deleteEventAsync(idStr),
+      { priority: options?.priority }
+    );
   } catch (error) {
     // Silently ignore if already removed
   }
+};
+
+/**
+ * Immediately deletes calendar events for one or more user-deleted tasks (0ms delay).
+ * - Deletes the linked `task.calendarEventId` on the high-priority native queue lane
+ * - Also scans the deleted task's date (±1 day) in Google Calendar and deletes any
+ *   duplicate or unlinked `[Synced from TaskFlow]` events with the same normalized title.
+ */
+export const removeTaskEventsFromCalendarImmediateAsync = async (tasksToRemove = [], settings = {}) => {
+  if (Platform.OS === 'web') return 0;
+  const list = (Array.isArray(tasksToRemove) ? tasksToRemove : [tasksToRemove]).filter(Boolean);
+  if (list.length === 0) return 0;
+
+  let removedCount = 0;
+  const removedEventIds = new Set();
+  const dateBuckets = new Map(); // dateKey -> Set<normTitle>
+
+  for (const task of list) {
+    if (task.calendarEventId) {
+      const idStr = String(task.calendarEventId).trim();
+      if (idStr && (Platform.OS !== 'android' || /^\d+$/.test(idStr)) && !removedEventIds.has(idStr)) {
+        removedEventIds.add(idStr);
+        try {
+          await addTombstoneAsync(idStr);
+          await removeTaskFromCalendarAsync(idStr, { priority: 'high' });
+          removedCount++;
+        } catch (e) {}
+      }
+    }
+    const normTitle = getTaskMatchTitle(task);
+    const dateKey = extractTaskDateKey(task);
+    if (normTitle && dateKey) {
+      if (!dateBuckets.has(dateKey)) dateBuckets.set(dateKey, new Set());
+      dateBuckets.get(dateKey).add(normTitle);
+    }
+  }
+
+  if (!settings?.calendarSyncEnabled || dateBuckets.size === 0) {
+    return removedCount;
+  }
+
+  try {
+    const calendarId = await getTargetCalendarIdAsync(settings?.selectedCalendarId, { priority: 'high' });
+    if (!calendarId || !isValidNativeCalendarId(calendarId)) return removedCount;
+
+    for (const [dateKey, titleSet] of dateBuckets.entries()) {
+      const [y, m, d] = dateKey.split('-').map(Number);
+      if (!y || !m || !d) continue;
+      const queryStart = new Date(y, m - 1, d - 1, 0, 0, 0, 0);
+      const queryEnd = new Date(y, m - 1, d + 1, 23, 59, 59, 999);
+      let events = [];
+      try {
+        events = await enqueueCalendarOp(
+          () => Calendar.getEventsAsync(
+            [String(calendarId)],
+            toNativeCalendarDate(queryStart),
+            toNativeCalendarDate(queryEnd)
+          ),
+          { priority: 'high' }
+        );
+      } catch (e) {}
+
+      for (const ev of events || []) {
+        if (!ev || !ev.id) continue;
+        const evId = String(ev.id).trim();
+        if (removedEventIds.has(evId)) continue;
+        if (!isTaskFlowExportedEvent(ev)) continue;
+        const evTitle = normalizeCalendarTitle(ev.title);
+        if (!evTitle || !titleSet.has(evTitle)) continue;
+        const { dateStr: evDate } = parseCalendarEventDate(ev);
+        if (evDate === dateKey || evDate === shiftDateKeyByDays(dateKey, -1) || evDate === shiftDateKeyByDays(dateKey, 1)) {
+          removedEventIds.add(evId);
+          try {
+            await addTombstoneAsync(evId);
+            await removeTaskFromCalendarAsync(evId, { priority: 'high' });
+            removedCount++;
+          } catch (e) {}
+        }
+      }
+    }
+  } catch (e) {}
+
+  return removedCount;
 };
 
 const isTaskFlowExportedEvent = (event) => {
@@ -722,38 +808,77 @@ export const fetchCalendarWindowEventsAsync = async (settings = {}) => {
 };
 
 /**
- * Removes TaskFlow-exported events for a disabled/unsynced board from Google / device calendar
- * while keeping all local tasks completely untouched in the app.
+ * Removes TaskFlow-exported events for a disabled/unsynced/deleted board from Google / device calendar
+ * while keeping all local tasks completely untouched in the app (when disabling sync).
+ * Also scans the active calendar window for any unlinked or duplicate [Synced from TaskFlow] events
+ * matching the board's task titles so no orphan events remain in Google Calendar.
  */
-export const removeBoardEventsFromCalendarAsync = async (boardTasks = [], settings = {}) => {
+export const removeBoardEventsFromCalendarAsync = async (boardTasks = [], settings = {}, prefetchedWindow = null) => {
   if (Platform.OS === 'web' || !settings?.calendarSyncEnabled) {
     return { removedCount: 0, clearedEventTaskIds: [] };
   }
   const clearedEventTaskIds = [];
+  const deletedEventIds = new Set();
+  const boardTitles = new Set();
   let removedCount = 0;
   let opsExecuted = 0;
 
   for (const task of boardTasks || []) {
-    if (!task || !task.calendarEventId) continue;
+    if (!task) continue;
+    const normTitle = getTaskMatchTitle(task);
+    if (normTitle) boardTitles.add(normTitle);
+
     const taskKey = task.id || task._id;
+    if (taskKey) {
+      clearedEventTaskIds.push(taskKey);
+    }
+    if (!task.calendarEventId) continue;
+
     const eventIdStr = String(task.calendarEventId).trim();
     const isValidExistingId = eventIdStr && (Platform.OS === 'android' ? /^\d+$/.test(eventIdStr) : true);
-    if (!taskKey) continue;
+    if (!isValidExistingId || deletedEventIds.has(eventIdStr)) continue;
 
-    // Only delete events that TaskFlow exported (never delete external non-TaskFlow Google events)
-    if (!task.syncedFromCalendar && isValidExistingId) {
-      opsExecuted++;
-      if (opsExecuted % 5 === 0) {
-        await sleepMs(30);
-      }
-      try {
-        await addTombstoneAsync(eventIdStr);
-        await removeTaskFromCalendarAsync(eventIdStr);
-        removedCount++;
-      } catch (e) {}
+    deletedEventIds.add(eventIdStr);
+    opsExecuted++;
+    if (opsExecuted % 5 === 0) {
+      await sleepMs(20);
     }
+    try {
+      await addTombstoneAsync(eventIdStr);
+      await removeTaskFromCalendarAsync(eventIdStr, { priority: 'high' });
+      removedCount++;
+    } catch (e) {}
+  }
 
-    clearedEventTaskIds.push(taskKey);
+  // Also scan the active calendar window for any unlinked or duplicate [Synced from TaskFlow]
+  // events whose title matches a task on this board (e.g. if calendarEventId was cleared or duplicated).
+  if (boardTitles.size > 0) {
+    try {
+      const windowData = prefetchedWindow || (await fetchCalendarWindowEventsAsync(settings));
+      const activeMap = windowData?.activeNativeEventMap;
+      if (activeMap && activeMap.size > 0) {
+        for (const [evId, ev] of activeMap.entries()) {
+          const idStr = String(evId).trim();
+          if (!idStr || deletedEventIds.has(idStr)) continue;
+          if (!isTaskFlowExportedEvent(ev)) continue;
+          const evTitle = normalizeCalendarTitle(ev?.title);
+          if (!evTitle || !boardTitles.has(evTitle)) continue;
+
+          deletedEventIds.add(idStr);
+          opsExecuted++;
+          if (opsExecuted % 5 === 0) {
+            await sleepMs(20);
+          }
+          try {
+            await addTombstoneAsync(idStr);
+            await removeTaskFromCalendarAsync(idStr, { priority: 'high' });
+            activeMap.delete(evId);
+            windowData?.activeNativeIds?.delete(evId);
+            removedCount++;
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
   }
 
   return { removedCount, clearedEventTaskIds };
@@ -986,9 +1111,8 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
 
     // 0. Automatic Cross-Board Duplicate Cleanup:
     // Removes previously imported `syncedFromCalendar` duplicates on 'main' when an authoritative
-    // task with the same (title, date) already exists on another board (payments, birthdays, etc.)
-    // or as a user-created task on 'main'.
-    const dedupPlan = buildTaskDeduplicationPlan(existingTasks);
+    // task with the same (title, date) or same title on an unsynced non-Main board already exists.
+    const dedupPlan = buildTaskDeduplicationPlan(existingTasks, boards, boardCalendarSync);
     const deletedTaskIds = [...dedupPlan.duplicateTaskIds];
     const deletedIdSet = new Set(deletedTaskIds.map(String));
     const clearedEventTaskIds = [];
@@ -1006,10 +1130,11 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
     // Clean up extra orphan [Synced from TaskFlow] calendar events left behind by duplicate imports
     for (const orphanCalId of dedupPlan.orphanCalendarEventIds) {
       const ev = activeNativeEventMap.get(String(orphanCalId));
-      if (ev && isTaskFlowExportedEvent(ev)) {
+      if (!ev || isTaskFlowExportedEvent(ev)) {
         addTombstoneAsync(orphanCalId).catch(() => {});
         removeTaskFromCalendarAsync(orphanCalId).catch(() => {});
         activeNativeEventMap.delete(String(orphanCalId));
+        activeNativeIds.delete(String(orphanCalId));
       }
     }
 
@@ -1107,6 +1232,18 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
         const existingLinkedTask = match.task;
         const linkedTaskId = existingLinkedTask.id || existingLinkedTask._id;
 
+        // If a previous sync mistakenly loopback-imported a [Synced from TaskFlow] event onto Main
+        // as a `syncedFromCalendar: true` task, purge both the bogus Main task and the orphan calendar event!
+        if (isFromTaskFlow && existingLinkedTask.syncedFromCalendar === true) {
+          addTombstoneAsync(eventCalId).catch(() => {});
+          removeTaskFromCalendarAsync(eventCalId).catch(() => {});
+          if (linkedTaskId && !deletedIdSet.has(String(linkedTaskId))) {
+            deletedTaskIds.push(linkedTaskId);
+            deletedIdSet.add(String(linkedTaskId));
+          }
+          continue;
+        }
+
         // If this linked task sits on a board whose calendar sync is OFF, remove the old
         // [Synced from TaskFlow] calendar event and clear calendarEventId without deleting the task!
         if (!isTaskEligibleForCalendarSync(existingLinkedTask, boards, boardCalendarSync)) {
@@ -1157,6 +1294,9 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
             addTombstoneAsync(eventCalId).catch(() => {});
             removeTaskFromCalendarAsync(eventCalId).catch(() => {});
           }
+          if (unlinkedId && unlinkedTask.calendarEventId) {
+            clearedEventTaskIds.push(unlinkedId);
+          }
           continue;
         }
 
@@ -1172,14 +1312,42 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
       }
 
       if (match.matchType === 'already_exists' && match.task) {
-        // A task with the same title & date already exists on payments/birthdays/events/main/etc.
+        // A task with the same title (& date or across board) already exists on another board or main.
         // Never create a duplicate copy on 'main'!
-        const existingCalId = match.task.calendarEventId ? String(match.task.calendarEventId).trim() : '';
-        if (isFromTaskFlow && existingCalId && existingCalId !== String(eventCalId)) {
-          // Extra duplicate event previously exported by TaskFlow -> clean it up from calendar
+        const matchedTask = match.task;
+        const matchedTaskId = matchedTask.id || matchedTask._id;
+        const existingCalId = matchedTask.calendarEventId ? String(matchedTask.calendarEventId).trim() : '';
+
+        if (!isTaskEligibleForCalendarSync(matchedTask, boards, boardCalendarSync)) {
+          if (isFromTaskFlow) {
+            addTombstoneAsync(eventCalId).catch(() => {});
+            removeTaskFromCalendarAsync(eventCalId).catch(() => {});
+          }
+          if (matchedTaskId && existingCalId) {
+            clearedEventTaskIds.push(matchedTaskId);
+          }
+          continue;
+        }
+
+        if (isFromTaskFlow && (
+          !existingCalId ||
+          existingCalId !== String(eventCalId) ||
+          extractTaskDateKey(matchedTask) !== dateStr
+        )) {
+          // Extra duplicate or stale event previously exported by TaskFlow -> clean it up from calendar
           addTombstoneAsync(eventCalId).catch(() => {});
           removeTaskFromCalendarAsync(eventCalId).catch(() => {});
         }
+        continue;
+      }
+
+      // CRITICAL LOOPBACK & ORPHAN GUARD:
+      // Events carrying `[Synced from TaskFlow]` were exported by TaskFlow, NEVER created externally in Google Calendar.
+      // If a `[Synced from TaskFlow]` event does not match any eligible local task (e.g. its task or board was deleted,
+      // or its board's calendar sync was turned OFF), delete it from Google Calendar and NEVER import it onto Main!
+      if (isFromTaskFlow) {
+        addTombstoneAsync(eventCalId).catch(() => {});
+        removeTaskFromCalendarAsync(eventCalId).catch(() => {});
         continue;
       }
 

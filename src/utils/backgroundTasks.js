@@ -61,7 +61,7 @@ export async function runHeadlessCalendarSyncIfDueAsync(themeState, tasks = [], 
 
     // 0. Prefetch calendar window ONCE & deduplicate previously imported main duplicates
     const prefetchedWindow = await fetchCalendarWindowEventsAsync(themeState);
-    const dedupPlan = buildTaskDeduplicationPlan(tasks);
+    const dedupPlan = buildTaskDeduplicationPlan(tasks, boards, themeState?.boardCalendarSync);
     const dupIdSet = new Set(dedupPlan.duplicateTaskIds.map(String));
     const transferMap = new Map(dedupPlan.linkTransfers.map(tr => [String(tr.taskId), tr.calendarEventId]));
 

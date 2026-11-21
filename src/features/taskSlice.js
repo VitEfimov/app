@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
-import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, removeBoardEventsFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, fetchCalendarWindowEventsAsync, buildTaskDeduplicationPlan, extractTaskDateKey, isDateStrInSyncWindow, getTaskCalendarFingerprint, isTaskEligibleForCalendarSync, resolveTaskBoard, getBoardCalendarSyncKey, MAX_EVENTS_PER_SYNC_BATCH, addTombstoneAsync, getCalendarSyncScheduleStateAsync, markCalendarSyncCompletedAsync, isScheduledCalendarSyncDue } from '../utils/calendarSync';
+import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, removeTaskEventsFromCalendarImmediateAsync, removeBoardEventsFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, fetchCalendarWindowEventsAsync, buildTaskDeduplicationPlan, extractTaskDateKey, getTaskMatchTitle, isMainBoardId, isDateStrInSyncWindow, getTaskCalendarFingerprint, isTaskEligibleForCalendarSync, resolveTaskBoard, getBoardCalendarSyncKey, MAX_EVENTS_PER_SYNC_BATCH, addTombstoneAsync, getCalendarSyncScheduleStateAsync, markCalendarSyncCompletedAsync, isScheduledCalendarSyncDue } from '../utils/calendarSync';
 import { setLastCalendarSyncAt, setBoardCalendarSync } from './themeSlice';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import { sanitizeId, sanitizeForStorage } from '../utils/securitySanitizer';
@@ -778,6 +778,16 @@ export const addTask = (payload) => async (dispatch, getState) => {
     const themeState = state.themeReducer;
     const isPremium = state.entitlementReducer?.isPremium;
     if (payload?.task) {
+        if (payload.isUndo && payload.task.calendarEventId) {
+            payload = {
+                ...payload,
+                task: {
+                    ...payload.task,
+                    calendarEventId: null,
+                    calendarSyncHash: null,
+                }
+            };
+        }
         if (isPremium && themeState?.defaultReminderEnabled && (!payload.task.reminder || payload.task.reminder === 'None')) {
             payload.task.reminder = themeState.defaultReminderTime || '15 min before';
         }
@@ -983,9 +993,12 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
     const taskId = payload?.taskId || (typeof payload === 'string' ? payload : null);
     const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id || t._id) === String(taskId)) : null;
 
-    // Immediately record tombstone if linked to calendar to prevent AppState resurrection
-    if (existingTask?.calendarEventId) {
-        addTombstoneAsync(existingTask.calendarEventId);
+    // Immediately record tombstone and delete from Google / Device Calendar (0ms delay)
+    if (existingTask) {
+        if (existingTask.calendarEventId) {
+            addTombstoneAsync(existingTask.calendarEventId);
+        }
+        removeTaskEventsFromCalendarImmediateAsync([existingTask], state.themeReducer).catch(() => {});
     }
 
     // 1. Optimistic UI update: Remove from Redux immediately (0ms delay)
@@ -1006,9 +1019,6 @@ export const deleteTask = (payload) => async (dispatch, getState) => {
                 if (!isRestored) {
                     if (existingTask) {
                         await cancelNotification(existingTask.notificationId, existingTask.id || existingTask._id);
-                        if (existingTask.calendarEventId) {
-                            await removeTaskFromCalendarAsync(existingTask.calendarEventId);
-                        }
                     } else {
                         await cancelNotification(null, taskId);
                     }
@@ -1030,12 +1040,15 @@ export const deleteMultipleTasks = (payload) => async (dispatch, getState) => {
 
     const state = getState();
     const idSet = new Set(taskIds.map(String));
-    const existingTasks = (state.taskReducer.tasks || []).filter(t => t && idSet.has(String(t.id)));
+    const existingTasks = (state.taskReducer.tasks || []).filter(t => t && idSet.has(String(t.id || t._id)));
 
     for (const t of existingTasks) {
         if (t.calendarEventId) {
             addTombstoneAsync(t.calendarEventId);
         }
+    }
+    if (existingTasks.length > 0) {
+        removeTaskEventsFromCalendarImmediateAsync(existingTasks, state.themeReducer).catch(() => {});
     }
 
     // 1. Single batched optimistic UI update
@@ -1046,17 +1059,15 @@ export const deleteMultipleTasks = (payload) => async (dispatch, getState) => {
     persistTasksToStorage(remainingTasks, getState);
     syncRecurringAutomations(getState);
 
-    // 3. Background async cancellation of OS notifications & calendar events (with Undo grace check)
+    // 3. Background async cancellation of OS notifications (with Undo grace check)
     setTimeout(async () => {
         try {
             const currentTasks = getState().taskReducer.tasks || [];
-            const currentIds = new Set(currentTasks.map(t => t && String(t.id)));
+            const currentIds = new Set(currentTasks.map(t => t && String(t.id || t._id)));
             for (const existing of existingTasks) {
-                if (!currentIds.has(String(existing.id))) {
-                    await cancelNotification(existing.notificationId, existing.id);
-                    if (existing.calendarEventId) {
-                        await removeTaskFromCalendarAsync(existing.calendarEventId);
-                    }
+                const effId = existing.id || existing._id;
+                if (!currentIds.has(String(effId))) {
+                    await cancelNotification(existing.notificationId, effId);
                 }
             }
         } catch (e) {}
@@ -1074,14 +1085,35 @@ export const deleteMultipleTasks = (payload) => async (dispatch, getState) => {
 export const deleteTasksByBoard = (payload) => async (dispatch, getState) => {
     const state = getState();
     const tasks = state.taskReducer.tasks || [];
-    let targetId = payload?.boardId || (typeof payload === 'string' ? payload : null);
-    const affected = targetId ? tasks.filter(t => t && String(t.boardId || t.board_id) === String(targetId)) : [];
+    let targetId = null;
+    let targetName = null;
+    if (typeof payload === 'object' && payload !== null) {
+        const bObj = (payload.boardId && typeof payload.boardId === 'object') ? payload.boardId : payload;
+        targetId = bObj.boardId || bObj.id || bObj._id || null;
+        targetName = bObj.boardName || bObj.name || null;
+        if (!targetId && typeof bObj === 'string') targetId = bObj;
+    } else if (payload) {
+        targetId = String(payload);
+    }
 
-    // Record tombstones for any linked calendar events before deletion
+    const affected = tasks.filter(t => {
+        if (!t) return false;
+        const bId = t.boardId || t.board_id;
+        if (!bId || bId === 'main' || bId === 'tasks') return false;
+        const strBId = String(bId);
+        if (targetId && strBId === String(targetId)) return true;
+        if (targetName && strBId.toLowerCase() === String(targetName).toLowerCase()) return true;
+        return false;
+    });
+
+    // Record tombstones & immediately remove all calendar events for this board (including unlinked title matches)
     for (const t of affected) {
         if (t?.calendarEventId) {
             addTombstoneAsync(t.calendarEventId);
         }
+    }
+    if (affected.length > 0) {
+        removeBoardEventsFromCalendarAsync(affected, state.themeReducer).catch(() => {});
     }
 
     // 1. Optimistic UI update
@@ -1091,15 +1123,12 @@ export const deleteTasksByBoard = (payload) => async (dispatch, getState) => {
     persistTasksToStorage(newTasks, getState);
     syncRecurringAutomations(getState);
 
-    // 2. Background async cancellation of OS notifications & calendar events
+    // 2. Background async cancellation of OS notifications
     if (affected.length > 0) {
         setTimeout(async () => {
             for (const t of affected) {
                 try {
-                    await cancelNotification(t.notificationId, t.id);
-                    if (t.calendarEventId) {
-                        await removeTaskFromCalendarAsync(t.calendarEventId);
-                    }
+                    await cancelNotification(t.notificationId, t.id || t._id);
                 } catch (e) {}
             }
         }, 0);
@@ -1465,10 +1494,21 @@ export const batchSyncCalendarTasks = () => async (dispatch, getState) => {
         const prefetchedWindow = await fetchCalendarWindowEventsAsync(themeState);
 
         // 0b. Deduplicate any previously imported 'main' calendar copies that duplicate tasks on
-        //     other boards (payments, birthdays, events, etc.) BEFORE exporting.
-        const dedupPlan = buildTaskDeduplicationPlan(tasks);
+        //     other boards (payments, birthdays, events, grocery, habits, etc.) BEFORE exporting.
+        const dedupPlan = buildTaskDeduplicationPlan(tasks, boards, themeState?.boardCalendarSync);
         const dupIdSet = new Set(dedupPlan.duplicateTaskIds.map(String));
         const transferMap = new Map(dedupPlan.linkTransfers.map(tr => [String(tr.taskId), tr.calendarEventId]));
+
+        for (const orphanCalId of dedupPlan.orphanCalendarEventIds) {
+            addTombstoneAsync(orphanCalId).catch(() => {});
+            removeTaskFromCalendarAsync(orphanCalId).catch(() => {});
+            if (prefetchedWindow?.activeNativeEventMap) {
+                prefetchedWindow.activeNativeEventMap.delete(String(orphanCalId));
+            }
+            if (prefetchedWindow?.activeNativeIds) {
+                prefetchedWindow.activeNativeIds.delete(String(orphanCalId));
+            }
+        }
 
         const tasksBeforeExport = tasks
             .filter(t => {
@@ -1650,9 +1690,30 @@ export const toggleBoardCalendarSync = ({ boardId, enabled }) => async (dispatch
 
     try {
         if (!enabled) {
-            const { removedCount = 0, clearedEventTaskIds = [] } = await removeBoardEventsFromCalendarAsync(boardTasks, themeState);
-            if (clearedEventTaskIds.length > 0) {
-                dispatch(batchCalendarSyncComplete({ clearedEventTaskIds }));
+            // Also find any bogus `syncedFromCalendar: true` duplicate copies sitting on Main
+            // whose normalized title matches a task on the board being turned OFF
+            const boardTitles = new Set(boardTasks.map(getTaskMatchTitle).filter(Boolean));
+            const mainDuplicates = canonicalKey !== 'main'
+                ? allTasks.filter(t => {
+                    if (!t) return false;
+                    const tid = t.id || t._id;
+                    const isCalImport = t.syncedFromCalendar === true || (tid && String(tid).startsWith('cal_'));
+                    if (!isCalImport || !isMainBoardId(t.boardId || t.board_id)) return false;
+                    const norm = getTaskMatchTitle(t);
+                    return Boolean(norm && boardTitles.has(norm));
+                })
+                : [];
+            const mainDupIds = mainDuplicates.map(t => t.id || t._id).filter(Boolean);
+
+            const { removedCount = 0, clearedEventTaskIds = [] } = await removeBoardEventsFromCalendarAsync(
+                [...boardTasks, ...mainDuplicates],
+                themeState
+            );
+            if (clearedEventTaskIds.length > 0 || mainDupIds.length > 0) {
+                dispatch(batchCalendarSyncComplete({
+                    clearedEventTaskIds,
+                    deletedTaskIds: mainDupIds
+                }));
                 persistTasksToStorage(getState().taskReducer.tasks, getState);
             }
             return { boardId: canonicalKey, enabled: false, syncedCount: 0, removedCount };
