@@ -241,6 +241,12 @@ const taskSlice = createSlice({
             const task = { ...rawTask };
             if (!task.id && task._id) task.id = task._id;
             if (!task.boardId && task.board_id) task.boardId = task.board_id;
+            if (!task.creationDate) {
+                task.creationDate = task.createdAt || new Date().toISOString();
+            }
+            if (!task.createdAt) {
+                task.createdAt = task.creationDate;
+            }
             if (!task.dateString || !/^\d{4}-\d{2}-\d{2}$/.test(String(task.dateString))) {
                 const extractedDate = extractTaskDateKey(task);
                 if (extractedDate) {

@@ -34,15 +34,29 @@ const IconClose = ({ color = '#888', size = 18 }) => (
 );
 
 /**
+ * Extracts a stable numeric creation timestamp (ms) from a Quick List task.
+ * Falls back to parsing a leading epoch timestamp from IDs like "1763699123456_a1b2".
+ */
+export function extractQuickListTimestamp(task) {
+  if (!task) return 0;
+  const parsed = Date.parse(task.creationDate || task.createdAt || '');
+  if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+  const rawId = String(task.id || task._id || '');
+  const leadingNum = parseInt(rawId, 10);
+  if (!Number.isNaN(leadingNum) && leadingNum > 1000000000000) return leadingNum;
+  return 0;
+}
+
+/**
  * Pure helper to order Quick List items stably in creation order
- * so checked items stay right in place (just like Subtasks in Edit Task).
+ * so checked and edited items stay right in place (just like Subtasks in Edit Task).
  */
 export function sortQuickListItems(tasks = []) {
   return [...(tasks || [])]
     .filter(Boolean)
     .sort((a, b) => {
-      const timeA = Date.parse(a.creationDate || a.createdAt || '') || Number(a.id) || 0;
-      const timeB = Date.parse(b.creationDate || b.createdAt || '') || Number(b.id) || 0;
+      const timeA = extractQuickListTimestamp(a);
+      const timeB = extractQuickListTimestamp(b);
       if (timeA !== timeB) return timeA - timeB;
       return String(a.id || a._id || '').localeCompare(String(b.id || b._id || ''));
     });
@@ -53,12 +67,11 @@ const QuickListRow = React.memo(({
   accentColor,
   colors,
   placeholder,
-  autoFocus,
   inputRefCallback,
+  onRowLayout,
   onFocusItem,
   onToggle,
   onSaveText,
-  onSubmitNext,
   onDelete,
   onBlurEmpty,
 }) => {
@@ -81,18 +94,6 @@ const QuickListRow = React.memo(({
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
-
-  const flushText = useCallback((val) => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-    const trimmed = val.trim();
-    if (trimmed !== lastSavedRef.current) {
-      lastSavedRef.current = trimmed;
-      onSaveText(itemId, trimmed);
-    }
-  }, [itemId, onSaveText]);
 
   const handleChangeText = (text) => {
     setDraftText(text);
@@ -136,12 +137,16 @@ const QuickListRow = React.memo(({
       lastSavedRef.current = trimmed;
       onSaveText(itemId, trimmed);
     }
-    onSubmitNext();
+    // Pressing Done/Enter on keyboard finishes editing this item in place (just like Subtasks in Edit Task)
+    // and never creates a new task or jumps to the bottom.
   };
 
   return (
     <View
       testID={`quick_list_item_${itemId}`}
+      onLayout={() => {
+        if (onRowLayout) onRowLayout(itemId);
+      }}
       style={[
         styles.itemRow,
         { borderBottomColor: colors.borderColor || colors.outlineVariant },
@@ -189,10 +194,8 @@ const QuickListRow = React.memo(({
         onSubmitEditing={handleSubmit}
         placeholder={placeholder}
         placeholderTextColor={colors.onSurfaceVariant || colors.textSecondary}
-        autoFocus={autoFocus}
         returnKeyType="done"
-        blurOnSubmit={false}
-        submitBehavior="submit"
+        blurOnSubmit={true}
       />
 
       <TouchableOpacity
@@ -227,8 +230,9 @@ export default function QuickListBoard({
   onClearCompleted,
 }) {
   const { t } = useTranslation();
-  const [focusItemId, setFocusItemId] = useState(null);
   const inputRefs = useRef(new Map());
+  const laidOutRowsRef = useRef(new Set());
+  const contentSizeReadyForIdRef = useRef(null);
   const scrollRef = useRef(null);
   const focusedItemIdRef = useRef(null);
   const pendingFocusIdRef = useRef(null);
@@ -256,23 +260,68 @@ export default function QuickListBoard({
   const clearBtnTextColor = colors.onErrorContainer || colors.danger;
   const progressTrackBg = colors.surfaceContainerHighest || colors.surfaceContainerHigh;
 
+  const scrollListToEnd = useCallback((animated = false) => {
+    if (scrollRef.current && typeof scrollRef.current.scrollToEnd === 'function') {
+      scrollRef.current.scrollToEnd({ animated });
+    }
+  }, []);
+
+  /**
+   * Commits focus to a newly added item ONLY AFTER both its native row layout (`onLayout`)
+   * and the ScrollView's content size (`onContentSizeChange`) have updated, and AFTER
+   * positioning the ScrollView at the bottom with `animated: false`.
+   * This prevents Android's `ScrollView.requestChildFocus()` from seeing (0, 0) un-laid-out
+   * bounds and jumping the ScrollView to the top of the list.
+   */
+  const commitPendingNewItemFocus = useCallback((force = false) => {
+    const targetId = pendingFocusIdRef.current;
+    if (!targetId) return;
+    const isRowLaidOut = laidOutRowsRef.current.has(targetId);
+    const isContentReady = contentSizeReadyForIdRef.current === targetId;
+    if (!force && (!isRowLaidOut || !isContentReady)) {
+      return;
+    }
+    const input = inputRefs.current.get(targetId);
+    if (!input) return;
+
+    pendingScrollToEndRef.current = false;
+    contentSizeReadyForIdRef.current = null;
+
+    // 1. Position ScrollView at the bottom synchronously so the new row is already inside
+    //    the visible viewport before requesting focus.
+    scrollListToEnd(false);
+
+    // 2. Focus on the next frame so Android requestChildFocus sees scrollDelta = 0 (no jump!)
+    const focusAfterScroll = () => {
+      const latestInput = inputRefs.current.get(targetId);
+      if (latestInput && typeof latestInput.focus === 'function') {
+        latestInput.focus();
+      }
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(focusAfterScroll);
+    } else {
+      setTimeout(focusAfterScroll, 16);
+    }
+  }, [scrollListToEnd]);
+
   const registerInputRef = useCallback((id, node) => {
     const idStr = String(id);
     if (node) {
       inputRefs.current.set(idStr, node);
-      if (pendingFocusIdRef.current === idStr && typeof node.focus === 'function') {
-        node.focus();
-      }
     } else {
       inputRefs.current.delete(idStr);
+      laidOutRowsRef.current.delete(idStr);
     }
   }, []);
 
-  const scrollListToEnd = useCallback(() => {
-    if (scrollRef.current && typeof scrollRef.current.scrollToEnd === 'function') {
-      scrollRef.current.scrollToEnd({ animated: true });
+  const handleRowLayout = useCallback((id) => {
+    const idStr = String(id);
+    laidOutRowsRef.current.add(idStr);
+    if (pendingFocusIdRef.current === idStr) {
+      commitPendingNewItemFocus(false);
     }
-  }, []);
+  }, [commitPendingNewItemFocus]);
 
   useEffect(() => {
     return () => {
@@ -281,26 +330,29 @@ export default function QuickListBoard({
     };
   }, []);
 
+  // Automatically clean up any stale unfocused empty rows stuck in the middle of the list
   useEffect(() => {
-    if (!focusItemId) return;
-    const targetId = String(focusItemId);
-    const immediateInput = inputRefs.current.get(targetId);
-    if (immediateInput && typeof immediateInput.focus === 'function') {
-      immediateInput.focus();
-    }
-    const timer = setTimeout(() => {
-      if (pendingFocusIdRef.current === targetId) {
-        const input = inputRefs.current.get(targetId);
-        if (input && typeof input.focus === 'function') {
-          input.focus();
-        }
-        pendingFocusIdRef.current = null;
+    const now = Date.now();
+    for (let i = 0; i < orderedItems.length; i++) {
+      const it = orderedItems[i];
+      if (!it) continue;
+      const idStr = String(it.id || it._id);
+      const hasText = Boolean(String(it.taskname || '').trim());
+      if (hasText) continue;
+      if (
+        idStr === focusedItemIdRef.current ||
+        idStr === pendingFocusIdRef.current ||
+        emptyBlurTimersRef.current.has(idStr)
+      ) {
+        continue;
       }
-      scrollListToEnd();
-      setFocusItemId(null);
-    }, 45);
-    return () => clearTimeout(timer);
-  }, [focusItemId, orderedItems.length, scrollListToEnd]);
+      const isMiddleItem = i < orderedItems.length - 1;
+      const ageMs = now - extractQuickListTimestamp(it);
+      if (isMiddleItem || ageMs > 2500) {
+        onDeleteItem(idStr);
+      }
+    }
+  }, [orderedItems, onDeleteItem]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -308,12 +360,14 @@ export default function QuickListBoard({
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const sub = Keyboard.addListener(showEvent, () => {
       const focusedId = focusedItemIdRef.current;
-      if (pendingScrollToEndRef.current || (focusedId && focusedId === lastItemIdRef.current)) {
+      const pendingId = pendingFocusIdRef.current;
+      // Only keep the bottom in view if the user is actively focused on the very last item.
+      // Never scroll to the bottom when the user is editing an existing item higher in the list!
+      if ((pendingId && pendingId === lastItemIdRef.current) || (focusedId && focusedId === lastItemIdRef.current)) {
         if (scrollTimer) clearTimeout(scrollTimer);
         scrollTimer = setTimeout(() => {
-          pendingScrollToEndRef.current = false;
-          scrollListToEnd();
-        }, 120);
+          scrollListToEnd(false);
+        }, 60);
       }
     });
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
@@ -347,14 +401,12 @@ export default function QuickListBoard({
     if (now < suppressFocusBounceUntilRef.current) {
       const targetId = pendingFocusIdRef.current;
       if (targetId && idStr !== targetId) {
-        // Android wrapped focus to first item before new last row claimed focus -> redirect immediately
-        const targetNode = inputRefs.current.get(targetId);
+        // Android attempted to focus another item before the newly added last row claimed focus
         const strayNode = inputRefs.current.get(idStr);
-        if (targetNode && typeof targetNode.focus === 'function') {
-          targetNode.focus();
-        } else if (strayNode && typeof strayNode.blur === 'function') {
+        if (strayNode && typeof strayNode.blur === 'function') {
           strayNode.blur();
         }
+        commitPendingNewItemFocus(true);
         return;
       }
       if (!targetId) {
@@ -368,29 +420,62 @@ export default function QuickListBoard({
     }
     if (pendingFocusIdRef.current === idStr) {
       pendingFocusIdRef.current = null;
+    } else if (pendingFocusIdRef.current && pendingFocusIdRef.current !== idStr) {
+      // User explicitly tapped a different existing item
+      pendingFocusIdRef.current = null;
+      pendingScrollToEndRef.current = false;
     }
     focusedItemIdRef.current = idStr;
-  }, []);
+  }, [commitPendingNewItemFocus]);
 
   const handleAddNewItem = useCallback(() => {
     HapticHelper.trigger('light');
+
+    // If the trailing item is already empty, reuse and focus it in place instead of
+    // deleting and recreating a second empty item (which causes a layout height bounce).
+    if (orderedItems.length > 0) {
+      const lastItem = orderedItems[orderedItems.length - 1];
+      const lastId = String(lastItem.id || lastItem._id);
+      if (!String(lastItem.taskname || '').trim()) {
+        if (emptyBlurTimersRef.current.has(lastId)) {
+          clearTimeout(emptyBlurTimersRef.current.get(lastId));
+          emptyBlurTimersRef.current.delete(lastId);
+        }
+        pendingFocusIdRef.current = lastId;
+        focusedItemIdRef.current = lastId;
+        suppressFocusBounceUntilRef.current = Date.now() + 450;
+        scrollListToEnd(false);
+        const existingInput = inputRefs.current.get(lastId);
+        if (existingInput && typeof existingInput.focus === 'function') {
+          existingInput.focus();
+        }
+        return;
+      }
+    }
+
     const createdId = onAddItem();
     if (createdId) {
       const idStr = String(createdId);
       pendingFocusIdRef.current = idStr;
       focusedItemIdRef.current = idStr;
-      suppressFocusBounceUntilRef.current = Date.now() + 450;
+      suppressFocusBounceUntilRef.current = Date.now() + 500;
       pendingScrollToEndRef.current = true;
-      setFocusItemId(idStr);
+      contentSizeReadyForIdRef.current = null;
+      // Fallback timer in case onContentSizeChange/onLayout coalesces on web or fast renders
+      setTimeout(() => {
+        if (pendingFocusIdRef.current === idStr) {
+          commitPendingNewItemFocus(true);
+        }
+      }, 90);
     }
-  }, [onAddItem]);
+  }, [onAddItem, orderedItems, scrollListToEnd, commitPendingNewItemFocus]);
 
   const handleContentSizeChange = useCallback(() => {
-    if (pendingScrollToEndRef.current) {
-      pendingScrollToEndRef.current = false;
-      scrollListToEnd();
+    if (pendingScrollToEndRef.current && pendingFocusIdRef.current) {
+      contentSizeReadyForIdRef.current = pendingFocusIdRef.current;
+      commitPendingNewItemFocus(false);
     }
-  }, [scrollListToEnd]);
+  }, [commitPendingNewItemFocus]);
 
   const handleBlurEmpty = useCallback((itemId, options = {}) => {
     const idStr = String(itemId);
@@ -518,12 +603,11 @@ export default function QuickListBoard({
                 accentColor={accentColor}
                 colors={colors}
                 placeholder={t('List item...') || 'List item...'}
-                autoFocus={focusItemId === itemId}
                 inputRefCallback={registerInputRef}
+                onRowLayout={handleRowLayout}
                 onFocusItem={handleFocusItem}
                 onToggle={onToggleItem}
                 onSaveText={onUpdateItemText}
-                onSubmitNext={handleAddNewItem}
                 onDelete={onDeleteItem}
                 onBlurEmpty={handleBlurEmpty}
               />

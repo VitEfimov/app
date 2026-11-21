@@ -3251,12 +3251,14 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const boardScreenSrc = fs.readFileSync(path.resolve('src/screens/BoardScreen.js'), 'utf8');
       assert.match(boardScreenSrc, /dispatch\(deleteTasksByBoard\(\{\s*boardId:\s*targetBoardId,\s*boardName:\s*targetBoardName\s*\}\)\);\s*dispatch\(deleteBoardAsync/, 'BoardScreen must dispatch deleteTasksByBoard BEFORE deleteBoardAsync so tasks are not wiped before calendar deletion');
 
-      // 6. Quick List focus stability: submitBehavior="submit", returnKeyType="done", focus bounce suppression, deferred empty blur
+      // 6. Quick List focus stability: returnKeyType="done", blurOnSubmit={true}, no new task on Enter, post-layout focus on + Add item
       const qlSrc = fs.readFileSync(path.resolve('src/components/QuickListBoard.js'), 'utf8');
-      assert.match(qlSrc, /returnKeyType="done"/, 'QuickListRow TextInput must use returnKeyType="done" to prevent Android IME_ACTION_NEXT focus wrap-around to first item');
-      assert.match(qlSrc, /submitBehavior="submit"/, 'QuickListRow TextInput must use submitBehavior="submit" on RN 0.76 Fabric');
-      assert.match(qlSrc, /pendingFocusIdRef/, 'QuickListBoard must track pendingFocusIdRef for instant focus handoff to new last item');
-      assert.match(qlSrc, /suppressFocusBounceUntilRef/, 'QuickListBoard must suppress Android focus bounce to first task on Enter and keyboard close');
+      assert.match(qlSrc, /returnKeyType="done"/, 'QuickListRow TextInput must use returnKeyType="done" to prevent Android IME_ACTION_NEXT focus wrap-around');
+      assert.match(qlSrc, /blurOnSubmit=\{true\}/, 'QuickListRow TextInput must blur on submit (Enter) rather than opening a new task at the bottom');
+      assert.doesNotMatch(qlSrc, /onSubmitNext/, 'QuickListRow must not open a new task when pressing Enter on an item');
+      assert.match(qlSrc, /commitPendingNewItemFocus/, 'QuickListBoard must wait for row layout + content size before focusing a newly added item');
+      assert.match(qlSrc, /pendingFocusIdRef/, 'QuickListBoard must track pendingFocusIdRef for post-layout focus handoff');
+      assert.match(qlSrc, /suppressFocusBounceUntilRef/, 'QuickListBoard must suppress Android focus bounce to first task on keyboard close');
     });
   });
 });
