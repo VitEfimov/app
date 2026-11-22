@@ -246,3 +246,83 @@ export async function isScreenSecurityEnabled(): Promise<boolean> {
   }
 }
 
+export function hasNativeVoiceNoteCapture(): boolean {
+  return Boolean(ExpoTaskAlarm && typeof ExpoTaskAlarm.startVoiceNoteCapture === 'function');
+}
+
+export async function startVoiceNoteCapture(languageTag?: string): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.startVoiceNoteCapture !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.startVoiceNoteCapture(languageTag || null);
+  } catch (e) {
+    console.warn('startVoiceNoteCapture failed:', e);
+    return false;
+  }
+}
+
+export async function pauseVoiceNoteCapture(): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.pauseVoiceNoteCapture !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.pauseVoiceNoteCapture();
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function resumeVoiceNoteCapture(): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.resumeVoiceNoteCapture !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.resumeVoiceNoteCapture();
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function stopVoiceNoteCapture(): Promise<Record<string, any> | null> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.stopVoiceNoteCapture !== 'function') return null;
+  try {
+    return await ExpoTaskAlarm.stopVoiceNoteCapture();
+  } catch (e) {
+    console.warn('stopVoiceNoteCapture failed:', e);
+    return null;
+  }
+}
+
+export async function cancelVoiceNoteCapture(): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.cancelVoiceNoteCapture !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.cancelVoiceNoteCapture();
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function startSpeechRecognition(languageTag?: string): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.startSpeechRecognition !== 'function') return false;
+  try {
+    return await ExpoTaskAlarm.startSpeechRecognition(languageTag || null);
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function stopSpeechRecognition(): Promise<string> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.stopSpeechRecognition !== 'function') return '';
+  try {
+    return (await ExpoTaskAlarm.stopSpeechRecognition()) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+export function addVoiceNoteListener(listener: (event: Record<string, any>) => void): { remove: () => void } {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.addListener !== 'function') {
+    return { remove: () => {} };
+  }
+  try {
+    return ExpoTaskAlarm.addListener('onVoiceNoteEvent', listener);
+  } catch (e) {
+    return { remove: () => {} };
+  }
+}
+

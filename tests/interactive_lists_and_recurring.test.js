@@ -3287,6 +3287,42 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const detailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
       assert.match(detailsSrc, /saveBtnScaleAnim/, 'TaskDetailsModal must animate Save button with native-driver scale feedback');
       assert.match(detailsSrc, /deferredNotificationJob/, 'TaskDetailsModal must defer notification scheduling off the synchronous Save/close UI path');
+
+      // 9. Voice Recorder & Live Voice Transcription in Notes & Attachments block
+      const voiceHelperSrc = fs.readFileSync(path.resolve('src/utils/voiceRecorderHelper.js'), 'utf8');
+      assert.match(voiceHelperSrc, /export function normalizeMeteringToLevel/, 'voiceRecorderHelper must export normalizeMeteringToLevel');
+      assert.match(voiceHelperSrc, /export function downsampleWaveform/, 'voiceRecorderHelper must export downsampleWaveform');
+      assert.match(voiceHelperSrc, /export function formatVoiceDuration/, 'voiceRecorderHelper must export formatVoiceDuration');
+      assert.match(voiceHelperSrc, /export function mergeTranscriptIntoNotes/, 'voiceRecorderHelper must export mergeTranscriptIntoNotes');
+      assert.match(voiceHelperSrc, /export function createVoiceRecorderSession/, 'voiceRecorderHelper must export createVoiceRecorderSession');
+      assert.match(voiceHelperSrc, /export function createStandaloneDictationSession/, 'voiceRecorderHelper must export createStandaloneDictationSession');
+
+      const voiceNativeKtSrc = fs.readFileSync(
+        path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/VoiceNoteManager.kt'),
+        'utf8'
+      );
+      assert.match(voiceNativeKtSrc, /SpeechRecognizer\.createSpeechRecognizer/, 'VoiceNoteManager.kt must integrate Android SpeechRecognizer for live transcription');
+      assert.match(voiceNativeKtSrc, /writeWavFromPcm/, 'VoiceNoteManager.kt must encode recorded PCM audio to a valid WAV file');
+
+      assert.match(detailsSrc, /testID="voice_recorder_active_panel"/, 'TaskDetailsModal must render inline live voice recorder panel inside Notes & attachments card');
+      assert.match(detailsSrc, /testID="record_voice_note_btn"/, 'TaskDetailsModal must render quick Voice note button inside Notes & attachments card');
+      assert.match(detailsSrc, /testID="dictate_to_notes_btn"/, 'TaskDetailsModal must render quick Dictate button inside Notes & attachments card');
+      assert.match(detailsSrc, /handleTogglePlayAudio/, 'TaskDetailsModal must support playing saved voice note attachments inline with waveform scrubber');
+      assert.match(detailsSrc, /handleCycleAudioSpeed/, 'TaskDetailsModal must support cycling 1x / 1.5x / 2x playback speed on saved voice notes');
+
+      const voiceMod = loadTranspiledModule(path.resolve('src/utils/voiceRecorderHelper.js'), {
+        'react-native': { Platform: { OS: 'android' } },
+        'expo-av': { Audio: {} },
+        'expo-file-system': {},
+        '../../modules/expo-task-alarm': { hasNativeVoiceNoteCapture: () => true },
+      });
+      assert.strictEqual(voiceMod.formatVoiceDuration(0), '0:00');
+      assert.strictEqual(voiceMod.formatVoiceDuration(65000), '1:05');
+      assert.strictEqual(
+        voiceMod.mergeTranscriptIntoNotes('Existing note', 'Spoken transcript line'),
+        'Existing note\nSpoken transcript line'
+      );
+      assert.strictEqual(voiceMod.downsampleWaveform([-50, -30, -10, 0], 12).length, 12);
     });
   });
 });

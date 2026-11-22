@@ -39,8 +39,17 @@ import { A11yHelper } from '../utils/a11yHelper';
 import { HapticHelper } from '../utils/hapticHelper';
 import { extractTaskAmountFromTitle, getCurrencyMeta, isPriceBoardType, parseLocalizedNumber, resolveCurrencyCode, extractTaskAmountAndCurrency, convertCurrency, formatCurrency, CURRENCIES, SYMBOL_TO_CURRENCY_CODE } from '../utils/currencyHelper';
 import { computeHabitStats, isHabitTask, normalizeHabitSchedule } from '../utils/habitHelper';
+import { Audio } from 'expo-av';
+import {
+  DEFAULT_WAVEFORM_BARS,
+  downsampleWaveform,
+  formatVoiceDuration,
+  mergeTranscriptIntoNotes,
+  createVoiceRecorderSession,
+  createStandaloneDictationSession,
+} from '../utils/voiceRecorderHelper';
 
-const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style }, ref) => {
+const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placeholder, placeholderTextColor, style, onTextChange }, ref) => {
   const [text, setText] = useState(initialValue || '');
 
   useEffect(() => {
@@ -48,8 +57,26 @@ const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placehol
   }, [initialValue]);
 
   React.useImperativeHandle(ref, () => ({
-    getText: () => text
+    getText: () => text,
+    setText: (nextVal) => {
+      const normalized = typeof nextVal === 'string' ? nextVal : '';
+      setText(normalized);
+      if (onTextChange) onTextChange(normalized);
+    },
+    appendText: (chunk) => {
+      if (!chunk || !String(chunk).trim()) return;
+      setText((prev) => {
+        const merged = mergeTranscriptIntoNotes(prev, chunk);
+        if (onTextChange) onTextChange(merged);
+        return merged;
+      });
+    },
   }));
+
+  const handleChangeText = (val) => {
+    setText(val);
+    if (onTextChange) onTextChange(val);
+  };
 
   return (
     <TextInput
@@ -58,7 +85,7 @@ const MemoizedNotesInput = React.memo(React.forwardRef(({ initialValue, placehol
       accessibilityLabel="Task Notes"
       style={[{ outlineStyle: 'none', outlineWidth: 0, borderWidth: 0, backgroundColor: 'transparent' }, style]}
       value={text}
-      onChangeText={setText}
+      onChangeText={handleChangeText}
       placeholder={placeholder}
       placeholderTextColor={placeholderTextColor}
       multiline={true}
@@ -214,6 +241,27 @@ const IconChevronDown = ({ color, isCollapsed }) => (
   </Svg>
 );
 
+const IconMic = ({ color, size = 18 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+    <Path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <Path d="M12 19v4M8 23h8" />
+  </Svg>
+);
+
+const IconPlay = ({ color, size = 16 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M5 3l14 9-14 9V3z" />
+  </Svg>
+);
+
+const IconPause = ({ color, size = 16 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="6" y="4" width="4" height="16" rx="1" />
+    <Rect x="14" y="4" width="4" height="16" rx="1" />
+  </Svg>
+);
+
 const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible, onClose }) {
   const { colors, isDark } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -271,6 +319,74 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
   const [isSaving, setIsSaving] = useState(false);
   const saveBtnScaleAnim = useRef(new Animated.Value(1)).current;
   const saveCardFadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Voice Recorder, Live Speech-to-Text Transcription & Audio Player States
+  const [voiceRecordState, setVoiceRecordState] = useState('idle'); // 'idle' | 'recording' | 'paused'
+  const [voiceRecordDurationMs, setVoiceRecordDurationMs] = useState(0);
+  const [voiceWaveformBars, setVoiceWaveformBars] = useState(() => Array.from({ length: DEFAULT_WAVEFORM_BARS }, () => 0.12));
+  const [voiceLiveTranscript, setVoiceLiveTranscript] = useState('');
+  const [isDictatingOnly, setIsDictatingOnly] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState(null);
+  const [audioPlaybackPosMs, setAudioPlaybackPosMs] = useState(0);
+  const [audioPlaybackDurMs, setAudioPlaybackDurMs] = useState(0);
+  const [audioPlaybackRate, setAudioPlaybackRate] = useState(1);
+
+  const voiceSessionRef = useRef(null);
+  const dictationSessionRef = useRef(null);
+  const preRecordNotesRef = useRef('');
+  const activeSoundRef = useRef(null);
+  const recPulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (voiceRecordState === 'recording' || isDictatingOnly) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(recPulseAnim, { toValue: 0.35, duration: 550, useNativeDriver: true }),
+          Animated.timing(recPulseAnim, { toValue: 1, duration: 550, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      recPulseAnim.setValue(1);
+    }
+  }, [voiceRecordState, isDictatingOnly, recPulseAnim]);
+
+  const cleanupVoiceAndAudioSessions = async () => {
+    try {
+      if (voiceSessionRef.current) {
+        await voiceSessionRef.current.cancel();
+        voiceSessionRef.current = null;
+      }
+    } catch (_) {}
+    try {
+      if (dictationSessionRef.current) {
+        await dictationSessionRef.current.stop();
+        dictationSessionRef.current = null;
+      }
+    } catch (_) {}
+    try {
+      if (activeSoundRef.current) {
+        await activeSoundRef.current.unloadAsync();
+        activeSoundRef.current = null;
+      }
+    } catch (_) {}
+    setVoiceRecordState('idle');
+    setVoiceRecordDurationMs(0);
+    setVoiceLiveTranscript('');
+    setIsDictatingOnly(false);
+    setPlayingAudioId(null);
+    setAudioPlaybackPosMs(0);
+  };
+
+  useEffect(() => {
+    if (!isVisible) {
+      cleanupVoiceAndAudioSessions();
+    }
+    return () => {
+      cleanupVoiceAndAudioSessions();
+    };
+  }, [isVisible]);
 
   // Security & Privacy Shield: Instantly close modal if device locks to prevent background leaks
   useEffect(() => {
@@ -1402,8 +1518,309 @@ useEffect(() => {
   };
 
 
-  const removeAttachment = (id) => {
+  const removeAttachment = async (id) => {
+    if (playingAudioId === id && activeSoundRef.current) {
+      try {
+        await activeSoundRef.current.stopAsync();
+        await activeSoundRef.current.unloadAsync();
+      } catch (_) {}
+      activeSoundRef.current = null;
+      setPlayingAudioId(null);
+      setAudioPlaybackPosMs(0);
+    }
     setAttachments(attachments.filter(a => a.id !== id));
+  };
+
+  const getSpeechLocaleTag = () => {
+    const lang = i18n?.language || 'en';
+    const map = {
+      en: 'en-US',
+      ru: 'ru-RU',
+      es: 'es-ES',
+      de: 'de-DE',
+      fr: 'fr-FR',
+      it: 'it-IT',
+      ja: 'ja-JP',
+      ko: 'ko-KR',
+      zh: 'zh-CN',
+      hi: 'hi-IN',
+    };
+    return map[lang] || lang;
+  };
+
+  const handleStartVoiceRecording = async () => {
+    try {
+      if (isDictatingOnly && dictationSessionRef.current) {
+        await dictationSessionRef.current.stop();
+        dictationSessionRef.current = null;
+        setIsDictatingOnly(false);
+      }
+      if (activeSoundRef.current) {
+        try {
+          await activeSoundRef.current.stopAsync();
+          await activeSoundRef.current.unloadAsync();
+        } catch (_) {}
+        activeSoundRef.current = null;
+        setPlayingAudioId(null);
+      }
+
+      const currentNotesText = notesRef.current ? notesRef.current.getText() : notes;
+      preRecordNotesRef.current = currentNotesText || '';
+      setVoiceLiveTranscript('');
+      setVoiceRecordDurationMs(0);
+      setVoiceWaveformBars(Array.from({ length: DEFAULT_WAVEFORM_BARS }, () => 0.12));
+
+      const session = createVoiceRecorderSession({
+        language: getSpeechLocaleTag(),
+        onMetering: ({ bars, durationMs }) => {
+          if (Array.isArray(bars)) setVoiceWaveformBars(bars);
+          if (typeof durationMs === 'number') setVoiceRecordDurationMs(durationMs);
+        },
+        onTranscript: ({ text }) => {
+          const spoken = (text || '').trim();
+          setVoiceLiveTranscript(spoken);
+          if (spoken) {
+            const merged = mergeTranscriptIntoNotes(preRecordNotesRef.current, spoken);
+            if (notesRef.current?.setText) {
+              notesRef.current.setText(merged);
+            }
+            setNotes(merged);
+          }
+        },
+        onStatusChange: (st) => {
+          if (st === 'recording' || st === 'paused') {
+            setVoiceRecordState(st);
+          }
+        },
+      });
+
+      SecurityLockHelper.markPickingAttachment(true);
+      await session.start();
+      SecurityLockHelper.markPickingAttachment(false);
+      voiceSessionRef.current = session;
+      setVoiceRecordState('recording');
+      HapticHelper.trigger('light');
+    } catch (err) {
+      SecurityLockHelper.markPickingAttachment(false);
+      setVoiceRecordState('idle');
+      setConfirmConfig({
+        isVisible: true,
+        title: t('Microphone Permission') || 'Microphone Permission',
+        message: t('Please allow microphone access to record voice notes and transcribe speech.') || 'Please allow microphone access to record voice notes and transcribe speech.',
+        hideCancel: true,
+        confirmText: t('OK') || 'OK',
+        onConfirm: () => setConfirmConfig((prev) => ({ ...prev, isVisible: false })),
+      });
+    }
+  };
+
+  const handleTogglePauseVoiceRecording = async () => {
+    const session = voiceSessionRef.current;
+    if (!session) return;
+    if (voiceRecordState === 'recording') {
+      await session.pause();
+      setVoiceRecordState('paused');
+      HapticHelper.trigger('selection');
+    } else if (voiceRecordState === 'paused') {
+      await session.resume();
+      setVoiceRecordState('recording');
+      HapticHelper.trigger('selection');
+    }
+  };
+
+  const handleCancelVoiceRecording = async () => {
+    const session = voiceSessionRef.current;
+    voiceSessionRef.current = null;
+    if (session) {
+      await session.cancel();
+    }
+    // Restore notes to what they were prior to this cancelled voice session
+    const restored = preRecordNotesRef.current || '';
+    if (notesRef.current?.setText) {
+      notesRef.current.setText(restored);
+    }
+    setNotes(restored);
+    setVoiceRecordState('idle');
+    setVoiceRecordDurationMs(0);
+    setVoiceLiveTranscript('');
+    HapticHelper.trigger('light');
+  };
+
+  const handleSaveVoiceRecording = async () => {
+    const session = voiceSessionRef.current;
+    voiceSessionRef.current = null;
+    if (!session) {
+      setVoiceRecordState('idle');
+      return;
+    }
+
+    setVoiceRecordState('idle');
+    const result = await session.stop();
+    if (!result || !result.uri) {
+      return;
+    }
+
+    const savedUri = await saveFileToDocuments(
+      result.uri,
+      result.name || `Voice-${Date.now()}.m4a`
+    );
+
+    const finalTranscript = (result.transcript || voiceLiveTranscript || '').trim();
+    if (finalTranscript) {
+      const merged = mergeTranscriptIntoNotes(preRecordNotesRef.current, finalTranscript);
+      if (notesRef.current?.setText) {
+        notesRef.current.setText(merged);
+      }
+      setNotes(merged);
+    }
+
+    const newAudioAttachment = {
+      id: `voice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      type: 'audio',
+      uri: savedUri,
+      name: result.name || `Voice-${dayjs().format('HH-mm-ss')}.m4a`,
+      size: result.size || 0,
+      mimeType: result.mimeType || 'audio/mp4',
+      durationMs: result.durationMs || voiceRecordDurationMs || 1000,
+      waveform: downsampleWaveform(result.waveform || voiceWaveformBars, DEFAULT_WAVEFORM_BARS),
+      transcript: finalTranscript,
+    };
+
+    setAttachments((prev) => [...prev, newAudioAttachment]);
+    setVoiceRecordDurationMs(0);
+    setVoiceLiveTranscript('');
+    HapticHelper.trigger('success');
+  };
+
+  const handleToggleDictation = async () => {
+    if (isDictatingOnly && dictationSessionRef.current) {
+      const session = dictationSessionRef.current;
+      dictationSessionRef.current = null;
+      setIsDictatingOnly(false);
+      const finalTxt = await session.stop();
+      if (finalTxt) {
+        const merged = mergeTranscriptIntoNotes(preRecordNotesRef.current, finalTxt);
+        if (notesRef.current?.setText) notesRef.current.setText(merged);
+        setNotes(merged);
+      }
+      setVoiceLiveTranscript('');
+      HapticHelper.trigger('success');
+      return;
+    }
+
+    try {
+      const currentNotesText = notesRef.current ? notesRef.current.getText() : notes;
+      preRecordNotesRef.current = currentNotesText || '';
+      setVoiceLiveTranscript('');
+
+      const session = createStandaloneDictationSession({
+        language: getSpeechLocaleTag(),
+        onTranscript: ({ text }) => {
+          const spoken = (text || '').trim();
+          setVoiceLiveTranscript(spoken);
+          if (spoken) {
+            const merged = mergeTranscriptIntoNotes(preRecordNotesRef.current, spoken);
+            if (notesRef.current?.setText) notesRef.current.setText(merged);
+            setNotes(merged);
+          }
+        },
+      });
+
+      SecurityLockHelper.markPickingAttachment(true);
+      const started = await session.start();
+      SecurityLockHelper.markPickingAttachment(false);
+      if (started) {
+        dictationSessionRef.current = session;
+        setIsDictatingOnly(true);
+        HapticHelper.trigger('light');
+      }
+    } catch (e) {
+      SecurityLockHelper.markPickingAttachment(false);
+      setIsDictatingOnly(false);
+    }
+  };
+
+  const handleTogglePlayAudio = async (att) => {
+    try {
+      if (playingAudioId === att.id && activeSoundRef.current) {
+        const status = await activeSoundRef.current.getStatusAsync();
+        if (status.isLoaded && status.isPlaying) {
+          await activeSoundRef.current.pauseAsync();
+          setPlayingAudioId(null);
+          return;
+        } else if (status.isLoaded) {
+          await activeSoundRef.current.playAsync();
+          setPlayingAudioId(att.id);
+          return;
+        }
+      }
+
+      if (activeSoundRef.current) {
+        try {
+          await activeSoundRef.current.stopAsync();
+          await activeSoundRef.current.unloadAsync();
+        } catch (_) {}
+        activeSoundRef.current = null;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+      });
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: att.uri },
+        { shouldPlay: true, rate: audioPlaybackRate, shouldCorrectPitch: true, progressUpdateIntervalMillis: 80 },
+        (status) => {
+          if (!status || !status.isLoaded) return;
+          setAudioPlaybackPosMs(status.positionMillis || 0);
+          setAudioPlaybackDurMs(status.durationMillis || att.durationMs || 1000);
+          if (status.didJustFinish) {
+            setPlayingAudioId(null);
+            setAudioPlaybackPosMs(0);
+          }
+        }
+      );
+
+      activeSoundRef.current = sound;
+      setPlayingAudioId(att.id);
+      setAudioPlaybackDurMs(att.durationMs || 1000);
+      HapticHelper.trigger('selection');
+    } catch (e) {
+      console.warn('[VoicePlayer] Playback error:', e);
+      setPlayingAudioId(null);
+    }
+  };
+
+  const handleSeekAudio = async (att, barIndex, totalBars) => {
+    const ratio = Math.max(0, Math.min(1, barIndex / Math.max(1, totalBars)));
+    const targetMs = Math.round(ratio * (att.durationMs || audioPlaybackDurMs || 1000));
+    if (playingAudioId === att.id && activeSoundRef.current) {
+      try {
+        await activeSoundRef.current.setPositionAsync(targetMs);
+        setAudioPlaybackPosMs(targetMs);
+      } catch (_) {}
+    } else {
+      await handleTogglePlayAudio(att);
+      if (activeSoundRef.current) {
+        try {
+          await activeSoundRef.current.setPositionAsync(targetMs);
+          setAudioPlaybackPosMs(targetMs);
+        } catch (_) {}
+      }
+    }
+  };
+
+  const handleCycleAudioSpeed = async () => {
+    const nextRate = audioPlaybackRate === 1 ? 1.5 : audioPlaybackRate === 1.5 ? 2 : 1;
+    setAudioPlaybackRate(nextRate);
+    if (activeSoundRef.current) {
+      try {
+        await activeSoundRef.current.setRateAsync(nextRate, true);
+      } catch (_) {}
+    }
+    HapticHelper.trigger('selection');
   };
 
   const addSubtask = () => {
@@ -2249,72 +2666,415 @@ useEffect(() => {
                 <MemoizedNotesInput
                   ref={notesRef}
                   initialValue={notes}
+                  onTextChange={setNotes}
                   placeholder={t("Add details") || t("Add notes...") || "Add details"}
                   placeholderTextColor={colors.textSecondary}
                   style={[styles.notesInput, { color: colors.textPrimary, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0, minHeight: isVeryCompact ? 32 : (isCompact ? 38 : 48) }]}
                 />
 
-                {attachments.length > 0 && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.attachmentsScroll}>
-                    {attachments.map(att => (
-                      <View key={att.id} style={styles.attachmentItem}>
-                        {att.type === 'image' ? (
-                          <TouchableOpacity 
-                            onPress={() => setSelectedFullscreenImage(att.uri)} 
-                            activeOpacity={0.8}
-                            accessible={true}
-                            accessibilityRole="button"
-                            accessibilityLabel={`${t('View image attachment') || 'View image attachment'}`}
-                            accessibilityHint={t('Double tap to view full screen') || 'Double tap to view full screen'}
-                          >
-                            <Image source={{ uri: att.uri }} style={styles.attachmentThumb} />
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity 
-                            onPress={() => openDocument(att.uri, att.mimeType)} 
-                            activeOpacity={0.8}
-                            accessible={true}
-                            accessibilityRole="button"
-                            accessibilityLabel={`${t('Open document') || 'Open document'}: ${att.name || 'File'}`}
-                            accessibilityHint={t('Double tap to view document') || 'Double tap to view document'}
-                          >
-                            <View style={[styles.attachmentThumb, { backgroundColor: colors.bgMain, justifyContent: 'center', alignItems: 'center', borderColor: colors.borderColor, borderWidth: 1 }]}>
-                              <IconFile color={colors.primary} />
-                              <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1}>{att.name}</Text>
-                            </View>
-                          </TouchableOpacity>
-                        )}
-                        <TouchableOpacity 
-                          style={styles.attachmentRemoveBtn} 
-                          onPress={() => removeAttachment(att.id)}
-                          accessible={true}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${t('Remove attachment') || 'Remove attachment'}: ${att.name || 'Image'}`}
-                          accessibilityHint={t('Deletes this attachment from task') || 'Deletes this attachment from task'}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                {/* Inline Live Voice Recorder & Real-Time Speech-to-Text Panel */}
+                {voiceRecordState !== 'idle' && (
+                  <View
+                    testID="voice_recorder_active_panel"
+                    style={{
+                      marginTop: 8,
+                      padding: 10,
+                      borderRadius: 12,
+                      backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.07)',
+                      borderWidth: 1,
+                      borderColor: isDark ? 'rgba(239,68,68,0.32)' : 'rgba(239,68,68,0.22)',
+                      gap: 8,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 }}>
+                        <Animated.View
+                          style={{
+                            width: 9,
+                            height: 9,
+                            borderRadius: 4.5,
+                            backgroundColor: voiceRecordState === 'paused' ? '#F59E0B' : '#EF4444',
+                            opacity: voiceRecordState === 'paused' ? 1 : recPulseAnim,
+                          }}
+                        />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>
+                          {voiceRecordState === 'paused'
+                            ? (t('Recording paused') || 'Recording paused')
+                            : (t('Recording & transcribing to notes...') || 'Recording & transcribing to notes...')}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#EF4444', fontVariant: ['tabular-nums'] }}>
+                        {formatVoiceDuration(voiceRecordDurationMs)}
+                      </Text>
+                    </View>
+
+                    {/* 36-Bar Live Animated Waveform Visualizer */}
+                    <View style={{ height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 2, paddingHorizontal: 2 }}>
+                      {voiceWaveformBars.map((lvl, idx) => {
+                        const barHeight = Math.max(4, Math.round((Number(lvl) || 0.12) * 32));
+                        return (
+                          <View
+                            key={`rec_bar_${idx}`}
+                            style={{
+                              flex: 1,
+                              height: barHeight,
+                              borderRadius: 2,
+                              backgroundColor: voiceRecordState === 'paused' ? '#F59E0B' : '#EF4444',
+                              opacity: 0.45 + 0.55 * (idx / Math.max(1, voiceWaveformBars.length)),
+                            }}
+                          />
+                        );
+                      })}
+                    </View>
+
+                    {Boolean(voiceLiveTranscript) && (
+                      <Text style={{ fontSize: 11, fontStyle: 'italic', color: colors.textSecondary }} numberOfLines={2}>
+                        “{voiceLiveTranscript}”
+                      </Text>
+                    )}
+
+                    {/* Recorder Controls: Cancel, Pause/Resume, Save */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+                      <TouchableOpacity
+                        testID="voice_record_cancel_btn"
+                        onPress={handleCancelVoiceRecording}
+                        activeOpacity={0.75}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          borderRadius: 8,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                        }}
+                      >
+                        <IconClose color={colors.textSecondary} size={14} />
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
+                          {t('Cancel') || 'Cancel'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <TouchableOpacity
+                          testID="voice_record_pause_btn"
+                          onPress={handleTogglePauseVoiceRecording}
+                          activeOpacity={0.75}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            paddingVertical: 6,
+                            paddingHorizontal: 11,
+                            borderRadius: 8,
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)',
+                          }}
                         >
-                          <IconClose color="#fff" />
+                          {voiceRecordState === 'paused' ? (
+                            <IconPlay color={colors.textPrimary} size={13} />
+                          ) : (
+                            <IconPause color={colors.textPrimary} size={13} />
+                          )}
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textPrimary }}>
+                            {voiceRecordState === 'paused' ? (t('Resume') || 'Resume') : (t('Pause') || 'Pause')}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          testID="voice_record_save_btn"
+                          onPress={handleSaveVoiceRecording}
+                          activeOpacity={0.8}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            paddingVertical: 6,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                            backgroundColor: '#10B981',
+                          }}
+                        >
+                          <IconCheck color="#FFFFFF" />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                            {t('Save voice') || 'Save voice'}
+                          </Text>
                         </TouchableOpacity>
                       </View>
-                    ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Saved Voice Note Attachments (Playable Waveform Cards inside Notes block) */}
+                {attachments.some(att => att.type === 'audio' || att.mimeType?.startsWith('audio/')) && (
+                  <View style={{ marginTop: 8, gap: 8 }}>
+                    {attachments
+                      .filter(att => att.type === 'audio' || att.mimeType?.startsWith('audio/'))
+                      .map((att) => {
+                        const isPlayingThis = playingAudioId === att.id;
+                        const bars = Array.isArray(att.waveform) && att.waveform.length > 0
+                          ? att.waveform
+                          : downsampleWaveform([], DEFAULT_WAVEFORM_BARS);
+                        const totalMs = Math.max(500, Number(isPlayingThis ? (audioPlaybackDurMs || att.durationMs) : att.durationMs) || 1000);
+                        const currentMs = isPlayingThis ? audioPlaybackPosMs : 0;
+                        const progressRatio = Math.max(0, Math.min(1, currentMs / totalMs));
+
+                        return (
+                          <View
+                            key={att.id}
+                            testID={`voice_attachment_card_${att.id}`}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              paddingVertical: 8,
+                              paddingHorizontal: 10,
+                              borderRadius: 12,
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)',
+                              borderWidth: 1,
+                              borderColor: isPlayingThis ? colors.primary : (colors.borderColor || '#E5E5EA'),
+                              gap: 10,
+                            }}
+                          >
+                            {/* Play / Pause Button */}
+                            <TouchableOpacity
+                              onPress={() => handleTogglePlayAudio(att)}
+                              activeOpacity={0.8}
+                              accessible={true}
+                              accessibilityRole="button"
+                              accessibilityLabel={isPlayingThis ? (t('Pause voice note') || 'Pause voice note') : (t('Play voice note') || 'Play voice note')}
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 17,
+                                backgroundColor: colors.primary,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              {isPlayingThis ? (
+                                <IconPause color={colors.textInverse || '#FFFFFF'} size={15} />
+                              ) : (
+                                <IconPlay color={colors.textInverse || '#FFFFFF'} size={15} />
+                              )}
+                            </TouchableOpacity>
+
+                            {/* Interactive Waveform Scrubber & Metadata */}
+                            <View style={{ flex: 1, gap: 4 }}>
+                              <View style={{ height: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                                {bars.map((lvl, bIdx) => {
+                                  const barProgress = bIdx / Math.max(1, bars.length);
+                                  const isPlayed = isPlayingThis && barProgress <= progressRatio;
+                                  const h = Math.max(4, Math.round((Number(lvl) || 0.15) * 22));
+                                  return (
+                                    <TouchableOpacity
+                                      key={`${att.id}_bar_${bIdx}`}
+                                      activeOpacity={0.7}
+                                      onPress={() => handleSeekAudio(att, bIdx, bars.length)}
+                                      style={{ flex: 1, height: 24, justifyContent: 'center', alignItems: 'center' }}
+                                    >
+                                      <View
+                                        style={{
+                                          width: '100%',
+                                          height: h,
+                                          borderRadius: 1.5,
+                                          backgroundColor: isPlayed
+                                            ? colors.primary
+                                            : (isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.24)'),
+                                        }}
+                                      />
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary, fontVariant: ['tabular-nums'] }}>
+                                  {isPlayingThis
+                                    ? `${formatVoiceDuration(currentMs)} / ${formatVoiceDuration(totalMs)}`
+                                    : `${formatVoiceDuration(totalMs)} · ${t('Voice note') || 'Voice note'}`}
+                                </Text>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  {Boolean(att.transcript) && (
+                                    <TouchableOpacity
+                                      onPress={() => {
+                                        if (notesRef.current?.appendText) {
+                                          notesRef.current.appendText(att.transcript);
+                                        }
+                                        HapticHelper.trigger('selection');
+                                      }}
+                                      style={{
+                                        paddingHorizontal: 6,
+                                        paddingVertical: 2,
+                                        borderRadius: 6,
+                                        backgroundColor: hexToRgba(colors.primary, 0.14),
+                                      }}
+                                    >
+                                      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
+                                        + {t('Transcript') || 'Transcript'}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )}
+
+                                  <TouchableOpacity
+                                    onPress={handleCycleAudioSpeed}
+                                    style={{
+                                      paddingHorizontal: 6,
+                                      paddingVertical: 2,
+                                      borderRadius: 6,
+                                      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textPrimary }}>
+                                      {audioPlaybackRate}x
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            </View>
+
+                            {/* Delete Voice Attachment Button */}
+                            <TouchableOpacity
+                              onPress={() => removeAttachment(att.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessible={true}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${t('Remove voice note') || 'Remove voice note'}`}
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: 12,
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <IconClose color={colors.textSecondary} size={14} />
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                  </View>
+                )}
+
+                {/* Image & Document Attachments Scroll */}
+                {attachments.some(att => att.type !== 'audio' && !att.mimeType?.startsWith('audio/')) && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.attachmentsScroll}>
+                    {attachments
+                      .filter(att => att.type !== 'audio' && !att.mimeType?.startsWith('audio/'))
+                      .map(att => (
+                        <View key={att.id} style={styles.attachmentItem}>
+                          {att.type === 'image' ? (
+                            <TouchableOpacity 
+                              onPress={() => setSelectedFullscreenImage(att.uri)} 
+                              activeOpacity={0.8}
+                              accessible={true}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${t('View image attachment') || 'View image attachment'}`}
+                              accessibilityHint={t('Double tap to view full screen') || 'Double tap to view full screen'}
+                            >
+                              <Image source={{ uri: att.uri }} style={styles.attachmentThumb} />
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity 
+                              onPress={() => openDocument(att.uri, att.mimeType)} 
+                              activeOpacity={0.8}
+                              accessible={true}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${t('Open document') || 'Open document'}: ${att.name || 'File'}`}
+                              accessibilityHint={t('Double tap to view document') || 'Double tap to view document'}
+                            >
+                              <View style={[styles.attachmentThumb, { backgroundColor: colors.bgMain, justifyContent: 'center', alignItems: 'center', borderColor: colors.borderColor, borderWidth: 1 }]}>
+                                <IconFile color={colors.primary} />
+                                <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1}>{att.name}</Text>
+                              </View>
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity 
+                            style={styles.attachmentRemoveBtn} 
+                            onPress={() => removeAttachment(att.id)}
+                            accessible={true}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('Remove attachment') || 'Remove attachment'}: ${att.name || 'Image'}`}
+                            accessibilityHint={t('Deletes this attachment from task') || 'Deletes this attachment from task'}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <IconClose color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
                   </ScrollView>
                 )}
 
-                <TouchableOpacity
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('Add attachment') || 'Add attachment'}
-                  accessibilityHint={t('Opens camera, photo gallery, or file picker') || 'Opens camera, photo gallery, or file picker'}
-                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: isVeryCompact ? 4 : 6, gap: 6, borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' }}
-                  onPress={handleOpenAttachmentOptions}
-                >
-                  <Svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <Path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                  </Svg>
-                  <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
-                    {t('Add attachment') || 'Add attachment'}
-                  </Text>
-                </TouchableOpacity>
+                {/* Bottom Action Footer: Add attachment + Quick Voice Note & Dictate */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: isVeryCompact ? 6 : 8, flexWrap: 'wrap', gap: 8 }}>
+                  <TouchableOpacity
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('Add attachment') || 'Add attachment'}
+                    accessibilityHint={t('Opens camera, photo gallery, voice recorder, or file picker') || 'Opens camera, photo gallery, voice recorder, or file picker'}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' }}
+                    onPress={handleOpenAttachmentOptions}
+                  >
+                    <Svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <Path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </Svg>
+                    <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
+                      {t('Add attachment') || 'Add attachment'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {voiceRecordState === 'idle' && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TouchableOpacity
+                        testID="dictate_to_notes_btn"
+                        accessible={true}
+                        accessibilityRole="button"
+                        accessibilityLabel={isDictatingOnly ? (t('Stop dictation') || 'Stop dictation') : (t('Dictate to notes') || 'Dictate to notes')}
+                        onPress={handleToggleDictation}
+                        activeOpacity={0.75}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          paddingVertical: 5,
+                          paddingHorizontal: 10,
+                          borderRadius: 10,
+                          backgroundColor: isDictatingOnly
+                            ? '#EF4444'
+                            : (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.045)'),
+                        }}
+                      >
+                        <IconMic color={isDictatingOnly ? '#FFFFFF' : colors.textSecondary} size={14} />
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: isDictatingOnly ? '#FFFFFF' : colors.textSecondary }}>
+                          {isDictatingOnly ? (t('Stop dictation') || 'Stop dictation') : (t('Dictate') || 'Dictate')}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        testID="record_voice_note_btn"
+                        accessible={true}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('Record voice note') || 'Record voice note'}
+                        onPress={handleStartVoiceRecording}
+                        activeOpacity={0.75}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          paddingVertical: 5,
+                          paddingHorizontal: 10,
+                          borderRadius: 10,
+                          backgroundColor: hexToRgba(colors.primary, isDark ? 0.18 : 0.12),
+                        }}
+                      >
+                        <IconMic color={colors.primary} size={14} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                          {t('Voice note') || 'Voice note'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -2576,7 +3336,7 @@ useEffect(() => {
                   paddingHorizontal: 14,
                   borderRadius: 12,
                   backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                  marginBottom: 12,
+                  marginBottom: 8,
                   gap: 12,
                 }}
                 onPress={() => {
@@ -2587,6 +3347,33 @@ useEffect(() => {
                 <IconFile color={colors.primary} />
                 <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
                   {t('Attach File') || t('Attach Document') || 'Attach File'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Record Voice Note') || 'Record Voice Note'}
+                accessibilityHint={t('Records a voice note and transcribes speech into notes') || 'Records a voice note and transcribes speech into notes'}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  marginBottom: 12,
+                  gap: 12,
+                }}
+                onPress={() => {
+                  setAttachmentOptionsVisible(false);
+                  setTimeout(() => handleStartVoiceRecording(), 120);
+                }}
+              >
+                <IconMic color={colors.primary} size={20} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
+                  {t('Record Voice Note') || 'Record Voice Note'}
                 </Text>
               </TouchableOpacity>
 

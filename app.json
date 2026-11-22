@@ -48,7 +48,8 @@
         "USE_FULL_SCREEN_INTENT",
         "WAKE_LOCK",
         "READ_CALENDAR",
-        "WRITE_CALENDAR"
+        "WRITE_CALENDAR",
+        "RECORD_AUDIO"
       ]
     },
     "web": {

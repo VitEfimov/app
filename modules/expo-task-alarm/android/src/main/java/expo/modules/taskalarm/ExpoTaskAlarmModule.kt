@@ -30,8 +30,24 @@ class ExpoTaskAlarmModule : Module() {
   private var photoPromise: Promise? = null
   private var tempPhotoPath: String? = null
   private var screenSecurityEnabled: Boolean = false
+  private var voiceNoteManager: VoiceNoteManager? = null
+
+  private fun getOrCreateVoiceNoteManager(context: Context): VoiceNoteManager {
+    val existing = voiceNoteManager
+    if (existing != null) return existing
+    val created = VoiceNoteManager(context) { payload ->
+      try {
+        sendEvent("onVoiceNoteEvent", payload)
+      } catch (_: Exception) {}
+    }
+    voiceNoteManager = created
+    return created
+  }
+
   override fun definition() = ModuleDefinition {
     Name("ExpoTaskAlarm")
+
+    Events("onVoiceNoteEvent")
 
     Function("getSavedThemeMode") {
       val context = appContext.reactContext ?: return@Function null
@@ -652,6 +668,41 @@ class ExpoTaskAlarmModule : Module() {
       val activity = appContext.currentActivity ?: return@AsyncFunction screenSecurityEnabled
       val flags = activity.window.attributes.flags
       return@AsyncFunction (flags and WindowManager.LayoutParams.FLAG_SECURE) != 0
+    }
+
+    AsyncFunction("startVoiceNoteCapture") { languageTag: String? ->
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      return@AsyncFunction getOrCreateVoiceNoteManager(context).startCapture(languageTag)
+    }
+
+    AsyncFunction("pauseVoiceNoteCapture") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      return@AsyncFunction getOrCreateVoiceNoteManager(context).pauseCapture()
+    }
+
+    AsyncFunction("resumeVoiceNoteCapture") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      return@AsyncFunction getOrCreateVoiceNoteManager(context).resumeCapture()
+    }
+
+    AsyncFunction("stopVoiceNoteCapture") {
+      val context = appContext.reactContext ?: return@AsyncFunction null
+      return@AsyncFunction getOrCreateVoiceNoteManager(context).stopCapture()
+    }
+
+    AsyncFunction("cancelVoiceNoteCapture") {
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      return@AsyncFunction getOrCreateVoiceNoteManager(context).cancelCapture()
+    }
+
+    AsyncFunction("startSpeechRecognition") { languageTag: String? ->
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      return@AsyncFunction getOrCreateVoiceNoteManager(context).startStandaloneSpeech(languageTag)
+    }
+
+    AsyncFunction("stopSpeechRecognition") {
+      val context = appContext.reactContext ?: return@AsyncFunction ""
+      return@AsyncFunction getOrCreateVoiceNoteManager(context).stopStandaloneSpeech()
     }
 
     OnActivityEntersForeground {
