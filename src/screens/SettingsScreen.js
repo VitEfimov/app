@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TouchableWithoutF
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks, toggleBoardCalendarSync } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setSelectedCalendarIds, toggleSelectedCalendarId } from '../features/themeSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync, getCalendarSyncScheduleStateAsync, getNextScheduledSyncTime, isBoardCalendarSyncEnabled, getBoardCalendarSyncKey, isCalendarSyncSupportedForBoard } from '../utils/calendarSync';
 import { getBoardColor } from '../utils/boardColors';
 import { registerBackgroundFetchAsync } from '../utils/backgroundTasks';
@@ -1151,78 +1151,111 @@ export default function SettingsScreen({ navigation }) {
             <>
               <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 
-              {/* Target Calendar Picker */}
-              <TouchableOpacity
-                activeOpacity={0.75}
-                onPress={() => setCalendarPickerOpen(!isCalendarPickerOpen)}
-                style={styles.cardItemRow}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: isCalendarPickerOpen }}
-                accessibilityLabel={t('Target Calendar') || 'Target Calendar'}
-              >
-                <View style={{ flex: 1, marginLeft: 52, marginRight: 12 }}>
-                  <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
-                    {t('Target Calendar') || 'Target Calendar'}
-                  </Text>
-                  <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]}>
-                    {theme.selectedCalendarId
-                      ? (deviceCalendars.find(c => String(c.id) === String(theme.selectedCalendarId))?.title || (t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)'))
-                      : (t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)')}
-                  </Text>
-                </View>
-                <IconChevronRight color={colors.textSecondary} />
-              </TouchableOpacity>
+              {/* Target Calendar Picker (Multi-Select Supported) */}
+              {(() => {
+                const selectedCalIds = Array.isArray(theme.selectedCalendarIds) && theme.selectedCalendarIds.length > 0
+                  ? theme.selectedCalendarIds.map(String)
+                  : (theme.selectedCalendarId ? [String(theme.selectedCalendarId)] : []);
+                const selectedTitles = selectedCalIds
+                  .map(id => {
+                    const found = deviceCalendars.find(c => String(c.id) === String(id));
+                    return found ? (found.title || found.source?.name || found.ownerAccount || 'Calendar') : null;
+                  })
+                  .filter(Boolean);
+                const summaryLabel = selectedCalIds.length === 0
+                  ? (t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)')
+                  : (selectedTitles.length > 0
+                      ? selectedTitles.join(', ')
+                      : `${selectedCalIds.length} ${t('selected') || 'selected'}`);
 
-              {isCalendarPickerOpen && (
-                <ScrollView nestedScrollEnabled={true} style={[styles.expandedSubOptions, { maxHeight: 220 }]} showsVerticalScrollIndicator={true}>
-                  {[
-                    { id: null, title: t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)', subtitle: null },
-                    ...deviceCalendars.map(cal => ({
-                      id: cal.id,
-                      title: cal.title || cal.source?.name || cal.ownerAccount || 'Calendar',
-                      subtitle: cal.ownerAccount || cal.source?.name || null
-                    }))
-                  ].map((calOpt, idx) => {
-                    const isSelected = calOpt.id === null
-                      ? !theme.selectedCalendarId
-                      : String(theme.selectedCalendarId) === String(calOpt.id);
-                    return (
-                      <TouchableOpacity
-                        key={`cal_opt_${calOpt.id || 'auto'}_${idx}`}
-                        style={styles.soundItemRow}
-                        onPress={() => {
-                          dispatch(setSelectedCalendarId(calOpt.id));
-                          setCalendarPickerOpen(false);
-                        }}
-                        accessible={true}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: isSelected }}
-                      >
-                        <View style={{ flex: 1, marginRight: 8 }}>
-                          <Text style={[
-                            styles.soundItemText,
-                            {
-                              color: isSelected ? primaryAccent : colors.textPrimary,
-                              fontWeight: isSelected ? '700' : '500'
-                            }
-                          ]}>
-                            {calOpt.title}
+                return (
+                  <>
+                    <TouchableOpacity
+                      testID="settings_target_calendars_picker_btn"
+                      activeOpacity={0.75}
+                      onPress={() => setCalendarPickerOpen(!isCalendarPickerOpen)}
+                      style={styles.cardItemRow}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: isCalendarPickerOpen }}
+                      accessibilityLabel={t('Target Calendar') || 'Target Calendar'}
+                    >
+                      <View style={{ flex: 1, marginLeft: 52, marginRight: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                            {t('Target Calendar') || 'Target Calendar'}
                           </Text>
-                          {calOpt.subtitle && calOpt.subtitle !== calOpt.title && (
-                            <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                              {calOpt.subtitle}
-                            </Text>
+                          {selectedCalIds.length > 1 && (
+                            <View style={{ backgroundColor: isDark ? 'rgba(93, 69, 219, 0.22)' : 'rgba(93, 69, 219, 0.10)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                                {selectedCalIds.length}
+                              </Text>
+                            </View>
                           )}
                         </View>
-                        {isSelected && (
-                          <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
+                        <Text style={[styles.itemSubtitleValue, { color: colors.textSecondary }]} numberOfLines={2}>
+                          {summaryLabel}
+                        </Text>
+                      </View>
+                      <IconChevronRight color={colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    {isCalendarPickerOpen && (
+                      <ScrollView nestedScrollEnabled={true} style={[styles.expandedSubOptions, { maxHeight: 240 }]} showsVerticalScrollIndicator={true}>
+                        {[
+                          { id: null, title: t('Auto (Default / Google Calendar)') || 'Auto (Default / Google Calendar)', subtitle: null },
+                          ...deviceCalendars.map(cal => ({
+                            id: cal.id,
+                            title: cal.title || cal.source?.name || cal.ownerAccount || 'Calendar',
+                            subtitle: cal.ownerAccount || cal.source?.name || null
+                          }))
+                        ].map((calOpt, idx) => {
+                          const isSelected = calOpt.id === null
+                            ? selectedCalIds.length === 0
+                            : selectedCalIds.includes(String(calOpt.id));
+                          return (
+                            <TouchableOpacity
+                              key={`cal_opt_${calOpt.id || 'auto'}_${idx}`}
+                              testID={`settings_calendar_opt_${calOpt.id || 'auto'}`}
+                              style={styles.soundItemRow}
+                              onPress={() => {
+                                if (calOpt.id === null) {
+                                  dispatch(setSelectedCalendarId(null));
+                                } else {
+                                  dispatch(toggleSelectedCalendarId(calOpt.id));
+                                }
+                              }}
+                              accessible={true}
+                              accessibilityRole="checkbox"
+                              accessibilityState={{ checked: isSelected }}
+                            >
+                              <View style={{ flex: 1, marginRight: 8 }}>
+                                <Text style={[
+                                  styles.soundItemText,
+                                  {
+                                    color: isSelected ? primaryAccent : colors.textPrimary,
+                                    fontWeight: isSelected ? '700' : '500'
+                                  }
+                                ]}>
+                                  {calOpt.title}
+                                </Text>
+                                {calOpt.subtitle && calOpt.subtitle !== calOpt.title && (
+                                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                                    {calOpt.subtitle}
+                                  </Text>
+                                )}
+                              </View>
+                              {isSelected && (
+                                <Text style={{ color: primaryAccent, fontWeight: 'bold' }}>✓</Text>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    )}
+                  </>
+                );
+              })()}
 
               <View style={[styles.divider, { backgroundColor: colors.borderColor || '#F0F0F4' }]} />
 

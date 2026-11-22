@@ -3200,7 +3200,7 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       const themeSliceSrc = fs.readFileSync(path.resolve('src/features/themeSlice.js'), 'utf8');
       assert.match(themeSliceSrc, /calendarAlarmsEnabled:\s*false/, 'themeSlice must enforce calendarAlarmsEnabled: false');
-      assert.match(themeSliceSrc, /return\s*\{\s*\.\.\.state,\s*\.\.\.action\.payload,\s*calendarAlarmsEnabled:\s*false\s*\}/, 'hydrateThemeState must keep calendarAlarmsEnabled false');
+      assert.match(themeSliceSrc, /\.\.\.state,\s*\.\.\.action\.payload,\s*calendarAlarmsEnabled:\s*false,\s*calendarPushEnabled:\s*false/, 'hydrateThemeState must keep calendarAlarmsEnabled and calendarPushEnabled false');
 
       const patchSrc = fs.readFileSync(path.resolve('scripts/patch-expo-calendar.js'), 'utf8');
       assert.match(patchSrc, /explicit-no-alarm-when-empty/, 'patch-expo-calendar.js must set HAS_ALARM=0 when alarms list is empty');
@@ -3259,6 +3259,21 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(qlSrc, /commitPendingNewItemFocus/, 'QuickListBoard must wait for row layout + content size before focusing a newly added item');
       assert.match(qlSrc, /pendingFocusIdRef/, 'QuickListBoard must track pendingFocusIdRef for post-layout focus handoff');
       assert.match(qlSrc, /suppressFocusBounceUntilRef/, 'QuickListBoard must suppress Android focus bounce to first task on keyboard close');
+
+      // 7. Fetch-Only Default Mode & Multi-Calendar Selection: pushing turned OFF by default (all push code preserved), fetching supports multiple device calendars
+      const { CALENDAR_PUSH_DEFAULT_ENABLED, normalizeSelectedCalendarIds } = require('../src/utils/calendarSyncSchedule');
+      assert.strictEqual(CALENDAR_PUSH_DEFAULT_ENABLED, false, 'Calendar push must be turned OFF by default while keeping fetch active');
+      assert.deepStrictEqual(normalizeSelectedCalendarIds(['1', '2', '1'], null), ['1', '2'], 'Must deduplicate multi-selected calendar IDs');
+      assert.deepStrictEqual(normalizeSelectedCalendarIds([], '7'), ['7'], 'Must fall back to legacy single selectedCalendarId when array is empty');
+      assert.deepStrictEqual(normalizeSelectedCalendarIds([], null), [], 'Empty selection must represent Auto mode');
+      assert.match(calSyncSrc, /export const getTargetCalendarIdsAsync/, 'calendarSync must export getTargetCalendarIdsAsync for multi-calendar fetching');
+      assert.match(calSyncSrc, /Calendar\.getEventsAsync\(\s*targetCalendarIds\.map\(String\)/, 'fetchCalendarWindowEventsAsync must query all selected device calendars at once');
+      assert.match(calSyncSrc, /const isPushActive = calendarPushEnabled === undefined \? CALENDAR_PUSH_DEFAULT_ENABLED : Boolean\(calendarPushEnabled\)/, 'syncTaskToCalendarAsync and syncAllTasksToCalendarAsync must guard pushing behind isPushActive while keeping push logic intact');
+      assert.match(calSyncSrc, /if\s*\(!isPushActive && !task\.syncedFromCalendar\)\s*continue;/, 'Fetch-only mode must never ghost-delete user-created local TaskFlow tasks');
+      assert.match(calSyncSrc, /isOutlookOrExchangeCalendar/, 'Calendar discovery must recognize Outlook and Exchange device calendars for fetching');
+      assert.match(themeSliceSrc, /toggleSelectedCalendarId/, 'themeSlice must support toggling multiple selected device calendars');
+      const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
+      assert.match(settingsSrc, /dispatch\(toggleSelectedCalendarId\(calOpt\.id\)\)/, 'SettingsScreen calendar picker must allow selecting multiple device calendars at once');
     });
   });
 });

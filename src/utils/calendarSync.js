@@ -7,6 +7,8 @@ import {
   DAILY_CALENDAR_SYNC_HOURS,
   DAILY_CALENDAR_SYNC_SLOTS,
   CALENDAR_SYNC_STATE_KEY,
+  CALENDAR_PUSH_DEFAULT_ENABLED,
+  normalizeSelectedCalendarIds,
   SYNC_PAST_DAYS,
   SYNC_FUTURE_DAYS,
   SYNC_CHUNK_DAYS,
@@ -48,6 +50,8 @@ export {
   DAILY_CALENDAR_SYNC_HOURS,
   DAILY_CALENDAR_SYNC_SLOTS,
   CALENDAR_SYNC_STATE_KEY,
+  CALENDAR_PUSH_DEFAULT_ENABLED,
+  normalizeSelectedCalendarIds,
   SYNC_PAST_DAYS,
   SYNC_FUTURE_DAYS,
   SYNC_CHUNK_DAYS,
@@ -172,6 +176,30 @@ const isValidNativeCalendarId = (id) => {
     return /^\d+$/.test(str);
   }
   return true;
+};
+
+const isCalendarReadable = (cal) => {
+  return Boolean(cal && isValidNativeCalendarId(cal.id));
+};
+
+const isOutlookOrExchangeCalendar = (cal) => {
+  if (!cal) return false;
+  const srcType = String(cal.source?.type || '').toLowerCase();
+  const srcName = String(cal.source?.name || '').toLowerCase();
+  const owner = String(cal.ownerAccount || '').toLowerCase();
+  const title = String(cal.title || '').toLowerCase();
+  return (
+    srcType.includes('outlook') ||
+    srcType.includes('exchange') ||
+    srcType.includes('microsoft') ||
+    srcName.includes('outlook') ||
+    srcName.includes('hotmail') ||
+    srcName.includes('exchange') ||
+    owner.includes('@outlook.') ||
+    owner.includes('@hotmail.') ||
+    owner.includes('@live.') ||
+    title.includes('outlook')
+  );
 };
 
 const isCalendarWritable = (cal) => {
@@ -333,9 +361,10 @@ export const requestCalendarPermissionsAsync = async () => {
 };
 
 /**
- * Fetches all writable calendars on the device (e.g. Google Calendar, iCloud, Local)
+ * Fetches all available calendars on the device (e.g. Google Calendar, Microsoft Outlook / Exchange, iCloud, Local).
+ * In fetch-only mode, also includes read-only synced calendars (such as Outlook or subscribed calendars) if no writable filter is forced.
  */
-export const getWritableCalendarsAsync = async () => {
+export const getWritableCalendarsAsync = async (options = {}) => {
   if (Platform.OS === 'web') return [];
   try {
     const hasPermission = await checkCalendarPermissionsAsync();
@@ -344,12 +373,16 @@ export const getWritableCalendarsAsync = async () => {
     const calendars = await enqueueCalendarOp(() =>
       Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT)
     );
-    const writable = (calendars || []).filter(isCalendarWritable);
-    return writable.sort((a, b) => {
+    const list = calendars || [];
+    const writable = list.filter(isCalendarWritable);
+    const readable = options?.requireWritable ? writable : list.filter(isCalendarReadable);
+    const pool = readable.length > 0 ? readable : writable;
+    return pool.sort((a, b) => {
       const score = (c) => {
         let s = 0;
         if (c.isPrimary) s += 4;
-        if (c.source?.type === 'com.google' || c.source?.name?.includes('@') || c.ownerAccount?.includes('@')) s += 2;
+        if (c.source?.type === 'com.google' || isOutlookOrExchangeCalendar(c) || c.source?.name?.includes('@') || c.ownerAccount?.includes('@')) s += 2;
+        if (isCalendarWritable(c)) s += 1;
         if (c.source?.isLocalAccount || c.source?.type === 'LOCAL') s += 1;
         return s;
       };
@@ -389,13 +422,15 @@ export const getTargetCalendarIdAsync = async (preferredCalendarId = null, optio
     if (!calendars || calendars.length === 0) return null;
 
     const writableCalendars = calendars.filter(isCalendarWritable);
-    if (writableCalendars.length === 0) return null;
+    const readableCalendars = calendars.filter(isCalendarReadable);
+    const candidateCalendars = writableCalendars.length > 0 ? writableCalendars : readableCalendars;
+    if (candidateCalendars.length === 0) return null;
 
     let resolvedId = null;
 
-    // 1. If preferred ID is provided and exists among writable calendars
+    // 1. If preferred ID is provided and exists among readable/writable calendars (supports Google, Outlook, Exchange, iCloud)
     if (preferredCalendarId) {
-      const match = writableCalendars.find(c => String(c.id) === String(preferredCalendarId));
+      const match = readableCalendars.find(c => String(c.id) === String(preferredCalendarId));
       if (match) resolvedId = String(match.id);
     }
 
@@ -406,23 +441,28 @@ export const getTargetCalendarIdAsync = async (preferredCalendarId = null, optio
           () => Calendar.getDefaultCalendarAsync(),
           { priority: options?.priority }
         );
-        if (defaultCal && isCalendarWritable(defaultCal)) {
+        if (defaultCal && isCalendarReadable(defaultCal)) {
           resolvedId = String(defaultCal.id);
         }
       } catch (e) {}
     }
 
-    // 3. On Android or fallback: find primary Google calendar or primary account
+    // 3. On Android or fallback: find primary Google / Outlook / Exchange calendar or primary account
     if (!resolvedId) {
-      const primaryGoogle = writableCalendars.find(
-        c => c.isPrimary || c.source?.name?.includes('@') || c.source?.type === 'com.google' || c.ownerAccount?.includes('@')
+      const primaryAccount = candidateCalendars.find(
+        c =>
+          c.isPrimary ||
+          c.source?.type === 'com.google' ||
+          isOutlookOrExchangeCalendar(c) ||
+          c.source?.name?.includes('@') ||
+          c.ownerAccount?.includes('@')
       );
-      if (primaryGoogle) resolvedId = String(primaryGoogle.id);
+      if (primaryAccount) resolvedId = String(primaryAccount.id);
     }
 
-    // 4. Any writable calendar
+    // 4. Any available calendar
     if (!resolvedId) {
-      resolvedId = String(writableCalendars[0].id);
+      resolvedId = String(candidateCalendars[0].id);
     }
 
     if (resolvedId) {
@@ -433,6 +473,44 @@ export const getTargetCalendarIdAsync = async (preferredCalendarId = null, optio
     DevLogger.warn('[CalendarSync] Error resolving target calendar ID', error?.message || String(error));
     console.warn('Error resolving target calendar ID:', error);
     return null;
+  }
+};
+
+/**
+ * Resolves one or more target device calendar IDs for multi-calendar fetching
+ * (e.g. simultaneously fetching from Google Calendar + Microsoft Outlook / Exchange + iCloud).
+ */
+export const getTargetCalendarIdsAsync = async (
+  preferredCalendarIds = [],
+  legacyPreferredCalendarId = null,
+  options = {}
+) => {
+  if (Platform.OS === 'web') return [];
+  const requestedIds = normalizeSelectedCalendarIds(preferredCalendarIds, legacyPreferredCalendarId);
+
+  try {
+    const hasPermission = await checkCalendarPermissionsAsync();
+    if (!hasPermission) return [];
+
+    if (requestedIds.length > 0) {
+      const calendars = await enqueueCalendarOp(
+        () => Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT),
+        { priority: options?.priority }
+      );
+      const readableIds = new Set(
+        (calendars || []).filter(isCalendarReadable).map(c => String(c.id).trim())
+      );
+      const matched = requestedIds.filter(id => readableIds.has(id) && isValidNativeCalendarId(id));
+      if (matched.length > 0) {
+        return matched;
+      }
+    }
+
+    const fallbackId = await getTargetCalendarIdAsync(legacyPreferredCalendarId, options);
+    return fallbackId && isValidNativeCalendarId(fallbackId) ? [String(fallbackId)] : [];
+  } catch (error) {
+    DevLogger.warn('[CalendarSync] Error resolving target calendar IDs', error?.message || String(error));
+    return [];
   }
 };
 
@@ -548,8 +626,10 @@ export const buildEventDetails = (task, calendarAlarmsEnabled = false) => {
  */
 export const syncTaskToCalendarAsync = async (task, settings = {}) => {
   if (Platform.OS === 'web') return null;
-  const { calendarSyncEnabled, calendarAlarmsEnabled, selectedCalendarId } = settings;
+  const { calendarSyncEnabled, calendarPushEnabled, calendarAlarmsEnabled, selectedCalendarId } = settings;
   if (!calendarSyncEnabled) return null;
+  const isPushActive = calendarPushEnabled === undefined ? CALENDAR_PUSH_DEFAULT_ENABLED : Boolean(calendarPushEnabled);
+  if (!isPushActive) return null;
   if (!task || (!task.completionDate && !task.dateString && !task.dueDate && !task.date)) return null;
 
   try {
@@ -743,21 +823,23 @@ export const fetchCalendarWindowEventsAsync = async (settings = {}) => {
   const now = new Date();
   const empty = {
     calendarId: null,
+    calendarIds: [],
     activeNativeEventMap: new Map(),
     activeNativeIds: new Set(),
     allChunksSucceeded: false,
     now,
   };
   if (Platform.OS === 'web') return empty;
-  const { calendarSyncEnabled, selectedCalendarId } = settings || {};
+  const { calendarSyncEnabled, selectedCalendarId, selectedCalendarIds } = settings || {};
   if (!calendarSyncEnabled) return empty;
 
   try {
     const hasPermission = await checkCalendarPermissionsAsync();
     if (!hasPermission) return empty;
 
-    const calendarId = await getTargetCalendarIdAsync(selectedCalendarId);
-    if (!calendarId || !isValidNativeCalendarId(calendarId)) return empty;
+    const targetCalendarIds = await getTargetCalendarIdsAsync(selectedCalendarIds, selectedCalendarId);
+    if (!targetCalendarIds || targetCalendarIds.length === 0) return empty;
+    const primaryCalendarId = String(targetCalendarIds[0]);
 
     const chunks = buildSyncWindowChunks(now, SYNC_PAST_DAYS, SYNC_FUTURE_DAYS, SYNC_CHUNK_DAYS);
     const activeNativeEventMap = new Map();
@@ -769,7 +851,7 @@ export const fetchCalendarWindowEventsAsync = async (settings = {}) => {
       try {
         const chunkEvents = await enqueueCalendarOp(() =>
           Calendar.getEventsAsync(
-            [String(calendarId)],
+            targetCalendarIds.map(String),
             toNativeCalendarDate(chunk.start),
             toNativeCalendarDate(chunk.end)
           )
@@ -795,7 +877,8 @@ export const fetchCalendarWindowEventsAsync = async (settings = {}) => {
     }
 
     return {
-      calendarId: String(calendarId),
+      calendarId: primaryCalendarId,
+      calendarIds: targetCalendarIds.map(String),
       activeNativeEventMap,
       activeNativeIds,
       allChunksSucceeded,
@@ -897,8 +980,10 @@ export const removeBoardEventsFromCalendarAsync = async (boardTasks = [], settin
  */
 export const syncAllTasksToCalendarAsync = async (tasks = [], settings = {}, prefetchedWindow = null, boards = []) => {
   if (Platform.OS === 'web') return { syncedCount: 0, removedCount: 0, eventMap: {}, hashMap: {}, clearedEventTaskIds: [] };
-  const { calendarSyncEnabled, calendarAlarmsEnabled, selectedCalendarId, boardCalendarSync = {} } = settings;
+  const { calendarSyncEnabled, calendarPushEnabled, calendarAlarmsEnabled, selectedCalendarId, boardCalendarSync = {} } = settings;
   if (!calendarSyncEnabled) return { syncedCount: 0, removedCount: 0, eventMap: {}, hashMap: {}, clearedEventTaskIds: [] };
+  const isPushActive = calendarPushEnabled === undefined ? CALENDAR_PUSH_DEFAULT_ENABLED : Boolean(calendarPushEnabled);
+  if (!isPushActive) return { syncedCount: 0, removedCount: 0, eventMap: {}, hashMap: {}, clearedEventTaskIds: [] };
 
   try {
     const calendarId = prefetchedWindow?.calendarId || (await getTargetCalendarIdAsync(selectedCalendarId));
@@ -1160,10 +1245,16 @@ export const performDifferentialCalendarSyncAsync = async (settings = {}, existi
     // ONLY evaluate deletions if all chunks succeeded, the task's board has calendar sync enabled,
     // the task is past the recent-write propagation grace window, AND direct native verification
     // via Calendar.getEventByIdAsync confirms the event is genuinely deleted from Google Calendar.
+    // In fetch-only mode (!isPushActive), ONLY check tasks that were fetched from the calendar
+    // (`task.syncedFromCalendar === true`), never user-created TaskFlow tasks.
+    const isPushActive = settings?.calendarPushEnabled === undefined
+      ? CALENDAR_PUSH_DEFAULT_ENABLED
+      : Boolean(settings.calendarPushEnabled);
     if (allChunksSucceeded) {
       const nowMs = now instanceof Date ? now.getTime() : Date.now();
       for (const task of effectiveTasks) {
         if (!task || !task.calendarEventId) continue;
+        if (!isPushActive && !task.syncedFromCalendar) continue;
         if (!isTaskEligibleForCalendarSync(task, boards, boardCalendarSync)) continue;
         if (isTaskRecentlyCreatedOrUpdated(task, nowMs)) continue;
 

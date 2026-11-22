@@ -11,6 +11,40 @@ export const DAILY_CALENDAR_SYNC_HOURS = [8, 12, 17]; // 08:00, 12:00 (noon), 17
 export const DAILY_CALENDAR_SYNC_SLOTS = ['08:00', '12:00', '17:00'];
 export const CALENDAR_SYNC_STATE_KEY = 'calendar_sync_schedule_state';
 
+// Fetch-Only Default Mode:
+// TaskFlow is the primary task manager; calendar synchronization defaults to fetching external
+// calendar events/meetings into TaskFlow while keeping task pushing turned OFF (code preserved).
+export const CALENDAR_PUSH_DEFAULT_ENABLED = false;
+
+/**
+ * Normalizes a multi-calendar selection array (and optional legacy single `selectedCalendarId`)
+ * into a deduplicated array of non-empty string calendar IDs.
+ * An empty array `[]` represents "Auto (Default / Primary Calendar)".
+ */
+export function normalizeSelectedCalendarIds(selectedCalendarIds = [], legacySelectedCalendarId = null) {
+  const result = [];
+  const seen = new Set();
+  const addId = (raw) => {
+    if (raw === null || raw === undefined) return;
+    const str = String(raw).trim();
+    if (!str || str === 'null' || str === 'undefined' || seen.has(str)) return;
+    seen.add(str);
+    result.push(str);
+  };
+
+  if (Array.isArray(selectedCalendarIds)) {
+    selectedCalendarIds.forEach(addId);
+  } else if (selectedCalendarIds) {
+    addId(selectedCalendarIds);
+  }
+
+  if (result.length === 0 && legacySelectedCalendarId) {
+    addId(legacySelectedCalendarId);
+  }
+
+  return result;
+}
+
 // Rolling sync window & Android cursor-safety caps
 export const SYNC_PAST_DAYS = 14;
 export const SYNC_FUTURE_DAYS = 60;

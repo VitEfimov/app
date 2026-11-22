@@ -161,9 +161,14 @@ const initialState = {
   // Calendar Sync (expo-calendar)
   // calendarAlarmsEnabled is always false so TaskFlow's own notification/alarm engine
   // is the single source of truth and Google Calendar never fires duplicate reminders.
+  // calendarPushEnabled defaults to false (fetch-only mode: fetch meetings/events from calendar without pushing tasks).
   calendarSyncEnabled: loaded?.calendarSyncEnabled || false,
+  calendarPushEnabled: false,
   calendarAlarmsEnabled: false,
   selectedCalendarId: loaded?.selectedCalendarId || null,
+  selectedCalendarIds: Array.isArray(loaded?.selectedCalendarIds)
+    ? loaded.selectedCalendarIds.filter(Boolean).map(String)
+    : (loaded?.selectedCalendarId ? [String(loaded.selectedCalendarId)] : []),
   lastCalendarSyncAt: loaded?.lastCalendarSyncAt || null,
   boardCalendarSync: loaded?.boardCalendarSync || {},
 
@@ -201,7 +206,11 @@ const themeSlice = createSlice({
       if (action.payload?.androidAutoEnabled !== undefined) {
         try { setNativeAndroidAutoMute(action.payload.androidAutoEnabled); } catch (e) {}
       }
-      return { ...state, ...action.payload, calendarAlarmsEnabled: false };
+      const next = { ...state, ...action.payload, calendarAlarmsEnabled: false, calendarPushEnabled: false };
+      if (!Array.isArray(next.selectedCalendarIds) || (next.selectedCalendarIds.length === 0 && next.selectedCalendarId)) {
+        next.selectedCalendarIds = next.selectedCalendarId ? [String(next.selectedCalendarId)] : [];
+      }
+      return next;
     },
     setThemeColor: (state, action) => {
       const { key, value } = action.payload;
@@ -375,11 +384,48 @@ const themeSlice = createSlice({
     setCalendarSyncEnabled: (state, action) => {
       state.calendarSyncEnabled = action.payload;
     },
+    setCalendarPushEnabled: (state, action) => {
+      state.calendarPushEnabled = Boolean(action.payload);
+    },
     setCalendarAlarmsEnabled: (state) => {
       state.calendarAlarmsEnabled = false;
     },
     setSelectedCalendarId: (state, action) => {
-      state.selectedCalendarId = action.payload;
+      const payload = action.payload;
+      if (payload === null || payload === undefined || payload === '') {
+        state.selectedCalendarId = null;
+        state.selectedCalendarIds = [];
+      } else if (Array.isArray(payload)) {
+        const clean = Array.from(new Set(payload.filter(Boolean).map(String)));
+        state.selectedCalendarIds = clean;
+        state.selectedCalendarId = clean[0] || null;
+      } else {
+        const idStr = String(payload);
+        state.selectedCalendarId = idStr;
+        state.selectedCalendarIds = [idStr];
+      }
+    },
+    setSelectedCalendarIds: (state, action) => {
+      const list = Array.isArray(action.payload) ? action.payload : [];
+      const clean = Array.from(new Set(list.filter(Boolean).map(String)));
+      state.selectedCalendarIds = clean;
+      state.selectedCalendarId = clean[0] || null;
+    },
+    toggleSelectedCalendarId: (state, action) => {
+      const rawId = action.payload;
+      if (rawId === null || rawId === undefined || rawId === '') {
+        state.selectedCalendarId = null;
+        state.selectedCalendarIds = [];
+        return;
+      }
+      const idStr = String(rawId);
+      const current = Array.isArray(state.selectedCalendarIds) && state.selectedCalendarIds.length > 0
+        ? state.selectedCalendarIds.map(String)
+        : (state.selectedCalendarId ? [String(state.selectedCalendarId)] : []);
+      const exists = current.includes(idStr);
+      const next = exists ? current.filter(id => id !== idStr) : [...current, idStr];
+      state.selectedCalendarIds = next;
+      state.selectedCalendarId = next[0] || null;
     },
     setLastCalendarSyncAt: (state, action) => {
       state.lastCalendarSyncAt = action.payload;
@@ -485,7 +531,7 @@ export const {
   setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setBiometricUnlockEnabled, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
   setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
-  setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setLastCalendarSyncAt, setBoardCalendarSync,
+  setCalendarSyncEnabled, setCalendarPushEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setSelectedCalendarIds, toggleSelectedCalendarId, setLastCalendarSyncAt, setBoardCalendarSync,
   setBlockScreenshots, setCurrencyCode, setBoardCurrency, setHabitStreakMode, setBoardExpensesSettings,
   setGoogleDrawerOpen, triggerJumpToToday
 } = themeSlice.actions;
