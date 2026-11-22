@@ -737,10 +737,19 @@ export default function SettingsScreen({ navigation }) {
         currentSoundRef.current = null;
       }
       if (soundFilename === 'default') {
-        if (Platform.OS === 'android') {
-          testAndroidDefaultNotification();
-        } else {
-          scheduleLocalNotification(t('Sound Preview'), t('Device Default Sound'), 1, false);
+        const defaultAsset = SOUND_ASSETS['notification.wav'];
+        if (defaultAsset) {
+          const { sound } = await Audio.Sound.createAsync(defaultAsset);
+          currentSoundRef.current = sound;
+          await sound.playAsync();
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.didJustFinish) {
+              sound.unloadAsync();
+              if (currentSoundRef.current === sound) {
+                currentSoundRef.current = null;
+              }
+            }
+          });
         }
         return;
       }
@@ -1197,7 +1206,7 @@ export default function SettingsScreen({ navigation }) {
                           {summaryLabel}
                         </Text>
                       </View>
-                      <IconChevronRight color={colors.textSecondary} />
+                      <IconChevronDown color={colors.textSecondary} isExpanded={isCalendarPickerOpen} />
                     </TouchableOpacity>
 
                     {isCalendarPickerOpen && (
@@ -1452,7 +1461,7 @@ export default function SettingsScreen({ navigation }) {
                 {t('Notification settings') || 'Notification settings'}
               </Text>
             </View>
-            <IconChevronRight color={colors.textSecondary} />
+            <IconChevronDown color={colors.textSecondary} isExpanded={isNotificationSettingsOpen} />
           </TouchableOpacity>
 
           {/* Expanded notification options */}
@@ -1516,7 +1525,7 @@ export default function SettingsScreen({ navigation }) {
                 {currentNotificationSoundName}
               </Text>
             </View>
-            <IconChevronRight color={colors.textSecondary} />
+            <IconChevronDown color={colors.textSecondary} isExpanded={isSoundPickerOpen} />
           </TouchableOpacity>
 
           {/* Expanded notification sound options */}
@@ -1583,7 +1592,7 @@ export default function SettingsScreen({ navigation }) {
                 {currentAlarmSoundName}
               </Text>
             </View>
-            <IconChevronRight color={colors.textSecondary} />
+            <IconChevronDown color={colors.textSecondary} isExpanded={isAlarmSoundPickerOpen} />
           </TouchableOpacity>
 
           {/* Expanded alarm sound options */}
@@ -1646,7 +1655,7 @@ export default function SettingsScreen({ navigation }) {
                 {formatSnoozeTime(defaultSnoozeTime)}
               </Text>
             </View>
-            <IconChevronRight color={colors.textSecondary} />
+            <IconChevronDown color={colors.textSecondary} isExpanded={isSnoozePickerOpen} />
           </TouchableOpacity>
 
           {/* Expanded snooze options */}

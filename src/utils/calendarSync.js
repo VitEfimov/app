@@ -182,6 +182,45 @@ const isCalendarReadable = (cal) => {
   return Boolean(cal && isValidNativeCalendarId(cal.id));
 };
 
+/**
+ * Filters out Google Calendar's built-in read-only virtual/system calendars:
+ * - Regional public holiday calendars (e.g. "Holidays in United States" en.usa#holiday@group.v.calendar.google.com,
+ *   "Праздники России" ru.russian#holiday@group.v.calendar.google.com)
+ * - Contacts birthday / weather virtual feeds (#contacts@group.v.calendar.google.com, addressbook#)
+ * - Auto-generated Google Family group calendar (family12345...@group.calendar.google.com)
+ */
+export const isSystemOrHolidayGroupCalendar = (cal) => {
+  if (!cal) return true;
+  const owner = String(cal.ownerAccount || '').trim().toLowerCase();
+  const name = String(cal.name || '').trim().toLowerCase();
+  const title = String(cal.title || '').trim().toLowerCase();
+
+  if (
+    owner.endsWith('@group.v.calendar.google.com') ||
+    owner.includes('#holiday@') ||
+    owner.includes('#contacts@') ||
+    owner.includes('#weather@') ||
+    owner.startsWith('addressbook#') ||
+    /^family\d*@group\.calendar\.google\.com$/i.test(owner)
+  ) {
+    return true;
+  }
+
+  if (
+    name.includes('#holiday@') ||
+    name.includes('#contacts@') ||
+    /^family\d*@group\.calendar\.google\.com$/i.test(name)
+  ) {
+    return true;
+  }
+
+  if (title === 'family' && owner.endsWith('@group.calendar.google.com')) {
+    return true;
+  }
+
+  return false;
+};
+
 const isOutlookOrExchangeCalendar = (cal) => {
   if (!cal) return false;
   const srcType = String(cal.source?.type || '').toLowerCase();
@@ -373,11 +412,24 @@ export const getWritableCalendarsAsync = async (options = {}) => {
     const calendars = await enqueueCalendarOp(() =>
       Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT)
     );
-    const list = calendars || [];
+    const list = (calendars || []).filter(c => !isSystemOrHolidayGroupCalendar(c));
     const writable = list.filter(isCalendarWritable);
-    const readable = options?.requireWritable ? writable : list.filter(isCalendarReadable);
-    const pool = readable.length > 0 ? readable : writable;
-    return pool.sort((a, b) => {
+    const readable = options?.requireWritable
+      ? writable
+      : list.filter(c => isCalendarWritable(c) || isOutlookOrExchangeCalendar(c));
+    const pool = readable.length > 0 ? readable : (writable.length > 0 ? writable : list.filter(isCalendarReadable));
+
+    // Deduplicate calendars with identical (title, ownerAccount) across synced accounts
+    const deduped = [];
+    const seenKeys = new Set();
+    for (const cal of pool) {
+      const key = `${String(cal.title || '').trim().toLowerCase()}|${String(cal.ownerAccount || cal.source?.name || '').trim().toLowerCase()}`;
+      if (key !== '|' && seenKeys.has(key)) continue;
+      if (key !== '|') seenKeys.add(key);
+      deduped.push(cal);
+    }
+
+    return deduped.sort((a, b) => {
       const score = (c) => {
         let s = 0;
         if (c.isPrimary) s += 4;

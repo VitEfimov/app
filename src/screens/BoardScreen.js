@@ -520,11 +520,11 @@ export default function BoardScreen({ route, navigation }) {
         [targetSection]: Math.max(prev[targetSection] || INITIAL_SECTION_PAGE_SIZE, 60),
       }));
 
-      // 3. Highlight and focus on the task in the list
+      // 3. Highlight and focus on the task in the list (auto-clears after 1 second when app is open)
       setHighlightedTaskId(String(t.id || t._id));
       const highlightTimer = setTimeout(() => {
         setHighlightedTaskId(null);
-      }, 4000);
+      }, 1000);
 
       // 4. Open task details modal with 150ms gesture transition buffer
       const modalTimer = setTimeout(() => {
@@ -2182,6 +2182,7 @@ export default function BoardScreen({ route, navigation }) {
           cancelAllInlineEditing();
           try { Keyboard?.dismiss?.(); } catch (e) {}
           setDetailsVisible(false);
+          setHighlightedTaskId(null);
         }}
       />
 

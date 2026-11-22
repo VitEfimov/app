@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions, BackHandler } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions, BackHandler, Animated, Easing } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -36,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { SecurityLockHelper } from '../utils/securityLockHelper';
 import { A11yHelper } from '../utils/a11yHelper';
+import { HapticHelper } from '../utils/hapticHelper';
 import { extractTaskAmountFromTitle, getCurrencyMeta, isPriceBoardType, parseLocalizedNumber, resolveCurrencyCode, extractTaskAmountAndCurrency, convertCurrency, formatCurrency, CURRENCIES, SYMBOL_TO_CURRENCY_CODE } from '../utils/currencyHelper';
 import { computeHabitStats, isHabitTask, normalizeHabitSchedule } from '../utils/habitHelper';
 
@@ -267,6 +268,9 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
   const [premiumFeatureName, setPremiumFeatureName] = useState('');
   const [selectedFullscreenImage, setSelectedFullscreenImage] = useState(null);
   const [isAttachmentOptionsVisible, setAttachmentOptionsVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveBtnScaleAnim = useRef(new Animated.Value(1)).current;
+  const saveCardFadeAnim = useRef(new Animated.Value(1)).current;
 
   // Security & Privacy Shield: Instantly close modal if device locks to prevent background leaks
   useEffect(() => {
@@ -486,6 +490,9 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
       setItemPriceInput(initialPriceStr);
       setHabitSchedule(initialHabitSchedule);
       setHabitCompletedDatesState(initialHabitDates);
+      setIsSaving(false);
+      saveBtnScaleAnim.setValue(1);
+      saveCardFadeAnim.setValue(1);
       dispatch(setTaskOptionsCollapsed(true));
 
       initialSnapshotRef.current = {
@@ -733,32 +740,41 @@ useEffect(() => {
 
     const effectiveTaskId = task.id || task._id;
     let didScheduleInSave = false;
+    let deferredNotificationJob = null;
     if (timeChanged || dateChanged || reminderChanged || isAlarmChanged || keepNotificationAllDayChanged || nameChanged) {
       updates.reminder = reminder;
       updates.isNagMode = reminder === 'Nag Mode (Every 10 min)';
       updates.escalationLevel = reminder === 'Escalating Reminder' ? 'active' : 'none';
       updates.keepNotificationAllDay = keepNotificationAllDay;
-      // Schedule new notifications: always cancel existing alarm/reminder first
-      await cancelNotification(task.notificationId, effectiveTaskId);
       updates.notificationId = null;
-
-      const notifIds = await scheduleTaskReminder(
-        taskName,
-        reminder,
-        selectedDate || dayjs().format('YYYY-MM-DD'),
-        selectedTime,
-        effectiveTaskId,
-        isAlarm,
-        themeState,
-        {
-          dateString: selectedDate || dayjs().format('YYYY-MM-DD'),
-          isNagMode: updates.isNagMode,
-          escalationLevel: updates.escalationLevel,
-          keepNotificationAllDay: keepNotificationAllDay
-        }
-      );
-      if (notifIds && notifIds.length > 0) updates.notificationId = notifIds;
       didScheduleInSave = true;
+
+      const targetDateStr = selectedDate || dayjs().format('YYYY-MM-DD');
+      const nextNagMode = updates.isNagMode;
+      const nextEscalation = updates.escalationLevel;
+      deferredNotificationJob = async () => {
+        try {
+          await cancelNotification(task.notificationId, effectiveTaskId);
+          const notifIds = await scheduleTaskReminder(
+            taskName,
+            reminder,
+            targetDateStr,
+            selectedTime,
+            effectiveTaskId,
+            isAlarm,
+            themeState,
+            {
+              dateString: targetDateStr,
+              isNagMode: nextNagMode,
+              escalationLevel: nextEscalation,
+              keepNotificationAllDay: keepNotificationAllDay
+            }
+          );
+          if (notifIds && notifIds.length > 0) {
+            dispatch(updateTask({ taskId: effectiveTaskId, skipReschedule: true, notificationId: notifIds }));
+          }
+        } catch (e) {}
+      };
     }
     
     if (JSON.stringify(subtasks) !== JSON.stringify(task.subtasks || [])) {
@@ -943,7 +959,41 @@ useEffect(() => {
       dispatch(updateTask({ taskId: task.id || task._id, skipReschedule: didScheduleInSave, ...updates }));
     }
 
-    onClose();
+    if (deferredNotificationJob) {
+      setTimeout(deferredNotificationJob, 0);
+    }
+
+    // Crisp tactile feedback & quick spring save animation before closing sheet
+    HapticHelper.trigger('success');
+    setIsSaving(true);
+    try { Keyboard?.dismiss?.(); } catch (e) {}
+
+    Animated.sequence([
+      Animated.timing(saveBtnScaleAnim, {
+        toValue: 0.96,
+        duration: 45,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.spring(saveBtnScaleAnim, {
+          toValue: 1.02,
+          friction: 5,
+          tension: 180,
+          useNativeDriver: true,
+        }),
+        Animated.timing(saveCardFadeAnim, {
+          toValue: 0.94,
+          duration: 85,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    setTimeout(() => {
+      onClose();
+    }, 110);
   };
 
   const handleSave = () => {
@@ -1456,6 +1506,13 @@ useEffect(() => {
     <Modal 
       testID="task_details_modal"
       isVisible={isVisible} 
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      animationInTiming={210}
+      animationOutTiming={160}
+      backdropTransitionInTiming={180}
+      backdropTransitionOutTiming={130}
+      useNativeDriverForBackdrop={true}
       onSwipeComplete={handleClose}
       swipeDirection={(scrollOffset > 0 || showTimePicker) ? undefined : ['down']}
       onBackdropPress={handleClose}
@@ -2344,23 +2401,37 @@ useEffect(() => {
 
             {/* Bottom Actions */}
             <View style={{ marginTop: isVeryCompact ? 6 : 10, marginBottom: 4 }}>
-              <TouchableOpacity 
-                testID="task_details_save_btn_bottom"
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel={t('Save changes') || 'Save changes'}
-                accessibilityHint={t('Saves all changes made to this task') || 'Saves all changes made to this task'}
-                onPress={handleSave} 
-                style={[styles.saveBtnFull, { backgroundColor: colors.primary, height: isVeryCompact ? 42 : (isCompact ? 46 : 48), borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 0, outlineStyle: 'none' }]}
-                activeOpacity={0.85}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <IconCheck color="#ffffff" />
-                  <Text style={[styles.saveBtnText, { color: '#ffffff', fontSize: 15, fontWeight: '700' }]}>
-                    {t('Save changes') || 'Save changes'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              <Animated.View style={{ transform: [{ scale: saveBtnScaleAnim }], opacity: saveCardFadeAnim }}>
+                <TouchableOpacity 
+                  testID="task_details_save_btn_bottom"
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={isSaving ? (t('Saved') || 'Saved') : (t('Save changes') || 'Save changes')}
+                  accessibilityHint={t('Saves all changes made to this task') || 'Saves all changes made to this task'}
+                  onPress={handleSave}
+                  disabled={isSaving}
+                  style={[
+                    styles.saveBtnFull,
+                    {
+                      backgroundColor: isSaving ? '#10B981' : colors.primary,
+                      height: isVeryCompact ? 42 : (isCompact ? 46 : 48),
+                      borderRadius: 24,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 0,
+                      outlineStyle: 'none',
+                    },
+                  ]}
+                  activeOpacity={0.85}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconCheck color="#ffffff" />
+                    <Text style={[styles.saveBtnText, { color: '#ffffff', fontSize: 15, fontWeight: '700' }]}>
+                      {isSaving ? (t('Saved') || 'Saved') : (t('Save changes') || 'Save changes')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
 
               <TouchableOpacity 
                 testID="task_details_delete_btn_bottom"

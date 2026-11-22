@@ -3274,6 +3274,19 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(themeSliceSrc, /toggleSelectedCalendarId/, 'themeSlice must support toggling multiple selected device calendars');
       const settingsSrc = fs.readFileSync(path.resolve('src/screens/SettingsScreen.js'), 'utf8');
       assert.match(settingsSrc, /dispatch\(toggleSelectedCalendarId\(calOpt\.id\)\)/, 'SettingsScreen calendar picker must allow selecting multiple device calendars at once');
+      assert.match(settingsSrc, /<IconChevronDown color=\{colors\.textSecondary\} isExpanded=\{isCalendarPickerOpen\} \/>/, 'Target Calendar row must use rotating IconChevronDown');
+      assert.match(settingsSrc, /<IconChevronDown color=\{colors\.textSecondary\} isExpanded=\{isNotificationSettingsOpen\} \/>/, 'Notification settings row must use rotating IconChevronDown');
+      assert.match(settingsSrc, /<IconChevronDown color=\{colors\.textSecondary\} isExpanded=\{isSoundPickerOpen\} \/>/, 'Notification sound row must use rotating IconChevronDown');
+      assert.match(settingsSrc, /<IconChevronDown color=\{colors\.textSecondary\} isExpanded=\{isAlarmSoundPickerOpen\} \/>/, 'Alarm sound row must use rotating IconChevronDown');
+      assert.match(settingsSrc, /<IconChevronDown color=\{colors\.textSecondary\} isExpanded=\{isSnoozePickerOpen\} \/>/, 'Default Snooze row must use rotating IconChevronDown');
+      assert.doesNotMatch(settingsSrc, /testAndroidDefaultNotification\(\)/, 'Selecting Device Default sound must preview audio in-app without firing an unexpected Android Sound Test push notification');
+
+      // 8. System/Holiday virtual calendars filtered out, 1s task focus clear, and fast animated task save
+      assert.match(calSyncSrc, /export const isSystemOrHolidayGroupCalendar/, 'calendarSync must filter out virtual Holiday and Family group calendars');
+      assert.match(boardScreenSrc, /setHighlightedTaskId\(null\);\s*\},\s*1000\)/, 'BoardScreen must clear focused task highlight after 1 second (1000ms)');
+      const detailsSrc = fs.readFileSync(path.resolve('src/components/TaskDetailsModal.js'), 'utf8');
+      assert.match(detailsSrc, /saveBtnScaleAnim/, 'TaskDetailsModal must animate Save button with native-driver scale feedback');
+      assert.match(detailsSrc, /deferredNotificationJob/, 'TaskDetailsModal must defer notification scheduling off the synchronous Save/close UI path');
     });
   });
 });

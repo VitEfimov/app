@@ -1153,114 +1153,123 @@ export const updateTask = (payload) => async (dispatch, getState) => {
     const taskId = payload?.taskId;
     const existingTask = taskId ? state.taskReducer.tasks.find(t => t && String(t.id || t._id) === String(taskId)) : null;
 
+    // 1. Optimistic 0ms UI update & immediate storage persistence
     dispatch(updateTaskSync(payload));
-    const updatedTask = taskId ? getState().taskReducer.tasks.find(t => t && String(t.id || t._id) === String(taskId)) : null;
+    const immediateTasks = getState().taskReducer.tasks;
+    persistTasksToStorage(immediateTasks, getState);
+    syncRecurringAutomations(getState);
 
-    if (updatedTask) {
-        const effectiveId = updatedTask.id || updatedTask._id;
-        const scheduleFieldChanged = Boolean(
-            payload &&
-            !payload.skipReschedule &&
-            payload.notificationId === undefined &&
-            (
-                payload.completionDate !== undefined ||
-                payload.time !== undefined ||
-                payload.reminder !== undefined ||
-                payload.isAlarm !== undefined ||
-                payload.isNagMode !== undefined ||
-                payload.escalationLevel !== undefined ||
-                payload.keepNotificationAllDay !== undefined ||
-                payload.name !== undefined
-            )
-        );
-        const justUncompleted = Boolean(existingTask && existingTask.completed && !updatedTask.completed);
+    const updatedTask = taskId ? immediateTasks.find(t => t && String(t.id || t._id) === String(taskId)) : null;
 
-        if (updatedTask.completed) {
-            await cancelNotification(updatedTask.notificationId, effectiveId);
-        } else if (justUncompleted || scheduleFieldChanged) {
-            if (scheduleFieldChanged) {
-                await cancelNotification(existingTask?.notificationId || updatedTask.notificationId, effectiveId);
-            }
-            const hasReminder = updatedTask.reminder && updatedTask.reminder !== 'None';
-            const isKeepAllDay = !!updatedTask.keepNotificationAllDay;
-            const isAlarm = !!updatedTask.isAlarm;
-            if ((hasReminder || isKeepAllDay || isAlarm) && updatedTask.completionDate) {
-                try {
-                    const notifIds = await scheduleTaskReminder(
-                        updatedTask.taskname,
-                        updatedTask.reminder,
-                        updatedTask.completionDate,
-                        updatedTask.time,
-                        effectiveId,
-                        isAlarm,
-                        state.themeReducer,
-                        {
-                            dateString: updatedTask.dateString,
-                            isNagMode: updatedTask.isNagMode,
-                            escalationLevel: updatedTask.escalationLevel,
-                            keepNotificationAllDay: updatedTask.keepNotificationAllDay
-                        }
-                    );
-                    dispatch(updateTaskSync({ taskId: effectiveId, notificationId: Array.isArray(notifIds) ? notifIds : [] }));
-                } catch (e) {}
-            } else if (scheduleFieldChanged) {
-                dispatch(updateTaskSync({ taskId: effectiveId, notificationId: [] }));
-            }
-        }
-    }
-
-    if (state.themeReducer?.calendarSyncEnabled && updatedTask) {
-        const effUpdatedId = updatedTask.id || updatedTask._id;
-        await runSerializedTaskCalendarWrite(effUpdatedId, async () => {
-            const liveState = getState();
-            const liveTheme = liveState.themeReducer || state.themeReducer;
-            const liveBoards = liveState.userReducer?.boards || [];
-            const liveTask = (liveState.taskReducer.tasks || []).find(
-                t => t && String(t.id || t._id) === String(effUpdatedId)
+    // 2. Non-blocking background notification & calendar sync so UI / modal close never lags
+    setTimeout(async () => {
+        if (updatedTask) {
+            const effectiveId = updatedTask.id || updatedTask._id;
+            const scheduleFieldChanged = Boolean(
+                payload &&
+                !payload.skipReschedule &&
+                payload.notificationId === undefined &&
+                (
+                    payload.completionDate !== undefined ||
+                    payload.time !== undefined ||
+                    payload.reminder !== undefined ||
+                    payload.isAlarm !== undefined ||
+                    payload.isNagMode !== undefined ||
+                    payload.escalationLevel !== undefined ||
+                    payload.keepNotificationAllDay !== undefined ||
+                    payload.name !== undefined
+                )
             );
-            if (!liveTask) return;
+            const justUncompleted = Boolean(existingTask && existingTask.completed && !updatedTask.completed);
 
-            const boardEligible = isTaskEligibleForCalendarSync(liveTask, liveBoards, liveTheme?.boardCalendarSync);
-            const liveDateKey = extractTaskDateKey(liveTask);
             try {
-                if (!boardEligible) {
-                    // Task lives on (or was just moved to) an unsynced board -> remove old TaskFlow calendar event
-                    if (liveTask.calendarEventId && !liveTask.syncedFromCalendar) {
+                if (updatedTask.completed) {
+                    await cancelNotification(updatedTask.notificationId, effectiveId);
+                } else if (justUncompleted || scheduleFieldChanged) {
+                    if (scheduleFieldChanged) {
+                        await cancelNotification(existingTask?.notificationId || updatedTask.notificationId, effectiveId);
+                    }
+                    const hasReminder = updatedTask.reminder && updatedTask.reminder !== 'None';
+                    const isKeepAllDay = !!updatedTask.keepNotificationAllDay;
+                    const isAlarm = !!updatedTask.isAlarm;
+                    if ((hasReminder || isKeepAllDay || isAlarm) && updatedTask.completionDate) {
+                        try {
+                            const notifIds = await scheduleTaskReminder(
+                                updatedTask.taskname,
+                                updatedTask.reminder,
+                                updatedTask.completionDate,
+                                updatedTask.time,
+                                effectiveId,
+                                isAlarm,
+                                state.themeReducer,
+                                {
+                                    dateString: updatedTask.dateString,
+                                    isNagMode: updatedTask.isNagMode,
+                                    escalationLevel: updatedTask.escalationLevel,
+                                    keepNotificationAllDay: updatedTask.keepNotificationAllDay
+                                }
+                            );
+                            dispatch(updateTaskSync({ taskId: effectiveId, notificationId: Array.isArray(notifIds) ? notifIds : [] }));
+                            persistTasksToStorage(getState().taskReducer.tasks, getState);
+                        } catch (e) {}
+                    } else if (scheduleFieldChanged) {
+                        dispatch(updateTaskSync({ taskId: effectiveId, notificationId: [] }));
+                        persistTasksToStorage(getState().taskReducer.tasks, getState);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (state.themeReducer?.calendarSyncEnabled && updatedTask) {
+            const effUpdatedId = updatedTask.id || updatedTask._id;
+            await runSerializedTaskCalendarWrite(effUpdatedId, async () => {
+                const liveState = getState();
+                const liveTheme = liveState.themeReducer || state.themeReducer;
+                const liveBoards = liveState.userReducer?.boards || [];
+                const liveTask = (liveState.taskReducer.tasks || []).find(
+                    t => t && String(t.id || t._id) === String(effUpdatedId)
+                );
+                if (!liveTask) return;
+
+                const boardEligible = isTaskEligibleForCalendarSync(liveTask, liveBoards, liveTheme?.boardCalendarSync);
+                const liveDateKey = extractTaskDateKey(liveTask);
+                try {
+                    if (!boardEligible) {
+                        if (liveTask.calendarEventId && !liveTask.syncedFromCalendar) {
+                            await addTombstoneAsync(liveTask.calendarEventId);
+                            await removeTaskFromCalendarAsync(liveTask.calendarEventId);
+                            dispatch(updateTaskSync({ taskId: effUpdatedId, calendarEventId: null, calendarSyncHash: null }));
+                        }
+                    } else if (liveTask.completed) {
+                        if (liveTask.calendarEventId) {
+                            await syncTaskToCalendarAsync(liveTask, liveTheme);
+                            dispatch(updateTaskSync({
+                                taskId: effUpdatedId,
+                                calendarSyncHash: getTaskCalendarFingerprint(liveTask, Boolean(liveTheme?.calendarAlarmsEnabled))
+                            }));
+                        }
+                    } else if (liveDateKey) {
+                        const newCalId = await syncTaskToCalendarAsync(liveTask, liveTheme);
+                        if (newCalId) {
+                            dispatch(updateTaskSync({
+                                taskId: effUpdatedId,
+                                calendarEventId: newCalId,
+                                calendarSyncHash: getTaskCalendarFingerprint(liveTask, Boolean(liveTheme?.calendarAlarmsEnabled))
+                            }));
+                        }
+                    } else if (!liveDateKey && liveTask.calendarEventId) {
                         await addTombstoneAsync(liveTask.calendarEventId);
                         await removeTaskFromCalendarAsync(liveTask.calendarEventId);
                         dispatch(updateTaskSync({ taskId: effUpdatedId, calendarEventId: null, calendarSyncHash: null }));
                     }
-                } else if (liveTask.completed) {
-                    if (liveTask.calendarEventId) {
-                        await syncTaskToCalendarAsync(liveTask, liveTheme);
-                        dispatch(updateTaskSync({
-                            taskId: effUpdatedId,
-                            calendarSyncHash: getTaskCalendarFingerprint(liveTask, Boolean(liveTheme?.calendarAlarmsEnabled))
-                        }));
-                    }
-                } else if (liveDateKey) {
-                    const newCalId = await syncTaskToCalendarAsync(liveTask, liveTheme);
-                    if (newCalId) {
-                        dispatch(updateTaskSync({
-                            taskId: effUpdatedId,
-                            calendarEventId: newCalId,
-                            calendarSyncHash: getTaskCalendarFingerprint(liveTask, Boolean(liveTheme?.calendarAlarmsEnabled))
-                        }));
-                    }
-                } else if (!liveDateKey && liveTask.calendarEventId) {
-                    await addTombstoneAsync(liveTask.calendarEventId);
-                    await removeTaskFromCalendarAsync(liveTask.calendarEventId);
-                    dispatch(updateTaskSync({ taskId: effUpdatedId, calendarEventId: null, calendarSyncHash: null }));
+                    persistTasksToStorage(getState().taskReducer.tasks, getState);
+                } catch (e) {
+                    console.warn('Calendar sync error on updateTask:', e);
                 }
-            } catch (e) {
-                console.warn('Calendar sync error on updateTask:', e);
-            }
-        });
-    }
+            });
+        }
+    }, 0);
 
-    const tasks = getState().taskReducer.tasks;
-    persistTasksToStorage(tasks, getState);
-    syncRecurringAutomations(getState);
     const dbSyncEnabled = state.themeReducer?.dbSyncEnabled !== false && Platform.OS !== 'web';
     if (state.userReducer?.isAuthenticated && dbSyncEnabled && payload?.taskId) {
         dispatch(updateTaskAsync({ taskId: payload.taskId, payload }));
