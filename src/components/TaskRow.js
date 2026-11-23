@@ -417,10 +417,23 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
     );
   }, [task, boardType, habitStreakMode, checkboxScale, dispatch, showToast, t]);
 
+  const handleSwipeThresholdReach = useCallback(() => {
+    const useNative = Platform.OS !== 'web';
+    checkboxScale.setValue(1);
+    Animated.sequence([
+      Animated.spring(checkboxScale, { toValue: 1.32, friction: 4, tension: 240, useNativeDriver: useNative }),
+      Animated.spring(checkboxScale, { toValue: 1.05, friction: 5, tension: 180, useNativeDriver: useNative }),
+    ]).start();
+    if (!task?.completed) {
+      HapticHelper.success();
+    } else {
+      HapticHelper.light();
+    }
+  }, [checkboxScale, task?.completed]);
+
   const handleSwipeComplete = useCallback(() => {
-    closeSwipeable();
     handleToggleComplete();
-  }, [closeSwipeable, handleToggleComplete]);
+  }, [handleToggleComplete]);
 
   const handleSwipeDelete = useCallback(() => {
     if (!task) return;
@@ -482,17 +495,49 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
   const rightActionsWidth = onPressMore ? 144 : 106;
 
   const renderLeftDrawer = useCallback((animStyle) => {
+    const isUncompleting = Boolean(task?.completed);
+    const accentColor = isUncompleting ? (colors.primary || '#6750A4') : '#10B981';
+    const bgTint = isUncompleting
+      ? (isDark ? 'rgba(103, 80, 164, 0.22)' : 'rgba(103, 80, 164, 0.12)')
+      : (isDark ? 'rgba(16, 185, 129, 0.22)' : 'rgba(16, 185, 129, 0.14)');
+
     return (
-      <View style={[styles.leftAction, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]}>
+      <View
+        style={[
+          styles.leftAction,
+          {
+            backgroundColor: bgTint,
+            borderBottomColor: colors.borderColor,
+            borderRadius: 10,
+          },
+          hideUnderline && { borderBottomWidth: 0 },
+        ]}
+      >
         <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, animStyle]}>
-          <View style={styles.leftActionIconWrapper}>
-            <SwipeIconComplete color={colors.primary} />
+          <View
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 15,
+              backgroundColor: accentColor,
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: accentColor,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.35,
+              shadowRadius: 4,
+              elevation: 3,
+            }}
+          >
+            <SwipeIconComplete color="#FFFFFF" />
           </View>
-          <Text style={[styles.actionText, { color: colors.primary, marginLeft: 8 }]}>{t('Complete')}</Text>
+          <Text style={[styles.actionText, { color: accentColor, marginLeft: 10, fontWeight: '700' }]}>
+            {isUncompleting ? (t('Mark Uncomplete') || 'Uncomplete') : (t('Complete') || 'Complete')}
+          </Text>
         </Animated.View>
       </View>
     );
-  }, [colors.surfaceContainer, colors.borderColor, colors.primary, t, hideUnderline]);
+  }, [task?.completed, isDark, colors.borderColor, colors.primary, t, hideUnderline]);
 
   const renderRightDrawer = useCallback((animStyle) => {
     return (
@@ -1106,6 +1151,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
         rightThreshold={40}
         renderLeftDrawer={renderLeftDrawer}
         renderRightDrawer={renderRightDrawer}
+        onSwipeLeftThresholdReach={handleSwipeThresholdReach}
         onSwipeLeftOpen={handleSwipeComplete}
         onWillOpen={() => {
           if (activeOpenSwipeable && activeOpenSwipeable !== swipeableRef.current) {

@@ -182,42 +182,40 @@ export function YearPickerModal({
         },
       ]}
     >
-        {/* Drag Handle */}
-        <View style={styles.dragHandleContainer}>
-          <View
-            style={[
-              styles.dragHandle,
-              { backgroundColor: colors.textSecondary || '#888' },
-            ]}
-          />
-        </View>
-
-        {/* Modal Header */}
+        {/* Top Full-Screen Navigation Header with single Back Arrow */}
         <View style={styles.headerRow}>
-          <Text
-            style={[
-              styles.title,
-              { color: colors.textPrimary || '#fff' },
-            ]}
-          >
-            {`${selectedMonthName} ${selectedYear}`}
-          </Text>
-          <TouchableOpacity
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={t('Cancel') || 'Close'}
-            style={styles.closeBtn}
-            onPress={onClose}
-          >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity
+              testID="month_year_cancel_btn"
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('Back') || 'Back'}
+              activeOpacity={0.7}
+              onPress={onClose}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: isContrast ? '#FFFFFF' : (colors.borderColor || 'rgba(128,128,128,0.3)'),
+                backgroundColor: isContrast ? '#000000' : (colors.bgCard || '#1e1e1e'),
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary || '#fff', lineHeight: 20 }}>
+                ←
+              </Text>
+            </TouchableOpacity>
             <Text
               style={[
-                styles.closeBtnText,
-                { color: colors.textSecondary || '#888' },
+                styles.title,
+                { color: colors.textPrimary || '#fff' },
               ]}
             >
-              ✕
+              {`${selectedMonthName} ${selectedYear}`}
             </Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* 1. HOT TAPS: Next 5 Months */}
@@ -446,12 +444,13 @@ export function YearPickerModal({
                 },
               ]}
             >
-              📅 {t('year') || 'Year'}: {selectedYear}
+              📅 {capitalize(t('Year') || t('year') || 'Year')}: {selectedYear}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* 4. SELECTOR CONTENT: 3x4 Month Grid or Year Grid */}
+        {/* 4. SELECTOR CONTENT: Full-Screen 3x4 Month Grid or Full-Screen Year Grid */}
+        <View style={{ flex: 1, justifyContent: 'flex-start' }}>
         {activeTab === 'month' ? (
           <View style={styles.gridContainer}>
             {months.map((m) => {
@@ -468,6 +467,7 @@ export function YearPickerModal({
                   style={[
                     styles.gridCell,
                     {
+                      paddingVertical: 16,
                       borderColor: isContrast
                         ? isSelected
                           ? '#FFFFFF'
@@ -514,7 +514,7 @@ export function YearPickerModal({
             style={styles.yearScroll}
             contentContainerStyle={styles.gridContainer}
             nestedScrollEnabled={true}
-            showsVerticalScrollIndicator={true}
+            showsVerticalScrollIndicator={false}
           >
             {years.map((year) => {
               const isSelected = year === selectedYear;
@@ -571,40 +571,10 @@ export function YearPickerModal({
             })}
           </ScrollView>
         )}
+        </View>
 
-        {/* 5. FOOTER BUTTONS: Cancel & Apply */}
+        {/* 5. FOOTER BUTTON: Full-Width Done / Apply */}
         <View style={styles.footerRow}>
-          <TouchableOpacity
-            testID="month_year_cancel_btn"
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={t('Cancel') || 'Cancel'}
-            activeOpacity={0.7}
-            style={[
-              styles.cancelBtn,
-              {
-                borderColor: isContrast
-                  ? '#FFFFFF'
-                  : colors.borderColor || 'rgba(128,128,128,0.3)',
-                borderWidth: isContrast ? 1.5 : 1,
-              },
-            ]}
-            onPress={onClose}
-          >
-            <Text
-              style={[
-                styles.cancelText,
-                {
-                  color: isContrast
-                    ? '#FFFFFF'
-                    : colors.textSecondary || '#888',
-                },
-              ]}
-            >
-              {t('Cancel') || 'Cancel'}
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             testID="month_year_apply_btn"
             accessible={true}
@@ -614,6 +584,9 @@ export function YearPickerModal({
             style={[
               styles.applyBtn,
               {
+                flex: 1,
+                borderRadius: 24,
+                paddingVertical: 14,
                 backgroundColor: isContrast
                   ? '#FFFFFF'
                   : colors.primary || '#6200ee',
@@ -680,12 +653,15 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   content: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 16,
     paddingBottom: 24,
-    maxHeight: 640,
+    justifyContent: 'space-between',
   },
   dragHandleContainer: {
     alignItems: 'center',
@@ -701,11 +677,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     letterSpacing: -0.3,
   },
   closeBtn: {
@@ -716,7 +692,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   hotSection: {
-    marginBottom: 10,
+    marginBottom: 12,
   },
   hotSectionTitle: {
     fontSize: 12,
@@ -731,8 +707,8 @@ const styles = StyleSheet.create({
     paddingRight: 10,
   },
   hotChip: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
@@ -745,11 +721,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: 12,
     padding: 4,
-    marginVertical: 10,
+    marginVertical: 12,
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
@@ -768,16 +744,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingVertical: 4,
-    rowGap: 8,
+    paddingVertical: 6,
+    rowGap: 10,
   },
   yearScroll: {
-    maxHeight: 200,
+    flex: 1,
   },
   gridCell: {
     width: '31.5%',
-    paddingVertical: 11,
-    borderRadius: 10,
+    paddingVertical: 13,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },

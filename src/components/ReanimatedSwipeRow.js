@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Animated, Platform, View, StyleSheet } from 'react-native';
+import { Animated, Easing, Platform, View, StyleSheet } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -9,11 +9,13 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
  *
  * Designed specifically for React Native 0.76+ Fabric + FlashList v2:
  * 1. Drives pan tracking via `Animated.event(..., { useNativeDriver: true })` (RNGH NATIVE_ANIMATED_EVENT)
- *    and native `Animated.spring` — zero JS bridge drag frames and zero per-row `onLayout` setState passes.
+ *    and native `Animated.spring` / `Animated.timing` — zero JS bridge drag frames.
  * 2. Avoids `react-native-reanimated` `useAnimatedStyle` on list items so `ReanimatedCommitHook`
  *    never triggers Fabric Issue #6659 (`ModalHostView` collapsing to 0x0 on `BoardScreen`/`CalendarScreen`).
  * 3. Lazily mounts left/right background action drawers ONLY when a horizontal swipe crosses the active
  *    threshold (`State.ACTIVE`), cutting idle TaskRow view & SVG count during vertical FlashList scrolling.
+ * 4. Plays a choreographed 60fps right-swipe completion glide, checkmark badge pop, and row fade-out
+ *    before committing state update so the task completion transition feels fluid and tactile.
  */
 const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
   {
@@ -23,6 +25,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     rightActionsWidth = 144,
     rightThreshold = 40,
     onSwipeLeftOpen,
+    onSwipeLeftThresholdReach,
     onWillOpen,
     onClose,
     renderLeftDrawer,
@@ -33,25 +36,39 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
 ) {
   const dragX = useRef(new Animated.Value(0)).current;
   const rowTranslation = useRef(new Animated.Value(0)).current;
+  const rowExitOpacity = useRef(new Animated.Value(1)).current;
+  const rowExitScale = useRef(new Animated.Value(1)).current;
+  const completeBadgePop = useRef(new Animated.Value(1)).current;
   const isOpenRef = useRef(false);
+  const isCompletingRef = useRef(false);
   const [actionsMounted, setActionsMounted] = useState(false);
 
   // Reset swipe offset & unmount drawers cleanly when FlashList recycles this row
   useEffect(() => {
     dragX.stopAnimation();
     rowTranslation.stopAnimation();
+    rowExitOpacity.stopAnimation();
+    rowExitScale.stopAnimation();
+    completeBadgePop.stopAnimation();
     dragX.setValue(0);
     rowTranslation.setValue(0);
+    rowExitOpacity.setValue(1);
+    rowExitScale.setValue(1);
+    completeBadgePop.setValue(1);
     isOpenRef.current = false;
+    isCompletingRef.current = false;
     setActionsMounted(prev => (prev ? false : prev));
-  }, [itemKey, dragX, rowTranslation]);
+  }, [itemKey, dragX, rowTranslation, rowExitOpacity, rowExitScale, completeBadgePop]);
 
   useEffect(() => {
     return () => {
       dragX.stopAnimation();
       rowTranslation.stopAnimation();
+      rowExitOpacity.stopAnimation();
+      rowExitScale.stopAnimation();
+      completeBadgePop.stopAnimation();
     };
-  }, [dragX, rowTranslation]);
+  }, [dragX, rowTranslation, rowExitOpacity, rowExitScale, completeBadgePop]);
 
   const ensureMounted = useCallback(() => {
     setActionsMounted(prev => (prev ? prev : true));
@@ -74,7 +91,11 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
 
   const closeRow = useCallback(() => {
     isOpenRef.current = false;
+    isCompletingRef.current = false;
     dragX.setValue(0);
+    rowExitOpacity.setValue(1);
+    rowExitScale.setValue(1);
+    completeBadgePop.setValue(1);
     Animated.timing(rowTranslation, {
       toValue: 0,
       duration: 160,
@@ -84,7 +105,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
         notifyClose();
       }
     });
-  }, [dragX, rowTranslation, notifyClose]);
+  }, [dragX, rowTranslation, rowExitOpacity, rowExitScale, completeBadgePop, notifyClose]);
 
   useImperativeHandle(
     ref,
@@ -111,11 +132,11 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
         return;
       }
 
-      if (oldState !== State.ACTIVE) {
+      if (oldState !== State.ACTIVE || isCompletingRef.current) {
         return;
       }
 
-      const maxRight = Math.max(40, leftThreshold * 1.35);
+      const maxRight = Math.max(80, leftThreshold * 2.2);
       const maxLeft = Math.max(40, rightActionsWidth);
       const startOffset = isOpenRef.current ? -rightActionsWidth : 0;
       const rawOffset = startOffset + translationX;
@@ -128,14 +149,58 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
       if (!isOpenRef.current) {
         if (rawOffset >= leftThreshold || (rawOffset > leftThreshold * 0.55 && velocityX > 650)) {
           isOpenRef.current = false;
-          Animated.spring(rowTranslation, {
-            toValue: 0,
-            velocity: velocityX,
-            bounciness: 4,
-            speed: 18,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }).start();
-          notifyLeftComplete();
+          isCompletingRef.current = true;
+          if (onSwipeLeftThresholdReach) {
+            try { onSwipeLeftThresholdReach(); } catch (_) {}
+          }
+
+          // Choreographed 2-stage Right-Swipe Complete animation:
+          // 1. Pop the checkmark badge while sliding the row smoothly across to the right
+          // 2. Fade & subtly scale the row out before dispatching the completion state change
+          const slideOutTarget = Math.max(leftThreshold * 1.85, 260);
+          Animated.parallel([
+            Animated.sequence([
+              Animated.spring(completeBadgePop, {
+                toValue: 1.28,
+                friction: 4,
+                tension: 240,
+                useNativeDriver: USE_NATIVE_DRIVER,
+              }),
+              Animated.spring(completeBadgePop, {
+                toValue: 1.05,
+                friction: 6,
+                tension: 180,
+                useNativeDriver: USE_NATIVE_DRIVER,
+              }),
+            ]),
+            Animated.timing(rowTranslation, {
+              toValue: slideOutTarget,
+              duration: 210,
+              easing: Easing.bezier(0.22, 1, 0.36, 1),
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
+            Animated.timing(rowExitOpacity, {
+              toValue: 0,
+              duration: 195,
+              delay: 15,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
+            Animated.timing(rowExitScale, {
+              toValue: 0.96,
+              duration: 200,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
+          ]).start(() => {
+            isCompletingRef.current = false;
+            notifyLeftComplete();
+            // Reset values after dispatch so if the row stays in the list or is recycled, it is clean
+            rowTranslation.setValue(0);
+            rowExitOpacity.setValue(1);
+            rowExitScale.setValue(1);
+            completeBadgePop.setValue(1);
+          });
           return;
         }
 
@@ -183,6 +248,10 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
       rightThreshold,
       rowTranslation,
       dragX,
+      rowExitOpacity,
+      rowExitScale,
+      completeBadgePop,
+      onSwipeLeftThresholdReach,
       notifyLeftComplete,
       notifyWillOpen,
       notifyClose,
@@ -190,7 +259,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
   );
 
   const transX = useMemo(() => {
-    const maxRight = Math.max(40, leftThreshold * 1.35);
+    const maxRight = Math.max(80, leftThreshold * 2.2);
     const maxLeft = Math.max(40, rightActionsWidth);
     return Animated.add(rowTranslation, dragX).interpolate({
       inputRange: [-maxLeft * 1.3, -maxLeft, 0, maxRight * 0.9, maxRight],
@@ -201,38 +270,46 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
 
   const foregroundStyle = useMemo(
     () => ({
-      transform: [{ translateX: transX }],
+      opacity: rowExitOpacity,
+      transform: [
+        { translateX: transX },
+        { scale: rowExitScale },
+      ],
     }),
-    [transX]
+    [transX, rowExitOpacity, rowExitScale]
   );
 
   const leftDrawerAnimStyle = useMemo(() => {
     const halfLeft = Math.max(20, leftThreshold * 0.5);
     const fullLeft = Math.max(40, leftThreshold);
+    const dragScale = transX.interpolate({
+      inputRange: [0, halfLeft, fullLeft, fullLeft * 1.6],
+      outputRange: [0.68, 0.96, 1.12, 1.18],
+      extrapolate: 'clamp',
+    });
     return {
-      opacity: transX.interpolate({
-        inputRange: [0, 1, 20, 50],
-        outputRange: [0, 0, 0.45, 1],
-        extrapolate: 'clamp',
-      }),
+      opacity: Animated.multiply(
+        rowExitOpacity,
+        transX.interpolate({
+          inputRange: [0, 6, 24, 55],
+          outputRange: [0, 0.25, 0.75, 1],
+          extrapolate: 'clamp',
+        })
+      ),
       transform: [
         {
           translateX: transX.interpolate({
-            inputRange: [0, fullLeft],
-            outputRange: [-20, 0],
+            inputRange: [0, fullLeft, fullLeft * 1.8],
+            outputRange: [-18, 4, 18],
             extrapolate: 'clamp',
           }),
         },
         {
-          scale: transX.interpolate({
-            inputRange: [0, halfLeft, fullLeft],
-            outputRange: [0.75, 1, 1.1],
-            extrapolate: 'clamp',
-          }),
+          scale: Animated.multiply(dragScale, completeBadgePop),
         },
       ],
     };
-  }, [transX, leftThreshold]);
+  }, [transX, leftThreshold, rowExitOpacity, completeBadgePop]);
 
   const rightDrawerAnimStyle = useMemo(
     () => ({
