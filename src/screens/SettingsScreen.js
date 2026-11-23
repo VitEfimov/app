@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TouchableWithoutF
 import { useDispatch, useSelector } from 'react-redux';
 import { clearTasks, updateTask, batchSyncCalendarTasks, toggleBoardCalendarSync } from '../features/taskSlice';
 import { rescheduleAllActiveTasks, testAndroidDefaultNotification, scheduleLocalNotification } from '../utils/notifications';
-import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setSelectedCalendarIds, toggleSelectedCalendarId } from '../features/themeSlice';
+import { setTaskNameWrap, setFontSize, setProgressMode, setDefaultSnoozeTime, setThemeMode, setAppPin, setBiometricUnlockEnabled, setBlockScreenshots, setAlarmSound, setNotificationSound, setVibrationEnabled, setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setBoardDefaultReminder, DEFAULT_REMINDER_OPTIONS, setDbSyncEnabled, setCalendarSyncEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setSelectedCalendarIds, toggleSelectedCalendarId } from '../features/themeSlice';
 import { checkCalendarPermissionsAsync, requestCalendarPermissionsAsync, getWritableCalendarsAsync, getCalendarSyncScheduleStateAsync, getNextScheduledSyncTime, isBoardCalendarSyncEnabled, getBoardCalendarSyncKey, isCalendarSyncSupportedForBoard } from '../utils/calendarSync';
 import { getBoardColor } from '../utils/boardColors';
 import { registerBackgroundFetchAsync } from '../utils/backgroundTasks';
@@ -1480,19 +1480,111 @@ export default function SettingsScreen({ navigation }) {
                   accessibilityLabel={t('Vibration') || 'Vibration'}
                 />
               </View>
-              {isPremium && (
-                <View style={styles.subOptionRow}>
-                  <Text style={[styles.subOptionLabel, { color: colors.textPrimary }]}>
-                    {t('Default reminder on new tasks') || 'Default reminder on new tasks'}
+              <View style={styles.subOptionRow}>
+                <Text style={[styles.subOptionLabel, { color: colors.textPrimary }]}>
+                  {t('Default reminder on new tasks') || 'Default reminder on new tasks'}
+                </Text>
+                <Switch
+                  value={Boolean(theme.defaultReminderEnabled)}
+                  onValueChange={val => dispatch(setDefaultReminderEnabled(val))}
+                  trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: !!theme.defaultReminderEnabled }}
+                  accessibilityLabel={t('Default reminder on new tasks') || 'Default reminder on new tasks'}
+                />
+              </View>
+
+              {/* Global Default Reminder Time (Google Calendar style) */}
+              <View style={{ marginTop: 8, marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 6 }}>
+                  {t('Default reminder time') || 'Default reminder time'}
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+                  {DEFAULT_REMINDER_OPTIONS.map((opt) => {
+                    const currentGlobal = theme.defaultReminderEnabled
+                      ? (theme.defaultReminderTime || '30 min before')
+                      : 'None';
+                    const isSelected = currentGlobal === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={`global_rem_${opt.value}`}
+                        testID={`global_default_reminder_${opt.value}`}
+                        onPress={() => {
+                          if (opt.value === 'None') {
+                            dispatch(setDefaultReminderTime('None'));
+                            dispatch(setDefaultReminderEnabled(false));
+                          } else {
+                            dispatch(setDefaultReminderTime(opt.value));
+                            dispatch(setDefaultReminderEnabled(true));
+                          }
+                        }}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 10,
+                          backgroundColor: isSelected ? primaryAccent : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
+                          borderWidth: 1,
+                          borderColor: isSelected ? primaryAccent : (colors.borderColor || '#E5E7EB'),
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                          {t(opt.label) || opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Per-Board Default Reminders (Google Calendar per-calendar style) */}
+              {Array.isArray(boards) && boards.length > 0 && (
+                <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.borderColor || 'rgba(128,128,128,0.15)' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 6 }}>
+                    {t('Board default reminders') || 'Board default reminders'}
                   </Text>
-                  <Switch
-                    value={theme.defaultReminderEnabled || false}
-                    onValueChange={val => dispatch(setDefaultReminderEnabled(val))}
-                    trackColor={{ false: colors.borderColor || '#CCC', true: primaryAccent }}
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: !!theme.defaultReminderEnabled }}
-                    accessibilityLabel={t('Default reminder on new tasks') || 'Default reminder on new tasks'}
-                  />
+                  {boards.map((b) => {
+                    const bId = b.id || b._id;
+                    if (!bId) return null;
+                    const boardOverride = theme.boardDefaultReminders?.[bId] || 'default';
+                    const bColor = getBoardColor(b, boards);
+                    const boardReminderOpts = [
+                      { label: t('Global') || 'Global', value: 'default' },
+                      ...DEFAULT_REMINDER_OPTIONS,
+                    ];
+                    return (
+                      <View key={`board_rem_row_${bId}`} style={{ marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: bColor }} />
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textPrimary }}>
+                            {b.name === 'Main' ? (t('Main') || 'Main') : b.name}
+                          </Text>
+                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 5 }}>
+                          {boardReminderOpts.map((opt) => {
+                            const isSel = boardOverride === opt.value;
+                            return (
+                              <TouchableOpacity
+                                key={`b_rem_${bId}_${opt.value}`}
+                                onPress={() => dispatch(setBoardDefaultReminder({ boardId: bId, reminder: opt.value }))}
+                                style={{
+                                  paddingHorizontal: 9,
+                                  paddingVertical: 4,
+                                  borderRadius: 8,
+                                  backgroundColor: isSel ? primaryAccent : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+                                  borderWidth: 1,
+                                  borderColor: isSel ? primaryAccent : (colors.borderColor || '#E5E7EB'),
+                                }}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: isSel ? '700' : '500', color: isSel ? '#FFFFFF' : colors.textSecondary }}>
+                                  {t(opt.label) || opt.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    );
+                  })}
                 </View>
               )}
             </View>

@@ -7,7 +7,7 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { updateRecurringAutomations, cancelNotification, scheduleTaskReminder } from '../utils/notifications';
 import { syncTaskToCalendarAsync, removeTaskFromCalendarAsync, removeTaskEventsFromCalendarImmediateAsync, removeBoardEventsFromCalendarAsync, syncAllTasksToCalendarAsync, importCalendarEventsAsync, performDifferentialCalendarSyncAsync, fetchCalendarWindowEventsAsync, buildTaskDeduplicationPlan, extractTaskDateKey, getTaskMatchTitle, isMainBoardId, isDateStrInSyncWindow, getTaskCalendarFingerprint, isTaskEligibleForCalendarSync, resolveTaskBoard, getBoardCalendarSyncKey, MAX_EVENTS_PER_SYNC_BATCH, addTombstoneAsync, getCalendarSyncScheduleStateAsync, markCalendarSyncCompletedAsync, isScheduledCalendarSyncDue } from '../utils/calendarSync';
-import { setLastCalendarSyncAt, setBoardCalendarSync } from './themeSlice';
+import { setLastCalendarSyncAt, setBoardCalendarSync, resolveEffectiveDefaultReminder } from './themeSlice';
 import { insertTaskSorted, sortTasksChronologically } from '../utils/binaryInsert';
 import { sanitizeId, sanitizeForStorage } from '../utils/securitySanitizer';
 import { computeHabitRolloverUpdates } from '../utils/habitHelper';
@@ -771,8 +771,7 @@ const syncRecurringAutomations = (getState) => {
             const state = getState();
             const themeState = state.themeReducer;
             const tasks = state.taskReducer.tasks;
-            const isPremium = state.entitlementReducer?.isPremium;
-            updateRecurringAutomations(themeState, tasks, isPremium);
+            updateRecurringAutomations(themeState, tasks, true);
         } catch (e) {
             // Silently catch in case of issues
         }
@@ -782,7 +781,6 @@ const syncRecurringAutomations = (getState) => {
 export const addTask = (payload) => async (dispatch, getState) => {
     const state = getState();
     const themeState = state.themeReducer;
-    const isPremium = state.entitlementReducer?.isPremium;
     if (payload?.task) {
         if (payload.isUndo && payload.task.calendarEventId) {
             payload = {
@@ -794,8 +792,15 @@ export const addTask = (payload) => async (dispatch, getState) => {
                 }
             };
         }
-        if (isPremium && themeState?.defaultReminderEnabled && (!payload.task.reminder || payload.task.reminder === 'None')) {
-            payload.task.reminder = themeState.defaultReminderTime || '15 min before';
+        if (!payload.task.isQuickListItem && (!payload.task.reminder || payload.task.reminder === 'None')) {
+            const effReminder = resolveEffectiveDefaultReminder(
+                themeState,
+                payload.task.boardId || 'main',
+                { whenSelectingTime: Boolean(payload.task.time) }
+            );
+            if (effReminder && effReminder !== 'None') {
+                payload.task.reminder = effReminder;
+            }
         }
     }
 
@@ -893,11 +898,17 @@ export const addTask = (payload) => async (dispatch, getState) => {
 export const addMultipleTasks = (payload) => async (dispatch, getState) => {
     const state = getState();
     const themeState = state.themeReducer;
-    const isPremium = state.entitlementReducer?.isPremium;
     if (Array.isArray(payload?.tasks)) {
         for (const task of payload.tasks) {
-            if (task && isPremium && themeState?.defaultReminderEnabled && (!task.reminder || task.reminder === 'None')) {
-                task.reminder = themeState.defaultReminderTime || '15 min before';
+            if (task && !task.isQuickListItem && (!task.reminder || task.reminder === 'None')) {
+                const effReminder = resolveEffectiveDefaultReminder(
+                    themeState,
+                    task.boardId || 'main',
+                    { whenSelectingTime: Boolean(task.time) }
+                );
+                if (effReminder && effReminder !== 'None') {
+                    task.reminder = effReminder;
+                }
             }
         }
     }
@@ -1834,8 +1845,6 @@ export const rolloverHabitTasks = () => async (dispatch, getState) => {
 export const processAutoManageTasks = (force = false) => async (dispatch, getState) => {
     await dispatch(rolloverHabitTasks());
     const state = getState();
-    const isPremium = state.entitlementReducer?.isPremium;
-    if (!isPremium) return;
 
     const now = Date.now();
     if (!force && now - lastAutoManageRun < 60000) {

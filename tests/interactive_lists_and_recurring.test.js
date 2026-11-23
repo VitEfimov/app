@@ -3323,6 +3323,35 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
         'Existing note\nSpoken transcript line'
       );
       assert.strictEqual(voiceMod.downsampleWaveform([-50, -30, -10, 0], 12).length, 12);
+      // Verify high-sensitivity perceptual metering curve (quiet speech at -40 dBFS produces >= 0.45 bar height)
+      assert.ok(voiceMod.normalizeMeteringToLevel(-40) >= 0.45, 'normalizeMeteringToLevel must boost quiet speech sensitivity');
+      assert.match(voiceNativeKtSrc, /AutomaticGainControl/, 'VoiceNoteManager.kt must enable hardware AutomaticGainControl for WhatsApp/Telegram sensitivity');
+      assert.match(voiceNativeKtSrc, /PREAMP_GAIN/, 'VoiceNoteManager.kt must apply software soft-knee pre-amp boost');
+
+      // 10. Google Calendar-style Global & Per-Board Default Reminders + Recurring Morning/Evening Reminders Fix
+      const themeMod = loadTranspiledModule(path.resolve('src/features/themeSlice.js'), {
+        '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} },
+        '../utils/cryptoStorage.js': { CryptoStorage: { setItem: async () => {} } },
+      });
+      assert.strictEqual(
+        themeMod.resolveEffectiveDefaultReminder({ defaultReminderEnabled: false, defaultReminderTime: '30 min before' }, 'main', { whenSelectingTime: true }),
+        '30 min before',
+        'Selecting a task time must auto-apply default reminder (30 min before) like Google Calendar'
+      );
+      assert.strictEqual(
+        themeMod.resolveEffectiveDefaultReminder(
+          { defaultReminderEnabled: true, defaultReminderTime: '30 min before', boardDefaultReminders: { work_1: '10 min before' } },
+          'work_1'
+        ),
+        '10 min before',
+        'Per-board default reminder must override global default reminder'
+      );
+
+      const notifSrc = fs.readFileSync(path.resolve('src/utils/notifications.js'), 'utf8');
+      assert.match(notifSrc, /export function parseAutomationTimeString/, 'notifications.js must export parseAutomationTimeString for Morning/Evening reminder times');
+      assert.match(notifSrc, /export async function updateRecurringAutomations\(themeState,\s*tasks\s*=\s*\[\],\s*isPremium\s*=\s*true\)/, 'updateRecurringAutomations must not abort when called from AutoManageSettings');
+      const autoManageSrc = fs.readFileSync(path.resolve('src/components/AutoManageSettings.js'), 'utf8');
+      assert.match(autoManageSrc, /updateRecurringAutomations\(mergedTheme,\s*tasks,\s*true\)/, 'AutoManageSettings must pass mergedTheme and true to updateRecurringAutomations on Save');
     });
   });
 });

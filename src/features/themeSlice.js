@@ -151,9 +151,10 @@ const initialState = {
   biometricUnlockEnabled: loaded?.biometricUnlockEnabled !== undefined ? loaded.biometricUnlockEnabled : true,
   blockScreenshots: loaded?.blockScreenshots !== undefined ? loaded.blockScreenshots : false,
 
-  // Default Reminder Settings for New Tasks
-  defaultReminderEnabled: loaded?.defaultReminderEnabled || false,
-  defaultReminderTime: loaded?.defaultReminderTime || '15 min before',
+  // Default Reminder Settings for New Tasks (Google Calendar style global + per-board default reminders)
+  defaultReminderEnabled: loaded?.defaultReminderEnabled !== undefined ? loaded.defaultReminderEnabled : false,
+  defaultReminderTime: loaded?.defaultReminderTime || '30 min before',
+  boardDefaultReminders: loaded?.boardDefaultReminders || {},
 
   // DB Sync
   dbSyncEnabled: loaded?.dbSyncEnabled !== undefined ? loaded.dbSyncEnabled : true,
@@ -377,6 +378,21 @@ const themeSlice = createSlice({
     },
     setDefaultReminderTime: (state, action) => {
       state.defaultReminderTime = action.payload;
+      if (action.payload && action.payload !== 'None') {
+        state.defaultReminderEnabled = true;
+      } else if (action.payload === 'None') {
+        state.defaultReminderEnabled = false;
+      }
+    },
+    setBoardDefaultReminder: (state, action) => {
+      const { boardId, reminder } = action.payload || {};
+      if (!boardId) return;
+      if (!state.boardDefaultReminders) state.boardDefaultReminders = {};
+      if (!reminder || reminder === 'default') {
+        delete state.boardDefaultReminders[boardId];
+      } else {
+        state.boardDefaultReminders[boardId] = reminder;
+      }
     },
     setDbSyncEnabled: (state, action) => {
       state.dbSyncEnabled = action.payload;
@@ -525,12 +541,50 @@ export const flushPendingThemeSaves = async (getState) => {
   }
 };
 
+export const DEFAULT_REMINDER_OPTIONS = [
+  { label: 'None', value: 'None' },
+  { label: 'At time of task', value: 'At time of task' },
+  { label: '5 min before', value: '5 min before' },
+  { label: '10 min before', value: '10 min before' },
+  { label: '15 min before', value: '15 min before' },
+  { label: '30 min before', value: '30 min before' },
+  { label: '1 hr before', value: '1 hr before' },
+  { label: '1 day before', value: '1 day before' },
+  { label: 'Day of', value: 'Day of' },
+];
+
+/**
+ * Resolves the effective default reminder for a board/task (Google Calendar style):
+ * 1. Explicit per-board default reminder in `themeState.boardDefaultReminders[boardId]`
+ * 2. Legacy expenses board default reminder in `themeState.boardExpensesSettings[boardId]?.defaultReminder`
+ * 3. Global default reminder (`themeState.defaultReminderTime` when `defaultReminderEnabled` is true)
+ * 4. If `whenSelectingTime` is true and global default is not explicitly set, falls back to `themeState.defaultReminderTime || '30 min before'`
+ */
+export const resolveEffectiveDefaultReminder = (themeState = {}, boardId = 'main', { whenSelectingTime = false } = {}) => {
+  const bKey = boardId || 'main';
+  const boardOverride = themeState?.boardDefaultReminders?.[bKey];
+  if (boardOverride && boardOverride !== 'default') {
+    return boardOverride;
+  }
+  const expenseDefault = themeState?.boardExpensesSettings?.[bKey]?.defaultReminder;
+  if (expenseDefault && expenseDefault !== 'default') {
+    return expenseDefault;
+  }
+  if (themeState?.defaultReminderEnabled) {
+    return themeState?.defaultReminderTime || '30 min before';
+  }
+  if (whenSelectingTime && themeState?.defaultReminderTime !== 'None') {
+    return themeState?.defaultReminderTime || '30 min before';
+  }
+  return 'None';
+};
+
 export const {
   hydrateThemeState, setThemeColor, setFontSize, setSourceColor, setThemeMode, setColumnWidth, toggleSettingsOpen, resetTheme,
   setUserPicture, setHeaderBackgroundFit, setCalendarPanePosition, setProgressMode, setDefaultSnoozeTime, setAutoRescheduleTime,
   setAutoManageSettings, setBoardAutoManageSettings, removeBoardAutoManageSettings, setBoardsCollapsed, setAppPin, setBiometricUnlockEnabled, setAlarmSound, setAlarmPresentationStyle, setNotificationSound, setVibrationEnabled,
   setDefaultTaskLimit, setDateFormat, setTaskNameWrap, setTimeFormat, setRandomColorDaily, setLastRandomColorDate,
-  setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setDbSyncEnabled,
+  setShowRecurringTasksOnBoard, setAndroidAutoEnabled, setDefaultReminderEnabled, setDefaultReminderTime, setBoardDefaultReminder, setDbSyncEnabled,
   setCalendarSyncEnabled, setCalendarPushEnabled, setCalendarAlarmsEnabled, setSelectedCalendarId, setSelectedCalendarIds, toggleSelectedCalendarId, setLastCalendarSyncAt, setBoardCalendarSync,
   setBlockScreenshots, setCurrencyCode, setBoardCurrency, setHabitStreakMode, setBoardExpensesSettings,
   setGoogleDrawerOpen, triggerJumpToToday

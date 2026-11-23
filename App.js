@@ -445,9 +445,12 @@ function InitApp() {
         await dispatch(fetchTasks());
         try {
           const { rolloverHabitTasks, performScheduledCalendarSync, performForegroundCalendarSync } = require('./src/features/taskSlice');
+          const { updateRecurringAutomations } = require('./src/utils/notifications');
           await dispatch(rolloverHabitTasks());
+          const latestState = store.getState();
+          updateRecurringAutomations(latestState.themeReducer, latestState.taskReducer?.tasks || [], true).catch(() => {});
           // Catch up any missed 8am / 12pm / 5pm calendar sync slot on startup, or run fast differential sync
-          if (store.getState().themeReducer?.calendarSyncEnabled && Platform.OS !== 'web') {
+          if (latestState.themeReducer?.calendarSyncEnabled && Platform.OS !== 'web') {
             const schedRes = await dispatch(performScheduledCalendarSync(false));
             if (!schedRes?.ran) {
               dispatch(performForegroundCalendarSync()).catch(() => {});

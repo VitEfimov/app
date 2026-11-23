@@ -25,7 +25,7 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, addTask, addMultipleTasks, deleteTasksByBoard, processAutoManageTasks, purgeOrphanedTasksThunk, rolloverHabitTasks, toggleBoardCalendarSync } from '../features/taskSlice';
 import { addBoardAsync, renameBoardAsync, updateBoardColorAsync, deleteBoardAsync, setActiveBoardId } from '../features/userSlice';
-import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency, setHabitStreakMode } from '../features/themeSlice';
+import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency, setHabitStreakMode, setBoardDefaultReminder, DEFAULT_REMINDER_OPTIONS } from '../features/themeSlice';
 import { isBoardCalendarSyncEnabled, getBoardCalendarSyncKey, isQuickListBoardType, isCalendarSyncSupportedForBoard } from '../utils/calendarSyncSchedule';
 import { useTaskRowConfig } from '../components/TaskRowConfigContext';
 import { formatCurrency, resolveCurrencyCode, CURRENCY_OPTION_CODES, getCurrencyMeta, isPriceBoardType, convertCurrency, getCachedTaskCurrency } from '../utils/currencyHelper';
@@ -293,6 +293,7 @@ export default function BoardScreen({ route, navigation }) {
   
   const isBoardsCollapsed = useSelector(state => state.themeReducer.isBoardsCollapsed);
   const showRecurringTasksOnBoard = useSelector(state => state.themeReducer.showRecurringTasksOnBoard || false);
+  const boardDefaultReminders = useSelector(state => state.themeReducer?.boardDefaultReminders || {});
 
   const toggleBoardsCollapsed = () => {
     dispatch(setBoardsCollapsed(!isBoardsCollapsed));
@@ -2471,6 +2472,54 @@ export default function BoardScreen({ route, navigation }) {
                   accessibilityState={{ checked: isSynced }}
                   accessibilityLabel={t('Sync with Google Calendar') || 'Sync with Google Calendar'}
                 />
+              </View>
+            );
+          })()}
+
+          {boardOptionsConfig.board && !isQuickListBoardType(boardOptionsConfig.board) && (() => {
+            const targetBoardId = boardOptionsConfig.board?.id || boardOptionsConfig.board?._id || 'main';
+            const currentBoardReminder = (boardDefaultReminders && boardDefaultReminders[targetBoardId]) || 'default';
+            const reminderChoices = [
+              { label: t('Global') || 'Global', value: 'default' },
+              ...DEFAULT_REMINDER_OPTIONS,
+            ];
+            return (
+              <View style={[styles.optionBtn, { borderBottomColor: colors.borderColor, flexDirection: 'column', alignItems: 'flex-start', paddingVertical: 10 }]}>
+                <Text style={[styles.optionText, { color: colors.textSecondary, fontSize: 13, marginBottom: 8 }]}>
+                  🔔 {t('Default Reminder') || 'Default Reminder'}
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {reminderChoices.map((opt) => {
+                    const isSelected = currentBoardReminder === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={`board_opt_rem_${opt.value}`}
+                        testID={`board_default_reminder_${opt.value}`}
+                        onPress={() => {
+                          dispatch(setBoardDefaultReminder({ boardId: targetBoardId, reminder: opt.value }));
+                          if (showToast) {
+                            showToast(
+                              `${t('Default Reminder') || 'Default Reminder'}: ${t(opt.label) || opt.label}`,
+                              'info'
+                            );
+                          }
+                        }}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 10,
+                          backgroundColor: isSelected ? colors.primary : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                          borderWidth: 1,
+                          borderColor: isSelected ? colors.primary : colors.borderColor,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: isSelected ? '#FFFFFF' : colors.textPrimary }}>
+                          {t(opt.label) || opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
             );
           })()}

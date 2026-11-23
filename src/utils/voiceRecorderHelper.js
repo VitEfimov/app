@@ -16,13 +16,16 @@ import {
 export const DEFAULT_WAVEFORM_BARS = 36;
 
 /**
- * Maps a raw decibel metering value (-60..0 dBFS) to a normalized visual bar height [0.10 .. 1.0].
+ * High-sensitivity WhatsApp/Telegram-grade perceptual decibel-to-bar mapper.
+ * Maps (-55 dBFS .. -5 dBFS) with a 0.58 power curve so even soft conversational speech
+ * produces responsive, expressive waveform bars in [0.10 .. 1.0].
  */
 export function normalizeMeteringToLevel(db) {
   if (typeof db !== 'number' || isNaN(db)) return 0.12;
-  const clamped = Math.max(-60, Math.min(0, db));
-  const linear = (clamped + 55) / 50;
-  return Math.max(0.10, Math.min(1.0, Number(linear.toFixed(3))));
+  const clamped = Math.max(-55, Math.min(-4, db));
+  const linear = Math.max(0, Math.min(1, (clamped + 55) / 51));
+  const boosted = Math.pow(linear, 0.58);
+  return Math.max(0.10, Math.min(1.0, Number(boosted.toFixed(3))));
 }
 
 /**
@@ -94,9 +97,9 @@ export function mergeTranscriptIntoNotes(baseNotes, transcriptText) {
  */
 export async function requestMicrophonePermissionAsync() {
   try {
-    const current = await Audio.getPermissionsAsync();
+    const current = await Audio?.getPermissionsAsync?.();
     if (current?.granted) return true;
-    const requested = await Audio.requestPermissionsAsync();
+    const requested = await Audio?.requestPermissionsAsync?.();
     return Boolean(requested?.granted);
   } catch (e) {
     console.warn('[VoiceRecorder] Permission request error:', e);
@@ -104,6 +107,7 @@ export async function requestMicrophonePermissionAsync() {
   }
 }
 
+// High-bitrate 128kbps 44.1kHz AAC profile for crisp, sensitive voice capture
 const VOICE_RECORDING_OPTIONS = {
   isMeteringEnabled: true,
   android: {
@@ -112,22 +116,22 @@ const VOICE_RECORDING_OPTIONS = {
     audioEncoder: Audio?.AndroidAudioEncoder?.AAC ?? 3,
     sampleRate: 44100,
     numberOfChannels: 1,
-    bitRate: 64000,
+    bitRate: 128000,
   },
   ios: {
     extension: '.m4a',
     outputFormat: Audio?.IOSOutputFormat?.MPEG4AAC ?? 'aac ',
-    audioQuality: Audio?.IOSAudioQuality?.HIGH ?? 96,
+    audioQuality: Audio?.IOSAudioQuality?.MAX ?? 127,
     sampleRate: 44100,
     numberOfChannels: 1,
-    bitRate: 64000,
+    bitRate: 128000,
     linearPCMBitDepth: 16,
     linearPCMIsBigEndian: false,
     linearPCMIsFloat: false,
   },
   web: {
     mimeType: 'audio/webm',
-    bitsPerSecond: 64000,
+    bitsPerSecond: 128000,
   },
 };
 
@@ -198,23 +202,19 @@ function createWebSpeechRecognizer(language, onTranscriptCallback) {
 }
 
 /**
- * Creates a unified voice recording + live transcription session.
- * Automatically uses the Android native dual-stream (`AudioRecord` + `SpeechRecognizer`) when available,
- * and falls back cleanly to `expo-av` + available SpeechRecognition on iOS/Web/legacy builds.
+ * Creates a dedicated, high-sensitivity Voice Note recording session (WhatsApp / Telegram style).
+ * Does not run speech recognition simultaneously so 100% of microphone gain & AGC goes to the voice recording.
  */
 export function createVoiceRecorderSession({
   language = 'en-US',
   onMetering,
-  onTranscript,
   onStatusChange,
 } = {}) {
   let mode = 'idle'; // 'native' | 'expo-av' | 'idle'
   let nativeSub = null;
   let expoRecording = null;
-  let webSpeech = null;
   let meteringHistory = [];
   let rollingBars = Array.from({ length: DEFAULT_WAVEFORM_BARS }, () => 0.12);
-  let latestTranscript = '';
   let latestDurationMs = 0;
   let isPaused = false;
 
@@ -242,27 +242,16 @@ export function createVoiceRecorderSession({
 
       meteringHistory = [];
       rollingBars = Array.from({ length: DEFAULT_WAVEFORM_BARS }, () => 0.12);
-      latestTranscript = '';
       latestDurationMs = 0;
       isPaused = false;
 
-      // 1. Try Native Android Dual-Stream Capture (AudioRecord + SpeechRecognizer)
+      // 1. Try Native Android High-Sensitivity Capture (with hardware AGC + NoiseSuppressor + 2.8x soft-knee pre-amp)
       if (Platform.OS === 'android' && hasNativeVoiceNoteCapture()) {
         nativeSub = addVoiceNoteListener((evt) => {
           if (!evt || typeof evt !== 'object') return;
           if (evt.type === 'metering') {
             if (!evt.isPaused) {
               pushMeteringLevel(evt.level ?? normalizeMeteringToLevel(evt.db), evt.durationMs || 0);
-            }
-          } else if (evt.type === 'transcript') {
-            latestTranscript = (evt.text || '').trim();
-            if (onTranscript) {
-              onTranscript({
-                text: latestTranscript,
-                finalizedText: evt.finalizedText || '',
-                partialText: evt.partialText || '',
-                isFinal: Boolean(evt.isFinal),
-              });
             }
           } else if (evt.type === 'status' && onStatusChange) {
             onStatusChange(evt.state);
@@ -281,21 +270,22 @@ export function createVoiceRecorderSession({
         }
       }
 
-      // 2. Fallback: Expo AV High-Quality Recording + Web/Hybrid SpeechRecognition
+      // 2. Fallback: Expo AV 128kbps 44.1kHz High-Sensitivity Voice Recording
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
         shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
       });
 
       const recording = new Audio.Recording();
       await recording.prepareToRecordAsync(VOICE_RECORDING_OPTIONS);
-      recording.setProgressUpdateInterval(65);
+      recording.setProgressUpdateInterval(45);
       recording.setOnRecordingStatusUpdate((status) => {
         if (!status) return;
         if (status.isRecording && !isPaused) {
-          const level = normalizeMeteringToLevel(status.metering ?? -35);
+          const level = normalizeMeteringToLevel(status.metering ?? -32);
           pushMeteringLevel(level, status.durationMillis || 0);
         }
       });
@@ -303,11 +293,6 @@ export function createVoiceRecorderSession({
       await recording.startAsync();
       expoRecording = recording;
       mode = 'expo-av';
-
-      webSpeech = createWebSpeechRecognizer(language, (tEvt) => {
-        latestTranscript = tEvt.text;
-        if (onTranscript) onTranscript(tEvt);
-      });
 
       if (onStatusChange) onStatusChange('recording');
       return true;
@@ -342,14 +327,6 @@ export function createVoiceRecorderSession({
     },
 
     async stop() {
-      if (webSpeech) {
-        webSpeech.stop();
-        if (!latestTranscript) {
-          latestTranscript = webSpeech.getTranscript();
-        }
-        webSpeech = null;
-      }
-
       if (nativeSub) {
         nativeSub.remove();
         nativeSub = null;
@@ -365,7 +342,6 @@ export function createVoiceRecorderSession({
           size: Number(res.size) || 0,
           mimeType: res.mimeType || 'audio/wav',
           durationMs: Number(res.durationMs) || latestDurationMs || 1000,
-          transcript: (res.transcript || latestTranscript || '').trim(),
           waveform: downsampleWaveform(res.waveform || meteringHistory, DEFAULT_WAVEFORM_BARS),
         };
       }
@@ -379,7 +355,11 @@ export function createVoiceRecorderSession({
           finalStatus = await rec.stopAndUnloadAsync();
         } catch (_) {}
         try {
-          await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            playsInSilentModeIOS: true,
+            playThroughEarpieceAndroid: false,
+          });
         } catch (_) {}
 
         const uri = rec.getURI();
@@ -401,7 +381,6 @@ export function createVoiceRecorderSession({
           size: fileSize,
           mimeType,
           durationMs: finalStatus?.durationMillis || latestDurationMs || 1000,
-          transcript: (latestTranscript || '').trim(),
           waveform: downsampleWaveform(meteringHistory, DEFAULT_WAVEFORM_BARS),
         };
       }
@@ -411,10 +390,6 @@ export function createVoiceRecorderSession({
     },
 
     async cancel() {
-      if (webSpeech) {
-        webSpeech.stop();
-        webSpeech = null;
-      }
       if (nativeSub) {
         nativeSub.remove();
         nativeSub = null;

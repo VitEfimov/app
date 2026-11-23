@@ -5,11 +5,12 @@ import android.content.Intent
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.os.Build
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.ParcelFileDescriptor
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -17,7 +18,6 @@ import android.util.Log
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Locale
@@ -25,7 +25,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sqrt
+import kotlin.math.tanh
 
 class VoiceNoteManager(
   private val context: Context,
@@ -33,10 +35,13 @@ class VoiceNoteManager(
 ) {
   companion object {
     private const val TAG = "VoiceNoteManager"
-    private const val SAMPLE_RATE = 16000
+    // 24 kHz wideband 16-bit mono PCM for crisp WhatsApp/Telegram voice clarity
+    private const val SAMPLE_RATE = 24000
     private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
     private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     private const val WAVEFORM_BARS = 36
+    // Pre-amp gain boost (2.8x) with soft-knee tanh limiter so quiet speech is captured clearly
+    private const val PREAMP_GAIN = 2.8
   }
 
   private val mainHandler = Handler(Looper.getMainLooper())
@@ -45,6 +50,9 @@ class VoiceNoteManager(
   private val isStandaloneSpeech = AtomicBoolean(false)
 
   private var audioRecord: AudioRecord? = null
+  private var agcEffect: AutomaticGainControl? = null
+  private var nsEffect: NoiseSuppressor? = null
+  private var aecEffect: AcousticEchoCanceler? = null
   private var recordingThread: Thread? = null
   private var rawPcmFile: File? = null
   private var outputWavFile: File? = null
@@ -58,10 +66,11 @@ class VoiceNoteManager(
   private val finalizedSentences = ArrayList<String>()
   private var currentPartialTranscript: String = ""
 
-  @Volatile
-  private var sttPipeOutput: OutputStream? = null
-  private var sttPipeReadPfd: ParcelFileDescriptor? = null
-
+  /**
+   * Starts pure, high-sensitivity voice recording (WhatsApp / Telegram style)
+   * with hardware AutomaticGainControl + NoiseSuppressor + software 2.8x soft-knee pre-amp.
+   * Does NOT run SpeechRecognizer concurrently so the microphone is 100% dedicated to crystal-clear audio.
+   */
   fun startCapture(languageTag: String?): Boolean {
     stopAndCleanupInternal(deleteFiles = true)
 
@@ -70,18 +79,19 @@ class VoiceNoteManager(
       Log.e(TAG, "Invalid min buffer size: $minBufSize")
       return false
     }
-    val bufferSize = max(minBufSize * 2, 4096)
+    val bufferSize = max(minBufSize * 2, 4800)
 
+    // Use AudioSource.MIC (with hardware AGC support) rather than VOICE_RECOGNITION (which disables AGC)
     val record = try {
       AudioRecord(
-        MediaRecorder.AudioSource.VOICE_RECOGNITION,
+        MediaRecorder.AudioSource.MIC,
         SAMPLE_RATE,
         CHANNEL_CONFIG,
         AUDIO_FORMAT,
         bufferSize
       ).takeIf { it.state == AudioRecord.STATE_INITIALIZED }
         ?: AudioRecord(
-          MediaRecorder.AudioSource.MIC,
+          MediaRecorder.AudioSource.VOICE_COMMUNICATION,
           SAMPLE_RATE,
           CHANNEL_CONFIG,
           AUDIO_FORMAT,
@@ -101,12 +111,26 @@ class VoiceNoteManager(
       return false
     }
 
+    // Attach hardware DSP Automatic Gain Control & Noise Suppression when supported by device
+    try {
+      val sessionId = record.audioSessionId
+      if (AutomaticGainControl.isAvailable()) {
+        agcEffect = AutomaticGainControl.create(sessionId)?.apply { enabled = true }
+      }
+      if (NoiseSuppressor.isAvailable()) {
+        nsEffect = NoiseSuppressor.create(sessionId)?.apply { enabled = true }
+      }
+      if (AcousticEchoCanceler.isAvailable()) {
+        aecEffect = AcousticEchoCanceler.create(sessionId)?.apply { enabled = true }
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "AudioFX initialization warning", e)
+    }
+
     val ts = System.currentTimeMillis()
     rawPcmFile = File(context.cacheDir, "voice_raw_$ts.pcm")
     outputWavFile = File(context.cacheDir, "Voice-$ts.wav")
     meteringHistory.clear()
-    finalizedSentences.clear()
-    currentPartialTranscript = ""
     currentLanguageTag = languageTag
     accumulatedDurationMs = 0L
     startTimeMs = ts
@@ -124,8 +148,6 @@ class VoiceNoteManager(
       stopAndCleanupInternal(deleteFiles = true)
       return false
     }
-
-    startSpeechRecognizerOnMainThread(languageTag, useAudioPipe = Build.VERSION.SDK_INT >= 33)
 
     recordingThread = Thread {
       runAudioCaptureLoop(record, rawPcmFile!!)
@@ -153,12 +175,6 @@ class VoiceNoteManager(
       accumulatedDurationMs += (now - lastResumeTimeMs)
       lastResumeTimeMs = 0L
     }
-    mainHandler.post {
-      try {
-        closeSttPipe()
-        speechRecognizer?.stopListening()
-      } catch (_: Exception) {}
-    }
     emitEvent(
       mapOf(
         "type" to "status",
@@ -173,7 +189,6 @@ class VoiceNoteManager(
     if (!isRecording.get() || !isPaused.get()) return false
     lastResumeTimeMs = System.currentTimeMillis()
     isPaused.set(false)
-    startSpeechRecognizerOnMainThread(currentLanguageTag, useAudioPipe = Build.VERSION.SDK_INT >= 33)
     emitEvent(
       mapOf(
         "type" to "status",
@@ -195,17 +210,7 @@ class VoiceNoteManager(
     } catch (_: Exception) {}
     recordingThread = null
 
-    try {
-      audioRecord?.stop()
-    } catch (_: Exception) {}
-    try {
-      audioRecord?.release()
-    } catch (_: Exception) {}
-    audioRecord = null
-
-    mainHandler.post {
-      destroySpeechRecognizer()
-    }
+    releaseAudioRecordAndEffects()
 
     val pcm = rawPcmFile
     val wav = outputWavFile
@@ -221,7 +226,6 @@ class VoiceNoteManager(
       return null
     }
 
-    val fullTranscript = buildCombinedTranscript()
     val waveform = downsampleMeteringHistory(WAVEFORM_BARS)
 
     return mapOf(
@@ -230,7 +234,6 @@ class VoiceNoteManager(
       "size" to wav.length().toDouble(),
       "mimeType" to "audio/wav",
       "durationMs" to max(totalDurationMs, 500L).toDouble(),
-      "transcript" to fullTranscript,
       "waveform" to waveform
     )
   }
@@ -255,7 +258,7 @@ class VoiceNoteManager(
     isStandaloneSpeech.set(true)
     isRecording.set(false)
     isPaused.set(false)
-    startSpeechRecognizerOnMainThread(languageTag, useAudioPipe = false)
+    startSpeechRecognizerOnMainThread(languageTag)
     return true
   }
 
@@ -277,8 +280,9 @@ class VoiceNoteManager(
   }
 
   private fun runAudioCaptureLoop(record: AudioRecord, pcmFile: File) {
-    val frameShorts = 960 // 60ms at 16kHz
+    val frameShorts = 1440 // 60ms at 24kHz
     val byteBuffer = ByteArray(frameShorts * 2)
+    val boostedBuffer = ByteArray(frameShorts * 2)
 
     FileOutputStream(pcmFile).use { fos ->
       while (isRecording.get()) {
@@ -289,34 +293,33 @@ class VoiceNoteManager(
           continue
         }
 
-        fos.write(byteBuffer, 0, bytesRead)
-
-        // Tee PCM bytes to SpeechRecognizer pipe on Android 13+
-        val pipeOut = sttPipeOutput
-        if (pipeOut != null) {
-          try {
-            pipeOut.write(byteBuffer, 0, bytesRead)
-            pipeOut.flush()
-          } catch (_: Exception) {
-            closeSttPipe()
-          }
-        }
-
-        // Compute RMS dBFS & normalized bar level [0.08 .. 1.0]
+        // Apply 2.8x soft-knee pre-amp boost and compute RMS dBFS for sensitive WhatsApp/Telegram waveform
         var sumSquares = 0.0
         val sampleCount = bytesRead / 2
         var i = 0
         while (i + 1 < bytesRead) {
           val lo = byteBuffer[i].toInt() and 0xFF
           val hi = byteBuffer[i + 1].toInt()
-          val sample = ((hi shl 8) or lo).toShort().toDouble() / 32768.0
-          sumSquares += sample * sample
+          val rawShort = ((hi shl 8) or lo).toShort()
+          val normSample = rawShort.toDouble() / 32768.0
+
+          // Soft-knee tanh pre-amp so quiet voices are boosted 2.8x while loud peaks never harsh-clip
+          val amplified = tanh(normSample * PREAMP_GAIN)
+          sumSquares += amplified * amplified
+
+          val boostedInt = (amplified * 32767.0).toInt().coerceIn(-32768, 32767)
+          boostedBuffer[i] = (boostedInt and 0xFF).toByte()
+          boostedBuffer[i + 1] = ((boostedInt shr 8) and 0xFF).toByte()
           i += 2
         }
 
+        fos.write(boostedBuffer, 0, bytesRead)
+
         val rms = if (sampleCount > 0) sqrt(sumSquares / sampleCount) else 0.0
         val db = if (rms > 0.00001) max(-60.0, min(0.0, 20.0 * log10(rms))) else -60.0
-        val normalized = min(1.0, max(0.08, ((db + 55.0) / 50.0)))
+        // Perceptual curve: map [-52 dBFS .. -4 dBFS] with power 0.58 for high-sensitivity visual feedback
+        val linear = ((db + 52.0) / 48.0).coerceIn(0.0, 1.0)
+        val normalized = (linear.pow(0.58)).coerceIn(0.10, 1.0)
 
         synchronized(meteringHistory) {
           meteringHistory.add(normalized)
@@ -336,7 +339,7 @@ class VoiceNoteManager(
     }
   }
 
-  private fun startSpeechRecognizerOnMainThread(languageTag: String?, useAudioPipe: Boolean) {
+  private fun startSpeechRecognizerOnMainThread(languageTag: String?) {
     mainHandler.post {
       try {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
@@ -349,28 +352,17 @@ class VoiceNoteManager(
         val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
         speechRecognizer = recognizer
 
+        val lang = if (!languageTag.isNullOrBlank()) languageTag else Locale.getDefault().toLanguageTag()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
           putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
           putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-          putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-          val lang = if (!languageTag.isNullOrBlank()) languageTag else Locale.getDefault().toLanguageTag()
+          putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
           putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
           putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
-        }
-
-        if (useAudioPipe && Build.VERSION.SDK_INT >= 33) {
-          try {
-            val pipe = ParcelFileDescriptor.createPipe()
-            sttPipeReadPfd = pipe[0]
-            sttPipeOutput = ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])
-            intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pipe[0])
-            intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
-            intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
-            intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, SAMPLE_RATE)
-          } catch (e: Exception) {
-            Log.w(TAG, "Pipe setup failed, falling back to direct mic recognition", e)
-            closeSttPipe()
-          }
+          // Extended silence windows so dictation catches quiet pauses without cutting off early
+          putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
+          putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+          putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 4000L)
         }
 
         recognizer.setRecognitionListener(object : RecognitionListener {
@@ -378,11 +370,11 @@ class VoiceNoteManager(
           override fun onBeginningOfSpeech() {}
           override fun onRmsChanged(rmsdB: Float) {
             if (isStandaloneSpeech.get()) {
-              val norm = min(1.0, max(0.08, (rmsdB.toDouble() + 2.0) / 12.0))
+              val norm = min(1.0, max(0.10, (rmsdB.toDouble() + 2.0) / 10.0))
               emitEvent(
                 mapOf(
                   "type" to "metering",
-                  "db" to (rmsdB.toDouble() * 3.0 - 45.0),
+                  "db" to (rmsdB.toDouble() * 3.0 - 40.0),
                   "level" to norm,
                   "durationMs" to 0L,
                   "isPaused" to false
@@ -394,17 +386,12 @@ class VoiceNoteManager(
           override fun onEndOfSpeech() {}
 
           override fun onError(error: Int) {
-            // Restart automatically while session is still active (e.g. after a pause in speech)
-            val shouldContinue = (isRecording.get() && !isPaused.get()) || isStandaloneSpeech.get()
-            if (shouldContinue && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS && error != SpeechRecognizer.ERROR_CLIENT) {
+            if (isStandaloneSpeech.get() && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS && error != SpeechRecognizer.ERROR_CLIENT) {
               mainHandler.postDelayed({
-                val stillActive = (isRecording.get() && !isPaused.get()) || isStandaloneSpeech.get()
-                if (stillActive) {
-                  // If piped audio failed with ERROR_AUDIO, fall back to direct mic recognizer
-                  val nextUsePipe = if (error == SpeechRecognizer.ERROR_AUDIO) false else (useAudioPipe && Build.VERSION.SDK_INT >= 33 && !isStandaloneSpeech.get())
-                  startSpeechRecognizerOnMainThread(currentLanguageTag, nextUsePipe)
+                if (isStandaloneSpeech.get()) {
+                  startSpeechRecognizerOnMainThread(currentLanguageTag)
                 }
-              }, 220L)
+              }, 180L)
             }
           }
 
@@ -428,17 +415,12 @@ class VoiceNoteManager(
               )
             )
 
-            val shouldContinue = (isRecording.get() && !isPaused.get()) || isStandaloneSpeech.get()
-            if (shouldContinue) {
+            if (isStandaloneSpeech.get()) {
               mainHandler.postDelayed({
-                val stillActive = (isRecording.get() && !isPaused.get()) || isStandaloneSpeech.get()
-                if (stillActive) {
-                  startSpeechRecognizerOnMainThread(
-                    currentLanguageTag,
-                    useAudioPipe && Build.VERSION.SDK_INT >= 33 && !isStandaloneSpeech.get()
-                  )
+                if (isStandaloneSpeech.get()) {
+                  startSpeechRecognizerOnMainThread(currentLanguageTag)
                 }
-              }, 120L)
+              }, 100L)
             }
           }
 
@@ -500,7 +482,7 @@ class VoiceNoteManager(
     for (i in 0 until targetCount) {
       val start = (i * chunkSize).toInt()
       val end = min(copy.size, max(start + 1, ((i + 1) * chunkSize).toInt()))
-      var peak = 0.08
+      var peak = 0.10
       for (j in start until end) {
         if (copy[j] > peak) peak = copy[j]
       }
@@ -509,19 +491,7 @@ class VoiceNoteManager(
     return result
   }
 
-  private fun closeSttPipe() {
-    try {
-      sttPipeOutput?.close()
-    } catch (_: Exception) {}
-    sttPipeOutput = null
-    try {
-      sttPipeReadPfd?.close()
-    } catch (_: Exception) {}
-    sttPipeReadPfd = null
-  }
-
   private fun destroySpeechRecognizer() {
-    closeSttPipe()
     try {
       speechRecognizer?.stopListening()
     } catch (_: Exception) {}
@@ -534,6 +504,18 @@ class VoiceNoteManager(
     speechRecognizer = null
   }
 
+  private fun releaseAudioRecordAndEffects() {
+    try { agcEffect?.release() } catch (_: Exception) {}
+    agcEffect = null
+    try { nsEffect?.release() } catch (_: Exception) {}
+    nsEffect = null
+    try { aecEffect?.release() } catch (_: Exception) {}
+    aecEffect = null
+    try { audioRecord?.stop() } catch (_: Exception) {}
+    try { audioRecord?.release() } catch (_: Exception) {}
+    audioRecord = null
+  }
+
   private fun stopAndCleanupInternal(deleteFiles: Boolean) {
     isRecording.set(false)
     isPaused.set(false)
@@ -542,13 +524,7 @@ class VoiceNoteManager(
       recordingThread?.join(400)
     } catch (_: Exception) {}
     recordingThread = null
-    try {
-      audioRecord?.stop()
-    } catch (_: Exception) {}
-    try {
-      audioRecord?.release()
-    } catch (_: Exception) {}
-    audioRecord = null
+    releaseAudioRecordAndEffects()
     mainHandler.post {
       destroySpeechRecognizer()
     }

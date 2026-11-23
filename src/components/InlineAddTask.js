@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { addTask } from '../features/taskSlice';
+import { resolveEffectiveDefaultReminder } from '../features/themeSlice';
 import { useTheme } from '../styles/ThemeContext';
 import { useTaskRepeat } from '../custom-hooks/useTaskRepeat';
 import { useTranslation } from 'react-i18next';
@@ -65,8 +66,9 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
   const currencySetting = useSelector(state => state.themeReducer?.currencyCode || 'auto');
   const boardCurrencies = useSelector(state => state.themeReducer?.boardCurrencies || {});
   const boardExpensesSettings = useSelector(state => state.themeReducer?.boardExpensesSettings || {});
+  const themeState = useSelector(state => state.themeReducer || {});
   const defaultReminderEnabled = useSelector(state => state.themeReducer?.defaultReminderEnabled || false);
-  const defaultReminderTime = useSelector(state => state.themeReducer?.defaultReminderTime || '15 min before');
+  const defaultReminderTime = useSelector(state => state.themeReducer?.defaultReminderTime || '30 min before');
   const { t, i18n } = useTranslation();
 
   useEffect(() => {
@@ -174,9 +176,7 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
       endDateStr = dayjs(selectedDate).add(count, unit).format('YYYY-MM-DD');
     }
 
-    const defaultReminderVal = (isExpensesBoard && expenseSettings.defaultReminder)
-      ? expenseSettings.defaultReminder
-      : (defaultReminderEnabled ? defaultReminderTime : 'None');
+    const defaultReminderVal = resolveEffectiveDefaultReminder(themeState, targetBoardId);
 
     const seriesId = hasDefaultRepeat ? ('series_' + Date.now().toString() + Math.random().toString(36).substr(2, 9)) : undefined;
 

@@ -102,14 +102,19 @@ export default function AutoManageSettings({ isVisible, onClose, boardId, boardN
 
   const handleSave = () => {
     if (boardId) {
+      const nextBoardAutomations = { ...(themeState?.boardAutomations || {}) };
       if (localSettings.overrideGlobal === false) {
+        delete nextBoardAutomations[boardId];
         dispatch(removeBoardAutoManageSettings({ boardId }));
       } else {
+        nextBoardAutomations[boardId] = localSettings;
         dispatch(setBoardAutoManageSettings({ boardId, settings: localSettings }));
       }
+      updateRecurringAutomations({ ...themeState, boardAutomations: nextBoardAutomations }, tasks, true);
     } else {
+      const mergedTheme = { ...themeState, ...localSettings };
       dispatch(setAutoManageSettings(localSettings));
-      updateRecurringAutomations(localSettings, tasks);
+      updateRecurringAutomations(mergedTheme, tasks, true);
     }
     dispatch(processAutoManageTasks(true));
     onClose();

@@ -32,6 +32,7 @@ import YearPickerModal, { parseCalendarHeaderDate } from './YearPickerModal';
 import ConfirmModal from './ConfirmModal';
 import PremiumModal from './PremiumModal';
 import { toggleTaskOptionsCollapsed, setTaskOptionsCollapsed } from '../features/userSlice';
+import { resolveEffectiveDefaultReminder } from '../features/themeSlice';
 import { useTranslation } from 'react-i18next';
 import { getBoardColor } from '../utils/boardColors';
 import { SecurityLockHelper } from '../utils/securityLockHelper';
@@ -1576,17 +1577,6 @@ useEffect(() => {
           if (Array.isArray(bars)) setVoiceWaveformBars(bars);
           if (typeof durationMs === 'number') setVoiceRecordDurationMs(durationMs);
         },
-        onTranscript: ({ text }) => {
-          const spoken = (text || '').trim();
-          setVoiceLiveTranscript(spoken);
-          if (spoken) {
-            const merged = mergeTranscriptIntoNotes(preRecordNotesRef.current, spoken);
-            if (notesRef.current?.setText) {
-              notesRef.current.setText(merged);
-            }
-            setNotes(merged);
-          }
-        },
         onStatusChange: (st) => {
           if (st === 'recording' || st === 'paused') {
             setVoiceRecordState(st);
@@ -1634,12 +1624,6 @@ useEffect(() => {
     if (session) {
       await session.cancel();
     }
-    // Restore notes to what they were prior to this cancelled voice session
-    const restored = preRecordNotesRef.current || '';
-    if (notesRef.current?.setText) {
-      notesRef.current.setText(restored);
-    }
-    setNotes(restored);
     setVoiceRecordState('idle');
     setVoiceRecordDurationMs(0);
     setVoiceLiveTranscript('');
@@ -1665,15 +1649,6 @@ useEffect(() => {
       result.name || `Voice-${Date.now()}.m4a`
     );
 
-    const finalTranscript = (result.transcript || voiceLiveTranscript || '').trim();
-    if (finalTranscript) {
-      const merged = mergeTranscriptIntoNotes(preRecordNotesRef.current, finalTranscript);
-      if (notesRef.current?.setText) {
-        notesRef.current.setText(merged);
-      }
-      setNotes(merged);
-    }
-
     const newAudioAttachment = {
       id: `voice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       type: 'audio',
@@ -1683,7 +1658,6 @@ useEffect(() => {
       mimeType: result.mimeType || 'audio/mp4',
       durationMs: result.durationMs || voiceRecordDurationMs || 1000,
       waveform: downsampleWaveform(result.waveform || voiceWaveformBars, DEFAULT_WAVEFORM_BARS),
-      transcript: finalTranscript,
     };
 
     setAttachments((prev) => [...prev, newAudioAttachment]);
@@ -2522,6 +2496,9 @@ useEffect(() => {
                         value={reminder === 'Nag Mode (Every 10 min)' ? t('Nag Mode (Every 10 min)') : reminder === 'Escalating Reminder' ? t('Escalating Reminder') : (t(reminder) || reminder)} 
                         options={[
                           {label: t('None'), value: 'None'}, 
+                          {label: t('At time of task') || 'At time of task', value: 'At time of task'},
+                          {label: t('5 min before') || '5 min before', value: '5 min before'},
+                          {label: t('10 min before') || '10 min before', value: '10 min before'},
                           {label: t('15 min before'), value: '15 min before'}, 
                           {label: t('30 min before'), value: '30 min before'}, 
                           {label: t('1 hr before'), value: '1 hr before'}, 
@@ -2700,7 +2677,7 @@ useEffect(() => {
                         <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>
                           {voiceRecordState === 'paused'
                             ? (t('Recording paused') || 'Recording paused')
-                            : (t('Recording & transcribing to notes...') || 'Recording & transcribing to notes...')}
+                            : (t('Recording voice note...') || 'Recording voice note...')}
                         </Text>
                       </View>
                       <Text style={{ fontSize: 13, fontWeight: '800', color: '#EF4444', fontVariant: ['tabular-nums'] }}>
@@ -3622,6 +3599,16 @@ useEffect(() => {
           onClose={() => setShowTimePicker(false)}
           onSave={(newTime) => {
             setSelectedTime(newTime);
+            if (newTime && (!reminder || reminder === 'None')) {
+              const autoReminder = resolveEffectiveDefaultReminder(
+                themeState,
+                selectedBoardId,
+                { whenSelectingTime: true }
+              );
+              if (autoReminder && autoReminder !== 'None') {
+                setReminder(autoReminder);
+              }
+            }
             setShowTimePicker(false);
           }}
         />
