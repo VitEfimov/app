@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share, Animated, PanResponder } from 'react-native';
 import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
@@ -106,6 +106,36 @@ export default function TaskQuickMenuModal({
   const [isMoveBoardVisible, setMoveBoardVisible] = React.useState(false);
   const [confirmConfig, setConfirmConfig] = React.useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, secondaryIsDestructive: false, hideCancel: false, onConfirm: null, secondaryConfirmText: null, onSecondaryConfirm: null });
   const streakMode = useSelector(state => state.themeReducer?.habitStreakMode || 'grace');
+
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const handlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 3,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          sheetTranslateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 40 || gestureState.vy > 0.45) {
+          Animated.timing(sheetTranslateY, {
+            toValue: 500,
+            duration: 140,
+            useNativeDriver: true,
+          }).start(() => {
+            sheetTranslateY.setValue(0);
+            if (onClose) onClose();
+          });
+        } else {
+          Animated.spring(sheetTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   if (!task) return null;
 
@@ -422,23 +452,33 @@ export default function TaskQuickMenuModal({
       swipeDirection={['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
+      onModalShow={() => sheetTranslateY.setValue(0)}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
-        <View style={styles.dragHandle} />
+      <Animated.View style={[styles.modalContent, { backgroundColor: colors.bgCard, transform: [{ translateY: sheetTranslateY }] }]}>
+        <View
+          {...handlePanResponder.panHandlers}
+          style={{ width: '100%', alignItems: 'center', paddingTop: 4, paddingBottom: 10, cursor: 'grab' }}
+        >
+          <View style={[styles.dragHandle, { marginBottom: 0 }]} />
+        </View>
         
-        <View style={styles.header}>
+        <View {...handlePanResponder.panHandlers} style={styles.header}>
           <Text style={[styles.taskTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {task.taskname}
           </Text>
         </View>
 
-        <ScrollView style={styles.actionList}>
+        <View style={styles.actionList}>
           {actionItems.map((item, index) => (
             <TouchableOpacity 
               key={index} 
               testID={`quick_menu_action_${item.label.toLowerCase().replace(/\s+/g, '_')}`}
-              style={[styles.actionRow, { borderBottomColor: colors.borderColor }]} 
+              style={[
+                styles.actionRow,
+                { borderBottomColor: colors.borderColor },
+                index === actionItems.length - 1 && { borderBottomWidth: 0 },
+              ]} 
               onPress={item.onPress}
             >
               <View style={styles.actionIconContainer}>
@@ -449,8 +489,8 @@ export default function TaskQuickMenuModal({
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
-      </View>
+        </View>
+      </Animated.View>
     </Modal>
     <MoveBoardModal
       isVisible={isMoveBoardVisible}
@@ -483,27 +523,27 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingTop: 15,
-    paddingBottom: 30,
+    paddingTop: 10,
+    paddingBottom: 20,
     paddingHorizontal: 20,
-    maxHeight: '70%'
+    maxHeight: '94%'
   },
   dragHandle: {
     width: 40,
     height: 5,
     backgroundColor: '#888',
     borderRadius: 3,
-    marginBottom: 20,
+    marginBottom: 10,
     alignSelf: 'center'
   },
   header: {
-    marginBottom: 15,
-    paddingBottom: 15,
+    marginBottom: 6,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(128,128,128,0.2)'
   },
   taskTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
   },
   actionList: {
@@ -512,17 +552,17 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
+    paddingVertical: 11,
     borderBottomWidth: 1,
   },
   actionIconContainer: {
-    marginRight: 15,
-    width: 30,
+    marginRight: 14,
+    width: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500'
   }
 });

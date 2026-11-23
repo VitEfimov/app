@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions, BackHandler, Animated, Easing } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Share, Image, KeyboardAvoidingView, Keyboard, Alert, Switch, AppState, Linking, useWindowDimensions, BackHandler, Animated, Easing, PanResponder } from 'react-native';
 import Modal from 'react-native-modal';
 import CustomTimePicker from './CustomTimePicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -320,6 +320,42 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
   const [isSaving, setIsSaving] = useState(false);
   const saveBtnScaleAnim = useRef(new Animated.Value(1)).current;
   const saveCardFadeAnim = useRef(new Animated.Value(1)).current;
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const sheetScaleAnim = useRef(new Animated.Value(1)).current;
+  const isClosingRef = useRef(false);
+
+  const animateSheetExit = (afterCloseCallback, { duration = 220 } = {}) => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    try { Keyboard?.dismiss?.(); } catch (_) {}
+
+    const slideDistance = Math.max(windowHeight || 800, 720);
+    Animated.parallel([
+      Animated.timing(sheetTranslateY, {
+        toValue: slideDistance,
+        duration,
+        easing: Easing.bezier(0.32, 0.0, 0.67, 0.0),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetScaleAnim, {
+        toValue: 0.955,
+        duration,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(saveCardFadeAnim, {
+        toValue: 0,
+        duration: Math.max(140, duration - 20),
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      isClosingRef.current = false;
+      if (typeof afterCloseCallback === 'function') {
+        afterCloseCallback();
+      }
+    });
+  };
 
   // Voice Recorder, Live Speech-to-Text Transcription & Audio Player States
   const [voiceRecordState, setVoiceRecordState] = useState('idle'); // 'idle' | 'recording' | 'paused'
@@ -608,8 +644,33 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
       setHabitSchedule(initialHabitSchedule);
       setHabitCompletedDatesState(initialHabitDates);
       setIsSaving(false);
+      isClosingRef.current = false;
       saveBtnScaleAnim.setValue(1);
-      saveCardFadeAnim.setValue(1);
+      saveCardFadeAnim.setValue(0.85);
+      sheetTranslateY.setValue(32);
+      sheetScaleAnim.setValue(0.975);
+      Animated.parallel([
+        Animated.spring(sheetTranslateY, {
+          toValue: 0,
+          damping: 22,
+          stiffness: 240,
+          mass: 0.85,
+          useNativeDriver: true,
+        }),
+        Animated.spring(sheetScaleAnim, {
+          toValue: 1,
+          damping: 20,
+          stiffness: 230,
+          mass: 0.85,
+          useNativeDriver: true,
+        }),
+        Animated.timing(saveCardFadeAnim, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
       dispatch(setTaskOptionsCollapsed(true));
 
       initialSnapshotRef.current = {
@@ -1080,7 +1141,7 @@ useEffect(() => {
       setTimeout(deferredNotificationJob, 0);
     }
 
-    // Crisp tactile feedback & quick spring save animation before closing sheet
+    // Crisp tactile feedback & choreographed spring + smooth sheet glide-out animation
     HapticHelper.trigger('success');
     setIsSaving(true);
     try { Keyboard?.dismiss?.(); } catch (e) {}
@@ -1092,25 +1153,17 @@ useEffect(() => {
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
-      Animated.parallel([
-        Animated.spring(saveBtnScaleAnim, {
-          toValue: 1.02,
-          friction: 5,
-          tension: 180,
-          useNativeDriver: true,
-        }),
-        Animated.timing(saveCardFadeAnim, {
-          toValue: 0.94,
-          duration: 85,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
+      Animated.spring(saveBtnScaleAnim, {
+        toValue: 1.02,
+        friction: 5,
+        tension: 190,
+        useNativeDriver: true,
+      }),
     ]).start();
 
     setTimeout(() => {
-      onClose();
-    }, 110);
+      animateSheetExit(onClose, { duration: 210 });
+    }, 95);
   };
 
   const handleSave = () => {
@@ -1147,7 +1200,7 @@ useEffect(() => {
         isDestructive: true,
         onConfirm: () => {
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          onClose();
+          animateSheetExit(onClose, { duration: 210 });
         },
         secondaryConfirmText: t('Save'),
         onSecondaryConfirm: () => {
@@ -1156,9 +1209,44 @@ useEffect(() => {
         }
       });
     } else {
-      onClose();
+      animateSheetExit(onClose, { duration: 210 });
     }
   };
+
+  const headerDragPanResponder = useMemo(() => {
+    if (!PanResponder?.create) return { panHandlers: {} };
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 4,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          sheetTranslateY.setValue(gestureState.dy);
+          const nextScale = Math.max(0.94, 1 - gestureState.dy / 2200);
+          sheetScaleAnim.setValue(nextScale);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 55 || gestureState.vy > 0.45) {
+          handleClose();
+        } else {
+          Animated.parallel([
+            Animated.spring(sheetTranslateY, {
+              toValue: 0,
+              damping: 20,
+              stiffness: 240,
+              useNativeDriver: true,
+            }),
+            Animated.spring(sheetScaleAnim, {
+              toValue: 1,
+              damping: 20,
+              stiffness: 240,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }
+      },
+    });
+  }, [sheetTranslateY, sheetScaleAnim, taskName, notes, attachments, subtasks, priority, selectedBoardId, selectedDate, selectedTime, repeatConfig, reminder, isAlarm, keepNotificationAllDay]);
 
   useEffect(() => {
     if (!isVisible || !task) return;
@@ -1854,7 +1942,7 @@ useEffect(() => {
         onConfirm: () => {
           dispatch(deleteTask({ taskId: task.id || task._id }));
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          onClose();
+          animateSheetExit(onClose, { duration: 200 });
         },
         secondaryConfirmText: t('All recurring tasks'),
         onSecondaryConfirm: () => {
@@ -1863,7 +1951,7 @@ useEffect(() => {
             dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId }));
           }
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          onClose();
+          animateSheetExit(onClose, { duration: 200 });
         }
       });
     } else {
@@ -1876,7 +1964,7 @@ useEffect(() => {
         onConfirm: () => {
           dispatch(deleteTask({ taskId: task.id || task._id }));
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          onClose();
+          animateSheetExit(onClose, { duration: 200 });
         }
       });
     }
@@ -1887,7 +1975,7 @@ useEffect(() => {
     const newCompletedState = !task.completed;
     handleUpdate({ completed: newCompletedState });
     if (newCompletedState) {
-      onClose();
+      animateSheetExit(onClose, { duration: 200 });
     }
   };
 
@@ -1899,10 +1987,11 @@ useEffect(() => {
       isVisible={isVisible} 
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      animationInTiming={210}
-      animationOutTiming={160}
-      backdropTransitionInTiming={180}
-      backdropTransitionOutTiming={130}
+      animationInTiming={230}
+      animationOutTiming={220}
+      backdropTransitionInTiming={200}
+      backdropTransitionOutTiming={200}
+      useNativeDriver={true}
       useNativeDriverForBackdrop={true}
       onSwipeComplete={handleClose}
       swipeDirection={(scrollOffset > 0 || showTimePicker) ? undefined : ['down']}
@@ -1920,8 +2009,24 @@ useEffect(() => {
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
       style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
-      <View style={[styles.modalContent, { backgroundColor: colors.bgCard, paddingTop: Platform.OS === 'ios' ? (isCompact ? 34 : 42) : (isVeryCompact ? 6 : 10) }]}>
-          <View style={[styles.dragHandleContainer, { paddingBottom: isVeryCompact ? 2 : 4 }]}>
+      <Animated.View
+        style={[
+          styles.modalContent,
+          {
+            backgroundColor: colors.bgCard,
+            paddingTop: Platform.OS === 'ios' ? (isCompact ? 34 : 42) : (isVeryCompact ? 6 : 10),
+            opacity: saveCardFadeAnim,
+            transform: [
+              { translateY: sheetTranslateY },
+              { scale: sheetScaleAnim },
+            ],
+          },
+        ]}
+      >
+          <View
+            {...headerDragPanResponder.panHandlers}
+            style={[styles.dragHandleContainer, { paddingTop: 4, paddingBottom: isVeryCompact ? 6 : 8, width: '100%', cursor: 'grab' }]}
+          >
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           
@@ -2982,7 +3087,7 @@ useEffect(() => {
                   </ScrollView>
                 )}
 
-                {/* Bottom Action Footer: Add attachment + Quick Voice Note & Dictate */}
+                {/* Bottom Action Footer: Add attachment (plus active dictation stop chip when dictating) */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: isVeryCompact ? 6 : 8, flexWrap: 'wrap', gap: 8 }}>
                   <TouchableOpacity
                     accessible={true}
@@ -3000,56 +3105,28 @@ useEffect(() => {
                     </Text>
                   </TouchableOpacity>
 
-                  {voiceRecordState === 'idle' && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <TouchableOpacity
-                        testID="dictate_to_notes_btn"
-                        accessible={true}
-                        accessibilityRole="button"
-                        accessibilityLabel={isDictatingOnly ? (t('Stop dictation') || 'Stop dictation') : (t('Dictate to notes') || 'Dictate to notes')}
-                        onPress={handleToggleDictation}
-                        activeOpacity={0.75}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 5,
-                          paddingVertical: 5,
-                          paddingHorizontal: 10,
-                          borderRadius: 10,
-                          backgroundColor: isDictatingOnly
-                            ? '#EF4444'
-                            : (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.045)'),
-                        }}
-                      >
-                        <IconMic color={isDictatingOnly ? '#FFFFFF' : colors.textSecondary} size={14} />
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: isDictatingOnly ? '#FFFFFF' : colors.textSecondary }}>
-                          {isDictatingOnly ? (t('Stop dictation') || 'Stop dictation') : (t('Dictate') || 'Dictate')}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        testID="record_voice_note_btn"
-                        accessible={true}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('Record voice note') || 'Record voice note'}
-                        onPress={handleStartVoiceRecording}
-                        activeOpacity={0.75}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 5,
-                          paddingVertical: 5,
-                          paddingHorizontal: 10,
-                          borderRadius: 10,
-                          backgroundColor: hexToRgba(colors.primary, isDark ? 0.18 : 0.12),
-                        }}
-                      >
-                        <IconMic color={colors.primary} size={14} />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                          {t('Voice note') || 'Voice note'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                  {isDictatingOnly && (
+                    <TouchableOpacity
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('Stop dictation') || 'Stop dictation'}
+                      onPress={handleToggleDictation}
+                      activeOpacity={0.75}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        paddingVertical: 5,
+                        paddingHorizontal: 10,
+                        borderRadius: 10,
+                        backgroundColor: '#EF4444',
+                      }}
+                    >
+                      <IconMic color="#FFFFFF" size={14} />
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFFFFF' }}>
+                        {t('Stop dictation') || 'Stop dictation'}
+                      </Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               </View>
@@ -3189,7 +3266,7 @@ useEffect(() => {
             
           </ScrollView>
 
-        </View>
+        </Animated.View>
 
         <ConfirmModal
           isVisible={confirmConfig.isVisible}
@@ -3328,11 +3405,12 @@ useEffect(() => {
               </TouchableOpacity>
 
               <TouchableOpacity
+                testID="record_voice_note_btn"
                 activeOpacity={0.75}
                 accessible={true}
                 accessibilityRole="button"
                 accessibilityLabel={t('Record Voice Note') || 'Record Voice Note'}
-                accessibilityHint={t('Records a voice note and transcribes speech into notes') || 'Records a voice note and transcribes speech into notes'}
+                accessibilityHint={t('Records a voice note attachment') || 'Records a voice note attachment'}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -3340,7 +3418,7 @@ useEffect(() => {
                   paddingHorizontal: 14,
                   borderRadius: 12,
                   backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                  marginBottom: 12,
+                  marginBottom: 8,
                   gap: 12,
                 }}
                 onPress={() => {
@@ -3351,6 +3429,36 @@ useEffect(() => {
                 <IconMic color={colors.primary} size={20} />
                 <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
                   {t('Record Voice Note') || 'Record Voice Note'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                testID="dictate_to_notes_btn"
+                activeOpacity={0.75}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={isDictatingOnly ? (t('Stop Dictation') || 'Stop Dictation') : (t('Dictate to Notes') || 'Dictate to Notes')}
+                accessibilityHint={t('Transcribes your speech directly into task notes') || 'Transcribes your speech directly into task notes'}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: isDictatingOnly
+                    ? 'rgba(239,68,68,0.14)'
+                    : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+                  marginBottom: 12,
+                  gap: 12,
+                }}
+                onPress={() => {
+                  setAttachmentOptionsVisible(false);
+                  setTimeout(() => handleToggleDictation(), 120);
+                }}
+              >
+                <IconMic color={isDictatingOnly ? '#EF4444' : colors.primary} size={20} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: isDictatingOnly ? '#EF4444' : colors.textPrimary }}>
+                  {isDictatingOnly ? (t('Stop Dictation') || 'Stop Dictation') : (t('Dictate to Notes') || 'Dictate to Notes')}
                 </Text>
               </TouchableOpacity>
 

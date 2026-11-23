@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, FlatList, KeyboardAvoidingView, Platform, Share, TextInput, LayoutAnimation, UIManager, useWindowDimensions, Keyboard, BackHandler, Switch, Animated, PanResponder } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { computeAndroidKeyboardPadding } from '../utils/keyboardLayout';
 import { useSelector, useDispatch } from 'react-redux';
@@ -194,7 +194,40 @@ const DEFAULT_COLLAPSED_SECTIONS = ['missed', 'on-this-week', 'on-next-week', 'l
 let currentSessionCollapsedSections = [...DEFAULT_COLLAPSED_SECTIONS];
 
 export default function BoardScreen({ route, navigation }) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isCompact = windowHeight < 820;
+  const isVeryCompact = windowHeight < 700;
+  const isWideScreen = windowWidth >= 768;
+
+  const sectionSheetTranslateY = useRef(new Animated.Value(0)).current;
+  const sectionSheetPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 4,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          sectionSheetTranslateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 45 || gestureState.vy > 0.5) {
+          Animated.timing(sectionSheetTranslateY, {
+            toValue: 400,
+            duration: 150,
+            useNativeDriver: true,
+          }).start(() => {
+            setSectionOptionsConfig({ isVisible: false, section: null });
+            sectionSheetTranslateY.setValue(0);
+          });
+        } else {
+          Animated.spring(sectionSheetTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
   const safeAreaInsets = useContext(SafeAreaInsetsContext);
   const topInset = safeAreaInsets?.top || 0;
   const topInsetRef = useRef(topInset);
@@ -2206,13 +2239,21 @@ export default function BoardScreen({ route, navigation }) {
           <TouchableOpacity 
             style={StyleSheet.absoluteFillObject} 
             activeOpacity={1} 
-            onPress={() => setSectionOptionsConfig({ isVisible: false, section: null })} 
+            onPress={() => {
+              sectionSheetTranslateY.setValue(0);
+              setSectionOptionsConfig({ isVisible: false, section: null });
+            }} 
           />
-          <View 
-            style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}
+          <Animated.View 
+            style={[styles.optionsModalContent, { backgroundColor: colors.bgCard, transform: [{ translateY: sectionSheetTranslateY }] }]}
             onStartShouldSetResponder={() => true}
           >
-            <View style={styles.optionsModalDragHandle} />
+            <View
+              {...sectionSheetPanResponder.panHandlers}
+              style={{ width: '100%', alignItems: 'center', paddingTop: 4, paddingBottom: 14, cursor: 'grab' }}
+            >
+              <View style={[styles.optionsModalDragHandle, { marginBottom: 0 }]} />
+            </View>
           <Text style={[styles.optionsModalTitle, { color: colors.textPrimary }]}>
             {t('Options for')} {sectionOptionsConfig.section?.title}
           </Text>
@@ -2284,7 +2325,7 @@ export default function BoardScreen({ route, navigation }) {
               </TouchableOpacity>
             </>
           )}
-        </View>
+        </Animated.View>
         </View>
       )}
 
@@ -2293,35 +2334,93 @@ export default function BoardScreen({ route, navigation }) {
           style={[StyleSheet.absoluteFillObject, styles.sheetOverlay, { zIndex: 99998, elevation: 99998 }]}
           pointerEvents="auto"
         >
-          <TouchableOpacity 
-            style={StyleSheet.absoluteFillObject} 
-            activeOpacity={1} 
-            onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })} 
-          />
           <View 
-            style={[styles.optionsModalContent, { backgroundColor: colors.bgCard }]}
+            style={{
+              flex: 1,
+              width: '100%',
+              height: '100%',
+              backgroundColor: colors.bgCard || '#FAF9F6',
+              paddingTop: Platform.OS === 'ios' ? 36 : (isCompact ? 10 : 14),
+              paddingBottom: Platform.OS === 'ios' ? 16 : (isCompact ? 10 : 14),
+            }}
             onStartShouldSetResponder={() => true}
           >
-            <View style={styles.optionsModalDragHandle} />
-          
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-            <View style={{
-              width: 16,
-              height: 16,
-              borderRadius: 8,
-              backgroundColor: getBoardColor(boardOptionsConfig.board, boards),
-              marginRight: 10,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.2)'
-            }} />
-            <Text style={[styles.optionsModalTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
-              {t('Category') || 'Category'}: {boardOptionsConfig.board?.name === 'Main' ? (t('Main') || 'Main') : boardOptionsConfig.board?.name}
-            </Text>
-          </View>
-          
-          <Text style={{ color: colors.textSecondary, marginBottom: 16, paddingHorizontal: 20, textAlign: 'center' }}>
-            {t('What would you like to do?')}
-          </Text>
+            {/* Top Navigation Row with Back Arrow & Cancel matching CreateBoardModal */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 20,
+                maxWidth: isWideScreen ? 640 : '100%',
+                width: '100%',
+                alignSelf: 'center',
+                marginBottom: isCompact ? 8 : 12,
+              }}
+            >
+              <TouchableOpacity
+                testID="board_settings_back_btn"
+                onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
+                activeOpacity={0.7}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('Back') || 'Back'}
+                style={{
+                  width: isCompact ? 34 : 38,
+                  height: isCompact ? 34 : 38,
+                  borderRadius: isCompact ? 17 : 19,
+                  borderWidth: 1,
+                  borderColor: colors.borderColor || '#E5E5EA',
+                  backgroundColor: colors.bgCard || '#FFF',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary || '#000'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <Path d="M19 12H5M12 19l-7-7 7-7" />
+                </Svg>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '500', color: colors.textSecondary || '#8E8E93' }}>
+                  {t('Cancel') || 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1, width: '100%' }}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingBottom: 24,
+                maxWidth: isWideScreen ? 640 : '100%',
+                width: '100%',
+                alignSelf: 'center',
+              }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <View style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 7,
+                  backgroundColor: getBoardColor(boardOptionsConfig.board, boards),
+                  marginRight: 10,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.2)'
+                }} />
+                <Text style={{ fontSize: isVeryCompact ? 22 : (isCompact ? 24 : 26), fontWeight: '800', letterSpacing: -0.5, color: colors.textPrimary }}>
+                  {t('Category') || 'Category'}: {boardOptionsConfig.board?.name === 'Main' ? (t('Main') || 'Main') : boardOptionsConfig.board?.name}
+                </Text>
+              </View>
+              
+              <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 18 }}>
+                {t('What would you like to do?')}
+              </Text>
 
           {/* Color Palette (Palitra) with Custom Color Picker */}
           <View style={{ width: '100%', marginBottom: 18, alignItems: 'center' }}>
@@ -2708,9 +2807,23 @@ export default function BoardScreen({ route, navigation }) {
             </>
           )}
 
-          <TouchableOpacity style={[styles.optionBtn, { borderBottomWidth: 0 }]} onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}>
-            <Text style={[styles.optionText, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
+          <TouchableOpacity
+            style={{
+              marginTop: 18,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+            }}
+            onPress={() => setBoardOptionsConfig({ isVisible: false, board: null })}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>
+              {t('Done') || 'Done'}
+            </Text>
           </TouchableOpacity>
+          </ScrollView>
         </View>
         </View>
       )}
