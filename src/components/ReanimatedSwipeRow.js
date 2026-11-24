@@ -5,6 +5,33 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 /**
+ * ============================================================================
+ * MANUAL SWIPE ANIMATION TUNING CONFIG
+ * You can adjust these values to regulate the speed and feel of all row swipes:
+ * - completeGlideDurationMs: How long (ms) the row takes to smoothly close on right-swipe complete (e.g. 180 - 280)
+ * - completeBadgePopScale: Peak scale of the green checkmark badge pop (e.g. 1.0 = no pop, 1.16 = subtle pop)
+ * - completeRowEndOpacity: Row opacity at the end of the close glide (1 = keep row solid with no dark gap)
+ * - completeRowEndScale: Row scale at the end of the close glide (1 = normal size)
+ * - leftSwipeOpenDurationMs: How long (ms) the left-swipe action menu takes to snap open
+ * - snapCancelDurationMs: How long (ms) a canceled swipe takes to glide back to 0
+ * - programmaticCloseDurationMs: How long (ms) closeRow() takes when closing an open menu
+ * ============================================================================
+ */
+export const SWIPE_ANIMATION_CONFIG = {
+  completeGlideDurationMs: 210,
+  completeBadgePopScale: 1.15,
+  completeBadgePopUpMs: 85,
+  completeBadgePopDownMs: 125,
+  completeRowEndOpacity: 1,
+  completeRowEndScale: 1,
+  leftSwipeOpenDurationMs: 200,
+  leftSwipeReopenDurationMs: 180,
+  snapCancelDurationMs: 190,
+  programmaticCloseDurationMs: 160,
+  easingCurve: Easing.bezier(0.25, 0.1, 0.25, 1),
+};
+
+/**
  * High-Performance Native-Driven Swipeable Row (RNGH PanGestureHandler + Native Animated)
  *
  * Designed specifically for React Native 0.76+ Fabric + FlashList v2:
@@ -55,6 +82,11 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     rowExitOpacity.setValue(1);
     rowExitScale.setValue(1);
     completeBadgePop.setValue(1);
+    // Also flush native animated nodes to 0 on the UI thread in case a trailing RNGH event fired during recycle
+    Animated.parallel([
+      Animated.timing(dragX, { toValue: 0, duration: 1, useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(rowTranslation, { toValue: 0, duration: 1, useNativeDriver: USE_NATIVE_DRIVER }),
+    ]).start();
     isOpenRef.current = false;
     isCompletingRef.current = false;
     setActionsMounted(prev => (prev ? false : prev));
@@ -92,15 +124,25 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
   const closeRow = useCallback(() => {
     isOpenRef.current = false;
     isCompletingRef.current = false;
-    dragX.setValue(0);
     rowExitOpacity.setValue(1);
     rowExitScale.setValue(1);
     completeBadgePop.setValue(1);
-    Animated.timing(rowTranslation, {
-      toValue: 0,
-      duration: 160,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start(({ finished }) => {
+    Animated.parallel([
+      Animated.timing(dragX, {
+        toValue: 0,
+        duration: SWIPE_ANIMATION_CONFIG.programmaticCloseDurationMs,
+        easing: SWIPE_ANIMATION_CONFIG.easingCurve,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(rowTranslation, {
+        toValue: 0,
+        duration: SWIPE_ANIMATION_CONFIG.programmaticCloseDurationMs,
+        easing: SWIPE_ANIMATION_CONFIG.easingCurve,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+    ]).start(({ finished }) => {
+      dragX.setValue(0);
+      rowTranslation.setValue(0);
       if (finished) {
         notifyClose();
       }
@@ -136,15 +178,8 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
         return;
       }
 
-      const maxRight = Math.max(80, leftThreshold * 2.2);
-      const maxLeft = Math.max(40, rightActionsWidth);
       const startOffset = isOpenRef.current ? -rightActionsWidth : 0;
       const rawOffset = startOffset + translationX;
-      const clampedCurrent = Math.max(-maxLeft * 1.08, Math.min(maxRight, rawOffset));
-
-      // Transfer active drag displacement into base translation cleanly so zero visual jump occurs
-      rowTranslation.setValue(clampedCurrent);
-      dragX.setValue(0);
 
       if (!isOpenRef.current) {
         if (rawOffset >= leftThreshold || (rawOffset > leftThreshold * 0.55 && velocityX > 650)) {
@@ -154,52 +189,66 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
             try { onSwipeLeftThresholdReach(); } catch (_) {}
           }
 
-          // Choreographed 2-stage Right-Swipe Complete animation:
-          // 1. Pop the checkmark badge while sliding the row smoothly across to the right
-          // 2. Fade & subtly scale the row out before dispatching the completion state change
-          const slideOutTarget = Math.max(leftThreshold * 1.85, 260);
+          // Smooth natural completion glide configured via SWIPE_ANIMATION_CONFIG.
+          // Uses deterministic Animated.timing (never open-ended Animated.spring) so there is zero ~1s pause/gap.
+          const {
+            completeGlideDurationMs,
+            completeBadgePopScale,
+            completeBadgePopUpMs,
+            completeBadgePopDownMs,
+            completeRowEndOpacity,
+            completeRowEndScale,
+            easingCurve,
+          } = SWIPE_ANIMATION_CONFIG;
+
           Animated.parallel([
             Animated.sequence([
-              Animated.spring(completeBadgePop, {
-                toValue: 1.28,
-                friction: 4,
-                tension: 240,
+              Animated.timing(completeBadgePop, {
+                toValue: completeBadgePopScale,
+                duration: completeBadgePopUpMs,
+                easing: Easing.out(Easing.quad),
                 useNativeDriver: USE_NATIVE_DRIVER,
               }),
-              Animated.spring(completeBadgePop, {
-                toValue: 1.05,
-                friction: 6,
-                tension: 180,
+              Animated.timing(completeBadgePop, {
+                toValue: 1,
+                duration: completeBadgePopDownMs,
+                easing: Easing.inOut(Easing.quad),
                 useNativeDriver: USE_NATIVE_DRIVER,
               }),
             ]),
+            Animated.timing(dragX, {
+              toValue: 0,
+              duration: completeGlideDurationMs,
+              easing: easingCurve,
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
             Animated.timing(rowTranslation, {
-              toValue: slideOutTarget,
-              duration: 210,
-              easing: Easing.bezier(0.22, 1, 0.36, 1),
+              toValue: 0,
+              duration: completeGlideDurationMs,
+              easing: easingCurve,
               useNativeDriver: USE_NATIVE_DRIVER,
             }),
             Animated.timing(rowExitOpacity, {
-              toValue: 0,
-              duration: 195,
-              delay: 15,
-              easing: Easing.out(Easing.cubic),
+              toValue: completeRowEndOpacity,
+              duration: completeGlideDurationMs,
+              easing: easingCurve,
               useNativeDriver: USE_NATIVE_DRIVER,
             }),
             Animated.timing(rowExitScale, {
-              toValue: 0.96,
-              duration: 200,
-              easing: Easing.out(Easing.quad),
+              toValue: completeRowEndScale,
+              duration: completeGlideDurationMs,
+              easing: easingCurve,
               useNativeDriver: USE_NATIVE_DRIVER,
             }),
           ]).start(() => {
             isCompletingRef.current = false;
-            notifyLeftComplete();
-            // Reset values after dispatch so if the row stays in the list or is recycled, it is clean
+            dragX.setValue(0);
             rowTranslation.setValue(0);
             rowExitOpacity.setValue(1);
             rowExitScale.setValue(1);
             completeBadgePop.setValue(1);
+            setActionsMounted(false);
+            notifyLeftComplete();
           });
           return;
         }
@@ -207,35 +256,64 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
         if (rawOffset < -rightThreshold || (rawOffset < -18 && velocityX < -500)) {
           isOpenRef.current = true;
           notifyWillOpen('right');
-          Animated.spring(rowTranslation, {
-            toValue: -rightActionsWidth,
-            velocity: velocityX,
-            bounciness: 4,
-            speed: 18,
-            useNativeDriver: USE_NATIVE_DRIVER,
-          }).start();
+          Animated.parallel([
+            Animated.timing(dragX, {
+              toValue: 0,
+              duration: SWIPE_ANIMATION_CONFIG.leftSwipeOpenDurationMs,
+              easing: SWIPE_ANIMATION_CONFIG.easingCurve,
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
+            Animated.timing(rowTranslation, {
+              toValue: -rightActionsWidth,
+              duration: SWIPE_ANIMATION_CONFIG.leftSwipeOpenDurationMs,
+              easing: SWIPE_ANIMATION_CONFIG.easingCurve,
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
+          ]).start(() => {
+            dragX.setValue(0);
+            rowTranslation.setValue(-rightActionsWidth);
+          });
           return;
         }
       } else if (translationX <= rightThreshold && velocityX <= 400 && rawOffset < -10) {
-        Animated.spring(rowTranslation, {
-          toValue: -rightActionsWidth,
-          velocity: velocityX,
-          bounciness: 4,
-          speed: 18,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }).start();
+        Animated.parallel([
+          Animated.timing(dragX, {
+            toValue: 0,
+            duration: SWIPE_ANIMATION_CONFIG.leftSwipeReopenDurationMs,
+            easing: SWIPE_ANIMATION_CONFIG.easingCurve,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+          Animated.timing(rowTranslation, {
+            toValue: -rightActionsWidth,
+            duration: SWIPE_ANIMATION_CONFIG.leftSwipeReopenDurationMs,
+            easing: SWIPE_ANIMATION_CONFIG.easingCurve,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+        ]).start(() => {
+          dragX.setValue(0);
+          rowTranslation.setValue(-rightActionsWidth);
+        });
         return;
       }
 
       const wasOpen = isOpenRef.current;
       isOpenRef.current = false;
-      Animated.spring(rowTranslation, {
-        toValue: 0,
-        velocity: velocityX,
-        bounciness: 4,
-        speed: 18,
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }).start(({ finished }) => {
+      Animated.parallel([
+        Animated.timing(dragX, {
+          toValue: 0,
+          duration: SWIPE_ANIMATION_CONFIG.snapCancelDurationMs,
+          easing: SWIPE_ANIMATION_CONFIG.easingCurve,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(rowTranslation, {
+          toValue: 0,
+          duration: SWIPE_ANIMATION_CONFIG.snapCancelDurationMs,
+          easing: SWIPE_ANIMATION_CONFIG.easingCurve,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ]).start(({ finished }) => {
+        dragX.setValue(0);
+        rowTranslation.setValue(0);
         if (finished && wasOpen) {
           notifyClose();
         }
@@ -277,6 +355,31 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
       ],
     }),
     [transX, rowExitOpacity, rowExitScale]
+  );
+
+  const leftContainerAnimStyle = useMemo(
+    () => ({
+      opacity: Animated.multiply(
+        rowExitOpacity,
+        transX.interpolate({
+          inputRange: [0, 2, 16],
+          outputRange: [0, 1, 1],
+          extrapolate: 'clamp',
+        })
+      ),
+    }),
+    [transX, rowExitOpacity]
+  );
+
+  const rightContainerAnimStyle = useMemo(
+    () => ({
+      opacity: transX.interpolate({
+        inputRange: [-16, -2, 0],
+        outputRange: [1, 1, 0],
+        extrapolate: 'clamp',
+      }),
+    }),
+    [transX]
   );
 
   const leftDrawerAnimStyle = useMemo(() => {
@@ -335,11 +438,20 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     <View style={styles.root}>
       {actionsMounted && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          {renderLeftDrawer ? renderLeftDrawer(leftDrawerAnimStyle) : null}
-          {renderRightDrawer ? renderRightDrawer(rightDrawerAnimStyle) : null}
+          {renderLeftDrawer ? (
+            <Animated.View style={[StyleSheet.absoluteFill, leftContainerAnimStyle]} pointerEvents="none">
+              {renderLeftDrawer(leftDrawerAnimStyle)}
+            </Animated.View>
+          ) : null}
+          {renderRightDrawer ? (
+            <Animated.View style={[StyleSheet.absoluteFill, rightContainerAnimStyle]} pointerEvents="box-none">
+              {renderRightDrawer(rightDrawerAnimStyle)}
+            </Animated.View>
+          ) : null}
         </View>
       )}
       <PanGestureHandler
+        key={itemKey}
         enabled={enabled}
         activeOffsetX={[-16, 16]}
         failOffsetY={[-10, 10]}

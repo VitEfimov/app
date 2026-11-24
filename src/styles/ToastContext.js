@@ -13,6 +13,7 @@ export const ToastProvider = ({ children }) => {
   const { colors, isDark, mode } = useTheme();
   const insets = useContext(SafeAreaInsetsContext);
   const [toastConfig, setToastConfig] = useState({
+    id: 0,
     visible: false,
     message: '',
     actionLabel: '',
@@ -21,37 +22,65 @@ export const ToastProvider = ({ children }) => {
 
   const translateY = useRef(new Animated.Value(100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.95)).current;
   const timeoutRef = useRef(null);
+  const activeToastIdRef = useRef(0);
 
-  const hideToast = useCallback(() => {
+  const hideToast = useCallback((expectedId) => {
+    const targetId = expectedId !== undefined ? expectedId : activeToastIdRef.current;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     Animated.parallel([
       Animated.timing(translateY, {
         toValue: 100,
-        duration: 250,
+        duration: 200,
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 250,
+        duration: 200,
         useNativeDriver: true,
-      })
-    ]).start(() => {
-      setToastConfig(prev => ({ ...prev, visible: false }));
+      }),
+      Animated.timing(scale, {
+        toValue: 0.95,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished && targetId === activeToastIdRef.current) {
+        setToastConfig(prev => ({ ...prev, visible: false }));
+      }
     });
-  }, [translateY, opacity]);
+  }, [translateY, opacity, scale]);
 
   const showToast = useCallback((message, actionLabel, onAction, duration = 4000) => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
 
+    // Stop any existing toast animation immediately and reset so the new toast visibly pops up fresh as the single active popup
+    translateY.stopAnimation();
+    opacity.stopAnimation();
+    scale.stopAnimation();
+
+    const nextId = activeToastIdRef.current + 1;
+    activeToastIdRef.current = nextId;
+
+    translateY.setValue(36);
+    opacity.setValue(0);
+    scale.setValue(0.95);
+
     setToastConfig({
+      id: nextId,
       visible: true,
       message,
       actionLabel,
       onAction: () => {
         if (onAction) onAction();
-        hideToast();
+        hideToast(nextId);
       }
     });
 
@@ -59,19 +88,26 @@ export const ToastProvider = ({ children }) => {
       Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
-        bounciness: 0,
+        bounciness: 4,
+        speed: 20,
       }),
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 250,
+        duration: 180,
         useNativeDriver: true,
-      })
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        bounciness: 4,
+        speed: 20,
+      }),
     ]).start();
 
     timeoutRef.current = setTimeout(() => {
-      hideToast();
+      hideToast(nextId);
     }, duration);
-  }, [hideToast, translateY, opacity]);
+  }, [hideToast, translateY, opacity, scale]);
 
   return (
     <ToastContext.Provider value={{ showToast, hideToast }}>
@@ -79,13 +115,14 @@ export const ToastProvider = ({ children }) => {
       {toastConfig.visible && (
         <View style={[styles.toastWrapper, { bottom: 30 + (insets?.bottom || 0) }]} pointerEvents="box-none">
           <Animated.View 
+            key={`toast_${toastConfig.id}`}
             style={[
               styles.container, 
               { 
                 backgroundColor: isDark ? colors.bgCard : '#333333',
                 borderColor: isDark ? colors.borderColor : 'transparent',
                 borderWidth: isDark ? 1 : 0,
-                transform: [{ translateY }],
+                transform: [{ translateY }, { scale }],
                 opacity
               }
             ]}

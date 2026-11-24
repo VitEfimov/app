@@ -90,7 +90,7 @@ if (Platform.OS !== 'web') {
 export default function TaskQuickMenuModal({
   isVisible,
   onClose,
-  task,
+  task: rawTask,
   onEdit,
   onSnooze,
   onPressEdit,
@@ -98,6 +98,13 @@ export default function TaskQuickMenuModal({
   onMoveForward,
   onMoveBackward,
 }) {
+  const lastValidTaskRef = useRef(null);
+  if (rawTask) {
+    lastValidTaskRef.current = rawTask;
+  }
+  const hasTask = Boolean(rawTask || lastValidTaskRef.current);
+  const task = rawTask || lastValidTaskRef.current || { id: '__empty__', taskname: '', completed: false, boardId: 'main' };
+
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
@@ -108,6 +115,16 @@ export default function TaskQuickMenuModal({
   const streakMode = useSelector(state => state.themeReducer?.habitStreakMode || 'grace');
 
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  React.useEffect(() => {
+    if (isVisible) {
+      sheetTranslateY.stopAnimation();
+      sheetTranslateY.setValue(0);
+    }
+  }, [isVisible, sheetTranslateY]);
+
   const handlePanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -119,14 +136,15 @@ export default function TaskQuickMenuModal({
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 40 || gestureState.vy > 0.45) {
+          // Trigger modal close immediately while sliding sheet off-screen;
+          // DO NOT reset sheetTranslateY to 0 until onModalHide after the modal is hidden,
+          // preventing the menu from flashing back onto the screen during react-native-modal's exit.
           Animated.timing(sheetTranslateY, {
-            toValue: 500,
-            duration: 140,
+            toValue: 600,
+            duration: 200,
             useNativeDriver: true,
-          }).start(() => {
-            sheetTranslateY.setValue(0);
-            if (onClose) onClose();
-          });
+          }).start();
+          if (onCloseRef.current) onCloseRef.current();
         } else {
           Animated.spring(sheetTranslateY, {
             toValue: 0,
@@ -136,8 +154,6 @@ export default function TaskQuickMenuModal({
       },
     })
   ).current;
-
-  if (!task) return null;
 
   const taskBoard = boards.find(b => b && (b.id === (task.boardId || task.board_id) || b._id === (task.boardId || task.board_id)));
   const isHabit = isHabitTask(task, taskBoard);
@@ -447,12 +463,17 @@ export default function TaskQuickMenuModal({
   return (
     <>
     <Modal
-      isVisible={isVisible}
+      isVisible={Boolean(isVisible && hasTask)}
       onSwipeComplete={onClose}
       swipeDirection={['down']}
       propagateSwipe={true}
       onBackdropPress={onClose}
-      onModalShow={() => sheetTranslateY.setValue(0)}
+      onBackButtonPress={onClose}
+      animationOutTiming={200}
+      backdropTransitionOutTiming={200}
+      hideModalContentWhileAnimating={true}
+      onModalWillShow={() => sheetTranslateY.setValue(0)}
+      onModalHide={() => sheetTranslateY.setValue(0)}
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
       <Animated.View style={[styles.modalContent, { backgroundColor: colors.bgCard, transform: [{ translateY: sheetTranslateY }] }]}>

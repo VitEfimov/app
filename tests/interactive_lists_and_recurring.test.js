@@ -3349,9 +3349,34 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
 
       const notifSrc = fs.readFileSync(path.resolve('src/utils/notifications.js'), 'utf8');
       assert.match(notifSrc, /export function parseAutomationTimeString/, 'notifications.js must export parseAutomationTimeString for Morning/Evening reminder times');
-      assert.match(notifSrc, /export async function updateRecurringAutomations\(themeState,\s*tasks\s*=\s*\[\],\s*isPremium\s*=\s*true\)/, 'updateRecurringAutomations must not abort when called from AutoManageSettings');
+      assert.match(notifSrc, /export async function updateRecurringAutomations\(themeState,\s*tasks\s*=\s*\[\],\s*isPremium\s*=\s*true/, 'updateRecurringAutomations must not abort when called from AutoManageSettings');
+      assert.match(notifSrc, /identifier:\s*`automation_morning_\$\{i\}`/, 'Morning automations must use deterministic slot identifiers to prevent duplicate notifications');
+      assert.match(notifSrc, /identifier:\s*`automation_summary_\$\{i\}`/, 'Daily Summary automations must use deterministic slot identifiers to prevent duplicate notifications');
+      assert.match(notifSrc, /identifier:\s*`automation_evening_\$\{i\}`/, 'Evening automations must use deterministic slot identifiers to prevent duplicate notifications');
+      assert.match(notifSrc, /export async function deduplicatePresentedNotificationsAsync/, 'notifications.js must export deduplicatePresentedNotificationsAsync to dismiss stacked duplicate notifications in the Android shade');
+      assert.match(notifSrc, /export async function cancelExistingAutomationsAsync/, 'notifications.js must export cancelExistingAutomationsAsync to cancel both deterministic IDs and legacy title-matched notifications');
       const autoManageSrc = fs.readFileSync(path.resolve('src/components/AutoManageSettings.js'), 'utf8');
       assert.match(autoManageSrc, /updateRecurringAutomations\(mergedTheme,\s*tasks,\s*true\)/, 'AutoManageSettings must pass mergedTheme and true to updateRecurringAutomations on Save');
+
+      // 11. TaskDetailsModal open/close animation matches ThemeSettingsModal (Settings -> Appearance -> Close)
+      assert.match(detailsSrc, /isVisible=\{Boolean\(isVisible && hasTask\)\}/, 'TaskDetailsModal must stay mounted and drive react-native-modal via Boolean(isVisible && hasTask) like ThemeSettingsModal');
+      assert.doesNotMatch(detailsSrc, /animateSheetExit/, 'TaskDetailsModal must not delay onClose with a competing inner exit animation');
+      assert.doesNotMatch(detailsSrc, /if\s*\(!task\)\s*return\s*null/, 'TaskDetailsModal must not unmount before react-native-modal completes its slideInUp/slideOutDown animations');
+
+      // 12. Swipe row drawer isolation (no green/grey overlap), full-width left-swipe kebab background, and single fresh Undo toast popup
+      const swipeRowSrc = fs.readFileSync(path.resolve('src/components/ReanimatedSwipeRow.js'), 'utf8');
+      assert.match(swipeRowSrc, /leftContainerAnimStyle/, 'ReanimatedSwipeRow must isolate left drawer container opacity to right-swipe only (transX > 0)');
+      assert.match(swipeRowSrc, /rightContainerAnimStyle/, 'ReanimatedSwipeRow must isolate right drawer container opacity to left-swipe only (transX < 0)');
+      const taskRowSrc = fs.readFileSync(path.resolve('src/components/TaskRow.js'), 'utf8');
+      assert.match(taskRowSrc, /width:\s*rightActionsWidth/, 'TaskRow rightActionContainer must span full rightActionsWidth edge-to-edge');
+      assert.match(taskRowSrc, /itemKey=\{`\$\{taskIdKey\}_\$\{sectionId\s*\|\|\s*'sec'\}_\$\{task\.completed\s*\?\s*'1'\s*:\s*'0'\}`\}/, 'TaskRow must include sectionId and completed state in ReanimatedSwipeRow itemKey so uncompleting a task from Completed resets swipe offset');
+      const toastSrc = fs.readFileSync(path.resolve('src/styles/ToastContext.js'), 'utf8');
+      assert.match(toastSrc, /activeToastIdRef/, 'ToastContext must track activeToastIdRef so only one toast is active and each new toast pops up fresh');
+
+      // 13. TaskQuickMenuModal & react-native-modal close without flashing back on screen
+      const quickMenuSrc = fs.readFileSync(path.resolve('src/components/TaskQuickMenuModal.js'), 'utf8');
+      assert.match(quickMenuSrc, /onModalHide=\{\(\)\s*=>\s*sheetTranslateY\.setValue\(0\)\}/, 'TaskQuickMenuModal must only reset sheetTranslateY in onModalHide/onModalWillShow so it never snaps back to 0 during exit');
+      assert.match(patchSrc, /atomic-close-set-state/, 'patch-expo-calendar.js must patch react-native-modal close() to set showContent and isVisible atomically without a 1-frame flash');
     });
   });
 });

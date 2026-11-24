@@ -1074,7 +1074,7 @@ export default function BoardScreen({ route, navigation }) {
         const seenTaskIds = new Map();
         visibleTasks.forEach((task, idx) => {
           const rawId = task?.id || task?._id || `idx_${idx}`;
-          const baseKey = `task_${rawId}_${section.id}`;
+          const baseKey = `task_${rawId}_${section.id}_${task?.completed ? '1' : '0'}`;
           const count = seenTaskIds.get(baseKey) || 0;
           seenTaskIds.set(baseKey, count + 1);
           const uniqueKey = count === 0 ? baseKey : `${baseKey}_dup_${count}`;

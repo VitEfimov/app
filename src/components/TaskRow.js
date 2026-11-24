@@ -508,7 +508,6 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
           {
             backgroundColor: bgTint,
             borderBottomColor: colors.borderColor,
-            borderRadius: 10,
           },
           hideUnderline && { borderBottomWidth: 0 },
         ]}
@@ -540,11 +539,22 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
   }, [task?.completed, isDark, colors.borderColor, colors.primary, t, hideUnderline]);
 
   const renderRightDrawer = useCallback((animStyle) => {
+    const btnWidth = onPressMore ? 48 : 53;
     return (
       <View style={styles.rightActionOverlay}>
-        <View style={[styles.rightActionContainer, { borderBottomColor: colors.borderColor }, hideUnderline && { borderBottomWidth: 0 }]}>
+        <View
+          style={[
+            styles.rightActionContainer,
+            {
+              width: rightActionsWidth,
+              backgroundColor: colors.surfaceContainer,
+              borderBottomColor: colors.borderColor,
+            },
+            hideUnderline && { borderBottomWidth: 0 },
+          ]}
+        >
           <TouchableOpacity
-            style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainer }]}
+            style={[styles.rightActionBtn, { width: btnWidth, backgroundColor: colors.surfaceContainer }]}
             onPress={handleSwipeSnooze}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             accessibilityRole="button"
@@ -556,7 +566,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
             </Animated.View>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.rightActionBtn, { backgroundColor: colors.surfaceContainerHigh }]}
+            style={[styles.rightActionBtn, { width: btnWidth, backgroundColor: colors.surfaceContainerHigh }]}
             onPress={handleSwipeDelete}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             accessibilityRole="button"
@@ -569,7 +579,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
           </TouchableOpacity>
           {onPressMore ? (
             <TouchableOpacity
-              style={[styles.rightActionKebabBtn, { backgroundColor: colors.surfaceContainer }]}
+              style={[styles.rightActionKebabBtn, { width: 48, backgroundColor: colors.surfaceContainer }]}
               onPress={handleSwipeMore}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               accessibilityRole="button"
@@ -584,7 +594,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
         </View>
       </View>
     );
-  }, [colors.surfaceContainer, colors.surfaceContainerHigh, colors.borderColor, colors.textPrimary, colors.textSecondary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore, onPressMore, hideUnderline, t]);
+  }, [rightActionsWidth, colors.surfaceContainer, colors.surfaceContainerHigh, colors.borderColor, colors.textPrimary, colors.textSecondary, handleSwipeSnooze, handleSwipeDelete, handleSwipeMore, onPressMore, hideUnderline, t]);
 
   const isCompletedSection = sectionId === 'completed' || !!task?.completed;
 
@@ -1144,7 +1154,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
     <>
       <ReanimatedSwipeRow
         ref={swipeableRef}
-        itemKey={taskIdKey}
+        itemKey={`${taskIdKey}_${sectionId || 'sec'}_${task.completed ? '1' : '0'}`}
         enabled={!isSelectionMode && !isEditing}
         leftThreshold={middleCompleteThreshold}
         rightActionsWidth={rightActionsWidth}
@@ -1315,7 +1325,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: '2.5%',
-    paddingRight: 10,
+    paddingRight: 0,
     borderBottomWidth: 1,
     overflow: 'hidden',
   },
@@ -1326,11 +1336,11 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   rightActionKebabBtn: {
-    width: 34,
+    width: 48,
     justifyContent: 'center',
     alignItems: 'center',
     height: '100%',
-    marginLeft: 4,
+    marginLeft: 0,
   },
   kebabBtnWrapper: {
     justifyContent: 'center',

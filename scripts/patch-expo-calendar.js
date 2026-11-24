@@ -44,6 +44,13 @@ const JS_VALUES_MAPPERS_PATH = path.join(
   'calendar',
   'JsValuesMappers.kt'
 );
+const RN_MODAL_PATH = path.join(
+  ROOT,
+  'node_modules',
+  'react-native-modal',
+  'dist',
+  'modal.js'
+);
 
 function applyPatchList(filePath, patches) {
   if (!fs.existsSync(filePath)) {
@@ -458,13 +465,49 @@ const jsValuesMappersPatches = [
   },
 ];
 
+const rnModalPatches = [
+  {
+    name: 'atomic-close-set-state',
+    marker: `                    this.setState({
+                        showContent: false,
+                        isVisible: false,
+                    }, () => {
+                        this.props.onModalHide();
+                    });`,
+    target: `                    this.setState({
+                        showContent: false,
+                    }, () => {
+                        this.setState({
+                            isVisible: false,
+                        }, () => {
+                            this.props.onModalHide();
+                        });
+                    });`,
+    replacement: `                    this.setState({
+                        showContent: false,
+                        isVisible: false,
+                    }, () => {
+                        this.props.onModalHide();
+                    });`,
+  },
+  {
+    name: 'hide-children-when-show-content-false',
+    marker: `const _children = !this.state.showContent ? (React.createElement(animatable.View, null)) : (children);`,
+    target: `        const _children = this.props.hideModalContentWhileAnimating &&
+            this.props.useNativeDriver &&
+            !this.state.showContent ? (React.createElement(animatable.View, null)) : (children);`,
+    replacement: `        const _children = !this.state.showContent ? (React.createElement(animatable.View, null)) : (children);`,
+  },
+];
+
 function run() {
   const res1 = applyPatchList(CALENDAR_MODULE_PATH, calendarModulePatches);
   const res2 = applyPatchList(JS_VALUES_MAPPERS_PATH, jsValuesMappersPatches);
+  const res3 = applyPatchList(RN_MODAL_PATH, rnModalPatches);
 
-  const totalApplied = res1.applied + res2.applied;
-  const totalAlready = res1.alreadyPatched + res2.alreadyPatched;
-  const totalMissed = res1.missed + res2.missed;
+  const totalApplied = res1.applied + res2.applied + res3.applied;
+  const totalAlready = res1.alreadyPatched + res2.alreadyPatched + res3.alreadyPatched;
+  const totalMissed = res1.missed + res2.missed + res3.missed;
 
   if (totalMissed > 0) {
     console.warn(`[patch-expo-calendar] Completed with ${totalMissed} unmatched patch(es) (applied=${totalApplied}, already=${totalAlready}).`);

@@ -773,7 +773,15 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     for (const escOffset of escOffsets) {
       let remDate = targetDate.subtract(escOffset.amount, escOffset.unit);
       if (remDate.isAfter(dayjs())) {
-        const remId = await scheduleExactTaskReminder(`[URGENT] ${taskName}`, remDate.toDate(), taskId, true, 'task_alarm', themeState, advancedOptions);
+        const remId = await scheduleExactTaskReminder(
+          `[URGENT] ${taskName}`,
+          remDate.toDate(),
+          taskId,
+          true,
+          'task_alarm',
+          themeState,
+          { ...advancedOptions, deterministicSlot: `esc_${escOffset.amount}_${escOffset.unit}` }
+        );
         if (remId) ids.push(remId);
       }
     }
@@ -783,7 +791,15 @@ export async function scheduleTaskReminder(taskName, reminderValue, completionDa
     for (let i = 1; i <= 12; i++) {
       let nagDate = targetDate.add(i * 10, 'minute');
       if (nagDate.isAfter(dayjs())) {
-        const nagId = await scheduleExactTaskReminder(`[OVERDUE] ${taskName}`, nagDate.toDate(), taskId, true, 'task_alarm', themeState, advancedOptions);
+        const nagId = await scheduleExactTaskReminder(
+          `[OVERDUE] ${taskName}`,
+          nagDate.toDate(),
+          taskId,
+          true,
+          'task_alarm',
+          themeState,
+          { ...advancedOptions, deterministicSlot: `nag_${i}` }
+        );
         if (nagId) ids.push(nagId);
       }
     }
@@ -818,7 +834,9 @@ export async function schedulePersistentTaskNotification(
       });
     }
 
+    const persistentIdentifier = taskId ? `task_persist_${taskId}` : undefined;
     const scheduledId = await Notifications.scheduleNotificationAsync({
+      ...(persistentIdentifier ? { identifier: persistentIdentifier } : {}),
       content: {
         title: 'Task Reminder',
         body: timeStr ? `${taskName} (${timeStr})` : taskName,
@@ -916,7 +934,23 @@ export async function scheduleExactTaskReminder(
     }
 
     const offsetSuffix = advancedOptions?.reminderOffsetLabel ? ` (${advancedOptions.reminderOffsetLabel})` : '';
+    let deterministicId;
+    if (taskId) {
+      if (advancedOptions?.deterministicSlot) {
+        deterministicId = `task_${advancedOptions.deterministicSlot}_${taskId}`;
+      } else if (advancedOptions?.reminderOffsetLabel) {
+        const safeOffset = String(advancedOptions.reminderOffsetLabel)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+        deterministicId = `task_offset_${safeOffset}_${taskId}`;
+      } else {
+        deterministicId = `task_exact_${taskId}`;
+      }
+    }
+
     const scheduledId = await Notifications.scheduleNotificationAsync({
+      ...(deterministicId ? { identifier: deterministicId } : {}),
       content: {
         title: isAlarm
           ? 'Task Alarm'
@@ -1085,10 +1119,21 @@ export async function cancelNotification(notificationIds, taskId = null) {
       if (Platform.OS === 'android') {
         await cancelAlarm(String(targetId));
       }
+      const suffix = `_${targetId}`;
+      for (const prefix of ['task_exact', 'task_persist']) {
+        try {
+          await Notifications.cancelScheduledNotificationAsync(`${prefix}_${targetId}`);
+          await Notifications.dismissNotificationAsync(`${prefix}_${targetId}`);
+        } catch (e) {}
+      }
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       for (const item of scheduled) {
         const itemTaskId = item.content?.data?.taskId;
-        if (itemTaskId !== undefined && itemTaskId !== null && String(itemTaskId) === String(targetId)) {
+        const itemId = String(item.identifier || '');
+        if (
+          (itemTaskId !== undefined && itemTaskId !== null && String(itemTaskId) === String(targetId)) ||
+          (itemId.startsWith('task_') && itemId.endsWith(suffix))
+        ) {
           await Notifications.cancelScheduledNotificationAsync(item.identifier);
           await Notifications.dismissNotificationAsync(item.identifier);
         }
@@ -1096,9 +1141,14 @@ export async function cancelNotification(notificationIds, taskId = null) {
 
       const presented = await Notifications.getPresentedNotificationsAsync();
       for (const item of presented) {
-        const itemTaskId = item.request?.content?.data?.taskId;
-        if (itemTaskId !== undefined && itemTaskId !== null && String(itemTaskId) === String(targetId)) {
-          await Notifications.dismissNotificationAsync(item.request.identifier);
+        const req = item?.request || item;
+        const itemTaskId = req?.content?.data?.taskId;
+        const itemId = String(req?.identifier || '');
+        if (
+          (itemTaskId !== undefined && itemTaskId !== null && String(itemTaskId) === String(targetId)) ||
+          (itemId.startsWith('task_') && itemId.endsWith(suffix))
+        ) {
+          await Notifications.dismissNotificationAsync(itemId);
         }
       }
     } catch (err) {
@@ -1161,203 +1211,340 @@ export function parseAutomationTimeString(timeStr, defaultHour = 8, defaultMinut
   return { hour, minute };
 }
 
-export async function updateRecurringAutomations(themeState, tasks = [], isPremium = true) {
+const AUTOMATION_TITLES = new Set(['Good Morning!', 'Daily Summary', 'Evening Review']);
+const AUTOMATION_TYPES = ['morning', 'summary', 'evening'];
+const AUTOMATION_DAYS_AHEAD = 7;
+
+let automationSyncLock = Promise.resolve();
+let lastAutomationFingerprint = null;
+
+export function isAutomationNotificationObject(notifOrReq) {
+  if (!notifOrReq) return false;
+  const req = notifOrReq.request || notifOrReq;
+  const id = String(req?.identifier || notifOrReq?.identifier || '');
+  const content = req?.content || notifOrReq?.content || {};
+  const data = content?.data || {};
+  const title = String(content?.title || '').trim();
+  return (
+    id.startsWith('automation_') ||
+    Boolean(data?.isAutomation) ||
+    Boolean(data?.automationType) ||
+    AUTOMATION_TITLES.has(title)
+  );
+}
+
+export async function deduplicatePresentedNotificationsAsync() {
+  if (Platform.OS === 'web') return 0;
+  let dismissedCount = 0;
+  try {
+    if (typeof Notifications.getPresentedNotificationsAsync !== 'function') {
+      return 0;
+    }
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    if (!Array.isArray(presented) || presented.length <= 1) {
+      return 0;
+    }
+
+    // Sort newest first so we keep the most recent notification and dismiss older duplicates
+    const sorted = [...presented].sort((a, b) => (Number(b?.date) || 0) - (Number(a?.date) || 0));
+    const seenKeys = new Set();
+
+    for (const item of sorted) {
+      const req = item?.request || item;
+      const id = req?.identifier || item?.identifier;
+      if (!id) continue;
+
+      const content = req?.content || item?.content || {};
+      const data = content?.data || {};
+      const title = String(content?.title || '').trim();
+      const body = String(content?.body || '').trim();
+
+      let dedupKey = null;
+      if (isAutomationNotificationObject(item)) {
+        dedupKey = `automation:${data?.automationType || title}`;
+      } else if (data?.taskId !== undefined && data?.taskId !== null) {
+        dedupKey = `task:${String(data.taskId)}:${title}`;
+      } else if (title || body) {
+        dedupKey = `generic:${title}:${body}`;
+      }
+
+      if (!dedupKey) continue;
+
+      if (seenKeys.has(dedupKey)) {
+        try {
+          await Notifications.dismissNotificationAsync(id);
+          dismissedCount++;
+        } catch (e) {}
+      } else {
+        seenKeys.add(dedupKey);
+      }
+    }
+  } catch (error) {
+    DevLogger.error('Failed to deduplicate presented notifications', error);
+  }
+  return dismissedCount;
+}
+
+export async function cancelExistingAutomationsAsync() {
   if (Platform.OS === 'web') return;
 
+  // 1. Explicitly cancel all deterministic slot IDs so native Android AlarmManager PendingIntents are cleared
+  for (const type of AUTOMATION_TYPES) {
+    for (let i = 0; i < AUTOMATION_DAYS_AHEAD; i++) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(`automation_${type}_${i}`);
+      } catch (e) {}
+    }
+  }
+
+  // 2. Also sweep any legacy random-UUID scheduled automation notifications (even if Android stripped data.isAutomation)
   try {
-    // Cancel existing automations
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    for (const notif of scheduled) {
-      if (notif.content?.data?.isAutomation) {
-        await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+    if (Array.isArray(scheduled)) {
+      for (const notif of scheduled) {
+        if (isAutomationNotificationObject(notif)) {
+          try {
+            await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+          } catch (e) {}
+        }
       }
     }
   } catch (error) {
     DevLogger.error('Failed to cancel existing automations', error);
   }
+}
 
-  const {
-    morningReminder, morningReminderTime,
-    eveningReminder, eveningReminderTime,
-    summaryReminder, summaryReminderTime
-  } = themeState || {};
+export function resetAutomationScheduleCacheForTests() {
+  lastAutomationFingerprint = null;
+}
 
-  const boardAutomations = themeState?.boardAutomations || {};
-  const anyBoardOverride = Object.values(boardAutomations).find(
-    (b) => b && b.overrideGlobal && (b.morningReminder || b.eveningReminder || b.summaryReminder)
-  );
+export async function updateRecurringAutomations(themeState, tasks = [], isPremium = true, options = {}) {
+  if (Platform.OS === 'web') return;
 
-  const effMorning = Boolean(morningReminder || anyBoardOverride?.morningReminder);
-  const effMorningTime = (morningReminder ? morningReminderTime : anyBoardOverride?.morningReminderTime) || '08:00';
-  const effEvening = Boolean(eveningReminder || anyBoardOverride?.eveningReminder);
-  const effEveningTime = (eveningReminder ? eveningReminderTime : anyBoardOverride?.eveningReminderTime) || '20:00';
-  const effSummary = Boolean(summaryReminder || anyBoardOverride?.summaryReminder);
-  const effSummaryTime = (summaryReminder ? summaryReminderTime : anyBoardOverride?.summaryReminderTime) || '09:00';
+  const runSerialized = async () => {
+    // Always deduplicate any duplicate notifications currently sitting in the Android shade
+    await deduplicatePresentedNotificationsAsync();
 
-  if (!effMorning && !effEvening && !effSummary) {
-    return;
-  }
+    const {
+      morningReminder, morningReminderTime,
+      eveningReminder, eveningReminderTime,
+      summaryReminder, summaryReminderTime
+    } = themeState || {};
 
-  const notificationSound = themeState?.notificationSound || 'default';
-  const alarmSound = themeState?.alarmSound || 'default';
-  const vibrationEnabled = themeState?.vibrationEnabled !== false;
-  const channelId = getChannelId(false, notificationSound, vibrationEnabled);
+    const boardAutomations = themeState?.boardAutomations || {};
+    const anyBoardOverride = Object.values(boardAutomations).find(
+      (b) => b && b.overrideGlobal && (b.morningReminder || b.eveningReminder || b.summaryReminder)
+    );
 
-  // Ensure channel exists
-  await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
+    const effMorning = Boolean(morningReminder || anyBoardOverride?.morningReminder);
+    const effMorningTime = (morningReminder ? morningReminderTime : anyBoardOverride?.morningReminderTime) || '08:00';
+    const effEvening = Boolean(eveningReminder || anyBoardOverride?.eveningReminder);
+    const effEveningTime = (eveningReminder ? eveningReminderTime : anyBoardOverride?.eveningReminderTime) || '20:00';
+    const effSummary = Boolean(summaryReminder || anyBoardOverride?.summaryReminder);
+    const effSummaryTime = (summaryReminder ? summaryReminderTime : anyBoardOverride?.summaryReminderTime) || '09:00';
 
-  // Helper to find the absolute next occurrence of a time, with an optional day offset
-  const getNextOccurrence = (hour, minute, daysOffset = 0) => {
+    if (!effMorning && !effEvening && !effSummary) {
+      await cancelExistingAutomationsAsync();
+      lastAutomationFingerprint = 'disabled';
+      return;
+    }
+
+    const notificationSound = themeState?.notificationSound || 'default';
+    const alarmSound = themeState?.alarmSound || 'default';
+    const vibrationEnabled = themeState?.vibrationEnabled !== false;
+    const channelId = getChannelId(false, notificationSound, vibrationEnabled);
+
     const now = dayjs();
-    let next = dayjs().hour(hour).minute(minute).second(0).millisecond(0);
-    // If user sets reminder for the current minute, fire in 5 seconds for immediate feedback
-    if (daysOffset === 0 && next.isSame(now, 'minute')) {
-      return now.add(5, 'second');
+    const isSameMinuteTest = [
+      effMorning ? parseAutomationTimeString(effMorningTime, 8, 0) : null,
+      effSummary ? parseAutomationTimeString(effSummaryTime, 9, 0) : null,
+      effEvening ? parseAutomationTimeString(effEveningTime, 20, 0) : null,
+    ].some((parsed) => parsed && parsed.hour === now.hour() && parsed.minute === now.minute());
+
+    const activeTasksSig = (tasks || [])
+      .filter((t) => t && !t.completed)
+      .map((t) => `${t.id || t._id || ''}:${t.taskname || ''}:${t.completionDate || ''}:${t.time || ''}`)
+      .join('|');
+
+    const fingerprint = [
+      now.format('YYYY-MM-DD:HH'),
+      effMorning ? `M:${effMorningTime}` : 'M:off',
+      effSummary ? `S:${effSummaryTime}` : 'S:off',
+      effEvening ? `E:${effEveningTime}` : 'E:off',
+      channelId,
+      activeTasksSig,
+    ].join('::');
+
+    if (!options?.force && !isSameMinuteTest && fingerprint === lastAutomationFingerprint) {
+      return;
     }
-    // If the time has already passed today, start from tomorrow
-    if (next.isSameOrBefore(now)) {
-      next = next.add(1, 'day');
+
+    await cancelExistingAutomationsAsync();
+
+    // Ensure channel exists
+    await configureAndroidNotificationChannels(notificationSound, alarmSound, vibrationEnabled);
+
+    // Helper to find the absolute next occurrence of a time, with an optional day offset
+    const getNextOccurrence = (hour, minute, daysOffset = 0) => {
+      const refNow = dayjs();
+      let next = dayjs().hour(hour).minute(minute).second(0).millisecond(0);
+      // If user sets reminder for the current minute, fire in 5 seconds for immediate feedback
+      if (daysOffset === 0 && next.isSame(refNow, 'minute')) {
+        return refNow.add(5, 'second');
+      }
+      // If the time has already passed today, start from tomorrow
+      if (next.isSameOrBefore(refNow)) {
+        next = next.add(1, 'day');
+      }
+      return next.add(daysOffset, 'day');
+    };
+
+    // Helper to determine if a task is overdue relative to a reference trigger date/time
+    const isTaskOverdueAt = (task, refDateTime) => {
+      if (!task || task.completed || !task.completionDate) return false;
+      const taskDate = dayjs(task.completionDate);
+      if (taskDate.isBefore(refDateTime, 'day')) return true;
+      if (taskDate.isSame(refDateTime, 'day') && task.time) {
+        const { hour: h, minute: m } = parseAutomationTimeString(task.time, -1, -1);
+        if (h >= 0 && m >= 0) {
+          const taskDateTime = dayjs(task.completionDate).hour(h).minute(m).second(0).millisecond(0);
+          if (taskDateTime.isBefore(refDateTime)) return true;
+        }
+      }
+      return false;
+    };
+
+    // Morning Reminder: Upcoming tasks (Schedule for next 7 days)
+    if (effMorning && effMorningTime) {
+      const { hour, minute } = parseAutomationTimeString(effMorningTime, 8, 0);
+
+      for (let i = 0; i < AUTOMATION_DAYS_AHEAD; i++) {
+        const triggerDate = getNextOccurrence(hour, minute, i);
+
+        const dueToday = (tasks || []).filter(t => t && !t.completed && t.completionDate && dayjs(t.completionDate).isSame(triggerDate, 'day'));
+        const overdue = (tasks || []).filter(t => isTaskOverdueAt(t, triggerDate));
+
+        let bodyText = 'You have no tasks due today. Have a great day!';
+        if (dueToday.length > 0) {
+          bodyText = `You have ${dueToday.length} task${dueToday.length === 1 ? '' : 's'} for today`;
+          if (overdue.length > 0) {
+            bodyText += ` (${overdue.length} overdue)`;
+          }
+          bodyText += '.\n';
+          const top5 = [...dueToday, ...overdue].slice(0, 5);
+          bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+          if (dueToday.length + overdue.length > 5) {
+            bodyText += `\n...and ${dueToday.length + overdue.length - 5} more`;
+          }
+        } else if (overdue.length > 0) {
+          bodyText = `You have no tasks due today, but ${overdue.length} overdue task${overdue.length === 1 ? '' : 's'} waiting.\n`;
+          const top5 = overdue.slice(0, 5);
+          bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+          if (overdue.length > 5) {
+            bodyText += `\n...and ${overdue.length - 5} more`;
+          }
+        }
+
+        try {
+          await Notifications.scheduleNotificationAsync({
+            identifier: `automation_morning_${i}`,
+            content: {
+              title: 'Good Morning!',
+              body: bodyText,
+              sound: notificationSound || 'default',
+              priority: Notifications.AndroidNotificationPriority.MAX,
+              categoryIdentifier: 'task_regular',
+              data: { isAutomation: true, automationType: 'morning', daySlot: i },
+            },
+            trigger: buildDateTrigger(triggerDate.toDate(), channelId),
+          });
+        } catch (error) {
+          DevLogger.error('Failed to schedule morning reminder', error);
+        }
+      }
     }
-    return next.add(daysOffset, 'day');
+
+    // Summary Reminder: Overdue tasks (Schedule for next 7 days)
+    if (effSummary && effSummaryTime) {
+      const { hour, minute } = parseAutomationTimeString(effSummaryTime, 9, 0);
+
+      for (let i = 0; i < AUTOMATION_DAYS_AHEAD; i++) {
+        const triggerDate = getNextOccurrence(hour, minute, i);
+
+        const overdueTasks = (tasks || []).filter(t => isTaskOverdueAt(t, triggerDate));
+
+        let bodyText = 'All tasks are on track! You have no overdue tasks.';
+        if (overdueTasks.length > 0) {
+          bodyText = `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.\n`;
+          const top5 = overdueTasks.slice(0, 5);
+          bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+          if (overdueTasks.length > 5) {
+            bodyText += `\n...and ${overdueTasks.length - 5} more`;
+          }
+        }
+
+        try {
+          await Notifications.scheduleNotificationAsync({
+            identifier: `automation_summary_${i}`,
+            content: {
+              title: 'Daily Summary',
+              body: bodyText,
+              sound: notificationSound || 'default',
+              priority: Notifications.AndroidNotificationPriority.MAX,
+              categoryIdentifier: 'task_regular',
+              data: { isAutomation: true, automationType: 'summary', daySlot: i },
+            },
+            trigger: buildDateTrigger(triggerDate.toDate(), channelId),
+          });
+        } catch (error) {
+          DevLogger.error('Failed to schedule summary reminder', error);
+        }
+      }
+    }
+
+    // Evening Reminder: Unfinished tasks (Schedule for next 7 days)
+    if (effEvening && effEveningTime) {
+      const { hour, minute } = parseAutomationTimeString(effEveningTime, 20, 0);
+
+      for (let i = 0; i < AUTOMATION_DAYS_AHEAD; i++) {
+        const triggerDate = getNextOccurrence(hour, minute, i);
+
+        const unfinishedTasks = (tasks || []).filter(t => t && !t.completed && t.completionDate && dayjs(t.completionDate).isSameOrBefore(triggerDate, 'day'));
+
+        let bodyText = 'All caught up for today! Have a relaxing evening.';
+        if (unfinishedTasks.length > 0) {
+          bodyText = `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.\n`;
+          const top5 = unfinishedTasks.slice(0, 5);
+          bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
+          if (unfinishedTasks.length > 5) {
+            bodyText += `\n...and ${unfinishedTasks.length - 5} more`;
+          }
+        }
+
+        try {
+          await Notifications.scheduleNotificationAsync({
+            identifier: `automation_evening_${i}`,
+            content: {
+              title: 'Evening Review',
+              body: bodyText,
+              sound: notificationSound || 'default',
+              priority: Notifications.AndroidNotificationPriority.MAX,
+              categoryIdentifier: 'task_regular',
+              data: { isAutomation: true, automationType: 'evening', daySlot: i },
+            },
+            trigger: buildDateTrigger(triggerDate.toDate(), channelId),
+          });
+        } catch (error) {
+          DevLogger.error('Failed to schedule evening reminder', error);
+        }
+      }
+    }
+
+    lastAutomationFingerprint = fingerprint;
   };
 
-  // Helper to determine if a task is overdue relative to a reference trigger date/time
-  const isTaskOverdueAt = (task, refDateTime) => {
-    if (!task || task.completed || !task.completionDate) return false;
-    const taskDate = dayjs(task.completionDate);
-    if (taskDate.isBefore(refDateTime, 'day')) return true;
-    if (taskDate.isSame(refDateTime, 'day') && task.time) {
-      const { hour: h, minute: m } = parseAutomationTimeString(task.time, -1, -1);
-      if (h >= 0 && m >= 0) {
-        const taskDateTime = dayjs(task.completionDate).hour(h).minute(m).second(0).millisecond(0);
-        if (taskDateTime.isBefore(refDateTime)) return true;
-      }
-    }
-    return false;
-  };
-
-  // Morning Reminder: Upcoming tasks (Schedule for next 7 days)
-  if (effMorning && effMorningTime) {
-    const { hour, minute } = parseAutomationTimeString(effMorningTime, 8, 0);
-    
-    for (let i = 0; i < 7; i++) {
-      const triggerDate = getNextOccurrence(hour, minute, i);
-
-      const dueToday = (tasks || []).filter(t => t && !t.completed && t.completionDate && dayjs(t.completionDate).isSame(triggerDate, 'day'));
-      const overdue = (tasks || []).filter(t => isTaskOverdueAt(t, triggerDate));
-      
-      let bodyText = 'You have no tasks due today. Have a great day!';
-      if (dueToday.length > 0) {
-        bodyText = `You have ${dueToday.length} task${dueToday.length === 1 ? '' : 's'} for today`;
-        if (overdue.length > 0) {
-          bodyText += ` (${overdue.length} overdue)`;
-        }
-        bodyText += '.\n';
-        const top5 = [...dueToday, ...overdue].slice(0, 5);
-        bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
-        if (dueToday.length + overdue.length > 5) {
-          bodyText += `\n...and ${dueToday.length + overdue.length - 5} more`;
-        }
-      } else if (overdue.length > 0) {
-        bodyText = `You have no tasks due today, but ${overdue.length} overdue task${overdue.length === 1 ? '' : 's'} waiting.\n`;
-        const top5 = overdue.slice(0, 5);
-        bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
-        if (overdue.length > 5) {
-          bodyText += `\n...and ${overdue.length - 5} more`;
-        }
-      }
-
-      try {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Good Morning!',
-            body: bodyText,
-            sound: notificationSound || 'default',
-            priority: Notifications.AndroidNotificationPriority.MAX,
-            categoryIdentifier: 'task_regular',
-            data: { isAutomation: true, automationType: 'morning' },
-          },
-          trigger: buildDateTrigger(triggerDate.toDate(), channelId),
-        });
-      } catch (error) {
-        DevLogger.error('Failed to schedule morning reminder', error);
-      }
-    }
-  }
-
-  // Summary Reminder: Overdue tasks (Schedule for next 7 days)
-  if (effSummary && effSummaryTime) {
-    const { hour, minute } = parseAutomationTimeString(effSummaryTime, 9, 0);
-    
-    for (let i = 0; i < 7; i++) {
-      const triggerDate = getNextOccurrence(hour, minute, i);
-
-      const overdueTasks = (tasks || []).filter(t => isTaskOverdueAt(t, triggerDate));
-      
-      let bodyText = 'All tasks are on track! You have no overdue tasks.';
-      if (overdueTasks.length > 0) {
-        bodyText = `You have ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'} waiting.\n`;
-        const top5 = overdueTasks.slice(0, 5);
-        bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
-        if (overdueTasks.length > 5) {
-          bodyText += `\n...and ${overdueTasks.length - 5} more`;
-        }
-      }
-
-      try {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Daily Summary',
-            body: bodyText,
-            sound: notificationSound || 'default',
-            priority: Notifications.AndroidNotificationPriority.MAX,
-            categoryIdentifier: 'task_regular',
-            data: { isAutomation: true, automationType: 'summary' },
-          },
-          trigger: buildDateTrigger(triggerDate.toDate(), channelId),
-        });
-      } catch (error) {
-        DevLogger.error('Failed to schedule summary reminder', error);
-      }
-    }
-  }
-
-  // Evening Reminder: Unfinished tasks (Schedule for next 7 days)
-  if (effEvening && effEveningTime) {
-    const { hour, minute } = parseAutomationTimeString(effEveningTime, 20, 0);
-    
-    for (let i = 0; i < 7; i++) {
-      const triggerDate = getNextOccurrence(hour, minute, i);
-
-      const unfinishedTasks = (tasks || []).filter(t => t && !t.completed && t.completionDate && dayjs(t.completionDate).isSameOrBefore(triggerDate, 'day'));
-      
-      let bodyText = 'All caught up for today! Have a relaxing evening.';
-      if (unfinishedTasks.length > 0) {
-        bodyText = `Wrap up ${unfinishedTasks.length} unfinished task${unfinishedTasks.length === 1 ? '' : 's'} before the day ends.\n`;
-        const top5 = unfinishedTasks.slice(0, 5);
-        bodyText += top5.map(t => `• ${t.taskname}`).join('\n');
-        if (unfinishedTasks.length > 5) {
-          bodyText += `\n...and ${unfinishedTasks.length - 5} more`;
-        }
-      }
-
-      try {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Evening Review',
-            body: bodyText,
-            sound: notificationSound || 'default',
-            priority: Notifications.AndroidNotificationPriority.MAX,
-            categoryIdentifier: 'task_regular',
-            data: { isAutomation: true, automationType: 'evening' },
-          },
-          trigger: buildDateTrigger(triggerDate.toDate(), channelId),
-        });
-      } catch (error) {
-        DevLogger.error('Failed to schedule evening reminder', error);
-      }
-    }
-  }
+  automationSyncLock = automationSyncLock.then(runSerialized, runSerialized);
+  return automationSyncLock;
 }
 
 export async function testAndroidDefaultNotification() {
@@ -1552,9 +1739,14 @@ export async function testAndroidDefaultNotification() {
 }
 
 export function attachNotificationDiagnostics() {
+  // Clean up any duplicate notifications already sitting in the tray on startup
+  deduplicatePresentedNotificationsAsync().catch(() => {});
+
   const receivedSubscription =
     Notifications.addNotificationReceivedListener(
       notification => {
+        // Collapse any duplicate presented notifications (e.g. legacy stacked Daily Summary alarms)
+        deduplicatePresentedNotificationsAsync().catch(() => {});
         if (Platform.OS === 'android' && typeof duckAudioForNotification === 'function') {
           const isPersistentSilent = !!(notification?.request?.content?.data?.keepNotificationAllDay);
           if (!isPersistentSilent) {

@@ -263,7 +263,24 @@ const IconPause = ({ color, size = 16 }) => (
   </Svg>
 );
 
-const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible, onClose }) {
+const FALLBACK_EMPTY_TASK = {
+  id: '__empty__',
+  taskname: '',
+  name: '',
+  completed: false,
+  subtasks: [],
+  priority: 'none',
+  boardId: 'main',
+};
+
+const TaskDetailsModal = React.memo(function TaskDetailsModal({ task: rawTask, isVisible, onClose }) {
+  const lastValidTaskRef = useRef(null);
+  if (rawTask) {
+    lastValidTaskRef.current = rawTask;
+  }
+  const hasTask = Boolean(rawTask || lastValidTaskRef.current);
+  const task = rawTask || lastValidTaskRef.current || FALLBACK_EMPTY_TASK;
+
   const { colors, isDark } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isCompact = windowHeight < 820;
@@ -286,7 +303,7 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
   const [scrollContentHeight, setScrollContentHeight] = useState(0);
   const [notes, setNotes] = useState('');
   const [attachments, setAttachments] = useState([]);
-  const [subtasks, setSubtasks] = useState(task ? normalizeSubtasks(task.subtasks) : []);
+  const [subtasks, setSubtasks] = useState(rawTask ? normalizeSubtasks(rawTask.subtasks) : []);
   const [priority, setPriority] = useState('none');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerType, setDatePickerType] = useState('due');
@@ -319,43 +336,6 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
   const [isAttachmentOptionsVisible, setAttachmentOptionsVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const saveBtnScaleAnim = useRef(new Animated.Value(1)).current;
-  const saveCardFadeAnim = useRef(new Animated.Value(1)).current;
-  const sheetTranslateY = useRef(new Animated.Value(0)).current;
-  const sheetScaleAnim = useRef(new Animated.Value(1)).current;
-  const isClosingRef = useRef(false);
-
-  const animateSheetExit = (afterCloseCallback, { duration = 220 } = {}) => {
-    if (isClosingRef.current) return;
-    isClosingRef.current = true;
-    try { Keyboard?.dismiss?.(); } catch (_) {}
-
-    const slideDistance = Math.max(windowHeight || 800, 720);
-    Animated.parallel([
-      Animated.timing(sheetTranslateY, {
-        toValue: slideDistance,
-        duration,
-        easing: Easing.bezier(0.32, 0.0, 0.67, 0.0),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetScaleAnim, {
-        toValue: 0.955,
-        duration,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(saveCardFadeAnim, {
-        toValue: 0,
-        duration: Math.max(140, duration - 20),
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      isClosingRef.current = false;
-      if (typeof afterCloseCallback === 'function') {
-        afterCloseCallback();
-      }
-    });
-  };
 
   // Voice Recorder, Live Speech-to-Text Transcription & Audio Player States
   const [voiceRecordState, setVoiceRecordState] = useState('idle'); // 'idle' | 'recording' | 'paused'
@@ -562,7 +542,7 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
   const stripHtml = (html) => html ? html.replace(/<[^>]+>/g, '').trim() : '';
 
   useEffect(() => {
-    if (isVisible && task) {
+    if (isVisible && hasTask && task.id !== '__empty__') {
       const initialTaskName = task.taskname || task.name || '';
       const initialNotesText = stripHtml(task.description?.text) || '';
       
@@ -644,33 +624,7 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task, isVisible,
       setHabitSchedule(initialHabitSchedule);
       setHabitCompletedDatesState(initialHabitDates);
       setIsSaving(false);
-      isClosingRef.current = false;
       saveBtnScaleAnim.setValue(1);
-      saveCardFadeAnim.setValue(0.85);
-      sheetTranslateY.setValue(32);
-      sheetScaleAnim.setValue(0.975);
-      Animated.parallel([
-        Animated.spring(sheetTranslateY, {
-          toValue: 0,
-          damping: 22,
-          stiffness: 240,
-          mass: 0.85,
-          useNativeDriver: true,
-        }),
-        Animated.spring(sheetScaleAnim, {
-          toValue: 1,
-          damping: 20,
-          stiffness: 230,
-          mass: 0.85,
-          useNativeDriver: true,
-        }),
-        Animated.timing(saveCardFadeAnim, {
-          toValue: 1,
-          duration: 180,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
       dispatch(setTaskOptionsCollapsed(true));
 
       initialSnapshotRef.current = {
@@ -1141,29 +1095,9 @@ useEffect(() => {
       setTimeout(deferredNotificationJob, 0);
     }
 
-    // Crisp tactile feedback & choreographed spring + smooth sheet glide-out animation
     HapticHelper.trigger('success');
-    setIsSaving(true);
     try { Keyboard?.dismiss?.(); } catch (e) {}
-
-    Animated.sequence([
-      Animated.timing(saveBtnScaleAnim, {
-        toValue: 0.96,
-        duration: 45,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.spring(saveBtnScaleAnim, {
-        toValue: 1.02,
-        friction: 5,
-        tension: 190,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    setTimeout(() => {
-      animateSheetExit(onClose, { duration: 210 });
-    }, 95);
+    onClose();
   };
 
   const handleSave = () => {
@@ -1200,7 +1134,7 @@ useEffect(() => {
         isDestructive: true,
         onConfirm: () => {
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          animateSheetExit(onClose, { duration: 210 });
+          onClose();
         },
         secondaryConfirmText: t('Save'),
         onSecondaryConfirm: () => {
@@ -1209,89 +1143,60 @@ useEffect(() => {
         }
       });
     } else {
-      animateSheetExit(onClose, { duration: 210 });
+      onClose();
     }
   };
 
-  const headerDragPanResponder = useMemo(() => {
-    if (!PanResponder?.create) return { panHandlers: {} };
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 4,
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          sheetTranslateY.setValue(gestureState.dy);
-          const nextScale = Math.max(0.94, 1 - gestureState.dy / 2200);
-          sheetScaleAnim.setValue(nextScale);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 55 || gestureState.vy > 0.45) {
-          handleClose();
-        } else {
-          Animated.parallel([
-            Animated.spring(sheetTranslateY, {
-              toValue: 0,
-              damping: 20,
-              stiffness: 240,
-              useNativeDriver: true,
-            }),
-            Animated.spring(sheetScaleAnim, {
-              toValue: 1,
-              damping: 20,
-              stiffness: 240,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        }
-      },
-    });
-  }, [sheetTranslateY, sheetScaleAnim, taskName, notes, attachments, subtasks, priority, selectedBoardId, selectedDate, selectedTime, repeatConfig, reminder, isAlarm, keepNotificationAllDay]);
+  const handleHardwareBack = () => {
+    if (confirmConfig.isVisible) {
+      setConfirmConfig(prev => ({ ...prev, isVisible: false }));
+      return true;
+    }
+    if (showCurrencyModal) {
+      setShowCurrencyModal(false);
+      return true;
+    }
+    if (isAttachmentOptionsVisible) {
+      setAttachmentOptionsVisible(false);
+      return true;
+    }
+    if (isYearPickerVisible) {
+      setYearPickerVisible(false);
+      return true;
+    }
+    if (showDatePicker) {
+      setShowDatePicker(false);
+      return true;
+    }
+    if (showTimePicker) {
+      setShowTimePicker(false);
+      return true;
+    }
+    if (isRepeatModalVisible) {
+      setIsRepeatModalVisible(false);
+      return true;
+    }
+    if (isCustomReminderModalVisible) {
+      setIsCustomReminderModalVisible(false);
+      return true;
+    }
+    if (isPremiumModalVisible) {
+      setPremiumModalVisible(false);
+      return true;
+    }
+    handleClose();
+    return true;
+  };
 
   useEffect(() => {
-    if (!isVisible || !task) return;
-    const onBackPress = () => {
-      if (confirmConfig.isVisible) {
-        setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-        return true;
-      }
-      if (isAttachmentOptionsVisible) {
-        setAttachmentOptionsVisible(false);
-        return true;
-      }
-      if (isYearPickerVisible) {
-        setYearPickerVisible(false);
-        return true;
-      }
-      if (showDatePicker) {
-        setShowDatePicker(false);
-        return true;
-      }
-      if (showTimePicker) {
-        setShowTimePicker(false);
-        return true;
-      }
-      if (isRepeatModalVisible) {
-        setIsRepeatModalVisible(false);
-        return true;
-      }
-      if (isCustomReminderModalVisible) {
-        setIsCustomReminderModalVisible(false);
-        return true;
-      }
-      if (isPremiumModalVisible) {
-        setPremiumModalVisible(false);
-        return true;
-      }
-      handleClose();
-      return true;
-    };
-    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    if (!isVisible || !hasTask) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', handleHardwareBack);
     return () => sub.remove();
   }, [
     isVisible,
-    Boolean(task),
+    hasTask,
     confirmConfig.isVisible,
+    showCurrencyModal,
     isAttachmentOptionsVisible,
     isYearPickerVisible,
     showDatePicker,
@@ -1942,7 +1847,7 @@ useEffect(() => {
         onConfirm: () => {
           dispatch(deleteTask({ taskId: task.id || task._id }));
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          animateSheetExit(onClose, { duration: 200 });
+          onClose();
         },
         secondaryConfirmText: t('All recurring tasks'),
         onSecondaryConfirm: () => {
@@ -1951,7 +1856,7 @@ useEffect(() => {
             dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId }));
           }
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          animateSheetExit(onClose, { duration: 200 });
+          onClose();
         }
       });
     } else {
@@ -1964,68 +1869,46 @@ useEffect(() => {
         onConfirm: () => {
           dispatch(deleteTask({ taskId: task.id || task._id }));
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          animateSheetExit(onClose, { duration: 200 });
+          onClose();
         }
       });
     }
   };
 
   const toggleComplete = () => {
-    if (!task) return;
+    if (!hasTask) return;
     const newCompletedState = !task.completed;
     handleUpdate({ completed: newCompletedState });
     if (newCompletedState) {
-      animateSheetExit(onClose, { duration: 200 });
+      onClose();
     }
   };
-
-  if (!task) return null;
 
   return (
     <Modal 
       testID="task_details_modal"
-      isVisible={isVisible} 
-      animationIn="slideInUp"
-      animationOut="slideOutDown"
-      animationInTiming={230}
-      animationOutTiming={220}
-      backdropTransitionInTiming={200}
-      backdropTransitionOutTiming={200}
-      useNativeDriver={true}
-      useNativeDriverForBackdrop={true}
+      isVisible={Boolean(isVisible && hasTask)} 
       onSwipeComplete={handleClose}
       swipeDirection={(scrollOffset > 0 || showTimePicker) ? undefined : ['down']}
-      onBackdropPress={handleClose}
-      onBackButtonPress={() => {
-        if (showTimePicker) {
-          setShowTimePicker(false);
-          return;
-        }
-        handleClose();
-      }}
       propagateSwipe={true}
+      onBackdropPress={handleClose}
+      onBackButtonPress={handleHardwareBack}
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
       style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
-      <Animated.View
+      <View
         style={[
           styles.modalContent,
           {
             backgroundColor: colors.bgCard,
             paddingTop: Platform.OS === 'ios' ? (isCompact ? 34 : 42) : (isVeryCompact ? 6 : 10),
-            opacity: saveCardFadeAnim,
-            transform: [
-              { translateY: sheetTranslateY },
-              { scale: sheetScaleAnim },
-            ],
           },
         ]}
       >
           <View
-            {...headerDragPanResponder.panHandlers}
-            style={[styles.dragHandleContainer, { paddingTop: 4, paddingBottom: isVeryCompact ? 6 : 8, width: '100%', cursor: 'grab' }]}
+            style={[styles.dragHandleContainer, { paddingTop: 4, paddingBottom: isVeryCompact ? 6 : 8, width: '100%' }]}
           >
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
@@ -3215,7 +3098,7 @@ useEffect(() => {
 
             {/* Bottom Actions */}
             <View style={{ marginTop: isVeryCompact ? 6 : 10, marginBottom: 4 }}>
-              <Animated.View style={{ transform: [{ scale: saveBtnScaleAnim }], opacity: saveCardFadeAnim }}>
+              <Animated.View style={{ transform: [{ scale: saveBtnScaleAnim }] }}>
                 <TouchableOpacity 
                   testID="task_details_save_btn_bottom"
                   accessible={true}
@@ -3265,8 +3148,6 @@ useEffect(() => {
             </View>
             
           </ScrollView>
-
-        </Animated.View>
 
         <ConfirmModal
           isVisible={confirmConfig.isVisible}
@@ -3722,18 +3603,14 @@ useEffect(() => {
         />
       )}
 
-      {/* Quick Currency Selector Modal */}
-      <Modal
-        visible={showCurrencyModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowCurrencyModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowCurrencyModal(false)}
-        >
+      {/* Quick Currency Selector Overlay */}
+      {Boolean(showCurrencyModal) && (
+        <View style={[StyleSheet.absoluteFillObject, styles.calendarOverlay, { zIndex: 99999, elevation: 99999 }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowCurrencyModal(false)}
+          />
           <View
             style={{
               width: '88%',
@@ -3749,8 +3626,7 @@ useEffect(() => {
               shadowOpacity: 0.15,
               shadowRadius: 12,
               alignSelf: 'center',
-              marginBottom: 'auto',
-              marginTop: 'auto',
+              zIndex: 1,
             }}
             onStartShouldSetResponder={() => true}
           >
@@ -3827,8 +3703,9 @@ useEffect(() => {
               })}
             </View>
           </View>
-        </TouchableOpacity>
-      </Modal>
+        </View>
+      )}
+      </View>
     </Modal>
   );
 }, (prev, next) => (
