@@ -13,6 +13,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Clipboard from 'expo-clipboard';
 import { Alert, Platform } from 'react-native';
 import { shareTaskAsync } from '../../modules/expo-task-alarm';
+import { collapseTaskRowById } from './ReanimatedSwipeRow';
 import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 
 const IconEdit = ({ color }) => (
@@ -174,16 +175,18 @@ export default function TaskQuickMenuModal({
       targetCompleted = toggled.patch.completed;
     }
 
-    dispatch(updateTask({ taskId: task.id, completed: targetCompleted, ...habitUpdates }));
+    const targetTaskId = task.id || task._id;
     onClose();
-    
-    showToast(
-      targetCompleted ? t('Task Completed') : t('Task Uncompleted'),
-      t('Undo'),
-      () => {
-        dispatch(updateTask({ taskId: task.id, completed: !targetCompleted, isUndo: true, ...undoHabitUpdates }));
-      }
-    );
+    collapseTaskRowById(targetTaskId, () => {
+      dispatch(updateTask({ taskId: task.id, completed: targetCompleted, ...habitUpdates }));
+      showToast(
+        targetCompleted ? t('Task Completed') : t('Task Uncompleted'),
+        t('Undo'),
+        () => {
+          dispatch(updateTask({ taskId: task.id, completed: !targetCompleted, isUndo: true, ...undoHabitUpdates }));
+        }
+      );
+    });
   };
 
   const handleToggleYesterdayHabit = () => {
@@ -216,37 +219,43 @@ export default function TaskQuickMenuModal({
           secondaryIsDestructive: true,
           onConfirm: () => {
             setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-            dispatch(deleteTask({ taskId: currentTask.id }));
-            showToast(
-              t('Task Deleted'),
-              t('Undo'),
-              () => {
-                dispatch(addTask({ task: currentTask, isUndo: true }));
-              }
-            );
+            collapseTaskRowById(currentTask.id || currentTask._id, () => {
+              dispatch(deleteTask({ taskId: currentTask.id }));
+              showToast(
+                t('Task Deleted'),
+                t('Undo'),
+                () => {
+                  dispatch(addTask({ task: currentTask, isUndo: true }));
+                }
+              );
+            });
           },
           secondaryConfirmText: t('All recurring tasks'),
           onSecondaryConfirm: () => {
             setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-            dispatch(deleteTask({ taskId: currentTask.id }));
-            if (currentTask.recurringSeriesId) {
-              dispatch(deleteRecurringSeries({ seriesId: currentTask.recurringSeriesId }));
-            }
-            showToast(t('Recurring tasks deleted'));
+            collapseTaskRowById(currentTask.id || currentTask._id, () => {
+              dispatch(deleteTask({ taskId: currentTask.id }));
+              if (currentTask.recurringSeriesId) {
+                dispatch(deleteRecurringSeries({ seriesId: currentTask.recurringSeriesId }));
+              }
+              showToast(t('Recurring tasks deleted'));
+            });
           }
         });
       }, 300);
     } else {
-      dispatch(deleteTask({ taskId: currentTask.id }));
+      const targetTaskId = currentTask.id || currentTask._id;
       onClose();
-      
-      showToast(
-        t('Task Deleted'),
-        t('Undo'),
-        () => {
-          dispatch(addTask({ task: currentTask, isUndo: true }));
-        }
-      );
+      collapseTaskRowById(targetTaskId, () => {
+        dispatch(deleteTask({ taskId: currentTask.id }));
+        showToast(
+          t('Task Deleted'),
+          t('Undo'),
+          () => {
+            dispatch(addTask({ task: currentTask, isUndo: true }));
+          }
+        );
+      });
     }
   };
 

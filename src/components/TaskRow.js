@@ -367,16 +367,19 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
     }
   }, []);
 
-  const handleToggleComplete = useCallback(() => {
+  const handleToggleComplete = useCallback((options = {}) => {
     if (!task) return;
+    const { skipFeedback = false } = options;
     const newCompletedState = !task.completed;
-    // Native-driver tactile pop animation on checkbox (avoids Reanimated CommitHook modal collision on Fabric)
-    const useNative = Platform.OS !== 'web';
-    checkboxScale.setValue(1);
-    Animated.sequence([
-      Animated.spring(checkboxScale, { toValue: 1.22, friction: 4, tension: 220, useNativeDriver: useNative }),
-      Animated.spring(checkboxScale, { toValue: 1, friction: 5, tension: 180, useNativeDriver: useNative }),
-    ]).start();
+    if (!skipFeedback) {
+      // Native-driver tactile pop animation on checkbox (avoids Reanimated CommitHook modal collision on Fabric)
+      const useNative = Platform.OS !== 'web';
+      checkboxScale.setValue(1);
+      Animated.sequence([
+        Animated.spring(checkboxScale, { toValue: 1.22, friction: 4, tension: 220, useNativeDriver: useNative }),
+        Animated.spring(checkboxScale, { toValue: 1, friction: 5, tension: 180, useNativeDriver: useNative }),
+      ]).start();
+    }
     const todayStr = dayjs().format('YYYY-MM-DD');
     let habitUpdates = {};
     let undoHabitUpdates = {};
@@ -397,10 +400,12 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
     
     A11yHelper.announce(targetCompletedState ? (t('Task Completed') || 'Task Completed') : (t('Task Uncompleted') || 'Task Uncompleted'));
 
-    if (targetCompletedState) {
-      HapticHelper.success();
-    } else {
-      HapticHelper.light();
+    if (!skipFeedback) {
+      if (targetCompletedState) {
+        HapticHelper.success();
+      } else {
+        HapticHelper.light();
+      }
     }
 
     showToast(
@@ -432,13 +437,16 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
   }, [checkboxScale, task?.completed]);
 
   const handleSwipeComplete = useCallback(() => {
-    handleToggleComplete();
+    handleToggleComplete({ skipFeedback: true });
   }, [handleToggleComplete]);
 
   const handleSwipeDelete = useCallback(() => {
     if (!task) return;
-    closeSwipeable();
+    if (activeOpenSwipeable === swipeableRef.current) {
+      activeOpenSwipeable = null;
+    }
     if (isRepeatingTask) {
+      closeSwipeable();
       setConfirmConfig({
         isVisible: true,
         title: t('Delete Recurring Task'),
@@ -448,34 +456,56 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
         secondaryIsDestructive: true,
         onConfirm: () => {
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          dispatch(deleteTask({ taskId: task.id }));
-          showToast(
-            t('Task Deleted'),
-            t('Undo'),
-            () => {
-              dispatch(addTask({ task, isUndo: true }));
-            }
-          );
+          const commitSingleDelete = () => {
+            dispatch(deleteTask({ taskId: task.id }));
+            showToast(
+              t('Task Deleted'),
+              t('Undo'),
+              () => {
+                dispatch(addTask({ task, isUndo: true }));
+              }
+            );
+          };
+          if (swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
+            swipeableRef.current.collapse(commitSingleDelete);
+          } else {
+            commitSingleDelete();
+          }
         },
         secondaryConfirmText: t('All recurring tasks'),
         onSecondaryConfirm: () => {
           setConfirmConfig(prev => ({ ...prev, isVisible: false }));
-          dispatch(deleteTask({ taskId: task.id }));
-          if (task.recurringSeriesId) {
-            dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId }));
+          const commitSeriesDelete = () => {
+            dispatch(deleteTask({ taskId: task.id }));
+            if (task.recurringSeriesId) {
+              dispatch(deleteRecurringSeries({ seriesId: task.recurringSeriesId }));
+            }
+            showToast(t('Recurring tasks deleted'));
+          };
+          if (swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
+            swipeableRef.current.collapse(commitSeriesDelete);
+          } else {
+            commitSeriesDelete();
           }
-          showToast(t('Recurring tasks deleted'));
         }
       });
     } else {
-      dispatch(deleteTask({ taskId: task.id }));
-      showToast(
-        t('Task Deleted'),
-        t('Undo'),
-        () => {
-          dispatch(addTask({ task, isUndo: true }));
-        }
-      );
+      const commitDelete = () => {
+        dispatch(deleteTask({ taskId: task.id }));
+        showToast(
+          t('Task Deleted'),
+          t('Undo'),
+          () => {
+            dispatch(addTask({ task, isUndo: true }));
+          }
+        );
+      };
+      if (swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
+        swipeableRef.current.collapse(commitDelete);
+      } else {
+        closeSwipeable();
+        commitDelete();
+      }
     }
   }, [closeSwipeable, dispatch, task, isRepeatingTask, showToast, t]);
 
@@ -781,6 +811,9 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
           closeOpenSwipeableRow();
           if (isSelectionMode) {
             if (onToggleSelect) onToggleSelect(task.id, sectionId);
+          } else if (swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
+            handleSwipeThresholdReach();
+            swipeableRef.current.collapse(() => handleToggleComplete({ skipFeedback: true }));
           } else {
             handleToggleComplete();
           }
@@ -1154,6 +1187,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
     <>
       <ReanimatedSwipeRow
         ref={swipeableRef}
+        taskId={taskIdKey}
         itemKey={`${taskIdKey}_${sectionId || 'sec'}_${task.completed ? '1' : '0'}`}
         enabled={!isSelectionMode && !isEditing}
         leftThreshold={middleCompleteThreshold}

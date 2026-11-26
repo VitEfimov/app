@@ -3377,6 +3377,14 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const quickMenuSrc = fs.readFileSync(path.resolve('src/components/TaskQuickMenuModal.js'), 'utf8');
       assert.match(quickMenuSrc, /onModalHide=\{\(\)\s*=>\s*sheetTranslateY\.setValue\(0\)\}/, 'TaskQuickMenuModal must only reset sheetTranslateY in onModalHide/onModalWillShow so it never snaps back to 0 during exit');
       assert.match(patchSrc, /atomic-close-set-state/, 'patch-expo-calendar.js must patch react-native-modal close() to set showContent and isVisible atomically without a 1-frame flash');
+
+      // 14. Smooth row collapse opacity fade-out + simultaneous upward list shift animation on task completion and deletion
+      assert.match(swipeRowSrc, /completeCollapseDurationMs/, 'ReanimatedSwipeRow SWIPE_ANIMATION_CONFIG must expose completeCollapseDurationMs');
+      assert.match(swipeRowSrc, /runCollapseExit/, 'ReanimatedSwipeRow must animate opacity and upward cell shift via runCollapseExit before committing completion or deletion');
+      assert.match(swipeRowSrc, /export const FlashListCollapseCellRenderer/, 'ReanimatedSwipeRow must export FlashListCollapseCellRenderer so cells below the disappearing task smoothly slide up in parallel');
+      assert.match(swipeRowSrc, /export const listCollapseShiftController/, 'ReanimatedSwipeRow must export listCollapseShiftController to coordinate simultaneous upward translateY across below-cells');
+      assert.match(taskRowSrc, /swipeableRef\.current\.collapse\(commitDelete\)/, 'TaskRow handleSwipeDelete must collapse the row with fade-out and upward list shift before deleting');
+      assert.match(boardScreenSrc, /CellRendererComponent=\{FlashListCollapseCellRenderer\}/, 'BoardScreen FabricFlashList must use FlashListCollapseCellRenderer so bottom items move up smoothly as tasks disappear');
     });
   });
 });

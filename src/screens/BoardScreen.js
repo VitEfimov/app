@@ -6,6 +6,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../styles/ThemeContext';
 import { useToast } from '../styles/ToastContext';
 import TaskRow, { closeOpenSwipeableRow, cancelAllInlineEditing, getCachedTaskAmount } from '../components/TaskRow';
+import { FlashListCollapseCellRenderer } from '../components/ReanimatedSwipeRow';
 import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskQuickMenuModal from '../components/TaskQuickMenuModal';
 import SnoozeModal from '../components/SnoozeModal';
@@ -2151,6 +2152,7 @@ export default function BoardScreen({ route, navigation }) {
           data={flattenedData}
           extraData={flashListExtraData}
           ListHeaderComponent={renderListSummaryBar}
+          CellRendererComponent={FlashListCollapseCellRenderer}
           keyExtractor={extractBoardItemKey}
           getItemType={getBoardItemType}
           renderItem={renderItem}

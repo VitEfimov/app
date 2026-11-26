@@ -55,7 +55,7 @@ export const ToastProvider = ({ children }) => {
     });
   }, [translateY, opacity, scale]);
 
-  const showToast = useCallback((message, actionLabel, onAction, duration = 4000) => {
+  const showToast = useCallback((message, actionLabel, onAction, duration = 5500) => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
