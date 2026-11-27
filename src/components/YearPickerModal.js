@@ -226,7 +226,7 @@ export function YearPickerModal({
               { color: colors.textSecondary || '#888' },
             ]}
           >
-            ⚡ {t('Next 5 Months') || 'Next 5 Months'}
+            {t('Next 5 Months') || 'Next 5 Months'}
           </Text>
           <ScrollView
             horizontal
@@ -297,7 +297,7 @@ export function YearPickerModal({
               { color: colors.textSecondary || '#888' },
             ]}
           >
-            ⚡ {t('Next 5 Years') || 'Next 5 Years'}
+            {t('Next 5 Years') || 'Next 5 Years'}
           </Text>
           <ScrollView
             horizontal

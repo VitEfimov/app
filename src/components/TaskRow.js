@@ -97,6 +97,19 @@ const IconRepeat = ({ color }) => (
   </Svg>
 );
 
+const IconLuggageMini = ({ color = '#3B82F6', size = 12 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="6" y="7" width="12" height="14" rx="2" />
+    <Path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+  </Svg>
+);
+
+const IconFlameMini = ({ color = '#D97706', size = 12 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  </Svg>
+);
+
 const IconSquare = ({ color }) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -999,10 +1012,11 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
               <TouchableOpacity
                 onPress={handleCyclePackingCategory}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#3B82F61A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, maxWidth: '100%' }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#3B82F61A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, maxWidth: '100%' }}
               >
+                <IconLuggageMini color="#3B82F6" size={12} />
                 <Text style={{ fontSize: 11, fontWeight: '600', color: '#3B82F6' }} numberOfLines={1} ellipsizeMode="tail">
-                  🎒 {t(task.itemCategory || 'Carry-On') || (task.itemCategory || 'Carry-On')}
+                  {t(task.itemCategory || 'Carry-On') || (task.itemCategory || 'Carry-On')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1010,9 +1024,10 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
 
           {boardType === 'habits' && habitStats && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', maxWidth: '100%' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F59E0B1A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 4 }}>
+                <IconFlameMini color="#D97706" size={12} />
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
-                  🔥 {habitStats.currentStreak} {t('days') || 'd'}{habitStats.freezeActive ? ' ❄️' : ''}
+                  {habitStats.currentStreak} {t('days') || 'd'}
                 </Text>
               </View>
 

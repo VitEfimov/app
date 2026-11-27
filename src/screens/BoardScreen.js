@@ -125,6 +125,31 @@ const IconSettingsSliders = ({ color = '#666', size = 16 }) => (
   </Svg>
 );
 
+const IconLuggageMini = ({ color = '#3B82F6', size = 14 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="6" y="7" width="12" height="14" rx="2" />
+    <Path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+  </Svg>
+);
+
+const IconFlameMini = ({ color = '#D97706', size = 13 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  </Svg>
+);
+
+const IconShieldMini = ({ color = '#10B981', size = 12 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </Svg>
+);
+
+const IconBoltMini = ({ color = '#EF4444', size = 12 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </Svg>
+);
+
 const SectionHeader = React.memo(function SectionHeader({
   section,
   isCollapsed,
@@ -1769,9 +1794,12 @@ export default function BoardScreen({ route, navigation }) {
       return (
         <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>
-              🧳 {t('Packed') || 'Packed'}: {completedCount}/{totalCount} ({progressPercent}%)
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <IconLuggageMini color="#3B82F6" size={14} />
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>
+                {t('Packed') || 'Packed'}: {completedCount}/{totalCount} ({progressPercent}%)
+              </Text>
+            </View>
             {completedCount > 0 && (
               <TouchableOpacity
                 onPress={() => {
@@ -1834,9 +1862,12 @@ export default function BoardScreen({ route, navigation }) {
       return (
         <View style={{ backgroundColor: colors.bgCard || '#FFFFFF', marginHorizontal: 16, marginTop: 4, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.borderColor || '#E5E7EB' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, gap: 6, flexWrap: 'wrap' }}>
-            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>
-              ⚡ {t("Today's Habits") || 'Habits'}: {completedCount}/{totalCount} ({progressPercent}%)
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <IconFlameMini color="#F59E0B" size={14} />
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>
+                {t("Today's Habits") || 'Habits'}: {completedCount}/{totalCount} ({progressPercent}%)
+              </Text>
+            </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {missedCount > 0 && (
                 <View style={{ backgroundColor: '#EF44441A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
@@ -1845,9 +1876,12 @@ export default function BoardScreen({ route, navigation }) {
                   </Text>
                 </View>
               )}
-              <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
-                🔥 {t('Best Streak') || 'Best Streak'}: {bestStreak} {t('days') || 'd'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <IconFlameMini color="#D97706" size={12} />
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#D97706' }}>
+                  {t('Best Streak') || 'Best Streak'}: {bestStreak} {t('days') || 'd'}
+                </Text>
+              </View>
               <TouchableOpacity
                 onPress={() => {
                   const nextMode = habitStreakMode === 'strict' ? 'grace' : 'strict';
@@ -1863,7 +1897,7 @@ export default function BoardScreen({ route, navigation }) {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: 3,
+                  gap: 4,
                   backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
                   paddingHorizontal: 7,
                   paddingVertical: 2,
@@ -1876,8 +1910,13 @@ export default function BoardScreen({ route, navigation }) {
                 accessibilityLabel={`${t('Habit Streak Mode') || 'Habit Streak Mode'}: ${habitStreakMode === 'strict' ? (t('Strict (No skips)') || 'Strict') : (t('1-Day Freeze (Grace)') || 'Grace')}`}
                 accessibilityHint={t('Tap to toggle between Grace and Strict mode') || 'Tap to toggle between Grace and Strict mode'}
               >
+                {habitStreakMode === 'strict' ? (
+                  <IconBoltMini color="#EF4444" size={11} />
+                ) : (
+                  <IconShieldMini color="#10B981" size={11} />
+                )}
                 <Text style={{ fontSize: 10, fontWeight: '700', color: habitStreakMode === 'strict' ? '#EF4444' : '#10B981' }}>
-                  {habitStreakMode === 'strict' ? `⚡ ${t('Strict (No skips)') || 'Strict'}` : `🛡️ ${t('1-Day Freeze (Grace)') || 'Grace'}`}
+                  {habitStreakMode === 'strict' ? (t('Strict (No skips)') || 'Strict') : (t('1-Day Freeze (Grace)') || 'Grace')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1935,7 +1974,7 @@ export default function BoardScreen({ route, navigation }) {
               </Text>
               <Text style={{ fontSize: 11, color: colors.textSecondary }}>•</Text>
               <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#F59E0B' }}>
-                {avgRating ? `⭐ ${avgRating}` : '—'}
+                {avgRating ? `★ ${avgRating}` : '—'}
               </Text>
             </View>
           </View>
@@ -2739,9 +2778,12 @@ export default function BoardScreen({ route, navigation }) {
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: habitStreakMode === 'grace' ? '#10B981' : colors.textPrimary }}>
-                    🛡️ {t('1-Day Freeze (Grace)') || 'Grace (1 skip)'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <IconShieldMini color={habitStreakMode === 'grace' ? '#10B981' : colors.textPrimary} size={13} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: habitStreakMode === 'grace' ? '#10B981' : colors.textPrimary }}>
+                      {t('1-Day Freeze (Grace)') || 'Grace (1 skip)'}
+                    </Text>
+                  </View>
                   <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, textAlign: 'center' }} numberOfLines={1}>
                     {t('Allows 1 missed scheduled day without breaking your streak') || '1 skip allowed'}
                   </Text>
@@ -2764,9 +2806,12 @@ export default function BoardScreen({ route, navigation }) {
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: habitStreakMode === 'strict' ? '#EF4444' : colors.textPrimary }}>
-                    ⚡ {t('Strict (No skips)') || 'Strict (0 skips)'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <IconBoltMini color={habitStreakMode === 'strict' ? '#EF4444' : colors.textPrimary} size={13} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: habitStreakMode === 'strict' ? '#EF4444' : colors.textPrimary }}>
+                      {t('Strict (No skips)') || 'Strict (0 skips)'}
+                    </Text>
+                  </View>
                   <Text style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, textAlign: 'center' }} numberOfLines={1}>
                     {t('Any missed scheduled day resets your active streak') || '0 skips allowed'}
                   </Text>

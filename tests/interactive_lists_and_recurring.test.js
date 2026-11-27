@@ -3407,9 +3407,9 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.ok(!singleGroceryShare.includes('Task:'), 'Grocery share must not label grocery items as "Task:"');
 
       const multiGroceryShare = shareMod.formatMultipleItemsForShare(groceryItems, { board: groceryBoard, currencyCode: 'USD' });
-      assert.ok(multiGroceryShare.includes('🛒 Weekly Groceries:'), 'Multi grocery share must format as a unified list under the board title');
-      assert.ok(multiGroceryShare.includes('☐ Organic Milk ×2 — $9.00'), 'Multi grocery share must include unchecked item with qty and total');
-      assert.ok(multiGroceryShare.includes('☑️ Sourdough Bread — $5.00'), 'Multi grocery share must include checked item with price');
+      assert.ok(multiGroceryShare.includes('• Weekly Groceries:'), 'Multi grocery share must format as a unified list under the board title with app-style dot prefix');
+      assert.ok(multiGroceryShare.includes('○ Organic Milk ×2 — $9.00'), 'Multi grocery share must include unchecked item with app-style circle, qty and total');
+      assert.ok(multiGroceryShare.includes('✓ Sourdough Bread — $5.00'), 'Multi grocery share must include checked item with app-style checkmark and price');
       assert.ok(multiGroceryShare.includes('Total: $14.00'), 'Multi grocery share must compute and include the grand total');
       assert.ok(!multiGroceryShare.includes('------------------------'), 'Multi grocery share must not separate items with dashed task dividers');
 

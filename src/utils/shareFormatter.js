@@ -103,11 +103,17 @@ function inferHabitTimeOfDay(task) {
   return task.itemCategory || 'Anytime';
 }
 
+function formatAppStyleStars(rating) {
+  const clamped = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
+  if (clamped === 0) return '';
+  return `${'★'.repeat(clamped)}${'☆'.repeat(5 - clamped)} (${clamped}/5)`;
+}
+
 function formatSubtasksBlock(subtasks, t, indent = '') {
   const list = Array.isArray(subtasks) ? subtasks.filter((s) => s && String(s.text || '').trim()) : [];
   if (list.length === 0) return '';
   return list
-    .map((s) => `${indent}- ${s.completed ? '☑️' : '🔲'} ${String(s.text).trim()}`)
+    .map((s) => `${indent}- [${s.completed ? '✓' : ' '}] ${String(s.text).trim()}`)
     .join('\n');
 }
 
@@ -118,7 +124,7 @@ function formatSingleLineListEntry(task, boardType, context) {
     habitStreakMode = 'grace',
   } = context;
   const name = String(task?.taskname || task?.name || '').trim() || tr(t, 'Untitled', 'Untitled');
-  const check = task?.completed ? '☑️' : '☐';
+  const check = task?.completed ? '✓' : '○';
   const qty = extractShareItemQuantity(task);
   const unitPrice = extractShareItemAmount(task, boardType);
   const itemCurrency = getCachedTaskCurrency(task, boardType) || task?.itemCurrency || boardCurrencyCode || 'USD';
@@ -145,7 +151,7 @@ function formatSingleLineListEntry(task, boardType, context) {
       rawDate && dayjs(rawDate).isValid()
         ? `${tr(t, 'Due', 'Due')}: ${dayjs(rawDate).format('MMM D, YYYY')}`
         : '';
-    const statusPart = task?.completed ? `${tr(t, 'Paid', 'Paid')} ✅` : datePart;
+    const statusPart = task?.completed ? tr(t, 'Paid', 'Paid') : datePart;
     mainLine = `${check} ${name}${pricePart}${statusPart ? ` (${statusPart})` : ''}`;
   } else if (boardType === 'packing') {
     const qtyPart = qty > 1 ? ` ×${qty}` : '';
@@ -156,14 +162,14 @@ function formatSingleLineListEntry(task, boardType, context) {
     const tod = inferHabitTimeOfDay(task);
     const todPart = tod ? ` [${tr(t, tod, tod)}]` : '';
     const stats = computeHabitStats(task, dayjs().format('YYYY-MM-DD'), habitStreakMode);
-    const streakPart = stats?.currentStreak > 0 ? ` — 🔥 ${stats.currentStreak}d` : '';
+    const streakPart = stats?.currentStreak > 0 ? ` · ${stats.currentStreak}${tr(t, 'd', 'd')}` : '';
     mainLine = `${check} ${name}${todPart}${streakPart}`;
   } else if (boardType === 'media') {
     const cat = task?.itemCategory || 'Books';
     const catPart = cat ? ` [${tr(t, cat, cat)}]` : '';
     const rating = Number(task?.itemRating) || 0;
-    const ratingPart = rating > 0 ? ` — ${'⭐'.repeat(rating)} (${rating}/5)` : '';
-    const progressPart = task?.itemProgress ? ` • ${task.itemProgress}` : '';
+    const ratingPart = rating > 0 ? ` — ${formatAppStyleStars(rating)}` : '';
+    const progressPart = task?.itemProgress ? ` · ${task.itemProgress}` : '';
     mainLine = `${check} ${name}${catPart}${ratingPart}${progressPart}`;
   } else if (boardType === 'simple_list') {
     mainLine = `${check} ${name}`;
@@ -173,7 +179,7 @@ function formatSingleLineListEntry(task, boardType, context) {
       rawDate && dayjs(rawDate).isValid()
         ? ` — ${dayjs(rawDate).format('MMM D, YYYY')}${task?.time ? ` ${tr(t, 'at', 'at')} ${task.time}` : ''}`
         : '';
-    mainLine = `🎉 ${name}${datePart}`;
+    mainLine = `• ${name}${datePart}`;
   } else {
     const rawDate = task?.completionDate || task?.dateString || task?.dueDate || task?.date;
     const datePart =
@@ -188,14 +194,14 @@ function formatSingleLineListEntry(task, boardType, context) {
   }
 
   const extras = [];
-  if (notes) extras.push(`   ${ notes.replace(/\n/g, '\n   ') }`);
+  if (notes) extras.push(`   ${notes.replace(/\n/g, '\n   ')}`);
   if (subtasksText) extras.push(subtasksText);
   return extras.length > 0 ? `${mainLine}\n${extras.join('\n')}` : mainLine;
 }
 
 /**
  * Formats a single board item or task for sharing (from Edit modal or Left-Swipe Quick Menu).
- * Adapts labels and fields to the board's domain (Grocery, Expenses, Packing, Habits, Media, Quick List, Events, or Standard Task).
+ * Uses clean app-style monochrome symbols (•, ○, ✓, ★, ☆, ·) matching the app UI.
  */
 export function formatSingleItemForShare(task, options = {}) {
   if (!task) return '';
@@ -238,7 +244,7 @@ export function formatSingleItemForShare(task, options = {}) {
     const unitPrice = extractShareItemAmount(task, boardType);
     const itemCurrency = getCachedTaskCurrency(task, boardType) || task.itemCurrency || boardCurrencyCode;
     const headerTitle = boardName || tr(t, 'Grocery & Shopping', 'Grocery List');
-    lines.push(`🛒 ${headerTitle}`);
+    lines.push(`• ${headerTitle}`);
     lines.push(
       formatSingleLineListEntry(task, boardType, {
         t,
@@ -261,10 +267,10 @@ export function formatSingleItemForShare(task, options = {}) {
     const unitPrice = extractShareItemAmount(task, boardType);
     const itemCurrency = getCachedTaskCurrency(task, boardType) || task.itemCurrency || boardCurrencyCode;
     const rawDate = task.completionDate || task.dateString || task.dueDate || task.date;
-    lines.push(`🧾 ${name}${unitPrice > 0 ? ` — ${formatCurrency(unitPrice, itemCurrency)}` : ''}`);
+    lines.push(`• ${name}${unitPrice > 0 ? ` — ${formatCurrency(unitPrice, itemCurrency)}` : ''}`);
     lines.push(
       `${tr(t, 'Status', 'Status')}: ${
-        task.completed ? `${tr(t, 'Paid', 'Paid')} ✅` : tr(t, 'Remaining Due', 'Due')
+        task.completed ? `${tr(t, 'Paid', 'Paid')} (✓)` : tr(t, 'Remaining Due', 'Due')
       }`
     );
     if (rawDate && dayjs(rawDate).isValid()) {
@@ -278,33 +284,33 @@ export function formatSingleItemForShare(task, options = {}) {
     const qty = extractShareItemQuantity(task);
     const cat = task.itemCategory || 'Carry-On';
     const headerTitle = boardName || tr(t, 'Travel & Packing', 'Packing List');
-    lines.push(`🧳 ${headerTitle}`);
-    lines.push(`${task.completed ? '☑️' : '☐'} ${name}${qty > 1 ? ` ×${qty}` : ''} [${tr(t, cat, cat)}]`);
+    lines.push(`• ${headerTitle}`);
+    lines.push(`${task.completed ? '✓' : '○'} ${name}${qty > 1 ? ` ×${qty}` : ''} [${tr(t, cat, cat)}]`);
   } else if (boardType === 'habits') {
     const tod = inferHabitTimeOfDay(task);
     const stats = computeHabitStats(task, dayjs().format('YYYY-MM-DD'), habitStreakMode);
-    lines.push(`🔥 ${name}`);
+    lines.push(`• ${name}`);
     lines.push(`${tr(t, 'Time of Day', 'Time of Day')}: ${tr(t, tod, tod)}${task.time ? ` (${task.time})` : ''}`);
     if (stats?.currentStreak > 0) {
-      lines.push(`${tr(t, 'Streak', 'Streak')}: 🔥 ${stats.currentStreak}d`);
+      lines.push(`${tr(t, 'Streak', 'Streak')}: ${stats.currentStreak}${tr(t, 'd', 'd')}`);
     }
   } else if (boardType === 'media') {
     const cat = task.itemCategory || 'Books';
     const rating = Number(task.itemRating) || 0;
-    lines.push(`📚 ${name} [${tr(t, cat, cat)}]`);
+    lines.push(`• ${name} [${tr(t, cat, cat)}]`);
     if (rating > 0) {
-      lines.push(`${tr(t, 'Rating', 'Rating')}: ${'⭐'.repeat(rating)} (${rating}/5)`);
+      lines.push(`${tr(t, 'Rating', 'Rating')}: ${formatAppStyleStars(rating)}`);
     }
     if (task.itemProgress) {
       lines.push(`${tr(t, 'In Progress', 'Progress')}: ${task.itemProgress}`);
     }
   } else if (boardType === 'simple_list') {
     const headerTitle = boardName || tr(t, 'Quick List', 'List');
-    lines.push(`📋 ${headerTitle}`);
-    lines.push(`${task.completed ? '☑️' : '☐'} ${name}`);
+    lines.push(`• ${headerTitle}`);
+    lines.push(`${task.completed ? '✓' : '○'} ${name}`);
   } else if (boardType === 'birthdays') {
     const rawDate = task.completionDate || task.dateString || task.dueDate || task.date;
-    lines.push(`🎉 ${name}`);
+    lines.push(`• ${name}`);
     if (rawDate && dayjs(rawDate).isValid()) {
       lines.push(
         `${tr(t, 'Date', 'Date')}: ${dayjs(rawDate).format('MMM D, YYYY')}${
@@ -343,7 +349,7 @@ export function formatSingleItemForShare(task, options = {}) {
 
 /**
  * Formats multiple selected items or tasks for sharing (from BoardScreen or CalendarScreen selection bar).
- * Shares items as a unified, clean list appropriate for the board type (e.g. Grocery list with quantities, prices, and total).
+ * Uses clean app-style monochrome symbols (•, ○, ✓, ★, ☆, ·) matching the app UI.
  */
 export function formatMultipleItemsForShare(tasks = [], options = {}) {
   const validTasks = Array.isArray(tasks) ? tasks.filter(Boolean) : [];
@@ -377,19 +383,6 @@ export function formatMultipleItemsForShare(tasks = [], options = {}) {
       : primaryBoard.name
     : tr(t, 'List', 'List');
 
-  const headerIconMap = {
-    grocery: '🛒',
-    shopping: '🛒',
-    expenses: '🧾',
-    packing: '🧳',
-    habits: '🔥',
-    media: '📚',
-    simple_list: '📋',
-    birthdays: '🎉',
-    standard: '📋',
-  };
-  const headerIcon = headerIconMap[primaryBoardType] || '📋';
-
   const itemLines = validTasks.map((item) => {
     const itemBoard = explicitBoard || resolveTaskBoard(item, { boards }) || primaryBoard;
     const itemBoardType = resolveShareBoardType(item, itemBoard);
@@ -406,7 +399,7 @@ export function formatMultipleItemsForShare(tasks = [], options = {}) {
     });
   });
 
-  const lines = [`${headerIcon} ${boardTitle}:`, ...itemLines];
+  const lines = [`• ${boardTitle}:`, ...itemLines];
 
   if (primaryBoardType === 'grocery' || primaryBoardType === 'shopping') {
     let grandTotal = 0;
@@ -439,7 +432,7 @@ export function formatMultipleItemsForShare(tasks = [], options = {}) {
       const remaining = Math.max(0, totalBills - totalPaid);
       lines.push('');
       lines.push(
-        `${tr(t, 'Total', 'Total')}: ${formatCurrency(totalBills, boardCurrencyCode)} (${tr(t, 'Paid', 'Paid')}: ${formatCurrency(totalPaid, boardCurrencyCode)} • ${tr(t, 'Remaining Due', 'Due')}: ${formatCurrency(remaining, boardCurrencyCode)})`
+        `${tr(t, 'Total', 'Total')}: ${formatCurrency(totalBills, boardCurrencyCode)} (${tr(t, 'Paid', 'Paid')}: ${formatCurrency(totalPaid, boardCurrencyCode)} · ${tr(t, 'Remaining Due', 'Due')}: ${formatCurrency(remaining, boardCurrencyCode)})`
       );
     }
   }

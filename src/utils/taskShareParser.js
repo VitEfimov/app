@@ -265,9 +265,11 @@ export function parseSingleTaskBlock(blockText, options = {}) {
     for (const sLine of subLines) {
       const sTrim = sLine.trim();
       if (!sTrim) continue;
-      const m = sTrim.match(/^(?:\[([ xX])\]|[-*•]|\d+[\.)]|☑️|🔲)\s*(.+)/);
+      const m = sTrim.match(/^(?:\[([ xX✓✔])\]|[-*•○✓✔]|\d+[\.)]|☑️|🔲|☐)\s*(.+)/);
       if (m) {
-        const isDone = m[1] ? m[1].toLowerCase() === 'x' : sTrim.startsWith('☑️');
+        const isDone = m[1]
+          ? ['x', '✓', '✔'].includes(m[1].toLowerCase())
+          : sTrim.startsWith('☑️') || sTrim.startsWith('✓') || sTrim.startsWith('✔');
         subtasks.push({
           id: `${Date.now()}_${index}_${subtasks.length}`,
           text: (m[2] || sTrim).trim(),
@@ -433,11 +435,14 @@ export function parseSharedTasks(text, options = {}) {
   const textLines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (textLines.length >= 2) {
     // Check if every line is a checklist/bullet item
-    const isAllListItems = textLines.every(l => /^(?:[-*•]|\d+[\.)]|\[[ xX]\]|☑️|🔲)/i.test(l));
+    const isAllListItems = textLines.every(l => /^(?:[-*•○✓✔]|\d+[\.)]|\[[ xX✓✔]\]|☑️|🔲|☐)/i.test(l));
     if (isAllListItems) {
       return textLines.map((line, idx) => {
-        const match = line.match(/^(?:[-*•]|\d+[\.)]|☑️|🔲)?\s*(?:\[([ xX])\])?\s*(.+)/i);
-        const isCompleted = match && match[1] ? match[1].toLowerCase() === 'x' : line.startsWith('☑️');
+        const match = line.match(/^(?:[-*•○✓✔]|\d+[\.)]|☑️|🔲|☐)?\s*(?:\[([ xX✓✔])\])?\s*(.+)/i);
+        const isCompleted =
+          match && match[1]
+            ? ['x', '✓', '✔'].includes(match[1].toLowerCase())
+            : line.startsWith('☑️') || line.startsWith('✓') || line.startsWith('✔');
         const rawContent = match && match[2] ? match[2].trim() : line;
         const attrs = extractTaskAttributes(rawContent);
 

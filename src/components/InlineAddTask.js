@@ -35,6 +35,20 @@ const IconDetails = ({ color }) => (
   </Svg>
 );
 
+const IconLuggageMini = ({ color = '#2563EB', size = 13 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M6 9a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9z" />
+    <Path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+  </Svg>
+);
+
+const IconMediaMini = ({ color = '#7C3AED', size = 13 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <Path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </Svg>
+);
+
 const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, onToggle, onToggleSection, onAddDetails, onAddTask, defaultBoardId, hideUnderline = false }) {
   const { generateRepeatingTasks } = useTaskRepeat();
   const [internalIsEditing, setInternalIsEditing] = useState(false);
@@ -514,15 +528,16 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
                   accessible={true}
                   accessibilityRole="button"
                   accessibilityLabel={`${t('Luggage Type') || 'Luggage Type'}: ${t(selectedPackingCategory) || selectedPackingCategory}`}
-                  style={[styles.chipBtn, { backgroundColor: '#3B82F61A', borderColor: '#3B82F660' }]}
+                  style={[styles.chipBtn, { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#3B82F61A', borderColor: '#3B82F660' }]}
                   onPress={() => {
                     const packingOrder = ['Carry-On', 'Checked Bag', 'Backpack', 'Essentials'];
                     const next = packingOrder[(packingOrder.indexOf(selectedPackingCategory) + 1) % packingOrder.length];
                     setSelectedPackingCategory(next);
                   }}
                 >
+                  <IconLuggageMini color="#2563EB" size={13} />
                   <Text style={[styles.chipText, { color: '#2563EB', fontWeight: '600' }]}>
-                    {selectedPackingCategory === 'Carry-On' ? '🎒' : selectedPackingCategory === 'Checked Bag' ? '🧳' : selectedPackingCategory === 'Backpack' ? '🎒' : '⭐'} {t(selectedPackingCategory) || selectedPackingCategory}
+                    {t(selectedPackingCategory) || selectedPackingCategory}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -532,15 +547,16 @@ const InlineAddTask = React.memo(function InlineAddTask({ sectionId, isActive, o
                   accessible={true}
                   accessibilityRole="button"
                   accessibilityLabel={`${t('Category') || 'Category'}: ${t(selectedMediaCategory) || selectedMediaCategory}`}
-                  style={[styles.chipBtn, { backgroundColor: '#8B5CF61A', borderColor: '#8B5CF660' }]}
+                  style={[styles.chipBtn, { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#8B5CF61A', borderColor: '#8B5CF660' }]}
                   onPress={() => {
                     const mediaOrder = ['Books', 'Movies/TV', 'Courses'];
                     const next = mediaOrder[(mediaOrder.indexOf(selectedMediaCategory) + 1) % mediaOrder.length];
                     setSelectedMediaCategory(next);
                   }}
                 >
+                  <IconMediaMini color="#7C3AED" size={13} />
                   <Text style={[styles.chipText, { color: '#7C3AED', fontWeight: '600' }]}>
-                    {selectedMediaCategory === 'Books' ? '📚' : selectedMediaCategory === 'Movies/TV' ? '🎬' : '🎓'} {t(selectedMediaCategory) || selectedMediaCategory}
+                    {t(selectedMediaCategory) || selectedMediaCategory}
                   </Text>
                 </TouchableOpacity>
               )}

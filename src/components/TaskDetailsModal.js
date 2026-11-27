@@ -264,6 +264,26 @@ const IconPause = ({ color, size = 16 }) => (
   </Svg>
 );
 
+const IconLuggageMini = ({ color = '#3B82F6', size = 14 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="6" y="7" width="12" height="14" rx="2" />
+    <Path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+  </Svg>
+);
+
+const IconMediaMini = ({ color = '#8B5CF6', size = 14 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <Path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </Svg>
+);
+
+const IconFlameMini = ({ color = '#D97706', size = 14 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  </Svg>
+);
+
 const FALLBACK_EMPTY_TASK = {
   id: '__empty__',
   taskname: '',
@@ -2193,9 +2213,12 @@ useEffect(() => {
             {selectedBoardType === 'packing' && (
               <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), gap: 8 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
-                    🧳 {t('Luggage Category') || 'Luggage Category'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconLuggageMini color="#3B82F6" size={15} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                      {t('Luggage Category') || 'Luggage Category'}
+                    </Text>
+                  </View>
                   <Text style={{ fontSize: 11, fontWeight: '600', color: '#3B82F6' }}>
                     {t(itemCategoryState || 'Carry-On') || (itemCategoryState || 'Carry-On')}
                   </Text>
@@ -2203,7 +2226,6 @@ useEffect(() => {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {['Carry-On', 'Checked Bag', 'Backpack', 'Essentials'].map((cat) => {
                     const isSel = (itemCategoryState || 'Carry-On') === cat;
-                    const icon = cat === 'Carry-On' ? '🎒' : cat === 'Checked Bag' ? '🧳' : cat === 'Backpack' ? '🎒' : '⭐';
                     return (
                       <TouchableOpacity
                         key={cat}
@@ -2220,7 +2242,7 @@ useEffect(() => {
                           borderColor: isSel ? '#3B82F6' : (isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'))
                         }}
                       >
-                        <Text style={{ fontSize: 12 }}>{icon}</Text>
+                        <IconLuggageMini color={isSel ? '#FFFFFF' : '#3B82F6'} size={13} />
                         <Text style={{ fontSize: 12, fontWeight: isSel ? '700' : '500', color: isSel ? '#FFFFFF' : colors.textPrimary }}>
                           {t(cat) || cat}
                         </Text>
@@ -2234,9 +2256,12 @@ useEffect(() => {
             {selectedBoardType === 'media' && (
               <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), gap: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
-                    🎬 {t('Media Category & Rating') || 'Media Category & Rating'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconMediaMini color="#8B5CF6" size={15} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                      {t('Media Category & Rating') || 'Media Category & Rating'}
+                    </Text>
+                  </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <TouchableOpacity
@@ -2254,7 +2279,6 @@ useEffect(() => {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {['Books', 'Movies/TV', 'Courses'].map((cat) => {
                     const isSel = (itemCategoryState || 'Books') === cat;
-                    const icon = cat === 'Books' ? '📚' : cat === 'Movies/TV' ? '🎬' : '🎓';
                     return (
                       <TouchableOpacity
                         key={cat}
@@ -2271,7 +2295,7 @@ useEffect(() => {
                           borderColor: isSel ? '#8B5CF6' : (isDark ? 'rgba(255,255,255,0.12)' : (colors.borderColor || '#E5E7EB'))
                         }}
                       >
-                        <Text style={{ fontSize: 12 }}>{icon}</Text>
+                        <IconMediaMini color={isSel ? '#FFFFFF' : '#8B5CF6'} size={13} />
                         <Text style={{ fontSize: 12, fontWeight: isSel ? '700' : '500', color: isSel ? '#FFFFFF' : colors.textPrimary }}>
                           {t(cat) || cat}
                         </Text>
@@ -2286,13 +2310,14 @@ useEffect(() => {
               <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12), gap: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View style={{ backgroundColor: '#F59E0B1A', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F59E0B1A', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                      <IconFlameMini color="#D97706" size={13} />
                       <Text style={{ fontSize: 12, fontWeight: '700', color: '#D97706' }}>
-                        🔥 {liveHabitStats.currentStreak} {t('days') || 'd'}{liveHabitStats.freezeActive ? ' ❄️' : ''}
+                        {liveHabitStats.currentStreak} {t('days') || 'd'}
                       </Text>
                     </View>
                     <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '600' }}>
-                      🏆 {t('Best Streak') || 'Best Streak'}: {liveHabitStats.bestStreak} {t('days') || 'd'}
+                      {t('Best Streak') || 'Best Streak'}: {liveHabitStats.bestStreak} {t('days') || 'd'}
                     </Text>
                   </View>
 
