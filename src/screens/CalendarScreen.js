@@ -910,6 +910,7 @@ export default function CalendarScreen({ navigation, route }) {
                     hideDate={true}
                     hideBoardBadge={false}
                     disableInlineEdit={true}
+                    collapseOnComplete={false}
                     testIDPrefix="calendar_"
                     isSelectionMode={selectionMode.isActive}
                     isSelected={selectedTaskIdsSet.has(task.id || task._id)}

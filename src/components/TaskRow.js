@@ -248,11 +248,13 @@ function areTaskRowPropsEqual(prev, next) {
     prev.onLongPress === next.onLongPress &&
     prev.onToggleSelect === next.onToggleSelect &&
     prev.onPressSnooze === next.onPressSnooze &&
-    prev.onPressMore === next.onPressMore
+    prev.onPressMore === next.onPressMore &&
+    prev.collapseOnComplete === next.collapseOnComplete
   );
 }
 
-const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, isHighlighted = false, backgroundColor, onToggleSelect, onPressSnooze, onPressMore, boardTypeProp, testIDPrefix = "" }) {
+const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDate = false, hideBoardBadge = false, hideUnderline = false, onPress, onLongPress, disableInlineEdit = false, isSelectionMode = false, isSelected = false, isHighlighted = false, backgroundColor, onToggleSelect, onPressSnooze, onPressMore, boardTypeProp, testIDPrefix = "", collapseOnComplete }) {
+  const shouldCollapseOnComplete = collapseOnComplete !== undefined ? Boolean(collapseOnComplete) : testIDPrefix !== 'calendar_';
   const dispatch = useDispatch();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
@@ -466,7 +468,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
               }
             );
           };
-          if (swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
+          if (shouldCollapseOnComplete && swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
             swipeableRef.current.collapse(commitSingleDelete);
           } else {
             commitSingleDelete();
@@ -482,7 +484,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
             }
             showToast(t('Recurring tasks deleted'));
           };
-          if (swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
+          if (shouldCollapseOnComplete && swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
             swipeableRef.current.collapse(commitSeriesDelete);
           } else {
             commitSeriesDelete();
@@ -500,14 +502,14 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
           }
         );
       };
-      if (swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
+      if (shouldCollapseOnComplete && swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
         swipeableRef.current.collapse(commitDelete);
       } else {
         closeSwipeable();
         commitDelete();
       }
     }
-  }, [closeSwipeable, dispatch, task, isRepeatingTask, showToast, t]);
+  }, [shouldCollapseOnComplete, closeSwipeable, dispatch, task, isRepeatingTask, showToast, t]);
 
   const handleSwipeSnooze = useCallback(() => {
     closeSwipeable();
@@ -811,7 +813,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
           closeOpenSwipeableRow();
           if (isSelectionMode) {
             if (onToggleSelect) onToggleSelect(task.id, sectionId);
-          } else if (swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
+          } else if (shouldCollapseOnComplete && swipeableRef.current && typeof swipeableRef.current.collapse === 'function') {
             handleSwipeThresholdReach();
             swipeableRef.current.collapse(() => handleToggleComplete({ skipFeedback: true }));
           } else {
@@ -1188,6 +1190,7 @@ const TaskRowInner = React.memo(function TaskRowInner({ task, sectionId, hideDat
       <ReanimatedSwipeRow
         ref={swipeableRef}
         taskId={taskIdKey}
+        collapseOnComplete={shouldCollapseOnComplete}
         itemKey={`${taskIdKey}_${sectionId || 'sec'}_${task.completed ? '1' : '0'}`}
         enabled={!isSelectionMode && !isEditing}
         leftThreshold={middleCompleteThreshold}

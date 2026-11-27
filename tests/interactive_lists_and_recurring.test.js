@@ -3381,9 +3381,14 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       // 14. Smooth row collapse opacity fade-out + simultaneous upward list shift animation on task completion and deletion
       assert.match(swipeRowSrc, /completeCollapseDurationMs/, 'ReanimatedSwipeRow SWIPE_ANIMATION_CONFIG must expose completeCollapseDurationMs');
       assert.match(swipeRowSrc, /runCollapseExit/, 'ReanimatedSwipeRow must animate opacity and upward cell shift via runCollapseExit before committing completion or deletion');
+      assert.match(swipeRowSrc, /foregroundRevealOpacity/, 'ReanimatedSwipeRow must fade foregroundRevealOpacity to 0 and slide past fullRowWidth when the Complete/Mark Uncomplete banner appears so the task completely disappears');
+      assert.match(swipeRowSrc, /keepBannerOpen:\s*true/, 'ReanimatedSwipeRow must keep the completion banner open during collapse without pulling the task row back over the banner');
       assert.match(swipeRowSrc, /export const FlashListCollapseCellRenderer/, 'ReanimatedSwipeRow must export FlashListCollapseCellRenderer so cells below the disappearing task smoothly slide up in parallel');
       assert.match(swipeRowSrc, /export const listCollapseShiftController/, 'ReanimatedSwipeRow must export listCollapseShiftController to coordinate simultaneous upward translateY across below-cells');
+      assert.match(swipeRowSrc, /if\s*\(!collapseOnComplete\)/, 'ReanimatedSwipeRow must support non-disappearing in-place swipe completion when collapseOnComplete is false (CalendarScreen)');
       assert.match(taskRowSrc, /swipeableRef\.current\.collapse\(commitDelete\)/, 'TaskRow handleSwipeDelete must collapse the row with fade-out and upward list shift before deleting');
+      const calendarScreenSrc = fs.readFileSync(path.resolve('src/screens/CalendarScreen.js'), 'utf8');
+      assert.match(calendarScreenSrc, /collapseOnComplete=\{false\}/, 'CalendarScreen must pass collapseOnComplete={false} to TaskRow so completed tasks stay in place without disappearing');
       assert.match(boardScreenSrc, /CellRendererComponent=\{FlashListCollapseCellRenderer\}/, 'BoardScreen FabricFlashList must use FlashListCollapseCellRenderer so bottom items move up smoothly as tasks disappear');
     });
   });

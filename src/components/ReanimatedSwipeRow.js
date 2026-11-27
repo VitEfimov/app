@@ -34,11 +34,14 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
  * ============================================================================
  */
 export const SWIPE_ANIMATION_CONFIG = {
-  completeBannerRevealPx: 250,
+  completeBannerRevealPx: 480,
   completeRevealDurationMs: 120,
   completeHoldBeforeCloseMs: 550,
   completeGlideDurationMs: 280,
   completeCollapseDurationMs: 280,
+  calendarBannerRevealPx: 210,
+  calendarHoldBeforeCloseMs: 320,
+  calendarGlideBackDurationMs: 220,
   completeBadgePopScale: 1.18,
   completeBadgePopUpMs: 120,
   completeBadgePopDownMs: 180,
@@ -51,7 +54,19 @@ export const SWIPE_ANIMATION_CONFIG = {
   programmaticCloseDurationMs: 160,
   easingCurve: Easing.bezier(0.25, 0.1, 0.25, 1),
 };
-
+/*export const SWIPE_ANIMATION_CONFIG = {
+  completeBannerRevealPx: 250,      // Banner open width (px)
+  completeRevealDurationMs: 120,    // Time (ms) to expand the banner
+  completeHoldBeforeCloseMs: 550,   // Time (ms) the banner stays open before closing
+  completeGlideDurationMs: 260,     // Time (ms) for the task to glide closed & fade out
+  completeCollapseDurationMs: 260,  // Time (ms) for the row height to collapse to 0 so tasks below slide up
+  completeBadgePopScale: 1.18,
+  completeBadgePopUpMs: 120,
+  completeBadgePopDownMs: 180,
+  completeRowEndOpacity: 0,         // 0 = smoothly fade out the disappearing task
+  completeRowEndScale: 0.96,        // 0.96 = subtle shrink as the task disappears
+  ...
+};*/
 const CellLayoutContext = createContext(null);
 
 const taskRowCollapseRegistry = new Map();
@@ -320,6 +335,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     children,
     itemKey,
     taskId,
+    collapseOnComplete = true,
     leftThreshold = 140,
     rightActionsWidth = 144,
     rightThreshold = 40,
@@ -338,11 +354,13 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
 
   const dragX = useRef(new Animated.Value(0)).current;
   const rowTranslation = useRef(new Animated.Value(0)).current;
+  const foregroundRevealOpacity = useRef(new Animated.Value(1)).current;
   const rowExitOpacity = useRef(new Animated.Value(1)).current;
   const rowExitScale = useRef(new Animated.Value(1)).current;
   const rowExitTranslateY = useRef(new Animated.Value(0)).current;
   const completeBadgePop = useRef(new Animated.Value(1)).current;
   const measuredHeightRef = useRef(56);
+  const measuredWidthRef = useRef(440);
   const collapseHeightAnim = useRef(new Animated.Value(56)).current;
   const collapseOpacityAnim = useRef(new Animated.Value(1)).current;
   const isOpenRef = useRef(false);
@@ -354,8 +372,12 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     (e) => {
       if (isCollapsing || isCompletingRef.current) return;
       const h = e?.nativeEvent?.layout?.height;
+      const w = e?.nativeEvent?.layout?.width;
       if (typeof h === 'number' && h > 10) {
         measuredHeightRef.current = h;
+      }
+      if (typeof w === 'number' && w > 50) {
+        measuredWidthRef.current = w;
       }
     },
     [isCollapsing]
@@ -363,8 +385,12 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
 
   // Reset swipe offset & unmount drawers cleanly when FlashList recycles this row
   useEffect(() => {
+    if (isCompletingRef.current && !collapseOnComplete) {
+      return;
+    }
     dragX.stopAnimation();
     rowTranslation.stopAnimation();
+    foregroundRevealOpacity.stopAnimation();
     rowExitOpacity.stopAnimation();
     rowExitScale.stopAnimation();
     rowExitTranslateY.stopAnimation();
@@ -373,6 +399,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     collapseOpacityAnim.stopAnimation();
     dragX.setValue(0);
     rowTranslation.setValue(0);
+    foregroundRevealOpacity.setValue(1);
     rowExitOpacity.setValue(1);
     rowExitScale.setValue(1);
     rowExitTranslateY.setValue(0);
@@ -388,12 +415,13 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     isCompletingRef.current = false;
     setIsCollapsing(prev => (prev ? false : prev));
     setActionsMounted(prev => (prev ? false : prev));
-  }, [itemKey, dragX, rowTranslation, rowExitOpacity, rowExitScale, rowExitTranslateY, completeBadgePop, collapseHeightAnim, collapseOpacityAnim]);
+  }, [itemKey, dragX, rowTranslation, foregroundRevealOpacity, rowExitOpacity, rowExitScale, rowExitTranslateY, completeBadgePop, collapseHeightAnim, collapseOpacityAnim]);
 
   useEffect(() => {
     return () => {
       dragX.stopAnimation();
       rowTranslation.stopAnimation();
+      foregroundRevealOpacity.stopAnimation();
       rowExitOpacity.stopAnimation();
       rowExitScale.stopAnimation();
       rowExitTranslateY.stopAnimation();
@@ -401,7 +429,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
       collapseHeightAnim.stopAnimation();
       collapseOpacityAnim.stopAnimation();
     };
-  }, [dragX, rowTranslation, rowExitOpacity, rowExitScale, rowExitTranslateY, completeBadgePop, collapseHeightAnim, collapseOpacityAnim]);
+  }, [dragX, rowTranslation, foregroundRevealOpacity, rowExitOpacity, rowExitScale, rowExitTranslateY, completeBadgePop, collapseHeightAnim, collapseOpacityAnim]);
 
   const ensureMounted = useCallback(() => {
     setActionsMounted(prev => (prev ? prev : true));
@@ -425,6 +453,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
   const closeRow = useCallback(() => {
     isOpenRef.current = false;
     isCompletingRef.current = false;
+    foregroundRevealOpacity.setValue(1);
     rowExitOpacity.setValue(1);
     rowExitScale.setValue(1);
     rowExitTranslateY.setValue(0);
@@ -449,10 +478,11 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
         notifyClose();
       }
     });
-  }, [dragX, rowTranslation, rowExitOpacity, rowExitScale, rowExitTranslateY, completeBadgePop, notifyClose]);
+  }, [dragX, rowTranslation, foregroundRevealOpacity, rowExitOpacity, rowExitScale, rowExitTranslateY, completeBadgePop, notifyClose]);
 
   const runCollapseExit = useCallback(
-    (onFinished) => {
+    (onFinished, options = {}) => {
+      const { keepBannerOpen = false } = options;
       const startHeight = measuredHeightRef.current > 10 ? measuredHeightRef.current : 56;
       const glideDuration = SWIPE_ANIMATION_CONFIG.completeGlideDurationMs || 280;
       const collapseDuration = SWIPE_ANIMATION_CONFIG.completeCollapseDurationMs || glideDuration;
@@ -474,18 +504,6 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
         });
 
       const parallelAnims = [
-        Animated.timing(dragX, {
-          toValue: 0,
-          duration: glideDuration,
-          easing: curve,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(rowTranslation, {
-          toValue: 0,
-          duration: glideDuration,
-          easing: curve,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
         Animated.timing(rowExitOpacity, {
           toValue: endOpacity,
           duration: Math.max(140, Math.round(glideDuration * 0.85)),
@@ -506,6 +524,23 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
         }),
         ...cellShiftAnimations,
       ];
+
+      if (!keepBannerOpen) {
+        parallelAnims.push(
+          Animated.timing(dragX, {
+            toValue: 0,
+            duration: glideDuration,
+            easing: curve,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+          Animated.timing(rowTranslation, {
+            toValue: 0,
+            duration: glideDuration,
+            easing: curve,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          })
+        );
+      }
 
       if (!isInsideFlashListCell) {
         collapseHeightAnim.stopAnimation();
@@ -563,7 +598,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
   );
 
   useEffect(() => {
-    if (taskId === undefined || taskId === null) return undefined;
+    if (!collapseOnComplete || taskId === undefined || taskId === null) return undefined;
     const key = String(taskId);
     taskRowCollapseRegistry.set(key, triggerCollapse);
     return () => {
@@ -571,7 +606,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
         taskRowCollapseRegistry.delete(key);
       }
     };
-  }, [taskId, triggerCollapse]);
+  }, [collapseOnComplete, taskId, triggerCollapse]);
 
   useImperativeHandle(
     ref,
@@ -622,16 +657,84 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
             completeBannerRevealPx,
             completeRevealDurationMs,
             completeHoldBeforeCloseMs,
+            calendarBannerRevealPx,
+            calendarHoldBeforeCloseMs,
+            calendarGlideBackDurationMs,
             completeBadgePopScale,
             completeBadgePopUpMs,
             completeBadgePopDownMs,
+            easingCurve,
           } = SWIPE_ANIMATION_CONFIG;
 
-          const revealTarget = Math.max(rawOffset, completeBannerRevealPx || 250);
+          if (!collapseOnComplete) {
+            // Calendar mode: task stays in the list when completed/uncompleted (does NOT disappear).
+            // Reveals the banner on the left while keeping the task visible, toggles state, and smoothly glides back to 0.
+            const calendarRevealTarget = Math.max(rawOffset, calendarBannerRevealPx || 210);
+            const revealMs = completeRevealDurationMs || 120;
+            const holdMs = calendarHoldBeforeCloseMs ?? 320;
+            const glideBackMs = calendarGlideBackDurationMs || 220;
+
+            Animated.parallel([
+              Animated.sequence([
+                Animated.timing(completeBadgePop, {
+                  toValue: completeBadgePopScale,
+                  duration: completeBadgePopUpMs,
+                  easing: Easing.out(Easing.quad),
+                  useNativeDriver: USE_NATIVE_DRIVER,
+                }),
+                Animated.timing(completeBadgePop, {
+                  toValue: 1,
+                  duration: completeBadgePopDownMs,
+                  easing: Easing.inOut(Easing.quad),
+                  useNativeDriver: USE_NATIVE_DRIVER,
+                }),
+              ]),
+              Animated.sequence([
+                Animated.timing(dragX, {
+                  toValue: calendarRevealTarget,
+                  duration: revealMs,
+                  easing: Easing.out(Easing.cubic),
+                  useNativeDriver: USE_NATIVE_DRIVER,
+                }),
+                Animated.delay(holdMs),
+              ]),
+            ]).start(() => {
+              Animated.parallel([
+                Animated.timing(dragX, {
+                  toValue: 0,
+                  duration: glideBackMs,
+                  easing: easingCurve,
+                  useNativeDriver: USE_NATIVE_DRIVER,
+                }),
+                Animated.timing(rowTranslation, {
+                  toValue: 0,
+                  duration: glideBackMs,
+                  easing: easingCurve,
+                  useNativeDriver: USE_NATIVE_DRIVER,
+                }),
+              ]).start(() => {
+                dragX.setValue(0);
+                rowTranslation.setValue(0);
+                isCompletingRef.current = false;
+                setActionsMounted(false);
+                notifyLeftComplete();
+              });
+            });
+            return;
+          }
+
+          const fullRowWidth = Math.max(measuredWidthRef.current + 32, completeBannerRevealPx || 480);
+          const revealTarget = Math.max(rawOffset, fullRowWidth);
           const revealMs = completeRevealDurationMs || 120;
           const holdMs = completeHoldBeforeCloseMs || 0;
 
           Animated.parallel([
+            Animated.timing(foregroundRevealOpacity, {
+              toValue: 0,
+              duration: revealMs,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
             Animated.sequence([
               Animated.timing(completeBadgePop, {
                 toValue: completeBadgePopScale,
@@ -656,7 +759,7 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
               Animated.delay(holdMs),
             ]),
           ]).start(() => {
-            runCollapseExit(notifyLeftComplete);
+            runCollapseExit(notifyLeftComplete, { keepBannerOpen: true });
           });
           return;
         }
@@ -729,11 +832,13 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
     },
     [
       ensureMounted,
+      collapseOnComplete,
       leftThreshold,
       rightActionsWidth,
       rightThreshold,
       rowTranslation,
       dragX,
+      foregroundRevealOpacity,
       rowExitOpacity,
       rowExitScale,
       completeBadgePop,
@@ -746,26 +851,47 @@ const ReanimatedSwipeRow = forwardRef(function ReanimatedSwipeRow(
   );
 
   const transX = useMemo(() => {
-    const maxRight = Math.max(80, leftThreshold * 2.2);
+    const maxRight = collapseOnComplete
+      ? Math.max(900, leftThreshold * 6)
+      : Math.max(80, leftThreshold * 2.1);
     const maxLeft = Math.max(40, rightActionsWidth);
     return Animated.add(rowTranslation, dragX).interpolate({
       inputRange: [-maxLeft * 1.3, -maxLeft, 0, maxRight * 0.9, maxRight],
       outputRange: [-maxLeft * 1.08, -maxLeft, 0, maxRight * 0.9, maxRight],
       extrapolate: 'clamp',
     });
-  }, [rowTranslation, dragX, leftThreshold, rightActionsWidth]);
+  }, [rowTranslation, dragX, collapseOnComplete, leftThreshold, rightActionsWidth]);
 
-  const foregroundStyle = useMemo(
-    () => ({
-      opacity: rowExitOpacity,
+  const foregroundStyle = useMemo(() => {
+    if (!collapseOnComplete) {
+      return {
+        opacity: rowExitOpacity,
+        transform: [
+          { translateX: transX },
+          { translateY: rowExitTranslateY },
+          { scale: rowExitScale },
+        ],
+      };
+    }
+    const halfLeft = Math.max(30, leftThreshold * 0.7);
+    const fullBannerLeft = Math.max(60, leftThreshold * 1.25);
+    const dragBannerFade = transX.interpolate({
+      inputRange: [0, halfLeft, fullBannerLeft],
+      outputRange: [1, 0.82, 0],
+      extrapolate: 'clamp',
+    });
+    return {
+      opacity: Animated.multiply(
+        Animated.multiply(rowExitOpacity, foregroundRevealOpacity),
+        dragBannerFade
+      ),
       transform: [
         { translateX: transX },
         { translateY: rowExitTranslateY },
         { scale: rowExitScale },
       ],
-    }),
-    [transX, rowExitOpacity, rowExitTranslateY, rowExitScale]
-  );
+    };
+  }, [collapseOnComplete, transX, leftThreshold, rowExitOpacity, foregroundRevealOpacity, rowExitTranslateY, rowExitScale]);
 
   const leftContainerAnimStyle = useMemo(
     () => ({
