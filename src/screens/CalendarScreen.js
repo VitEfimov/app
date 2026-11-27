@@ -38,6 +38,7 @@ import { updateTask, updateMultipleTasks, deleteTask, deleteMultipleTasks, batch
 import { setGoogleDrawerOpen, setThemeMode } from '../features/themeSlice';
 import { addBoardAsync } from '../features/userSlice';
 import { getBoardColor } from '../utils/boardColors';
+import { formatMultipleItemsForShare } from '../utils/shareFormatter';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
 import { A11yHelper } from '../utils/a11yHelper';
 import { ResponsiveHelper } from '../utils/responsiveHelper';
@@ -97,6 +98,7 @@ export default function CalendarScreen({ navigation, route }) {
 
   const tasks = useSelector(state => state.taskReducer?.tasks || []);
   const boards = useSelector(state => state.userReducer?.boards || []);
+  const themeState = useSelector(state => state.themeReducer);
   const jumpToTodayTrigger = useSelector(state => state.themeReducer?.jumpToTodayTrigger);
   const isGoogleDrawerOpen = useSelector(state => state.themeReducer?.isGoogleDrawerOpen || false);
   const calendarSyncEnabled = useSelector(state => state.themeReducer?.calendarSyncEnabled || false);
@@ -308,18 +310,19 @@ export default function CalendarScreen({ navigation, route }) {
 
   const handleShareSelected = async () => {
     try {
-      const selectedTasksObjects = selectedTasks.filter(t => selectionMode.selectedTaskIds.includes(t.id || t._id));
-      const shareText = selectedTasksObjects.map(t => {
-        const taskName = t.taskname;
-        const taskDate = t.dateString || t.completionDate;
-        const taskTime = t.time;
-        const notes = t.description?.text ? t.description.text.replace(/<[^>]+>/g, '').trim() : '';
-        const priority = t.priority && t.priority !== 'none' ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : '';
+      const selectedIdSet = new Set(selectionMode.selectedTaskIds.map(String));
+      const selectedTasksObjects = selectedTasks.filter(t => t && selectedIdSet.has(String(t.id || t._id)));
+      const shareMessage = formatMultipleItemsForShare(selectedTasksObjects, {
+        board: activeBoard,
+        boards,
+        currencyCode: themeState?.currencyCode || 'auto',
+        boardCurrencies: themeState?.boardCurrencies || {},
+        habitStreakMode: themeState?.habitStreakMode || 'grace',
+        langCode: i18n?.language,
+        t,
+      });
 
-        return `Task: ${taskName}\nDue: ${taskDate ? dayjs(taskDate).format('MMM D, YYYY') : 'Not set'}${taskTime ? ` at ${taskTime}` : ''}${priority ? `\nPriority: ${priority}` : ''}${notes ? `\n\nNotes:\n${notes}` : ''}`.trim();
-      }).join('\n\n------------------------\n\n');
-
-      await Share.share({ message: `Tasks:\n\n${shareText}` });
+      await Share.share({ message: shareMessage });
       setSelectionMode({ isActive: false, selectedTaskIds: [] });
     } catch (error) {
       console.log(error);

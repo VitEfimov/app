@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateTask, deleteTask, addTask, deleteRecurringSeries } from '../features/taskSlice';
 import { computeHabitStats, isHabitTask, toggleHabitCompletionForDate } from '../utils/habitHelper';
+import { formatSingleItemForShare } from '../utils/shareFormatter';
 import { useToast } from '../styles/ToastContext';
 import { useTheme } from '../styles/ThemeContext';
 import dayjs from 'dayjs';
@@ -106,7 +107,7 @@ export default function TaskQuickMenuModal({
   const hasTask = Boolean(rawTask || lastValidTaskRef.current);
   const task = rawTask || lastValidTaskRef.current || { id: '__empty__', taskname: '', completed: false, boardId: 'main' };
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { colors, isDark } = useTheme();
   const dispatch = useDispatch();
   const { showToast } = useToast();
@@ -114,6 +115,8 @@ export default function TaskQuickMenuModal({
   const [isMoveBoardVisible, setMoveBoardVisible] = React.useState(false);
   const [confirmConfig, setConfirmConfig] = React.useState({ isVisible: false, title: '', message: '', confirmText: 'Confirm', cancelText: 'Cancel', isDestructive: false, secondaryIsDestructive: false, hideCancel: false, onConfirm: null, secondaryConfirmText: null, onSecondaryConfirm: null });
   const streakMode = useSelector(state => state.themeReducer?.habitStreakMode || 'grace');
+  const currencySetting = useSelector(state => state.themeReducer?.currencyCode || 'auto');
+  const boardCurrencies = useSelector(state => state.themeReducer?.boardCurrencies || {});
 
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const onCloseRef = useRef(onClose);
@@ -305,7 +308,15 @@ export default function TaskQuickMenuModal({
         attachments.push({ uri: task.description.img, type: 'image', name: 'image.jpg' });
       }
 
-      const message = `${task.taskname}\n\n${task.description?.text || ''}`;
+      const message = formatSingleItemForShare(task, {
+        board: taskBoard,
+        boards,
+        currencyCode: currencySetting,
+        boardCurrencies,
+        habitStreakMode: streakMode,
+        langCode: i18n?.language,
+        t,
+      });
 
       if (attachments.length > 0 && Platform.OS !== 'web') {
         await Clipboard.setStringAsync(message);

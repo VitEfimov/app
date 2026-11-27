@@ -38,6 +38,7 @@ import { getBoardColor } from '../utils/boardColors';
 import { SecurityLockHelper } from '../utils/securityLockHelper';
 import { A11yHelper } from '../utils/a11yHelper';
 import { HapticHelper } from '../utils/hapticHelper';
+import { formatSingleItemForShare } from '../utils/shareFormatter';
 import { extractTaskAmountFromTitle, getCurrencyMeta, isPriceBoardType, parseLocalizedNumber, resolveCurrencyCode, extractTaskAmountAndCurrency, convertCurrency, formatCurrency, CURRENCIES, SYMBOL_TO_CURRENCY_CODE } from '../utils/currencyHelper';
 import { computeHabitStats, isHabitTask, normalizeHabitSchedule } from '../utils/habitHelper';
 import { Audio } from 'expo-av';
@@ -724,9 +725,40 @@ useEffect(() => {
 
   const handleShare = async () => {
     try {
-      const priorityStr = priority && priority !== 'none' ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
       const currentNotes = notesRef.current ? notesRef.current.getText() : notes;
-      const message = `${t('Task')}: ${taskName}\n${t('Due')}: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : t('Not set')}${selectedTime ? ` ${t('at')} ${selectedTime}` : ''}${priorityStr ? `\n${t('Priority')}: ${priorityStr}` : ''}\n\n${currentNotes ? `${t('Notes')}:\n${currentNotes}\n\n` : ''}${subtasks.length > 0 ? `${t('Subtasks')}:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`;
+      const parsedPriceNum =
+        itemPriceInput !== undefined && itemPriceInput !== null && String(itemPriceInput).trim() !== ''
+          ? parseLocalizedNumber(String(itemPriceInput))
+          : task.itemPrice;
+      const liveTaskSnapshot = {
+        ...task,
+        taskname: taskName,
+        name: taskName,
+        boardId: selectedBoardId,
+        completionDate: selectedDate,
+        dateString: selectedDate,
+        time: selectedTime,
+        priority,
+        subtasks,
+        itemPrice: !isNaN(Number(parsedPriceNum)) && String(itemPriceInput).trim() !== '' ? Number(parsedPriceNum) : task.itemPrice,
+        itemCurrency: itemCurrencyState || task.itemCurrency,
+        itemCategory: itemCategoryState || task.itemCategory,
+        itemRating: itemRatingState || task.itemRating,
+        habitSchedule: habitSchedule || task.habitSchedule,
+        habitCompletedDates: habitCompletedDatesState || task.habitCompletedDates,
+      };
+      const targetBoard = boards.find(b => b && (String(b.id) === String(selectedBoardId) || String(b._id) === String(selectedBoardId))) || null;
+      const message = formatSingleItemForShare(liveTaskSnapshot, {
+        board: targetBoard,
+        boards,
+        currencyCode: themeState?.currencyCode || 'auto',
+        boardCurrencies: themeState?.boardCurrencies || {},
+        habitStreakMode: themeState?.habitStreakMode || 'grace',
+        langCode: i18n?.language,
+        notesOverride: currentNotes,
+        subtasksOverride: subtasks,
+        t,
+      });
       
       if (attachments.length > 0 && Platform.OS !== 'web') {
         await Clipboard.setStringAsync(message);

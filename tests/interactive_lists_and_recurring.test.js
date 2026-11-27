@@ -3390,6 +3390,33 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       const calendarScreenSrc = fs.readFileSync(path.resolve('src/screens/CalendarScreen.js'), 'utf8');
       assert.match(calendarScreenSrc, /collapseOnComplete=\{false\}/, 'CalendarScreen must pass collapseOnComplete={false} to TaskRow so completed tasks stay in place without disappearing');
       assert.match(boardScreenSrc, /CellRendererComponent=\{FlashListCollapseCellRenderer\}/, 'BoardScreen FabricFlashList must use FlashListCollapseCellRenderer so bottom items move up smoothly as tasks disappear');
+
+      // 15. Board-dependent share formatting across Edit (TaskDetailsModal), Swipe (TaskQuickMenuModal), and Selected (BoardScreen & CalendarScreen)
+      const shareMod = loadTranspiledModule(path.resolve('src/utils/shareFormatter.js'), {
+        './currencyHelper': loadTranspiledModule(path.resolve('src/utils/currencyHelper.js')),
+        './habitHelper': loadTranspiledModule(path.resolve('src/utils/habitHelper.js')),
+      });
+      const groceryBoard = { id: 'g1', name: 'Weekly Groceries', type: 'grocery' };
+      const groceryItems = [
+        { id: '1', boardId: 'g1', taskname: 'Organic Milk', itemQuantity: 2, itemPrice: 4.5, completed: false },
+        { id: '2', boardId: 'g1', taskname: 'Sourdough Bread', itemQuantity: 1, itemPrice: 5.0, completed: true },
+      ];
+      const singleGroceryShare = shareMod.formatSingleItemForShare(groceryItems[0], { board: groceryBoard, currencyCode: 'USD' });
+      assert.ok(singleGroceryShare.includes('Organic Milk ×2'), 'Single grocery share must include quantity (×2)');
+      assert.ok(singleGroceryShare.includes('$9.00') && singleGroceryShare.includes('$4.50'), 'Single grocery share must include unit and total price');
+      assert.ok(!singleGroceryShare.includes('Task:'), 'Grocery share must not label grocery items as "Task:"');
+
+      const multiGroceryShare = shareMod.formatMultipleItemsForShare(groceryItems, { board: groceryBoard, currencyCode: 'USD' });
+      assert.ok(multiGroceryShare.includes('🛒 Weekly Groceries:'), 'Multi grocery share must format as a unified list under the board title');
+      assert.ok(multiGroceryShare.includes('☐ Organic Milk ×2 — $9.00'), 'Multi grocery share must include unchecked item with qty and total');
+      assert.ok(multiGroceryShare.includes('☑️ Sourdough Bread — $5.00'), 'Multi grocery share must include checked item with price');
+      assert.ok(multiGroceryShare.includes('Total: $14.00'), 'Multi grocery share must compute and include the grand total');
+      assert.ok(!multiGroceryShare.includes('------------------------'), 'Multi grocery share must not separate items with dashed task dividers');
+
+      assert.match(detailsSrc, /formatSingleItemForShare/, 'TaskDetailsModal handleShare must use formatSingleItemForShare');
+      assert.match(quickMenuSrc, /formatSingleItemForShare/, 'TaskQuickMenuModal handleShare must use formatSingleItemForShare');
+      assert.match(boardScreenSrc, /formatMultipleItemsForShare/, 'BoardScreen handleShareSelected must use formatMultipleItemsForShare');
+      assert.match(calendarScreenSrc, /formatMultipleItemsForShare/, 'CalendarScreen handleShareSelected must use formatMultipleItemsForShare');
     });
   });
 });

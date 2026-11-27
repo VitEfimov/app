@@ -30,6 +30,7 @@ import { setBoardsCollapsed, setGoogleDrawerOpen, setThemeMode, setBoardCurrency
 import { isBoardCalendarSyncEnabled, getBoardCalendarSyncKey, isQuickListBoardType, isCalendarSyncSupportedForBoard } from '../utils/calendarSyncSchedule';
 import { useTaskRowConfig } from '../components/TaskRowConfigContext';
 import { formatCurrency, resolveCurrencyCode, CURRENCY_OPTION_CODES, getCurrencyMeta, isPriceBoardType, convertCurrency, getCachedTaskCurrency } from '../utils/currencyHelper';
+import { formatMultipleItemsForShare } from '../utils/shareFormatter';
 import { computeHabitStats } from '../utils/habitHelper';
 import GoogleDrawer from '../components/calendar/GoogleDrawer';
 import { useTranslation } from 'react-i18next';
@@ -709,18 +710,17 @@ export default function BoardScreen({ route, navigation }) {
 
   const handleShareSelected = async () => {
     try {
-      const selectedTasksObjects = boardTasks.filter(t => selectionMode.selectedTaskIds.includes(t.id));
-      const shareText = selectedTasksObjects.map(t => {
-        const taskName = t.taskname;
-        const selectedDate = t.completionDate;
-        const selectedTime = t.time;
-        const notes = t.description?.text ? t.description.text.replace(/<[^>]+>/g, '').trim() : '';
-        const img = t.description?.img ? t.description.img : '';
-        const subtasks = t.subtasks || [];
-        const priority = t.priority && t.priority !== 'none' ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : '';
-
-        return `Task: ${taskName}\nDue: ${selectedDate ? dayjs(selectedDate).format('MMM D, YYYY') : 'Not set'}${selectedTime ? ` at ${selectedTime}` : ''}${priority ? `\nPriority: ${priority}` : ''}\n\n${notes ? `Notes:\n${notes}\n\n` : ''}${img ? `[Image Attached]\n\n` : ''}${subtasks.length > 0 ? `Subtasks:\n${subtasks.map(s => `- ${s.completed ? '☑️' : '🔲'} ${s.text}`).join('\n')}` : ''}`.trim();
-      }).join('\n\n------------------------\n\n');
+      const selectedIdSet = new Set(selectionMode.selectedTaskIds.map(String));
+      const selectedTasksObjects = boardTasks.filter(t => t && selectedIdSet.has(String(t.id || t._id)));
+      const shareMessage = formatMultipleItemsForShare(selectedTasksObjects, {
+        board: activeBoard,
+        boards,
+        currencyCode: currencySetting,
+        boardCurrencies,
+        habitStreakMode,
+        langCode: i18n?.language,
+        t,
+      });
       
       const allAttachments = [];
       selectedTasksObjects.forEach(t => {
@@ -749,13 +749,13 @@ export default function BoardScreen({ route, navigation }) {
         }
 
         if (Platform.OS === 'android') {
-          await shareTaskAsync(`Tasks:\n\n${shareText}`, urlsToShare);
+          await shareTaskAsync(shareMessage, urlsToShare);
         } else {
-          await RNShare.open({ urls: urlsToShare, type: '*/*', title: 'Share Tasks', failOnCancel: false });
+          await RNShare.open({ urls: urlsToShare, type: '*/*', title: t('Share') || 'Share', failOnCancel: false });
         }
       } else {
         await Share.share({
-          message: `Tasks:\n\n${shareText}`,
+          message: shareMessage,
         });
       }
       setSelectionMode({ isActive: false, sectionId: null, selectedTaskIds: [] });
