@@ -1353,8 +1353,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     marginHorizontal: '2.5%',
+    marginVertical: 2,
     paddingLeft: 20,
-    borderBottomWidth: 1,
+    borderRadius: 12,
+    borderBottomWidth: 0,
     overflow: 'hidden',
   },
   leftActionIconWrapper: {

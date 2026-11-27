@@ -317,6 +317,66 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task: rawTask, i
   const initialSnapshotRef = useRef(null);
   const { t, i18n } = useTranslation();
   const [scrollOffset, setScrollOffset] = useState(0);
+  const scrollOffsetRef = useRef(0);
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const handleCloseRef = useRef(null);
+  const hasUnsavedChangesRef = useRef(null);
+
+  const finishSwipeDownDrag = (_, gestureState) => {
+    if (gestureState.dy > 45 || gestureState.vy > 0.45) {
+      try { Keyboard?.dismiss?.(); } catch (_) {}
+      const dirty = hasUnsavedChangesRef.current ? hasUnsavedChangesRef.current() : false;
+      if (dirty) {
+        Animated.spring(sheetTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+        if (handleCloseRef.current) handleCloseRef.current();
+      } else {
+        Animated.timing(sheetTranslateY, {
+          toValue: 680,
+          duration: 190,
+          useNativeDriver: true,
+        }).start();
+        if (handleCloseRef.current) handleCloseRef.current();
+      }
+    } else {
+      Animated.spring(sheetTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const dragHandlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 3,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) {
+          sheetTranslateY.setValue(gs.dy);
+        }
+      },
+      onPanResponderRelease: finishSwipeDownDrag,
+      onPanResponderTerminate: finishSwipeDownDrag,
+    })
+  ).current;
+
+  const headerSwipePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.15,
+      onMoveShouldSetPanResponderCapture: (_, gs) => gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.15,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) {
+          sheetTranslateY.setValue(gs.dy);
+        }
+      },
+      onPanResponderRelease: finishSwipeDownDrag,
+      onPanResponderTerminate: finishSwipeDownDrag,
+    })
+  ).current;
 
   const [taskName, setTaskName] = useState('');
   const [nameInputHeight, setNameInputHeight] = useState(48);
@@ -622,6 +682,10 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task: rawTask, i
 
       setTaskName(initialTaskName);
       setNameInputHeight(48);
+      setScrollOffset(0);
+      scrollOffsetRef.current = 0;
+      sheetTranslateY.stopAnimation();
+      sheetTranslateY.setValue(0);
       setNotes(initialNotesText);
       setAttachments(existingAttachments);
       setSubtasks(initialSubtasks);
@@ -635,7 +699,8 @@ const TaskDetailsModal = React.memo(function TaskDetailsModal({ task: rawTask, i
       setReminder(initialReminderVal);
       setIsAlarm(initialAlarmVal);
       setKeepNotificationAllDay(initialKeepNotificationVal);
-      const initialCategoryVal = task.itemCategory || (selectedBoardType === 'packing' ? 'Carry-On' : selectedBoardType === 'media' ? 'Books' : '');
+      const taskBoardType = boardForTask?.type || 'standard';
+      const initialCategoryVal = task.itemCategory || (taskBoardType === 'packing' ? 'Carry-On' : taskBoardType === 'media' ? 'Books' : '');
       const initialRatingVal = Number(task.itemRating) || 0;
       const initialCurrencyVal = task.itemCurrency || '';
       setItemCategoryState(initialCategoryVal);
@@ -1198,6 +1263,8 @@ useEffect(() => {
       onClose();
     }
   };
+  handleCloseRef.current = handleClose;
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
 
   const handleHardwareBack = () => {
     if (confirmConfig.isVisible) {
@@ -1941,32 +2008,39 @@ useEffect(() => {
       testID="task_details_modal"
       isVisible={Boolean(isVisible && hasTask)} 
       onSwipeComplete={handleClose}
-      swipeDirection={(scrollOffset > 0 || showTimePicker) ? undefined : ['down']}
+      swipeDirection={(scrollOffset > 2 || showTimePicker) ? undefined : ['down']}
       propagateSwipe={true}
       onBackdropPress={handleClose}
       onBackButtonPress={handleHardwareBack}
+      onModalWillShow={() => sheetTranslateY.setValue(0)}
+      onModalHide={() => sheetTranslateY.setValue(0)}
       scrollTo={(p) => scrollViewRef.current?.scrollTo(p)}
       scrollOffset={scrollOffset}
       scrollOffsetMax={Math.max(0, scrollContentHeight - scrollViewHeight)}
       style={{ margin: 0, justifyContent: 'flex-end', height: '100%' }}
     >
-      <View
+      <Animated.View
         style={[
           styles.modalContent,
           {
             backgroundColor: colors.bgCard,
             paddingTop: Platform.OS === 'ios' ? (isCompact ? 34 : 42) : (isVeryCompact ? 6 : 10),
+            transform: [{ translateY: sheetTranslateY }],
           },
         ]}
       >
           <View
+            {...dragHandlePanResponder.panHandlers}
             style={[styles.dragHandleContainer, { paddingTop: 4, paddingBottom: isVeryCompact ? 6 : 8, width: '100%' }]}
           >
             <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary }]} />
           </View>
           
           {/* Top navigation row with Back button and Cancel */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: isWideScreen ? 32 : 20, marginBottom: isVeryCompact ? 4 : (isCompact ? 6 : 10), maxWidth: isWideScreen ? 680 : '100%', width: '100%', alignSelf: 'center' }}>
+          <View
+            {...headerSwipePanResponder.panHandlers}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: isWideScreen ? 32 : 20, marginBottom: isVeryCompact ? 4 : (isCompact ? 6 : 10), maxWidth: isWideScreen ? 680 : '100%', width: '100%', alignSelf: 'center' }}
+          >
             <TouchableOpacity 
               onPress={handleClose} 
               activeOpacity={0.7}
@@ -2008,7 +2082,11 @@ useEffect(() => {
 
           <ScrollView 
             ref={scrollViewRef}
-            onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.y)}
+            onScroll={(e) => {
+              const y = e.nativeEvent.contentOffset.y;
+              scrollOffsetRef.current = y;
+              setScrollOffset(y);
+            }}
             onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
             onContentSizeChange={(_, h) => setScrollContentHeight(h)}
             scrollEventThrottle={16}
@@ -2031,12 +2109,14 @@ useEffect(() => {
           >
             <View>
             {/* Screen Title: Edit task */}
-            <Text 
-              accessibilityRole="header"
-              style={{ fontSize: isVeryCompact ? 20 : (isCompact ? 22 : 25), fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary, marginBottom: isVeryCompact ? 6 : (isCompact ? 8 : 12) }}
-            >
-              {t('Edit task') || 'Edit task'}
-            </Text>
+            <View {...headerSwipePanResponder.panHandlers}>
+              <Text 
+                accessibilityRole="header"
+                style={{ fontSize: isVeryCompact ? 20 : (isCompact ? 22 : 25), fontWeight: '700', letterSpacing: -0.5, color: colors.textPrimary, marginBottom: isVeryCompact ? 6 : (isCompact ? 8 : 12) }}
+              >
+                {t('Edit task') || 'Edit task'}
+              </Text>
+            </View>
             
             {/* Task Name Section */}
             <View style={{ marginBottom: isVeryCompact ? 8 : (isCompact ? 10 : 12) }}>
@@ -3762,7 +3842,7 @@ useEffect(() => {
           </View>
         </View>
       )}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }, (prev, next) => (

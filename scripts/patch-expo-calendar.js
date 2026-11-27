@@ -498,6 +498,22 @@ const rnModalPatches = [
             !this.state.showContent ? (React.createElement(animatable.View, null)) : (children);`,
     replacement: `        const _children = !this.state.showContent ? (React.createElement(animatable.View, null)) : (children);`,
   },
+  {
+    name: 'allow-pull-down-swipe-when-scrolled-to-top',
+    marker: `const isPullDownAtTop = (!this.props.scrollOffset || this.props.scrollOffset <= 2)`,
+    target: `            onMoveShouldSetPanResponder: (evt, gestureState) => {
+                // Use propagateSwipe to allow inner content to scroll. See PR:
+                // https://github.com/react-native-community/react-native-modal/pull/246
+                if (!this.shouldPropagateSwipe(evt, gestureState)) {`,
+    replacement: `            onMoveShouldSetPanResponder: (evt, gestureState) => {
+                // Use propagateSwipe to allow inner content to scroll. See PR:
+                // https://github.com/react-native-community/react-native-modal/pull/246
+                const isPullDownAtTop = (!this.props.scrollOffset || this.props.scrollOffset <= 2) &&
+                    gestureState.dy > 8 &&
+                    Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.2 &&
+                    this.isSwipeDirectionAllowed(gestureState);
+                if (!this.shouldPropagateSwipe(evt, gestureState) || isPullDownAtTop) {`,
+  },
 ];
 
 function run() {

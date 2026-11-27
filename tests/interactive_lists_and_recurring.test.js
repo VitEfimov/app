@@ -3414,6 +3414,8 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.ok(!multiGroceryShare.includes('------------------------'), 'Multi grocery share must not separate items with dashed task dividers');
 
       assert.match(detailsSrc, /formatSingleItemForShare/, 'TaskDetailsModal handleShare must use formatSingleItemForShare');
+      assert.match(detailsSrc, /dragHandlePanResponder\.panHandlers/, 'TaskDetailsModal must attach dragHandlePanResponder to drag handle for reliable swipe-down-to-close');
+      assert.match(detailsSrc, /headerSwipePanResponder\.panHandlers/, 'TaskDetailsModal must attach headerSwipePanResponder to top header and title for swipe-down-to-close');
       assert.match(quickMenuSrc, /formatSingleItemForShare/, 'TaskQuickMenuModal handleShare must use formatSingleItemForShare');
       assert.match(boardScreenSrc, /formatMultipleItemsForShare/, 'BoardScreen handleShareSelected must use formatMultipleItemsForShare');
       assert.match(calendarScreenSrc, /formatMultipleItemsForShare/, 'CalendarScreen handleShareSelected must use formatMultipleItemsForShare');
