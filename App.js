@@ -26,7 +26,7 @@ import AutomaticCleanupModal from './src/components/AutomaticCleanupModal';
 import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask, addMultipleTasks } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
-import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId, attachNotificationDiagnostics } from './src/utils/notifications';
+import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId, attachNotificationDiagnostics, deduplicatePresentedNotificationsAsync } from './src/utils/notifications';
 import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
 import PinLockScreen from './src/screens/PinLockScreen';
@@ -576,6 +576,7 @@ function InitApp() {
     const handleAppStateChange = async (nextAppState) => {
       if (nextAppState === 'active') {
         setIsAppBackgrounded(false);
+        deduplicatePresentedNotificationsAsync().catch(() => {});
         const currentTheme = store.getState().themeReducer;
         const shouldBlockScreenshots = !!(currentTheme?.blockScreenshots || (currentTheme?.appPin && !isUnlocked));
         setScreenSecurityAsync(shouldBlockScreenshots);

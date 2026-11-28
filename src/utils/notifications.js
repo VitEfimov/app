@@ -10,13 +10,21 @@ dayjs.extend(isSameOrBefore);
 
 // Set how notifications should be handled when the app is in the foreground
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    try {
+      await dismissPriorBeforeNotificationsForIncomingAsync(notification);
+      setTimeout(() => {
+        deduplicatePresentedNotificationsAsync(notification).catch(() => {});
+      }, 350);
+    } catch (e) {}
+    return {
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 const DATE_TRIGGER_TYPE = Notifications.SchedulableTriggerInputTypes?.DATE || 'date';
@@ -934,6 +942,15 @@ export async function scheduleExactTaskReminder(
     }
 
     const offsetSuffix = advancedOptions?.reminderOffsetLabel ? ` (${advancedOptions.reminderOffsetLabel})` : '';
+    const isBeforeReminder = Boolean(
+      advancedOptions?.reminderOffsetLabel ||
+      (typeof advancedOptions?.deterministicSlot === 'string' && advancedOptions.deterministicSlot.startsWith('esc_'))
+    );
+    const reminderType = isBeforeReminder
+      ? 'before'
+      : (advancedOptions?.deterministicSlot ? String(advancedOptions.deterministicSlot) : 'exact');
+    const baseTaskName = String(taskName || '').replace(/^\[(?:URGENT|OVERDUE)\]\s*/i, '').trim();
+
     let deterministicId;
     if (taskId) {
       if (advancedOptions?.deterministicSlot) {
@@ -970,6 +987,9 @@ export async function scheduleExactTaskReminder(
         data: {
           taskId,
           isAlarm,
+          reminderType,
+          reminderOffsetLabel: advancedOptions?.reminderOffsetLabel || null,
+          baseTaskName,
         },
 
         /*
@@ -1233,20 +1253,241 @@ export function isAutomationNotificationObject(notifOrReq) {
   );
 }
 
-export async function deduplicatePresentedNotificationsAsync() {
+export const BEFORE_REMINDER_SUFFIX_REGEX = /\s*\((\d+\s*(?:min|minute|mins|minutes|hr|hour|hrs|hours|day|days)\s*before)\)\s*$/i;
+
+const KNOWN_BEFORE_OFFSET_SLOTS = [
+  '5_min_before',
+  '10_min_before',
+  '15_min_before',
+  '30_min_before',
+  '1_hr_before',
+  '2_hr_before',
+  '1_day_before',
+];
+
+const KNOWN_ESCALATION_SLOTS = [
+  'esc_1_hour',
+  'esc_30_minute',
+  'esc_15_minute',
+  'esc_5_minute',
+  'esc_1_minute',
+];
+
+export function normalizeTaskNotificationBaseName(rawText) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  return rawText
+    .replace(BEFORE_REMINDER_SUFFIX_REGEX, '')
+    .replace(/^\[(?:URGENT|OVERDUE)\]\s*/i, '')
+    .replace(/\s+is due now$/i, '')
+    .trim();
+}
+
+export function extractTaskNotificationMeta(notifOrReq) {
+  if (!notifOrReq) return null;
+  const req = notifOrReq.request || notifOrReq;
+  const rawId = String(req?.identifier || notifOrReq?.identifier || '');
+  let tag = rawId;
+  if (rawId.startsWith('expo-notifications://foreign_notifications')) {
+    const tagMatch = rawId.match(/[?&]tag=([^&]+)/);
+    if (tagMatch && tagMatch[1]) {
+      try {
+        tag = decodeURIComponent(tagMatch[1]);
+      } catch (e) {
+        tag = tagMatch[1];
+      }
+    }
+  }
+
+  const content = req?.content || notifOrReq?.content || {};
+  let data = content?.data || {};
+  if ((!data || Object.keys(data).length === 0) && typeof content?.dataString === 'string' && content.dataString.trim().startsWith('{')) {
+    try {
+      data = JSON.parse(content.dataString);
+    } catch (e) {
+      data = {};
+    }
+  }
+
+  const title = String(content?.title || '').trim();
+  const body = String(content?.body || content?.text || '').trim();
+
+  let taskId = data?.taskId !== undefined && data?.taskId !== null && String(data.taskId) !== ''
+    ? String(data.taskId)
+    : null;
+
+  let slotType = null;
+  if (tag.startsWith('task_exact_')) {
+    slotType = 'exact';
+    if (!taskId) taskId = tag.slice('task_exact_'.length) || null;
+  } else if (tag.startsWith('task_persist_')) {
+    slotType = 'persist';
+    if (!taskId) taskId = tag.slice('task_persist_'.length) || null;
+  } else if (tag.startsWith('task_offset_')) {
+    slotType = 'before';
+    if (!taskId) {
+      const m = tag.match(/^task_offset_[a-z0-9_]*?_before_(.+)$/i);
+      if (m && m[1]) taskId = m[1];
+    }
+  } else if (tag.startsWith('task_esc_')) {
+    slotType = 'before';
+    if (!taskId) {
+      const m = tag.match(/^task_esc_\d+_(?:hour|minute|day)_(.+)$/i);
+      if (m && m[1]) taskId = m[1];
+    }
+  } else if (tag.startsWith('task_nag_')) {
+    slotType = 'nag';
+    if (!taskId) {
+      const m = tag.match(/^task_nag_\d+_(.+)$/i);
+      if (m && m[1]) taskId = m[1];
+    }
+  }
+
+  const isPersistent = Boolean(
+    slotType === 'persist' ||
+    data?.keepNotificationAllDay ||
+    content?.categoryIdentifier === 'task_persistent'
+  );
+
+  const hasBeforeSuffix = BEFORE_REMINDER_SUFFIX_REGEX.test(body);
+  const isBefore = Boolean(
+    !isPersistent &&
+    (slotType === 'before' ||
+      data?.reminderType === 'before' ||
+      Boolean(data?.reminderOffsetLabel) ||
+      hasBeforeSuffix ||
+      /^\[URGENT\]\s*/i.test(body))
+  );
+
+  const isTaskNotification = Boolean(
+    !isAutomationNotificationObject(notifOrReq) &&
+    (taskId !== null ||
+      tag.startsWith('task_') ||
+      title === 'Task Reminder' ||
+      title === 'Task Alarm' ||
+      content?.categoryIdentifier === 'task_reminder' ||
+      content?.categoryIdentifier === 'task_regular' ||
+      content?.categoryIdentifier === 'task_alarm')
+  );
+
+  const isExact = Boolean(isTaskNotification && !isPersistent && !isBefore);
+  const baseTaskName = normalizeTaskNotificationBaseName(data?.baseTaskName || body);
+
+  return {
+    id: rawId,
+    tag,
+    title,
+    body,
+    data,
+    taskId,
+    isTaskNotification,
+    isPersistent,
+    isBefore,
+    isExact,
+    baseTaskName,
+  };
+}
+
+export async function dismissPriorBeforeNotificationsForTaskAsync(
+  taskId = null,
+  baseTaskName = null,
+  excludeIdentifier = null
+) {
+  if (Platform.OS === 'web') return 0;
+  let dismissedCount = 0;
+  const cleanTaskId = taskId !== undefined && taskId !== null && String(taskId) !== '' ? String(taskId) : null;
+  const cleanBaseName = normalizeTaskNotificationBaseName(baseTaskName).toLowerCase();
+
+  // 1. Directly dismiss deterministic 'before' and escalation notification IDs for this taskId
+  if (cleanTaskId && typeof Notifications.dismissNotificationAsync === 'function') {
+    for (const slot of KNOWN_BEFORE_OFFSET_SLOTS) {
+      const candidateId = `task_offset_${slot}_${cleanTaskId}`;
+      if (candidateId !== excludeIdentifier) {
+        try {
+          await Notifications.dismissNotificationAsync(candidateId);
+        } catch (e) {}
+      }
+    }
+    for (const escSlot of KNOWN_ESCALATION_SLOTS) {
+      const candidateId = `task_${escSlot}_${cleanTaskId}`;
+      if (candidateId !== excludeIdentifier) {
+        try {
+          await Notifications.dismissNotificationAsync(candidateId);
+        } catch (e) {}
+      }
+    }
+  }
+
+  // 2. Scan currently presented notifications in the tray and dismiss any matching 'before' notifications
+  if (typeof Notifications.getPresentedNotificationsAsync === 'function') {
+    try {
+      const presented = await Notifications.getPresentedNotificationsAsync();
+      if (Array.isArray(presented)) {
+        for (const item of presented) {
+          const meta = extractTaskNotificationMeta(item);
+          if (!meta || !meta.id || meta.isPersistent) continue;
+          if (excludeIdentifier && (meta.id === excludeIdentifier || meta.tag === excludeIdentifier)) {
+            continue;
+          }
+          const matchesTaskId = Boolean(cleanTaskId && meta.taskId && String(meta.taskId) === cleanTaskId);
+          const matchesBaseName = Boolean(
+            cleanBaseName &&
+            meta.isTaskNotification &&
+            meta.baseTaskName &&
+            meta.baseTaskName.toLowerCase() === cleanBaseName
+          );
+          if ((matchesTaskId || matchesBaseName) && meta.isBefore) {
+            try {
+              await Notifications.dismissNotificationAsync(meta.id);
+              dismissedCount++;
+            } catch (e) {}
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  return dismissedCount;
+}
+
+export async function dismissPriorBeforeNotificationsForIncomingAsync(incomingNotification) {
+  if (!incomingNotification || Platform.OS === 'web') return 0;
+  const meta = extractTaskNotificationMeta(incomingNotification);
+  if (!meta || !meta.isTaskNotification || meta.isPersistent) return 0;
+  // When an exact-time notification (or nag notification) fires, dismiss all prior 'before' notifications for this task
+  if (!meta.isBefore && (meta.taskId || meta.baseTaskName)) {
+    return await dismissPriorBeforeNotificationsForTaskAsync(meta.taskId, meta.baseTaskName, meta.id);
+  }
+  return 0;
+}
+
+export async function deduplicatePresentedNotificationsAsync(incomingNotification = null) {
   if (Platform.OS === 'web') return 0;
   let dismissedCount = 0;
   try {
+    if (incomingNotification) {
+      dismissedCount += await dismissPriorBeforeNotificationsForIncomingAsync(incomingNotification);
+    }
     if (typeof Notifications.getPresentedNotificationsAsync !== 'function') {
-      return 0;
+      return dismissedCount;
     }
     const presented = await Notifications.getPresentedNotificationsAsync();
     if (!Array.isArray(presented) || presented.length <= 1) {
-      return 0;
+      return dismissedCount;
     }
 
-    // Sort newest first so we keep the most recent notification and dismiss older duplicates
-    const sorted = [...presented].sort((a, b) => (Number(b?.date) || 0) - (Number(a?.date) || 0));
+    // Sort so that exact-time notifications ALWAYS take priority over "before" notifications,
+    // and then newest date first so the latest notification wins and older/before ones are dismissed.
+    const sorted = [...presented].sort((a, b) => {
+      const metaA = extractTaskNotificationMeta(a);
+      const metaB = extractTaskNotificationMeta(b);
+      if (metaA?.isTaskNotification && metaB?.isTaskNotification) {
+        if (metaA.isBefore !== metaB.isBefore) {
+          return metaA.isBefore ? 1 : -1;
+        }
+      }
+      return (Number(b?.date) || 0) - (Number(a?.date) || 0);
+    });
+
     const seenKeys = new Set();
 
     for (const item of sorted) {
@@ -1258,25 +1499,36 @@ export async function deduplicatePresentedNotificationsAsync() {
       const data = content?.data || {};
       const title = String(content?.title || '').trim();
       const body = String(content?.body || '').trim();
+      const meta = extractTaskNotificationMeta(item);
 
-      let dedupKey = null;
+      const candidateKeys = [];
       if (isAutomationNotificationObject(item)) {
-        dedupKey = `automation:${data?.automationType || title}`;
-      } else if (data?.taskId !== undefined && data?.taskId !== null) {
-        dedupKey = `task:${String(data.taskId)}:${title}`;
+        candidateKeys.push(`automation:${data?.automationType || title}`);
+      } else if (meta?.isPersistent) {
+        candidateKeys.push(`persist:${meta.taskId || meta.baseTaskName || body}`);
+      } else if (meta?.isTaskNotification) {
+        if (meta.taskId) {
+          candidateKeys.push(`task:${meta.taskId}:${title.toLowerCase()}`);
+        }
+        if (meta.baseTaskName) {
+          candidateKeys.push(`taskBase:${title.toLowerCase()}:${meta.baseTaskName.toLowerCase()}`);
+        }
       } else if (title || body) {
-        dedupKey = `generic:${title}:${body}`;
+        candidateKeys.push(`generic:${title}:${body}`);
       }
 
-      if (!dedupKey) continue;
+      if (candidateKeys.length === 0) continue;
 
-      if (seenKeys.has(dedupKey)) {
+      const isDuplicateOrSuperseded = candidateKeys.some((k) => seenKeys.has(k));
+      if (isDuplicateOrSuperseded) {
         try {
           await Notifications.dismissNotificationAsync(id);
           dismissedCount++;
         } catch (e) {}
       } else {
-        seenKeys.add(dedupKey);
+        for (const k of candidateKeys) {
+          seenKeys.add(k);
+        }
       }
     }
   } catch (error) {
@@ -1745,8 +1997,12 @@ export function attachNotificationDiagnostics() {
   const receivedSubscription =
     Notifications.addNotificationReceivedListener(
       notification => {
-        // Collapse any duplicate presented notifications (e.g. legacy stacked Daily Summary alarms)
-        deduplicatePresentedNotificationsAsync().catch(() => {});
+        // Immediately dismiss any prior "before" reminder when the exact-time reminder fires,
+        // and re-check shortly after presentation completes on Android
+        deduplicatePresentedNotificationsAsync(notification).catch(() => {});
+        setTimeout(() => {
+          deduplicatePresentedNotificationsAsync(notification).catch(() => {});
+        }, 400);
         if (Platform.OS === 'android' && typeof duckAudioForNotification === 'function') {
           const isPersistentSilent = !!(notification?.request?.content?.data?.keepNotificationAllDay);
           if (!isPersistentSilent) {

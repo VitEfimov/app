@@ -3419,6 +3419,13 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(quickMenuSrc, /formatSingleItemForShare/, 'TaskQuickMenuModal handleShare must use formatSingleItemForShare');
       assert.match(boardScreenSrc, /formatMultipleItemsForShare/, 'BoardScreen handleShareSelected must use formatMultipleItemsForShare');
       assert.match(calendarScreenSrc, /formatMultipleItemsForShare/, 'CalendarScreen handleShareSelected must use formatMultipleItemsForShare');
+
+      // 16. Automatic dismissal of "before" notifications (e.g. 15 min before, 1 hr before) when the exact-time notification fires
+      assert.match(notifSrc, /export function normalizeTaskNotificationBaseName/, 'notifications.js must export normalizeTaskNotificationBaseName to match before-reminders with exact-time reminders');
+      assert.match(notifSrc, /export function extractTaskNotificationMeta/, 'notifications.js must export extractTaskNotificationMeta to parse taskId, before-suffixes, and foreign notification tags');
+      assert.match(notifSrc, /export async function dismissPriorBeforeNotificationsForTaskAsync/, 'notifications.js must export dismissPriorBeforeNotificationsForTaskAsync to dismiss earlier before-reminders when exact reminder arrives');
+      assert.match(notifSrc, /export async function dismissPriorBeforeNotificationsForIncomingAsync/, 'notifications.js must export dismissPriorBeforeNotificationsForIncomingAsync for incoming exact reminders');
+      assert.match(patchSrc, /dismiss-superseded-before-task-notifications/, 'patch-expo-calendar.js must patch ExpoPresentationDelegate.kt so native Android background notifications also auto-dismiss prior before-notifications');
     });
   });
 });

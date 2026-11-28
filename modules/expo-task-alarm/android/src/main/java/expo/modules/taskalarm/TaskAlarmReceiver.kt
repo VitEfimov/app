@@ -163,6 +163,23 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         }
 
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                val beforeSuffixRegex = Regex("""\s*\(\d+\s*(?:min|minute|mins|minutes|hr|hour|hrs|hours|day|days)\s*before\)\s*$""", RegexOption.IGNORE_CASE)
+                if (nm != null) {
+                    for (sbn in nm.activeNotifications) {
+                        val activeTag = sbn.tag ?: ""
+                        if (activeTag.startsWith("task_persist_")) continue
+                        val activeText = NotificationCompat.getContentText(sbn.notification)?.toString()?.trim() ?: ""
+                        val activeBaseText = activeText.replace(beforeSuffixRegex, "").trim()
+                        val matchesTaskId = taskId.isNotEmpty() && (activeTag == "task_exact_$taskId" || (activeTag.startsWith("task_offset_") && activeTag.endsWith("_$taskId")) || (activeTag.startsWith("task_esc_") && activeTag.endsWith("_$taskId")))
+                        val matchesTaskName = taskName.isNotEmpty() && activeBaseText.equals(taskName.trim(), ignoreCase = true) && beforeSuffixRegex.containsMatchIn(activeText)
+                        if (matchesTaskId || matchesTaskName) {
+                            NotificationManagerCompat.from(context).cancel(sbn.tag, sbn.id)
+                        }
+                    }
+                }
+            }
             NotificationManagerCompat.from(context).notify(requestCode, notification)
         } catch (e: SecurityException) {
             e.printStackTrace()

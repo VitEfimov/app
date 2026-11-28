@@ -51,6 +51,21 @@ const RN_MODAL_PATH = path.join(
   'dist',
   'modal.js'
 );
+const EXPO_PRESENTATION_DELEGATE_PATH = path.join(
+  ROOT,
+  'node_modules',
+  'expo-notifications',
+  'android',
+  'src',
+  'main',
+  'java',
+  'expo',
+  'modules',
+  'notifications',
+  'service',
+  'delegates',
+  'ExpoPresentationDelegate.kt'
+);
 
 function applyPatchList(filePath, patches) {
   if (!fs.existsSync(filePath)) {
@@ -516,14 +531,110 @@ const rnModalPatches = [
   },
 ];
 
+const expoPresentationDelegatePatches = [
+  {
+    name: 'dismiss-superseded-before-task-notifications',
+    marker: 'dismissSupersededTaskNotifications(notification)',
+    target: `    CoroutineScope(Dispatchers.IO).launch {
+      val androidNotification = createNotification(notification, behavior)
+
+      NotificationManagerCompat.from(context).notify(
+        notification.notificationRequest.identifier,
+        getNotifyId(notification.notificationRequest),
+        androidNotification
+      )
+    }
+  }`,
+    replacement: `    CoroutineScope(Dispatchers.IO).launch {
+      val androidNotification = createNotification(notification, behavior)
+
+      dismissSupersededTaskNotifications(notification)
+
+      NotificationManagerCompat.from(context).notify(
+        notification.notificationRequest.identifier,
+        getNotifyId(notification.notificationRequest),
+        androidNotification
+      )
+    }
+  }
+
+  private fun dismissSupersededTaskNotifications(incoming: Notification) {
+    try {
+      val req = incoming.notificationRequest ?: return
+      val incomingId = req.identifier ?: ""
+      if (incomingId.startsWith("task_persist_")) return
+
+      val incomingTitle = req.content?.title?.trim() ?: ""
+      val incomingText = req.content?.text?.trim() ?: ""
+      val isTaskNotif = incomingId.startsWith("task_") || incomingTitle == "Task Reminder" || incomingTitle == "Task Alarm"
+      if (!isTaskNotif) return
+
+      val beforeSuffixRegex = Regex("""\\s*\\(\\d+\\s*(?:min|minute|mins|minutes|hr|hour|hrs|hours|day|days)\\s*before\\)\\s*$""", RegexOption.IGNORE_CASE)
+      val prefixUrgentRegex = Regex("""^\\[(?:URGENT|OVERDUE)\\]\\s*""", RegexOption.IGNORE_CASE)
+      val dueNowSuffixRegex = Regex("""\\s+is due now$""", RegexOption.IGNORE_CASE)
+
+      fun normalizeBaseText(text: String): String {
+        return text
+          .replace(beforeSuffixRegex, "")
+          .replace(prefixUrgentRegex, "")
+          .replace(dueNowSuffixRegex, "")
+          .trim()
+      }
+
+      fun extractTaskId(id: String): String? {
+        if (id.startsWith("task_exact_")) return id.removePrefix("task_exact_").takeIf { it.isNotEmpty() }
+        if (id.startsWith("task_offset_")) {
+          return Regex("""^task_offset_[a-z0-9_]*?_before_(.+)$""", RegexOption.IGNORE_CASE).find(id)?.groupValues?.getOrNull(1)
+        }
+        if (id.startsWith("task_esc_")) {
+          return Regex("""^task_esc_\\d+_(?:hour|minute|day)_(.+)$""", RegexOption.IGNORE_CASE).find(id)?.groupValues?.getOrNull(1)
+        }
+        if (id.startsWith("task_nag_")) {
+          return Regex("""^task_nag_\\d+_(.+)$""", RegexOption.IGNORE_CASE).find(id)?.groupValues?.getOrNull(1)
+        }
+        return null
+      }
+
+      val incomingTaskId = extractTaskId(incomingId) ?: req.content?.body?.optString("taskId", "")?.takeIf { it.isNotEmpty() }
+      val incomingBaseText = normalizeBaseText(incomingText)
+      val incomingIsBefore = incomingId.startsWith("task_offset_") || incomingId.startsWith("task_esc_") || beforeSuffixRegex.containsMatchIn(incomingText)
+
+      val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+      for (sbn in nm.activeNotifications) {
+        val activeTag = sbn.tag ?: ""
+        if (activeTag == incomingId || activeTag.startsWith("task_persist_")) continue
+
+        val activeTitle = NotificationCompat.getContentTitle(sbn.notification)?.toString()?.trim() ?: ""
+        val activeText = NotificationCompat.getContentText(sbn.notification)?.toString()?.trim() ?: ""
+        val activeIsBefore = activeTag.startsWith("task_offset_") || activeTag.startsWith("task_esc_") || beforeSuffixRegex.containsMatchIn(activeText)
+        val activeTaskId = extractTaskId(activeTag)
+        val activeBaseText = normalizeBaseText(activeText)
+
+        val sameTaskById = !incomingTaskId.isNullOrEmpty() && !activeTaskId.isNullOrEmpty() && incomingTaskId == activeTaskId
+        val sameTaskByText = incomingBaseText.isNotEmpty() &&
+          activeBaseText.equals(incomingBaseText, ignoreCase = true) &&
+          (activeTitle == "Task Reminder" || activeTitle == "Task Alarm" || activeTag.startsWith("task_"))
+
+        if ((sameTaskById || sameTaskByText) && (activeIsBefore || !incomingIsBefore)) {
+          NotificationManagerCompat.from(context).cancel(sbn.tag, sbn.id)
+        }
+      }
+    } catch (e: Exception) {
+      Log.w("expo-notifications", "Failed to dismiss superseded before-notification", e)
+    }
+  }`,
+  },
+];
+
 function run() {
   const res1 = applyPatchList(CALENDAR_MODULE_PATH, calendarModulePatches);
   const res2 = applyPatchList(JS_VALUES_MAPPERS_PATH, jsValuesMappersPatches);
   const res3 = applyPatchList(RN_MODAL_PATH, rnModalPatches);
+  const res4 = applyPatchList(EXPO_PRESENTATION_DELEGATE_PATH, expoPresentationDelegatePatches);
 
-  const totalApplied = res1.applied + res2.applied + res3.applied;
-  const totalAlready = res1.alreadyPatched + res2.alreadyPatched + res3.alreadyPatched;
-  const totalMissed = res1.missed + res2.missed + res3.missed;
+  const totalApplied = res1.applied + res2.applied + res3.applied + res4.applied;
+  const totalAlready = res1.alreadyPatched + res2.alreadyPatched + res3.alreadyPatched + res4.alreadyPatched;
+  const totalMissed = res1.missed + res2.missed + res3.missed + res4.missed;
 
   if (totalMissed > 0) {
     console.warn(`[patch-expo-calendar] Completed with ${totalMissed} unmatched patch(es) (applied=${totalApplied}, already=${totalAlready}).`);
