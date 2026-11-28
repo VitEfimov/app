@@ -47,7 +47,70 @@ class ExpoTaskAlarmModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ExpoTaskAlarm")
 
-    Events("onVoiceNoteEvent")
+    Events("onVoiceNoteEvent", "onWidgetAction")
+
+    OnCreate {
+      TaskWidgetDataStore.widgetActionBridgeListener = { payload ->
+        try {
+          sendEvent("onWidgetAction", payload)
+        } catch (_: Exception) {}
+      }
+    }
+
+    Function("syncWidgetData") { jsonPayload: String ->
+      val context = appContext.reactContext ?: return@Function false
+      TaskWidgetDataStore.saveSnapshotFromJs(context, jsonPayload)
+      TaskWidgetDataStore.refreshAllWidgets(context)
+      return@Function true
+    }
+
+    Function("getPendingWidgetActions") {
+      val context = appContext.reactContext ?: return@Function "[]"
+      return@Function TaskWidgetDataStore.getAndClearPendingWidgetActions(context)
+    }
+
+    Function("clearPendingWidgetActions") {
+      val context = appContext.reactContext ?: return@Function false
+      TaskWidgetDataStore.clearPendingWidgetActions(context)
+      return@Function true
+    }
+
+    Function("getPendingWidgetLaunchAction") {
+      val context = appContext.reactContext ?: return@Function null
+      return@Function TaskWidgetDataStore.getAndClearPendingLaunchAction(context)
+    }
+
+    Function("getActiveWidgetCounts") {
+      val context = appContext.reactContext ?: return@Function emptyMap<String, Int>()
+      val mgr = android.appwidget.AppWidgetManager.getInstance(context)
+      val scheduleCount = mgr.getAppWidgetIds(android.content.ComponentName(context, TaskScheduleWidgetProvider::class.java))?.size ?: 0
+      val monthCount = mgr.getAppWidgetIds(android.content.ComponentName(context, TaskMonthWidgetProvider::class.java))?.size ?: 0
+      val compactCount = mgr.getAppWidgetIds(android.content.ComponentName(context, TaskCompactWidgetProvider::class.java))?.size ?: 0
+      return@Function mapOf(
+        "schedule" to scheduleCount,
+        "month" to monthCount,
+        "compact" to compactCount,
+        "total" to (scheduleCount + monthCount + compactCount)
+      )
+    }
+
+    AsyncFunction("requestPinWidget") { widgetType: String ->
+      val context = appContext.reactContext ?: return@AsyncFunction false
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return@AsyncFunction false
+      val mgr = android.appwidget.AppWidgetManager.getInstance(context)
+      if (!mgr.isRequestPinAppWidgetSupported) return@AsyncFunction false
+      val providerClass = when (widgetType.lowercase()) {
+        "month", "calendar" -> TaskMonthWidgetProvider::class.java
+        "compact", "upnext", "strip" -> TaskCompactWidgetProvider::class.java
+        else -> TaskScheduleWidgetProvider::class.java
+      }
+      val component = android.content.ComponentName(context, providerClass)
+      return@AsyncFunction try {
+        mgr.requestPinAppWidget(component, null, null)
+      } catch (_: Exception) {
+        false
+      }
+    }
 
     Function("getSavedThemeMode") {
       val context = appContext.reactContext ?: return@Function null
@@ -59,6 +122,7 @@ class ExpoTaskAlarmModule : Module() {
       val context = appContext.reactContext ?: return@Function false
       val prefs = context.getSharedPreferences("taskflow_theme", Context.MODE_PRIVATE)
       prefs.edit().putString("themeMode", mode).apply()
+      TaskWidgetDataStore.refreshAllWidgets(context)
       return@Function true
     }
 

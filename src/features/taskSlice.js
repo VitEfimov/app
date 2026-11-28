@@ -129,7 +129,7 @@ export const fetchTasks = createAsyncThunk('task/fetchTasks', async (_, thunkAPI
                 
                 const unsyncedTasks = localTasks.filter(t => {
                     if (!t) return false;
-                    const isLocalDraft = t.isLocalDraft === true || (t.id && String(t.id).startsWith('temp_'));
+                    const isLocalDraft = t.isLocalDraft === true || (t.id && (String(t.id).startsWith('temp_') || String(t.id).startsWith('wtask_')));
                     const key = `${(t.taskname || '').trim().toLowerCase()}_${t.boardId || 'main'}`;
                     return isLocalDraft && !remoteIds.has(t.id) && !remoteIds.has(t._id) && !remoteKeys.has(key);
                 });
@@ -222,7 +222,7 @@ const taskSlice = createSlice({
     initialState,
     reducers: {
         hydrateTaskState: (state, action) => {
-            const normalized = action.payload.map(t => {
+            const normalized = (action.payload || []).map(t => {
                 const updated = { ...t };
                 if (!updated.id && updated._id) updated.id = updated._id;
                 if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
@@ -233,7 +233,14 @@ const taskSlice = createSlice({
                 }
                 return updated;
             });
-            state.tasks = sortTasksChronologically(normalized);
+            // Preserve any in-memory widget-created or local draft tasks so late hydration never overwrites them
+            const incomingIds = new Set(normalized.map(t => String(t.id || t._id || '')));
+            const inMemoryDrafts = (state.tasks || []).filter(t => {
+                if (!t) return false;
+                const tid = String(t.id || t._id || '');
+                return (t.isLocalDraft === true || tid.startsWith('wtask_') || tid.startsWith('temp_')) && !incomingIds.has(tid);
+            });
+            state.tasks = sortTasksChronologically([...normalized, ...inMemoryDrafts]);
         },
         addTaskSync(state, action) {
             const rawTask = action.payload?.task;
@@ -645,7 +652,7 @@ const taskSlice = createSlice({
             .addCase(fetchTasks.pending, (state) => { state.loading = true; })
             .addCase(fetchTasks.fulfilled, (state, action) => {
                 state.loading = false;
-                const normalized = action.payload.map(t => {
+                const normalized = (action.payload || []).map(t => {
                     const updated = { ...t };
                     if (!updated.id && updated._id) updated.id = updated._id;
                     if (!updated.boardId && updated.board_id) updated.boardId = updated.board_id;
@@ -658,7 +665,14 @@ const taskSlice = createSlice({
                     }
                     return updated;
                 });
-                state.tasks = sortTasksChronologically(normalized);
+                // Preserve any widget-created or local draft tasks added while fetchTasks was in flight
+                const incomingIds = new Set(normalized.map(t => String(t.id || t._id || '')));
+                const inFlightLocalTasks = (state.tasks || []).filter(t => {
+                    if (!t) return false;
+                    const tid = String(t.id || t._id || '');
+                    return (t.isLocalDraft === true || tid.startsWith('wtask_') || tid.startsWith('temp_')) && !incomingIds.has(tid);
+                });
+                state.tasks = sortTasksChronologically([...normalized, ...inFlightLocalTasks]);
             })
             .addCase(fetchTasks.rejected, (state, action) => { state.loading = false; state.error = action.error.message; })
             .addCase('user/deleteBoard/pending', (state, action) => {

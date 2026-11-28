@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="72dp"
+    android:viewportWidth="320"
+    android:viewportHeight="72">
+    <!-- Outer Dark Rounded Strip -->
+    <path
+        android:fillColor="#141419"
+        android:pathData="M22,2 H298 A20,20 0 0,1 318,22 V50 A20,20 0 0,1 298,70 H22 A20,20 0 0,1 2,50 V22 A20,20 0 0,1 22,2 Z" />
+    <!-- Left Accent Date Tile -->
+    <path
+        android:fillColor="#6C5CE7"
+        android:pathData="M24,13 H46 A12,12 0 0,1 58,25 V47 A12,12 0 0,1 46,59 H24 A12,12 0 0,1 12,47 V25 A12,12 0 0,1 24,13 Z" />
+    <!-- Center Up Next Text Lines -->
+    <path android:fillColor="#6C5CE7" android:pathData="M70,16 H148 V22 H70 Z" />
+    <path android:fillColor="#F5F5FA" android:pathData="M70,29 H214 V39 H70 Z" />
+    <path android:fillColor="#8E8E9E" android:pathData="M70,45 H172 V52 H70 Z" />
+    <!-- Right Complete & Add Buttons -->
+    <path android:fillColor="#16382C" android:pathData="M250,36 m-14,0 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0" />
+    <path android:strokeColor="#10B981" android:strokeWidth="2.2" android:pathData="M245,36 L249,40 L256,32" />
+    <path android:fillColor="#6C5CE7" android:pathData="M288,36 m-14,0 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M287,30 H289 V35 H294 V37 H289 V42 H287 V37 H282 V35 H287 Z" />
+</vector>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_schedule_label">TaskCalendar • Schedule &amp; Lists</string>
+    <string name="widget_schedule_desc">Google Calendar-style agenda with interactive task check-off, specialized lists (Grocery, Bills, Habits), and live streaks.</string>
+    <string name="widget_month_label">TaskCalendar • Month &amp; Day View</string>
+    <string name="widget_month_desc">Interactive monthly calendar grid with priority dots, day selection preview, and one-tap task completion.</string>
+    <string name="widget_compact_label">TaskCalendar • Up Next &amp; Focus</string>
+    <string name="widget_compact_desc">Compact daily progress strip showing your next due task, habit streak, and quick add.</string>
+</resources>

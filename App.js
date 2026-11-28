@@ -27,6 +27,7 @@ import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask, addMultipleTasks } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
 import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId, attachNotificationDiagnostics, deduplicatePresentedNotificationsAsync } from './src/utils/notifications';
+import { syncWidgetsWithStore, consumePendingWidgetActionsAsync, consumePendingWidgetLaunchAction, addWidgetActionListener } from './src/utils/widgetSync';
 import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
 import PinLockScreen from './src/screens/PinLockScreen';
@@ -281,6 +282,26 @@ function InitApp() {
                 navigationRef.navigate('Board', { editTaskId: taskId, boardId: boardId || 'main', focusTaskId: taskId });
               }
             }
+          } else if (type === 'widget_add_task') {
+            const targetDate = pendingNotificationPayload.dateKey || dayjs().format('YYYY-MM-DD');
+            try {
+              navigationRef.navigate('MainTabs', {
+                screen: 'Board',
+                params: { widgetAddTaskDate: targetDate, triggerAddTaskTs: Date.now() }
+              });
+            } catch (e) {
+              navigationRef.navigate('Board', { widgetAddTaskDate: targetDate, triggerAddTaskTs: Date.now() });
+            }
+          } else if (type === 'widget_calendar') {
+            const targetDate = pendingNotificationPayload.dateKey || dayjs().format('YYYY-MM-DD');
+            try {
+              navigationRef.navigate('MainTabs', {
+                screen: 'Calendar',
+                params: { selectedDate: targetDate }
+              });
+            } catch (e) {
+              navigationRef.navigate('Calendar', { selectedDate: targetDate });
+            }
           } else if (type === 'automation' || automationType) {
             const targetSection = automationType === 'summary' ? 'missed' : 'today';
             navigationRef.navigate('Board', { sectionId: targetSection });
@@ -297,6 +318,71 @@ function InitApp() {
     const removeDiagnostics = attachNotificationDiagnostics();
     return removeDiagnostics;
   }, []);
+
+  // Bi-directional Android Home Screen Widgets synchronization (Schedule, Month & Compact widgets)
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !isHydrated) return;
+
+    const handleWidgetLaunch = async (launchPayload) => {
+      if (!launchPayload || !launchPayload.actionType) return;
+      try {
+        await consumePendingWidgetActionsAsync(store, dispatch, updateTask, cancelNotification, addTask);
+      } catch (e) {}
+      const { actionType, taskId, boardId, dateKey } = launchPayload;
+      if (actionType === 'open_task' && taskId) {
+        setPendingNotificationPayload({
+          type: 'task',
+          taskId,
+          boardId: boardId || 'main',
+          actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
+        });
+      } else if (actionType === 'add_task') {
+        setPendingNotificationPayload({
+          type: 'widget_add_task',
+          dateKey: dateKey || dayjs().format('YYYY-MM-DD'),
+          boardId: boardId || 'main',
+        });
+      } else if (actionType === 'open_calendar' || actionType === 'open_calendar_date') {
+        setPendingNotificationPayload({
+          type: 'widget_calendar',
+          dateKey: dateKey || dayjs().format('YYYY-MM-DD'),
+        });
+      }
+    };
+
+    // Initial sync & consume any home-screen widget check-offs, widget-created tasks, or launch taps
+    consumePendingWidgetActionsAsync(store, dispatch, updateTask, cancelNotification, addTask).finally(() => {
+      syncWidgetsWithStore(store.getState(), true);
+    });
+    const initialLaunch = consumePendingWidgetLaunchAction();
+    if (initialLaunch) {
+      handleWidgetLaunch(initialLaunch);
+    }
+
+    let debounceTimer = null;
+    const unsubscribeStore = store.subscribe(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        syncWidgetsWithStore(store.getState(), false);
+      }, 180);
+    });
+
+    const widgetEventSub = addWidgetActionListener((event) => {
+      if (!event) return;
+      if (event.type === 'TOGGLE_TASK' || event.type === 'CREATE_TASK') {
+        consumePendingWidgetActionsAsync(store, dispatch, updateTask, cancelNotification, addTask).catch(() => {});
+      } else if (event.type === 'LAUNCH_ACTION') {
+        const launch = consumePendingWidgetLaunchAction() || event;
+        handleWidgetLaunch(launch);
+      }
+    });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribeStore();
+      widgetEventSub.remove();
+    };
+  }, [isHydrated, dispatch]);
 
   useEffect(() => {
     const loadStorage = async () => {
@@ -423,6 +509,13 @@ function InitApp() {
           } catch (parseErr) {
             console.error("Failed to parse cached tasks", parseErr);
           }
+        }
+
+        // Ingest any tasks created or completed on the Android Home Screen widgets BEFORE fetchTasks() runs
+        if (Platform.OS === 'android') {
+          try {
+            await consumePendingWidgetActionsAsync(store, dispatch, updateTask, cancelNotification, addTask);
+          } catch (e) {}
         }
 
         // Signal that state is hydrated — mounts AppNavigator, BoardScreen & CalendarScreen behind the loading screen
@@ -577,6 +670,28 @@ function InitApp() {
       if (nextAppState === 'active') {
         setIsAppBackgrounded(false);
         deduplicatePresentedNotificationsAsync().catch(() => {});
+        await consumePendingWidgetActionsAsync(store, dispatch, updateTask, cancelNotification, addTask);
+        const pendingLaunch = consumePendingWidgetLaunchAction();
+        if (pendingLaunch && pendingLaunch.actionType) {
+          if (pendingLaunch.actionType === 'open_task' && pendingLaunch.taskId) {
+            setPendingNotificationPayload({
+              type: 'task',
+              taskId: pendingLaunch.taskId,
+              boardId: pendingLaunch.boardId || 'main',
+              actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
+            });
+          } else if (pendingLaunch.actionType === 'add_task') {
+            setPendingNotificationPayload({
+              type: 'widget_add_task',
+              dateKey: pendingLaunch.dateKey || dayjs().format('YYYY-MM-DD'),
+            });
+          } else if (pendingLaunch.actionType === 'open_calendar' || pendingLaunch.actionType === 'open_calendar_date') {
+            setPendingNotificationPayload({
+              type: 'widget_calendar',
+              dateKey: pendingLaunch.dateKey || dayjs().format('YYYY-MM-DD'),
+            });
+          }
+        }
         const currentTheme = store.getState().themeReducer;
         const shouldBlockScreenshots = !!(currentTheme?.blockScreenshots || (currentTheme?.appPin && !isUnlocked));
         setScreenSecurityAsync(shouldBlockScreenshots);

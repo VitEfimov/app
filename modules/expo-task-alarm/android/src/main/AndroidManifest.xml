@@ -9,5 +9,74 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/task_alarm_file_paths" />
         </provider>
+
+        <!-- 1. Google Calendar-style Schedule & Specialized Lists Widget (4x3 resizable) -->
+        <receiver
+            android:name="expo.modules.taskalarm.TaskScheduleWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_schedule_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_schedule_info" />
+        </receiver>
+
+        <!-- 2. Google Calendar-style Interactive Month Grid & Day Preview Widget (4x4 resizable) -->
+        <receiver
+            android:name="expo.modules.taskalarm.TaskMonthWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_month_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_month_info" />
+        </receiver>
+
+        <!-- 3. Compact Up Next, Habit Streak & Quick Add Strip Widget (4x1 resizable) -->
+        <receiver
+            android:name="expo.modules.taskalarm.TaskCompactWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_compact_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_compact_info" />
+        </receiver>
+
+        <!-- RemoteViewsService powering scrollable task/section list in Schedule Widget -->
+        <service
+            android:name="expo.modules.taskalarm.TaskWidgetRemoteViewsService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
+        <!-- Interactive Widget Action BroadcastReceiver (direct task check-off, filter cycle, month flip, day selection, deep links) -->
+        <receiver
+            android:name="expo.modules.taskalarm.TaskWidgetActionReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="expo.modules.taskalarm.ACTION_WIDGET_TOGGLE_TASK" />
+                <action android:name="expo.modules.taskalarm.ACTION_WIDGET_CYCLE_FILTER" />
+                <action android:name="expo.modules.taskalarm.ACTION_WIDGET_MONTH_PREV" />
+                <action android:name="expo.modules.taskalarm.ACTION_WIDGET_MONTH_NEXT" />
+                <action android:name="expo.modules.taskalarm.ACTION_WIDGET_MONTH_TODAY" />
+                <action android:name="expo.modules.taskalarm.ACTION_WIDGET_SELECT_DATE" />
+                <action android:name="expo.modules.taskalarm.ACTION_WIDGET_LAUNCH_APP" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Floating Home-Screen Quick Add Dialog Activity (adds task right on widget without opening main app) -->
+        <activity
+            android:name="expo.modules.taskalarm.WidgetQuickAddActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:windowSoftInputMode="stateVisible|adjustResize"
+            android:theme="@android:style/Theme.DeviceDefault.Dialog.NoActionBar" />
     </application>
 </manifest>

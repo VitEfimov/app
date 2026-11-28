@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="220dp"
+    android:viewportWidth="320"
+    android:viewportHeight="220">
+    <!-- Outer Dark Rounded Card -->
+    <path
+        android:fillColor="#141419"
+        android:pathData="M24,2 H296 A22,22 0 0,1 318,24 V196 A22,22 0 0,1 296,218 H24 A22,22 0 0,1 2,196 V24 A22,22 0 0,1 24,2 Z" />
+    <!-- Top Header Container -->
+    <path
+        android:fillColor="#22222C"
+        android:pathData="M24,14 H296 A12,12 0 0,1 308,26 V64 A12,12 0 0,1 296,76 H24 A12,12 0 0,1 12,64 V26 A12,12 0 0,1 24,14 Z" />
+    <!-- Accent Title Bar & Subtitle -->
+    <path android:fillColor="#6C5CE7" android:pathData="M26,24 H84 A3,3 0 0,1 87,27 V29 A3,3 0 0,1 84,32 H26 Z" />
+    <path android:fillColor="#F5F5FA" android:pathData="M26,38 H156 A4,4 0 0,1 160,42 V47 A4,4 0 0,1 156,51 H26 Z" />
+    <path android:fillColor="#8E8E9E" android:pathData="M26,57 H124 A3,3 0 0,1 127,60 V62 A3,3 0 0,1 124,65 H26 Z" />
+    <!-- Filter Pill & + FAB -->
+    <path android:fillColor="#2E2E3C" android:pathData="M214,32 H254 A13,13 0 0,1 267,45 V45 A13,13 0 0,1 254,58 H214 A13,13 0 0,1 201,45 V45 A13,13 0 0,1 214,32 Z" />
+    <path android:fillColor="#6C5CE7" android:pathData="M286,45 m-14,0 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M285,39 H287 V44 H292 V46 H287 V51 H285 V46 H280 V44 H285 Z" />
+
+    <!-- Row 1: High Priority Task -->
+    <path android:fillColor="#1E1E26" android:pathData="M22,88 H298 A10,10 0 0,1 308,98 V124 A10,10 0 0,1 298,134 H22 A10,10 0 0,1 12,124 V98 A10,10 0 0,1 22,88 Z" />
+    <path android:fillColor="#EF4444" android:pathData="M18,96 H22 V126 H18 Z" />
+    <path android:strokeColor="#EF4444" android:strokeWidth="2" android:pathData="M38,111 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
+    <path android:fillColor="#F5F5FA" android:pathData="M56,101 H182 V109 H56 Z" />
+    <path android:fillColor="#8E8E9E" android:pathData="M56,115 H132 V121 H56 Z" />
+    <path android:fillColor="#3A1D24" android:pathData="M254,102 H292 A7,7 0 0,1 299,109 V113 A7,7 0 0,1 292,120 H254 A7,7 0 0,1 247,113 V109 A7,7 0 0,1 254,102 Z" />
+
+    <!-- Row 2: Grocery Item Checked -->
+    <path android:fillColor="#1E1E26" android:pathData="M22,142 H298 A10,10 0 0,1 308,152 V178 A10,10 0 0,1 298,188 H22 A10,10 0 0,1 12,178 V152 A10,10 0 0,1 22,142 Z" />
+    <path android:fillColor="#10B981" android:pathData="M18,150 H22 V180 H18 Z" />
+    <path android:fillColor="#10B981" android:pathData="M38,165 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="2" android:pathData="M34,165 L37,168 L43,162" />
+    <path android:fillColor="#7E7E94" android:pathData="M56,155 H168 V163 H56 Z" />
+    <path android:fillColor="#7E7E94" android:pathData="M56,169 H118 V175 H56 Z" />
+    <path android:fillColor="#16382C" android:pathData="M258,156 H292 A7,7 0 0,1 299,163 V167 A7,7 0 0,1 292,174 H258 A7,7 0 0,1 251,167 V163 A7,7 0 0,1 258,156 Z" />
+</vector>

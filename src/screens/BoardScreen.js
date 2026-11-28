@@ -494,6 +494,13 @@ export default function BoardScreen({ route, navigation }) {
     }
   }, [route?.params?.sectionId]);
 
+  useEffect(() => {
+    if (route?.params?.triggerAddTaskTs) {
+      setCollapsedSections(prev => prev.filter(id => id !== 'today'));
+      setActiveAddSectionId('today');
+    }
+  }, [route?.params?.triggerAddTaskTs]);
+
   useFocusEffect(
     useCallback(() => {
       dispatch(processAutoManageTasks());

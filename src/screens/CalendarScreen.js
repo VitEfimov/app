@@ -139,6 +139,17 @@ export default function CalendarScreen({ navigation, route }) {
     }
   }, [route?.params?.focusBoardId]);
 
+  useEffect(() => {
+    const incomingDate = route?.params?.selectedDate;
+    if (incomingDate && /^\d{4}-\d{2}-\d{2}$/.test(String(incomingDate))) {
+      setSelectedDate(incomingDate);
+      setCalendarMonth(incomingDate);
+    }
+    if (route?.params?.openInlineAdd) {
+      setIsInlineAddActive(true);
+    }
+  }, [route?.params?.selectedDate, route?.params?.openInlineAdd]);
+
   // Automatically reset focus when navigating away (user changes screen)
   useEffect(() => {
     if (!navigation?.addListener) return;

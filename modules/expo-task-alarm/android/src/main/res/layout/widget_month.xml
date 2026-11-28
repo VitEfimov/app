@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_month_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="2dp">
+
+    <ImageView
+        android:id="@+id/widget_month_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_shape_rounded_24"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- Top Month Navigation Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+
+            <LinearLayout
+                android:id="@+id/widget_month_header_click"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_month_header_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:text="November 2026"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_month_subtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:text="0 due this month"
+                    android:textColor="#9A9AAE"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- Prev Month ‹ -->
+            <FrameLayout
+                android:id="@+id/widget_month_prev_btn"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginRight="4dp">
+
+                <ImageView
+                    android:id="@+id/widget_month_prev_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_shape_circle"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/widget_month_prev_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:paddingBottom="2dp"
+                    android:text="‹"
+                    android:textColor="#FFFFFF"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <!-- Today Pill -->
+            <FrameLayout
+                android:id="@+id/widget_month_today_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_marginRight="4dp">
+
+                <ImageView
+                    android:id="@+id/widget_month_today_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_shape_pill"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/widget_month_today_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:paddingLeft="9dp"
+                    android:paddingRight="9dp"
+                    android:text="Today"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <!-- Next Month › -->
+            <FrameLayout
+                android:id="@+id/widget_month_next_btn"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginRight="6dp">
+
+                <ImageView
+                    android:id="@+id/widget_month_next_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_shape_circle"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/widget_month_next_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:paddingBottom="2dp"
+                    android:text="›"
+                    android:textColor="#FFFFFF"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <!-- Add Task + -->
+            <FrameLayout
+                android:id="@+id/widget_month_add_btn"
+                android:layout_width="30dp"
+                android:layout_height="30dp">
+
+                <ImageView
+                    android:id="@+id/widget_month_add_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_shape_circle"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/widget_month_add_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:paddingBottom="2dp"
+                    android:text="+"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- High-DPI Anti-Aliased Month Grid Canvas + Interactive 6x7 Day Hit-Targets -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <ImageView
+                android:id="@+id/widget_month_canvas"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="@null" />
+
+            <!-- Overlay Grid: top spacer for weekday header row (13%), then 6 equal week rows with 7 clickable day cells each -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:weightSum="100">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="13"
+                    android:text="" />
+
+                <!-- Week Row 0 -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="14.5" android:orientation="horizontal">
+                    <TextView android:id="@+id/mcell_0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_4" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_5" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_6" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                </LinearLayout>
+                <!-- Week Row 1 -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="14.5" android:orientation="horizontal">
+                    <TextView android:id="@+id/mcell_7" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_8" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_9" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_11" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_12" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_13" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                </LinearLayout>
+                <!-- Week Row 2 -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="14.5" android:orientation="horizontal">
+                    <TextView android:id="@+id/mcell_14" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_15" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_16" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_17" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_18" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_19" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_20" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                </LinearLayout>
+                <!-- Week Row 3 -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="14.5" android:orientation="horizontal">
+                    <TextView android:id="@+id/mcell_21" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_22" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_23" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_24" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_25" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_26" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_27" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                </LinearLayout>
+                <!-- Week Row 4 -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="14.5" android:orientation="horizontal">
+                    <TextView android:id="@+id/mcell_28" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_29" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_30" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_31" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_32" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_33" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_34" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                </LinearLayout>
+                <!-- Week Row 5 -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="14.5" android:orientation="horizontal">
+                    <TextView android:id="@+id/mcell_35" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_36" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_37" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_38" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_39" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_40" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                    <TextView android:id="@+id/mcell_41" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- Bottom Selected-Day Mini Agenda Drawer -->
+        <FrameLayout
+            android:id="@+id/widget_month_drawer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp">
+
+            <ImageView
+                android:id="@+id/widget_month_drawer_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_shape_rounded_16"
+                android:contentDescription="@null" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="10dp"
+                android:paddingTop="8dp"
+                android:paddingRight="10dp"
+                android:paddingBottom="8dp">
+
+                <LinearLayout
+                    android:id="@+id/widget_month_selected_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="4dp">
+
+                    <TextView
+                        android:id="@+id/widget_month_selected_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:letterSpacing="0.04"
+                        android:singleLine="true"
+                        android:text="TODAY • NOV 27"
+                        android:textColor="#6C5CE7"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/widget_month_open_day_btn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:singleLine="true"
+                        android:text="Open Day ›"
+                        android:textColor="#A0A0B2"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Preview Row 1 (Tapping checkbox or row toggles completion directly on widget!) -->
+                <LinearLayout
+                    android:id="@+id/widget_month_row1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp">
+
+                    <ImageView
+                        android:id="@+id/widget_month_row1_dot"
+                        android:layout_width="4dp"
+                        android:layout_height="22dp"
+                        android:layout_marginRight="8dp"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/widget_shape_accent_bar"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:id="@+id/widget_month_row1_check"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_marginRight="6dp"
+                        android:gravity="center"
+                        android:text="◯"
+                        android:textColor="#A0A0B2"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/widget_month_row1_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:text="Task 1"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/widget_month_row1_meta"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="6dp"
+                        android:singleLine="true"
+                        android:text="11:30 AM"
+                        android:textColor="#9A9AAE"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <!-- Preview Row 2 (Tapping checkbox or row toggles completion directly on widget!) -->
+                <LinearLayout
+                    android:id="@+id/widget_month_row2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp">
+
+                    <ImageView
+                        android:id="@+id/widget_month_row2_dot"
+                        android:layout_width="4dp"
+                        android:layout_height="22dp"
+                        android:layout_marginRight="8dp"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/widget_shape_accent_bar"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:id="@+id/widget_month_row2_check"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_marginRight="6dp"
+                        android:gravity="center"
+                        android:text="◯"
+                        android:textColor="#A0A0B2"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/widget_month_row2_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:text="Task 2"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/widget_month_row2_meta"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="6dp"
+                        android:singleLine="true"
+                        android:text="2:00 PM"
+                        android:textColor="#9A9AAE"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/widget_month_empty_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    android:singleLine="true"
+                    android:text="No tasks for this day • Tap + to schedule one"
+                    android:textColor="#8E8E9E"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

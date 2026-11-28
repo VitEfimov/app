@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="320dp"
+    android:viewportWidth="320"
+    android:viewportHeight="320">
+    <!-- Outer Dark Rounded Card -->
+    <path
+        android:fillColor="#141419"
+        android:pathData="M24,2 H296 A22,22 0 0,1 318,24 V296 A22,22 0 0,1 296,318 H24 A22,22 0 0,1 2,296 V24 A22,22 0 0,1 24,2 Z" />
+    <!-- Month Title + Nav Pills + Add Button -->
+    <path android:fillColor="#F5F5FA" android:pathData="M20,20 H134 V32 H20 Z" />
+    <path android:fillColor="#8E8E9E" android:pathData="M20,38 H100 V44 H20 Z" />
+    <path android:fillColor="#2E2E3C" android:pathData="M210,20 H252 A11,11 0 0,1 263,31 V31 A11,11 0 0,1 252,42 H210 A11,11 0 0,1 199,31 V31 A11,11 0 0,1 210,20 Z" />
+    <path android:fillColor="#6C5CE7" android:pathData="M288,31 m-13,0 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M287,25 H289 V30 H294 V32 H289 V37 H287 V32 H282 V30 H287 Z" />
+
+    <!-- Selected Day Ring (1:1 Perfect Circle) & Today Filled Circle (1:1 Perfect Circle) -->
+    <path android:strokeColor="#6C5CE7" android:strokeWidth="2.5" android:pathData="M118,162 m-14,0 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0" />
+    <path android:fillColor="#6C5CE7" android:pathData="M246,162 m-14,0 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0" />
+
+    <!-- Grid Dots & Indicators -->
+    <path android:fillColor="#EF4444" android:pathData="M75,118 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path android:fillColor="#10B981" android:pathData="M160,118 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path android:fillColor="#F59E0B" android:pathData="M203,118 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path android:fillColor="#EF4444" android:pathData="M114,182 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path android:fillColor="#10B981" android:pathData="M122,182 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path android:fillColor="#6C5CE7" android:pathData="M242,182 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path android:fillColor="#10B981" android:pathData="M250,182 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+
+    <!-- Bottom Mini Agenda Drawer -->
+    <path
+        android:fillColor="#22222C"
+        android:pathData="M24,232 H296 A12,12 0 0,1 308,244 V294 A12,12 0 0,1 296,306 H24 A12,12 0 0,1 12,294 V244 A12,12 0 0,1 24,232 Z" />
+    <path android:fillColor="#6C5CE7" android:pathData="M24,242 H112 V248 H24 Z" />
+    <path android:fillColor="#EF4444" android:pathData="M24,258 H28 V272 H24 Z" />
+    <path android:fillColor="#F5F5FA" android:pathData="M38,261 H174 V269 H38 Z" />
+    <path android:fillColor="#10B981" android:pathData="M24,280 H28 V294 H24 Z" />
+    <path android:fillColor="#F5F5FA" android:pathData="M38,283 H152 V291 H38 Z" />
+</vector>

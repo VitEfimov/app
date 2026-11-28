@@ -3426,6 +3426,70 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.match(notifSrc, /export async function dismissPriorBeforeNotificationsForTaskAsync/, 'notifications.js must export dismissPriorBeforeNotificationsForTaskAsync to dismiss earlier before-reminders when exact reminder arrives');
       assert.match(notifSrc, /export async function dismissPriorBeforeNotificationsForIncomingAsync/, 'notifications.js must export dismissPriorBeforeNotificationsForIncomingAsync for incoming exact reminders');
       assert.match(patchSrc, /dismiss-superseded-before-task-notifications/, 'patch-expo-calendar.js must patch ExpoPresentationDelegate.kt so native Android background notifications also auto-dismiss prior before-notifications');
+
+      // 17. Native Kotlin Android Home Screen Widgets (Schedule & Lists, Interactive Month Grid, and Up Next Compact Strip)
+      const widgetManifestSrc = fs.readFileSync(path.resolve('modules/expo-task-alarm/android/src/main/AndroidManifest.xml'), 'utf8');
+      assert.match(widgetManifestSrc, /TaskScheduleWidgetProvider/, 'AndroidManifest must register TaskScheduleWidgetProvider');
+      assert.match(widgetManifestSrc, /TaskMonthWidgetProvider/, 'AndroidManifest must register TaskMonthWidgetProvider');
+      assert.match(widgetManifestSrc, /TaskCompactWidgetProvider/, 'AndroidManifest must register TaskCompactWidgetProvider');
+      assert.match(widgetManifestSrc, /TaskWidgetRemoteViewsService/, 'AndroidManifest must register TaskWidgetRemoteViewsService with BIND_REMOTEVIEWS permission');
+      assert.match(widgetManifestSrc, /TaskWidgetActionReceiver/, 'AndroidManifest must register TaskWidgetActionReceiver for direct home-screen task check-off and month/filter switching');
+      assert.match(widgetManifestSrc, /WidgetQuickAddActivity/, 'AndroidManifest must register floating WidgetQuickAddActivity with taskAffinity="" so users can add tasks directly on the widget without opening the main app');
+
+      const widgetMonthXml = fs.readFileSync(path.resolve('modules/expo-task-alarm/android/src/main/res/layout/widget_month.xml'), 'utf8');
+      assert.match(widgetMonthXml, /android:id="@\+id\/widget_month_canvas"[\s\S]*?android:scaleType="fitCenter"/, 'widget_month.xml must use scaleType="fitCenter" on widget_month_canvas so numbers and circles are never stretched');
+
+      const widgetMonthInfoXml = fs.readFileSync(path.resolve('modules/expo-task-alarm/android/src/main/res/xml/widget_month_info.xml'), 'utf8');
+      assert.match(widgetMonthInfoXml, /android:previewImage="@drawable\/widget_preview_month"/, 'widget_month_info.xml must provide previewImage example for widget picker');
+      assert.match(widgetMonthInfoXml, /android:previewLayout="@layout\/widget_month_preview"/, 'widget_month_info.xml must provide previewLayout example for widget picker');
+
+      const widgetDataStoreKt = fs.readFileSync(path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/TaskWidgetDataStore.kt'), 'utf8');
+      assert.match(widgetDataStoreKt, /fun toggleTaskFromWidget/, 'TaskWidgetDataStore.kt must support instant home-screen task completion toggling');
+      assert.match(widgetDataStoreKt, /fun addTaskFromWidget/, 'TaskWidgetDataStore.kt must support creating tasks directly from the Home Screen widget without opening the app');
+      assert.match(widgetDataStoreKt, /fun renderMonthCalendarBitmap/, 'TaskWidgetDataStore.kt must render anti-aliased Google Calendar-style month grid canvas with priority dots');
+      assert.match(widgetDataStoreKt, /val FILTER_MODES = listOf\("ALL", "TODAY", "LISTS", "HABITS"\)/, 'TaskWidgetDataStore.kt must support cycling Schedule widget filters across ALL, TODAY, LISTS, and HABITS');
+
+      const widgetSyncMod = loadTranspiledModule(path.resolve('src/utils/widgetSync.js'), {
+        '../../modules/expo-task-alarm': {
+          syncWidgetData: () => true,
+          getPendingWidgetActions: () => [],
+          getPendingWidgetLaunchAction: () => null,
+          getActiveWidgetCounts: () => ({ schedule: 1, month: 1, compact: 1, total: 3 }),
+          requestPinWidget: async () => true,
+          addWidgetActionListener: () => ({ remove: () => {} }),
+        },
+        './currencyHelper': loadTranspiledModule(path.resolve('src/utils/currencyHelper.js')),
+        './habitHelper': loadTranspiledModule(path.resolve('src/utils/habitHelper.js')),
+      });
+
+      const todayStr = dayjs().format('YYYY-MM-DD');
+      const snapshot = widgetSyncMod.buildWidgetSnapshotFromState({
+        themeReducer: { themeMode: 'dark', sourceColor: '#6C5CE7', currency: 'USD', timeFormat: '12h', weekStartDay: 1 },
+        userReducer: {
+          activeBoardId: 'main',
+          boards: [
+            { id: 'main', name: 'Work', type: 'standard' },
+            { id: 'g1', name: 'Groceries', type: 'grocery' },
+            { id: 'h1', name: 'Daily Habits', type: 'habits' },
+          ],
+        },
+        taskReducer: {
+          tasks: [
+            { id: 't1', boardId: 'main', taskname: 'Architecture Review', completionDate: todayStr, time: '14:30', priority: 'high', completed: false, subtasks: [{ completed: true }, { completed: false }] },
+            { id: 't2', boardId: 'g1', taskname: 'Avocados', completionDate: todayStr, itemQuantity: 3, itemPrice: 2.0, completed: false },
+            { id: 't3', boardId: 'h1', taskname: 'Morning Run', completionDate: todayStr, time: '07:00', habitCompletedDates: [todayStr], completed: true },
+          ],
+        },
+      });
+      assert.strictEqual(snapshot.themeMode, 'dark', 'Widget snapshot must capture themeMode');
+      assert.strictEqual(snapshot.weekStartDay, 1, 'Widget snapshot must capture Monday weekStartDay');
+      assert.strictEqual(snapshot.dueTodayCount, 2, 'Widget snapshot must count uncompleted dueToday tasks');
+      assert.strictEqual(snapshot.completedTodayCount, 1, 'Widget snapshot must count completedToday tasks');
+      const groceryWidgetItem = snapshot.tasks.find((item) => item.id === 't2');
+      assert.strictEqual(groceryWidgetItem.title, 'Avocados ×3', 'Widget grocery item title must include quantity multiplier');
+      assert.strictEqual(groceryWidgetItem.badgeText, '$6.00', 'Widget grocery item badge must display computed total price');
+      const habitWidgetItem = snapshot.tasks.find((item) => item.id === 't3');
+      assert.match(habitWidgetItem.badgeText, /🔥\s*1d/, 'Widget habit item badge must display current streak');
     });
   });
 });

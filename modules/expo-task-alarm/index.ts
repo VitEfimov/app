@@ -326,3 +326,78 @@ export function addVoiceNoteListener(listener: (event: Record<string, any>) => v
   }
 }
 
+export function syncWidgetData(jsonPayload: string): boolean {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.syncWidgetData !== 'function') return false;
+  try {
+    return Boolean(ExpoTaskAlarm.syncWidgetData(jsonPayload));
+  } catch (e) {
+    return false;
+  }
+}
+
+export function getPendingWidgetActions(): any[] {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getPendingWidgetActions !== 'function') return [];
+  try {
+    const raw = ExpoTaskAlarm.getPendingWidgetActions();
+    if (typeof raw === 'string') return JSON.parse(raw);
+    if (Array.isArray(raw)) return raw;
+    return [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function clearPendingWidgetActions(): boolean {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.clearPendingWidgetActions !== 'function') return false;
+  try {
+    return Boolean(ExpoTaskAlarm.clearPendingWidgetActions());
+  } catch (e) {
+    return false;
+  }
+}
+
+export function getPendingWidgetLaunchAction(): Record<string, any> | null {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getPendingWidgetLaunchAction !== 'function') return null;
+  try {
+    const raw = ExpoTaskAlarm.getPendingWidgetLaunchAction();
+    if (!raw) return null;
+    if (typeof raw === 'string') return JSON.parse(raw);
+    if (typeof raw === 'object') return raw;
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function getActiveWidgetCounts(): Record<string, number> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getActiveWidgetCounts !== 'function') {
+    return { schedule: 0, month: 0, compact: 0, total: 0 };
+  }
+  try {
+    return ExpoTaskAlarm.getActiveWidgetCounts() || { schedule: 0, month: 0, compact: 0, total: 0 };
+  } catch (e) {
+    return { schedule: 0, month: 0, compact: 0, total: 0 };
+  }
+}
+
+export async function requestPinWidget(widgetType: 'schedule' | 'month' | 'compact' = 'schedule'): Promise<boolean> {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.requestPinWidget !== 'function') return false;
+  try {
+    return Boolean(await ExpoTaskAlarm.requestPinWidget(widgetType));
+  } catch (e) {
+    return false;
+  }
+}
+
+export function addWidgetActionListener(listener: (event: Record<string, any>) => void): { remove: () => void } {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.addListener !== 'function') {
+    return { remove: () => {} };
+  }
+  try {
+    return ExpoTaskAlarm.addListener('onWidgetAction', listener);
+  } catch (e) {
+    return { remove: () => {} };
+  }
+}
+
+

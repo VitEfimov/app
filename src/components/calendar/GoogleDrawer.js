@@ -13,6 +13,7 @@ import {
   IconClose
 } from './CalendarIcons';
 import { getBoardColor } from '../../utils/boardColors';
+import { requestPinWidget } from '../../utils/widgetSync';
 
 export default function GoogleDrawer({
   isOpen,
@@ -37,6 +38,7 @@ export default function GoogleDrawer({
 }) {
   const { t } = useTranslation();
   const [miniCalMonth, setMiniCalMonth] = useState(dayjs(currentDate).startOf('month'));
+  const [showWidgetsGallery, setShowWidgetsGallery] = useState(false);
 
   // Mini calendar calculation
   const startDay = miniCalMonth.startOf('month').startOf('week');
@@ -264,6 +266,77 @@ export default function GoogleDrawer({
         })}
 
         <View style={[styles.divider, { backgroundColor: colors.borderColor }]} />
+
+        {/* Home Screen Widgets Gallery & One-Tap Pin (Kotlin AppWidgets) */}
+        <TouchableOpacity
+          style={styles.navItemRow}
+          onPress={() => setShowWidgetsGallery(prev => !prev)}
+        >
+          <IconMonthView color={colors.primary} size={18} />
+          <Text style={[styles.navItemText, { color: colors.textPrimary, flex: 1 }]}>
+            {t('Home Screen Widgets') || 'Home Screen Widgets'}
+          </Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+            {showWidgetsGallery ? '▾' : '▸'}
+          </Text>
+        </TouchableOpacity>
+
+        {showWidgetsGallery && (
+          <View style={{ paddingHorizontal: 14, paddingBottom: 10, gap: 8 }}>
+            {[
+              {
+                id: 'schedule',
+                title: 'Schedule & Specialized Lists (4×3)',
+                desc: 'Google Calendar-style agenda with direct task check-off, filter tabs (All / Today / Lists / Habits), grocery totals & habit streaks.',
+              },
+              {
+                id: 'month',
+                title: 'Month Grid & Day Preview (4×4)',
+                desc: 'Interactive monthly calendar with multi-color priority dots, day selection mini-agenda drawer, and month navigation.',
+              },
+              {
+                id: 'compact',
+                title: 'Up Next & Focus Strip (4×1)',
+                desc: 'Compact Today date tile, next due task, one-tap complete button, daily completion counter & quick add.',
+              },
+            ].map((w) => (
+              <View
+                key={w.id}
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                  borderWidth: 1,
+                  borderColor: colors.borderColor,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary }}>
+                  {w.title}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3, lineHeight: 15 }}>
+                  {w.desc}
+                </Text>
+                {Platform.OS === 'android' && (
+                  <TouchableOpacity
+                    onPress={() => requestPinWidget(w.id)}
+                    style={{
+                      marginTop: 8,
+                      alignSelf: 'flex-start',
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 999,
+                      backgroundColor: colors.primary,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>
+                      + Pin to Home Screen
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Settings & Extras */}
         <TouchableOpacity
