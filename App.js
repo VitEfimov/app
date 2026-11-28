@@ -349,7 +349,7 @@ function InitApp() {
           boardId: boardId || 'main',
           actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
         });
-      } else if (actionType === 'open_board') {
+      } else if (actionType === 'open_board' || actionType === 'open_calendar') {
         setPendingNotificationPayload({
           type: 'widget_board',
           boardId: boardId || null,
@@ -360,7 +360,7 @@ function InitApp() {
           dateKey: dateKey || dayjs().format('YYYY-MM-DD'),
           boardId: boardId || 'main',
         });
-      } else if (actionType === 'open_calendar' || actionType === 'open_calendar_date') {
+      } else if (actionType === 'open_calendar_date') {
         setPendingNotificationPayload({
           type: 'widget_calendar',
           dateKey: dateKey || dayjs().format('YYYY-MM-DD'),
@@ -699,7 +699,7 @@ function InitApp() {
               boardId: pendingLaunch.boardId || 'main',
               actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
             });
-          } else if (pendingLaunch.actionType === 'open_board') {
+          } else if (pendingLaunch.actionType === 'open_board' || pendingLaunch.actionType === 'open_calendar') {
             setPendingNotificationPayload({
               type: 'widget_board',
               boardId: pendingLaunch.boardId || null,
@@ -709,7 +709,7 @@ function InitApp() {
               type: 'widget_add_task',
               dateKey: pendingLaunch.dateKey || dayjs().format('YYYY-MM-DD'),
             });
-          } else if (pendingLaunch.actionType === 'open_calendar' || pendingLaunch.actionType === 'open_calendar_date') {
+          } else if (pendingLaunch.actionType === 'open_calendar_date') {
             setPendingNotificationPayload({
               type: 'widget_calendar',
               dateKey: pendingLaunch.dateKey || dayjs().format('YYYY-MM-DD'),

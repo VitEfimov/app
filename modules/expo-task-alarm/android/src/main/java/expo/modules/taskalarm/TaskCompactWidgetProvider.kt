@@ -145,7 +145,7 @@ class TaskCompactWidgetProvider : AppWidgetProvider() {
             // Left Date Tile -> Open Calendar
             val openCalIntent = Intent(context, TaskWidgetActionReceiver::class.java).apply {
                 action = TaskWidgetActionReceiver.ACTION_WIDGET_LAUNCH_APP
-                putExtra(TaskWidgetActionReceiver.EXTRA_LAUNCH_TYPE, "open_calendar")
+                putExtra(TaskWidgetActionReceiver.EXTRA_LAUNCH_TYPE, "open_calendar_date")
                 putExtra(TaskWidgetActionReceiver.EXTRA_DATE_KEY, todayKey)
             }
             views.setOnClickPendingIntent(

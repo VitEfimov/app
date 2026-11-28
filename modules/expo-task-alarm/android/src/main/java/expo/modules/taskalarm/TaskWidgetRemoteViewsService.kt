@@ -61,6 +61,16 @@ class TaskScheduleRemoteViewsFactory(
                 rv.setTextColor(R.id.widget_section_title, row.textColor)
                 rv.setTextViewText(R.id.widget_section_right, row.rightSummary)
                 rv.setTextColor(R.id.widget_section_right, palette.textMuted)
+
+                val openBoardFillIn = Intent().apply {
+                    data = android.net.Uri.parse("taskcalendar://widget/open_board_section/$position")
+                    putExtra(TaskWidgetActionReceiver.EXTRA_WIDGET_ACTION, TaskWidgetActionReceiver.ACTION_WIDGET_LAUNCH_APP)
+                    putExtra(TaskWidgetActionReceiver.EXTRA_LAUNCH_TYPE, "open_board")
+                    putExtra(TaskWidgetActionReceiver.EXTRA_DATE_KEY, snapshot.todayKey)
+                }
+                rv.setOnClickFillInIntent(R.id.widget_section_root, openBoardFillIn)
+                rv.setOnClickFillInIntent(R.id.widget_section_title, openBoardFillIn)
+                rv.setOnClickFillInIntent(R.id.widget_section_right, openBoardFillIn)
                 rv
             }
 
