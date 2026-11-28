@@ -282,6 +282,19 @@ function InitApp() {
                 navigationRef.navigate('Board', { editTaskId: taskId, boardId: boardId || 'main', focusTaskId: taskId });
               }
             }
+          } else if (type === 'widget_board') {
+            if (boardId) {
+              const { setActiveBoardId } = require('./src/features/userSlice');
+              dispatch(setActiveBoardId(boardId));
+            }
+            try {
+              navigationRef.navigate('MainTabs', {
+                screen: 'Board',
+                params: { triggerOpenBoardTs: Date.now() }
+              });
+            } catch (e) {
+              navigationRef.navigate('Board', { triggerOpenBoardTs: Date.now() });
+            }
           } else if (type === 'widget_add_task') {
             const targetDate = pendingNotificationPayload.dateKey || dayjs().format('YYYY-MM-DD');
             try {
@@ -336,6 +349,11 @@ function InitApp() {
           boardId: boardId || 'main',
           actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
         });
+      } else if (actionType === 'open_board') {
+        setPendingNotificationPayload({
+          type: 'widget_board',
+          boardId: boardId || null,
+        });
       } else if (actionType === 'add_task') {
         setPendingNotificationPayload({
           type: 'widget_add_task',
@@ -346,6 +364,7 @@ function InitApp() {
         setPendingNotificationPayload({
           type: 'widget_calendar',
           dateKey: dateKey || dayjs().format('YYYY-MM-DD'),
+          taskId: taskId || null,
         });
       }
     };
@@ -680,6 +699,11 @@ function InitApp() {
               boardId: pendingLaunch.boardId || 'main',
               actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
             });
+          } else if (pendingLaunch.actionType === 'open_board') {
+            setPendingNotificationPayload({
+              type: 'widget_board',
+              boardId: pendingLaunch.boardId || null,
+            });
           } else if (pendingLaunch.actionType === 'add_task') {
             setPendingNotificationPayload({
               type: 'widget_add_task',
@@ -689,6 +713,7 @@ function InitApp() {
             setPendingNotificationPayload({
               type: 'widget_calendar',
               dateKey: pendingLaunch.dateKey || dayjs().format('YYYY-MM-DD'),
+              taskId: pendingLaunch.taskId || null,
             });
           }
         }

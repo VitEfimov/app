@@ -100,16 +100,15 @@ class TaskScheduleWidgetProvider : AppWidgetProvider() {
             views.setTextColor(R.id.widget_schedule_empty_title, palette.textPrimary)
             views.setTextColor(R.id.widget_schedule_empty_subtitle, palette.textMuted)
 
-            // 1. Header left tap -> Open Calendar view
-            val openCalendarIntent = Intent(context, TaskWidgetActionReceiver::class.java).apply {
+            // 1. Header left & empty state tap -> Open Board view in app
+            val openBoardIntent = Intent(context, TaskWidgetActionReceiver::class.java).apply {
                 action = TaskWidgetActionReceiver.ACTION_WIDGET_LAUNCH_APP
-                putExtra(TaskWidgetActionReceiver.EXTRA_LAUNCH_TYPE, "open_calendar")
+                putExtra(TaskWidgetActionReceiver.EXTRA_LAUNCH_TYPE, "open_board")
                 putExtra(TaskWidgetActionReceiver.EXTRA_DATE_KEY, snapshot.todayKey)
             }
-            views.setOnClickPendingIntent(
-                R.id.widget_schedule_header_left,
-                PendingIntent.getBroadcast(context, 7101, openCalendarIntent, immutableFlags())
-            )
+            val openBoardPending = PendingIntent.getBroadcast(context, 7101, openBoardIntent, immutableFlags())
+            views.setOnClickPendingIntent(R.id.widget_schedule_header_left, openBoardPending)
+            views.setOnClickPendingIntent(R.id.widget_schedule_empty, openBoardPending)
 
             // 2. Filter pill tap -> Cycle filter (All -> Today -> Lists -> Habits)
             val cycleFilterIntent = Intent(context, TaskWidgetActionReceiver::class.java).apply {

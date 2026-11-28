@@ -149,6 +149,7 @@ class TaskMonthWidgetProvider : AppWidgetProvider() {
             val openCalHeaderPending = PendingIntent.getBroadcast(context, 7205, openCalHeaderIntent, immutableFlags())
             views.setOnClickPendingIntent(R.id.widget_month_header_click, openCalHeaderPending)
             views.setOnClickPendingIntent(R.id.widget_month_selected_header, openCalHeaderPending)
+            views.setOnClickPendingIntent(R.id.widget_month_empty_text, openCalHeaderPending)
 
             // Wire each of the 42 day cells so tapping any date selects it immediately on the widget
             for (i in 0 until minOf(42, gridRender.cellDateKeys.size)) {
@@ -265,17 +266,17 @@ class TaskMonthWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(checkId, togglePending)
             views.setOnClickPendingIntent(dotId, togglePending)
 
-            // 2. Tapping the task title or meta opens the app to that task / day!
-            val openTaskIntent = Intent(context, TaskWidgetActionReceiver::class.java).apply {
+            // 2. Tapping the task title or meta on the Calendar Month widget opens the app on the Calendar screen for that date!
+            val openCalDayIntent = Intent(context, TaskWidgetActionReceiver::class.java).apply {
                 action = TaskWidgetActionReceiver.ACTION_WIDGET_LAUNCH_APP
-                putExtra(TaskWidgetActionReceiver.EXTRA_LAUNCH_TYPE, "open_task")
+                putExtra(TaskWidgetActionReceiver.EXTRA_LAUNCH_TYPE, "open_calendar_date")
                 putExtra(TaskWidgetActionReceiver.EXTRA_TASK_ID, task.id)
                 putExtra(TaskWidgetActionReceiver.EXTRA_BOARD_ID, task.boardId)
                 putExtra(TaskWidgetActionReceiver.EXTRA_DATE_KEY, task.dateKey)
             }
-            val openTaskPending = PendingIntent.getBroadcast(context, reqBase + 2, openTaskIntent, immutableFlags())
-            views.setOnClickPendingIntent(titleId, openTaskPending)
-            views.setOnClickPendingIntent(metaId, openTaskPending)
+            val openCalDayPending = PendingIntent.getBroadcast(context, reqBase + 2, openCalDayIntent, immutableFlags())
+            views.setOnClickPendingIntent(titleId, openCalDayPending)
+            views.setOnClickPendingIntent(metaId, openCalDayPending)
         }
     }
 }
