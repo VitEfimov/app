@@ -126,6 +126,18 @@ class ExpoTaskAlarmModule : Module() {
       return@Function true
     }
 
+    Function("getSavedAppLanguage") {
+      val context = appContext.reactContext ?: return@Function "en"
+      return@Function TaskTranslations.getSavedLanguage(context)
+    }
+
+    Function("setSavedAppLanguage") { langCode: String ->
+      val context = appContext.reactContext ?: return@Function false
+      TaskTranslations.setSavedLanguage(context, langCode)
+      TaskWidgetDataStore.refreshAllWidgets(context)
+      return@Function true
+    }
+
     Function("setSavedAndroidAutoMute") { enabled: Boolean ->
       val context = appContext.reactContext ?: return@Function false
       CarUtils.setAndroidAutoMuteEnabled(context, enabled)
@@ -389,8 +401,12 @@ class ExpoTaskAlarmModule : Module() {
                   .setUsage(AudioAttributes.USAGE_ALARM)
                   .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                   .build()
-              val alarmChannel = NotificationChannel(resolvedChannelId, "Task alarms", NotificationManager.IMPORTANCE_HIGH).apply {
-                  description = "Urgent task alarms with sound and vibration"
+              val alarmChannel = NotificationChannel(
+                  resolvedChannelId,
+                  TaskTranslations.t(context, "channel_task_alarms"),
+                  NotificationManager.IMPORTANCE_HIGH
+              ).apply {
+                  description = TaskTranslations.t(context, "channel_task_alarms_desc")
                   setSound(soundUri, audioAttributes)
                   enableVibration(!resolvedChannelId.contains("_vib0_"))
                   setBypassDnd(true)

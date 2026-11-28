@@ -40,7 +40,9 @@ class AlarmActivity : Activity() {
         val layoutId = resources.getIdentifier("activity_alarm", "layout", packageName)
         setContentView(layoutId)
 
-        val taskName = intent.getStringExtra("taskName") ?: "Unknown Task"
+        val lang = TaskTranslations.getSavedLanguage(this)
+        val locale = TaskTranslations.getLocale(lang)
+        val taskName = intent.getStringExtra("taskName") ?: TaskTranslations.t(this, "untitled_task", lang)
         val channelId = intent.getStringExtra("channelId") ?: "task_alarm_channel"
         val requestCode = intent.getIntExtra("requestCode", 0)
         val taskId = intent.getStringExtra("taskId") ?: ""
@@ -95,14 +97,16 @@ class AlarmActivity : Activity() {
         titleView?.setOnClickListener { openTaskAction() }
         
         val nameView = findViewById<TextView>(nameId)
-        val dateFormat = SimpleDateFormat("EEE, MMM d • hh:mm a", Locale.getDefault())
+        val dateFormat = SimpleDateFormat("EEE, MMM d • hh:mm a", locale)
         val currentDateTime = dateFormat.format(Date())
         nameView?.text = currentDateTime
         nameView?.setOnClickListener { openTaskAction() }
 
         findViewById<android.view.View>(android.R.id.content)?.setOnClickListener { openTaskAction() }
 
-        findViewById<Button>(dismissBtnId)?.setOnClickListener {
+        val dismissBtn = findViewById<Button>(dismissBtnId)
+        dismissBtn?.text = TaskTranslations.t(this, "stop", lang)
+        dismissBtn?.setOnClickListener {
             AlarmAudioManager.stopAlarmSound(this)
             if (keepAllDay) {
                 AlarmActionReceiver.postSilentPersistentReminder(this, requestCode, taskName, taskId)
@@ -112,7 +116,9 @@ class AlarmActivity : Activity() {
             finish()
         }
 
-        findViewById<Button>(snoozeBtnId)?.setOnClickListener {
+        val snoozeBtn = findViewById<Button>(snoozeBtnId)
+        snoozeBtn?.text = TaskTranslations.t(this, "snooze", lang)
+        snoozeBtn?.setOnClickListener {
             AlarmAudioManager.stopAlarmSound(this)
             NotificationManagerCompat.from(this).cancel(requestCode)
             

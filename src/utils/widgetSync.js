@@ -8,9 +8,245 @@ import {
   getActiveWidgetCounts,
   requestPinWidget,
   addWidgetActionListener,
+  setSavedAppLanguage,
 } from '../../modules/expo-task-alarm';
 import { CURRENCIES, resolveCurrencyCode, extractTaskAmountFromTitle } from './currencyHelper';
 import { computeHabitStats } from './habitHelper';
+
+const WIDGET_META_TRANSLATIONS = {
+  en: {
+    'All Tasks': 'All Tasks',
+    'Tasks': 'Tasks',
+    'Main': 'Main',
+    'Untitled Task': 'Untitled Task',
+    'ea': 'ea',
+    'Overdue': 'Overdue',
+    'Due Today': 'Due Today',
+    'Recurring': 'Recurring',
+    'Morning': 'Morning',
+    'Afternoon': 'Afternoon',
+    'Evening': 'Evening',
+    'Anytime': 'Anytime',
+    'Qty': 'Qty',
+    'Media': 'Media',
+    'HIGH': 'HIGH',
+    'Alarm': 'Alarm',
+    'subtasks': 'subtasks',
+    'dayShort': 'd',
+  },
+  ru: {
+    'All Tasks': 'Все задачи',
+    'Tasks': 'Задачи',
+    'Main': 'Главная',
+    'Untitled Task': 'Задача без названия',
+    'ea': 'шт',
+    'Overdue': 'Просрочено',
+    'Due Today': 'На сегодня',
+    'Recurring': 'Повтор',
+    'Morning': 'Утро',
+    'Afternoon': 'День',
+    'Evening': 'Вечер',
+    'Anytime': 'В любое время',
+    'Qty': 'Кол-во',
+    'Media': 'Медиа',
+    'HIGH': 'ВЫСОКИЙ',
+    'Alarm': 'Будильник',
+    'subtasks': 'подзадач',
+    'dayShort': 'дн',
+  },
+  es: {
+    'All Tasks': 'Todas las tareas',
+    'Tasks': 'Tareas',
+    'Main': 'Principal',
+    'Untitled Task': 'Tarea sin título',
+    'ea': 'c/u',
+    'Overdue': 'Vencida',
+    'Due Today': 'Para hoy',
+    'Recurring': 'Recurrente',
+    'Morning': 'Mañana',
+    'Afternoon': 'Tarde',
+    'Evening': 'Noche',
+    'Anytime': 'Cualquier momento',
+    'Qty': 'Cant.',
+    'Media': 'Multimedia',
+    'HIGH': 'ALTA',
+    'Alarm': 'Alarma',
+    'subtasks': 'subtareas',
+    'dayShort': 'd',
+  },
+  zh: {
+    'All Tasks': '所有任务',
+    'Tasks': '任务',
+    'Main': '主看板',
+    'Untitled Task': '未命名任务',
+    'ea': '每件',
+    'Overdue': '已逾期',
+    'Due Today': '今日到期',
+    'Recurring': '重复',
+    'Morning': '晨间',
+    'Afternoon': '午后',
+    'Evening': '晚间',
+    'Anytime': '随时',
+    'Qty': '数量',
+    'Media': '影音',
+    'HIGH': '高',
+    'Alarm': '闹钟',
+    'subtasks': '个子任务',
+    'dayShort': '天',
+  },
+  ja: {
+    'All Tasks': 'すべてのタスク',
+    'Tasks': 'タスク',
+    'Main': 'メイン',
+    'Untitled Task': '無題のタスク',
+    'ea': '個',
+    'Overdue': '期限切れ',
+    'Due Today': '今日期限',
+    'Recurring': '繰り返し',
+    'Morning': '朝',
+    'Afternoon': '午後',
+    'Evening': '夜',
+    'Anytime': 'いつでも',
+    'Qty': '数量',
+    'Media': 'メディア',
+    'HIGH': '高',
+    'Alarm': 'アラーム',
+    'subtasks': '件のサブタスク',
+    'dayShort': '日',
+  },
+  fr: {
+    'All Tasks': 'Toutes les tâches',
+    'Tasks': 'Tâches',
+    'Main': 'Principal',
+    'Untitled Task': 'Tâche sans titre',
+    'ea': 'unité',
+    'Overdue': 'En retard',
+    'Due Today': "Pour aujourd'hui",
+    'Recurring': 'Récurrente',
+    'Morning': 'Matin',
+    'Afternoon': 'Après-midi',
+    'Evening': 'Soir',
+    'Anytime': "N'importe quand",
+    'Qty': 'Qté',
+    'Media': 'Média',
+    'HIGH': 'HAUTE',
+    'Alarm': 'Alarme',
+    'subtasks': 'sous-tâches',
+    'dayShort': 'j',
+  },
+  de: {
+    'All Tasks': 'Alle Aufgaben',
+    'Tasks': 'Aufgaben',
+    'Main': 'Hauptboard',
+    'Untitled Task': 'Unbenannte Aufgabe',
+    'ea': 'Stk.',
+    'Overdue': 'Überfällig',
+    'Due Today': 'Heute fällig',
+    'Recurring': 'Wiederkehrend',
+    'Morning': 'Morgens',
+    'Afternoon': 'Nachmittags',
+    'Evening': 'Abends',
+    'Anytime': 'Jederzeit',
+    'Qty': 'Anz.',
+    'Media': 'Medien',
+    'HIGH': 'HOCH',
+    'Alarm': 'Alarm',
+    'subtasks': 'Unteraufgaben',
+    'dayShort': 'T',
+  },
+  it: {
+    'All Tasks': 'Tutte le attività',
+    'Tasks': 'Attività',
+    'Main': 'Principale',
+    'Untitled Task': 'Attività senza titolo',
+    'ea': 'cad.',
+    'Overdue': 'Scaduta',
+    'Due Today': 'Per oggi',
+    'Recurring': 'Ricorrente',
+    'Morning': 'Mattina',
+    'Afternoon': 'Pomeriggio',
+    'Evening': 'Sera',
+    'Anytime': 'Qualsiasi momento',
+    'Qty': 'Qtà',
+    'Media': 'Media',
+    'HIGH': 'ALTA',
+    'Alarm': 'Sveglia',
+    'subtasks': 'sottoattività',
+    'dayShort': 'g',
+  },
+  hi: {
+    'All Tasks': 'सभी कार्य',
+    'Tasks': 'कार्य',
+    'Main': 'मुख्य',
+    'Untitled Task': 'शीर्षकहीन कार्य',
+    'ea': 'प्रति',
+    'Overdue': 'अतिदेय',
+    'Due Today': 'आज देय',
+    'Recurring': 'आवर्ती',
+    'Morning': 'सुबह',
+    'Afternoon': 'दोपहर',
+    'Evening': 'शाम',
+    'Anytime': 'कभी भी',
+    'Qty': 'मात्रा',
+    'Media': 'मीडिया',
+    'HIGH': 'उच्च',
+    'Alarm': 'अलार्म',
+    'subtasks': 'उप-कार्य',
+    'dayShort': 'दि',
+  },
+  ko: {
+    'All Tasks': '모든 할 일',
+    'Tasks': '할 일',
+    'Main': '메인',
+    'Untitled Task': '제목 없는 할 일',
+    'ea': '개당',
+    'Overdue': '기한 지남',
+    'Due Today': '오늘 마감',
+    'Recurring': '반복',
+    'Morning': '아침',
+    'Afternoon': '오후',
+    'Evening': '저녁',
+    'Anytime': '언제든지',
+    'Qty': '수량',
+    'Media': '미디어',
+    'HIGH': '높음',
+    'Alarm': '알람',
+    'subtasks': '개 하위 작업',
+    'dayShort': '일',
+  },
+};
+
+export function resolveWidgetLanguage(explicitLang = null) {
+  let raw = explicitLang;
+  if (!raw) {
+    try {
+      const i18nMod = require('../i18n');
+      const i18nInst = i18nMod?.default || i18nMod;
+      if (i18nInst && typeof i18nInst.language === 'string' && i18nInst.language) {
+        raw = i18nInst.language;
+      }
+    } catch (e) {}
+  }
+  const base = String(raw || 'en').trim().toLowerCase().split(/[-_]/)[0] || 'en';
+  return WIDGET_META_TRANSLATIONS[base] ? base : 'en';
+}
+
+export function translateWidgetMeta(key, langCode = 'en') {
+  const normLang = resolveWidgetLanguage(langCode);
+  const table = WIDGET_META_TRANSLATIONS[normLang] || WIDGET_META_TRANSLATIONS.en;
+  if (table && table[key] !== undefined) {
+    return table[key];
+  }
+  try {
+    const i18nMod = require('../i18n');
+    const i18nInst = i18nMod?.default || i18nMod;
+    if (i18nInst && typeof i18nInst.t === 'function') {
+      const res = i18nInst.t(key, { lng: normLang });
+      if (res) return res;
+    }
+  } catch (e) {}
+  return WIDGET_META_TRANSLATIONS.en[key] || key;
+}
 
 export function inferHabitTimeOfDay(task) {
   if (!task) return 'Anytime';
@@ -76,11 +312,14 @@ export function extractWidgetTaskDateKey(task, fallbackToday) {
   return parsed.isValid() ? parsed.format('YYYY-MM-DD') : fallbackToday;
 }
 
-export function buildWidgetSnapshotFromState(state = {}) {
+export function buildWidgetSnapshotFromState(state = {}, options = {}) {
   const todayKey = dayjs().format('YYYY-MM-DD');
   const themeState = state?.themeReducer || {};
   const userState = state?.userReducer || {};
   const taskState = state?.taskReducer || {};
+
+  const language = resolveWidgetLanguage(options?.language || themeState.language || themeState.appLanguage);
+  const tw = (key) => translateWidgetMeta(key, language);
 
   const themeMode = themeState.themeMode || 'dark';
   const accentHex = themeState.sourceColor || '#6C5CE7';
@@ -105,7 +344,8 @@ export function buildWidgetSnapshotFromState(state = {}) {
 
   const activeBoardId = String(userState.activeBoardId || 'main');
   const activeBoardObj = boardMap.get(activeBoardId);
-  const activeBoardName = activeBoardObj?.name || 'All Tasks';
+  const rawActiveName = activeBoardObj?.name || tw('All Tasks');
+  const activeBoardName = rawActiveName === 'Main' ? tw('Main') : rawActiveName;
 
   const rawTasks = Array.isArray(taskState.tasks) ? taskState.tasks : [];
   let bestHabitStreak = 0;
@@ -114,6 +354,7 @@ export function buildWidgetSnapshotFromState(state = {}) {
   let overdueCount = 0;
 
   const widgetTasks = [];
+  const dayShort = tw('dayShort');
 
   for (const t of rawTasks) {
     if (!t) continue;
@@ -122,7 +363,8 @@ export function buildWidgetSnapshotFromState(state = {}) {
 
     const rawBoardId = String(t.boardId || t.board_id || 'main');
     const boardObj = boardMap.get(rawBoardId);
-    const boardName = boardObj?.name || (rawBoardId === 'main' || rawBoardId === 'tasks' ? 'Tasks' : rawBoardId);
+    const rawBoardName = boardObj?.name || (rawBoardId === 'main' || rawBoardId === 'tasks' ? tw('Tasks') : rawBoardId);
+    const boardName = rawBoardName === 'Main' ? tw('Main') : rawBoardName;
     const boardType = String(boardObj?.type || t.boardType || 'standard').toLowerCase();
     const boardColor = boardObj?.color || accentHex;
 
@@ -145,7 +387,7 @@ export function buildWidgetSnapshotFromState(state = {}) {
       overdueCount++;
     }
 
-    const baseTitle = String(t.taskname || t.title || t.name || 'Untitled Task').trim();
+    const baseTitle = String(t.taskname || t.title || t.name || tw('Untitled Task')).trim();
     const qty = Math.max(1, Number(t.itemQuantity) || 1);
     const unitPrice =
       t.itemPrice !== undefined && t.itemPrice !== null && t.itemPrice !== ''
@@ -187,7 +429,7 @@ export function buildWidgetSnapshotFromState(state = {}) {
       }
       const metaParts = [];
       if (qty > 1 && unitPrice > 0) {
-        metaParts.push(`${currencySymbol}${unitPrice.toFixed(2)} ea`);
+        metaParts.push(`${currencySymbol}${unitPrice.toFixed(2)} ${tw('ea')}`);
       }
       if (t.itemCategory) metaParts.push(String(t.itemCategory));
       metaParts.push(boardName);
@@ -197,43 +439,43 @@ export function buildWidgetSnapshotFromState(state = {}) {
         badgeText = `${currencySymbol}${priceTotal.toFixed(2)}`;
       }
       const metaParts = [];
-      if (dateKey < todayKey && !completed) metaParts.push('Overdue');
-      else if (dateKey === todayKey) metaParts.push('Due Today');
+      if (dateKey < todayKey && !completed) metaParts.push(tw('Overdue'));
+      else if (dateKey === todayKey) metaParts.push(tw('Due Today'));
       else metaParts.push(dateKey);
-      if (isRecurring) metaParts.push('↻ Recurring');
+      if (isRecurring) metaParts.push(`↻ ${tw('Recurring')}`);
       metaParts.push(boardName);
       metaText = metaParts.join(' • ');
     } else if (boardType === 'habits') {
       if (streakDays > 0) {
-        badgeText = `🔥 ${streakDays}d`;
+        badgeText = `🔥 ${streakDays}${dayShort}`;
       }
-      const tod = inferHabitTimeOfDay(t);
+      const tod = tw(inferHabitTimeOfDay(t));
       const metaParts = [tod];
       if (timeLabel) metaParts.push(timeLabel);
       metaParts.push(boardName);
       metaText = metaParts.join(' • ');
     } else if (boardType === 'packing') {
       badgeText = t.itemCategory ? String(t.itemCategory) : (qty > 1 ? `×${qty}` : '');
-      metaText = [qty > 1 ? `Qty ${qty}` : null, boardName].filter(Boolean).join(' • ');
+      metaText = [qty > 1 ? `${tw('Qty')} ${qty}` : null, boardName].filter(Boolean).join(' • ');
     } else if (boardType === 'media') {
       const rating = Number(t.itemRating) || 0;
       badgeText = rating > 0 ? `★ ${rating}/5` : (t.itemCategory || '');
-      metaText = [t.itemCategory || 'Media', t.itemProgress || null, boardName].filter(Boolean).join(' • ');
+      metaText = [t.itemCategory || tw('Media'), t.itemProgress || null, boardName].filter(Boolean).join(' • ');
     } else {
       // Standard / Calendar task
       if (timeLabel) {
         badgeText = timeLabel;
       } else if (priority === 'high' || priority === 'urgent') {
-        badgeText = 'HIGH';
+        badgeText = tw('HIGH');
       } else if (subtaskSummary) {
         badgeText = subtaskSummary;
       }
       const metaParts = [];
-      if (dateKey < todayKey && !completed) metaParts.push('Overdue');
+      if (dateKey < todayKey && !completed) metaParts.push(tw('Overdue'));
       if (timeLabel) metaParts.push(timeLabel);
-      if (isAlarm) metaParts.push('⏰ Alarm');
+      if (isAlarm) metaParts.push(`⏰ ${tw('Alarm')}`);
       if (isRecurring) metaParts.push('↻');
-      if (subtaskSummary) metaParts.push(`${subtaskSummary} subtasks`);
+      if (subtaskSummary) metaParts.push(`${subtaskSummary} ${tw('subtasks')}`);
       metaParts.push(boardName);
       metaText = metaParts.join(' • ');
     }
@@ -262,6 +504,7 @@ export function buildWidgetSnapshotFromState(state = {}) {
 
   return {
     todayKey,
+    language,
     themeMode,
     accentHex,
     weekStartDay,
@@ -279,6 +522,11 @@ export function syncWidgetsWithStore(state, force = false) {
   if (Platform.OS !== 'android') return false;
   try {
     const snapshot = buildWidgetSnapshotFromState(state);
+    if (typeof setSavedAppLanguage === 'function' && snapshot.language) {
+      try {
+        setSavedAppLanguage(snapshot.language);
+      } catch (e) {}
+    }
     const json = JSON.stringify(snapshot);
     if (!force && json === lastSyncedWidgetJson) {
       return false;

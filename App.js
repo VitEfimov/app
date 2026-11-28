@@ -26,14 +26,14 @@ import AutomaticCleanupModal from './src/components/AutomaticCleanupModal';
 import { useShareIntent } from 'expo-share-intent';
 import { addTask, updateTask, addMultipleTasks } from './src/features/taskSlice';
 import * as Notifications from 'expo-notifications';
-import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId, attachNotificationDiagnostics, deduplicatePresentedNotificationsAsync } from './src/utils/notifications';
+import { scheduleTaskReminder, scheduleExactTaskReminder, cancelNotification, getChannelId, attachNotificationDiagnostics, deduplicatePresentedNotificationsAsync, configureNotificationCategoriesAsync, configureAndroidNotificationChannels, rescheduleAllActiveTasks, updateRecurringAutomations, tNotif } from './src/utils/notifications';
 import { syncWidgetsWithStore, consumePendingWidgetActionsAsync, consumePendingWidgetLaunchAction, addWidgetActionListener } from './src/utils/widgetSync';
 import dayjs from 'dayjs';
 import { navigationRef } from './src/navigation/AppNavigator';
 import PinLockScreen from './src/screens/PinLockScreen';
 import { SecurityLockHelper } from './src/utils/securityLockHelper';
 import { CryptoStorage } from './src/utils/cryptoStorage';
-import { setScreenSecurityAsync } from './modules/expo-task-alarm';
+import { setScreenSecurityAsync, setSavedAppLanguage } from './modules/expo-task-alarm';
 import { CrashLogger } from './src/utils/crashLogger';
 import { DevLogger } from './src/utils/logger';
 import { A11yHelper } from './src/utils/a11yHelper';
@@ -403,6 +403,47 @@ function InitApp() {
     };
   }, [isHydrated, dispatch]);
 
+  // Dynamic language switch synchronization for Home Screen Widgets, Notification Categories, Channels, Automations & Alarms
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const handleLanguageChanged = (newLang) => {
+      if (Platform.OS === 'android') {
+        try {
+          setSavedAppLanguage(newLang);
+        } catch (e) {}
+        syncWidgetsWithStore(store.getState(), true);
+      }
+      if (Platform.OS !== 'web') {
+        configureNotificationCategoriesAsync(newLang).catch(() => {});
+        const latestState = store.getState();
+        const th = latestState.themeReducer || {};
+        configureAndroidNotificationChannels(
+          th.notificationSound || 'default',
+          th.alarmSound || 'default',
+          th.vibrationEnabled !== false
+        ).catch(() => {});
+        updateRecurringAutomations(
+          th,
+          latestState.taskReducer?.tasks || [],
+          true,
+          { force: true, language: newLang }
+        ).catch(() => {});
+        rescheduleAllActiveTasks(
+          latestState.taskReducer?.tasks || [],
+          th,
+          dispatch,
+          updateTask
+        ).catch(() => {});
+      }
+    };
+
+    i18n.on('languageChanged', handleLanguageChanged);
+    return () => {
+      i18n.off('languageChanged', handleLanguageChanged);
+    };
+  }, [isHydrated, dispatch]);
+
   useEffect(() => {
     const loadStorage = async () => {
       const startTime = Date.now();
@@ -496,9 +537,12 @@ function InitApp() {
         const pomodoroJson = storageMap.pomodoro;
         if (pomodoroJson) dispatch(hydratePomodoroState(JSON.parse(pomodoroJson)));
 
-        const appLanguage = storageMap.appLanguage;
+        const appLanguage = storageMap.appLanguage || await AsyncStorage.getItem('appLanguage');
         if (appLanguage) {
-          i18n.changeLanguage(appLanguage);
+          try { setSavedAppLanguage(appLanguage); } catch (e) {}
+          await i18n.changeLanguage(appLanguage);
+        } else if (i18n.language) {
+          try { setSavedAppLanguage(i18n.language); } catch (e) {}
         }
 
         const statsJson = storageMap.stats;
@@ -896,8 +940,8 @@ function InitApp() {
           try {
             await Notifications.scheduleNotificationAsync({
               content: {
-                title: 'Task Snoozed',
-                body: `Snoozed '${taskName}' for ${snoozeMins} minute(s)`,
+                title: tNotif('Task Snoozed'),
+                body: tNotif("Snoozed '{{taskName}}' for {{count}} minute(s)", { taskName, count: snoozeMins }),
                 priority: Notifications.AndroidNotificationPriority.MAX,
               },
               trigger: null,

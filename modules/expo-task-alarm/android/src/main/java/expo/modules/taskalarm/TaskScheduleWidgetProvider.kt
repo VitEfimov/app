@@ -62,41 +62,44 @@ class TaskScheduleWidgetProvider : AppWidgetProvider() {
             )
 
             // Header typography & summary
-            val dayHeader = TaskWidgetDataStore.formatShortHeaderDate(snapshot.todayKey)
+            val lang = snapshot.language
+            val dayHeader = TaskWidgetDataStore.formatShortHeaderDate(snapshot.todayKey, lang)
             views.setTextViewText(R.id.widget_schedule_day_label, dayHeader)
             views.setTextColor(R.id.widget_schedule_day_label, palette.accentColor)
 
             val headerTitle = when (filter) {
-                "TODAY" -> "Today's Focus"
-                "LISTS" -> "Specialized Lists"
-                "HABITS" -> "Daily Habits"
-                else -> "Schedule & Tasks"
+                "TODAY" -> TaskTranslations.t(context, "todays_focus", lang)
+                "LISTS" -> TaskTranslations.t(context, "specialized_lists", lang)
+                "HABITS" -> TaskTranslations.t(context, "daily_habits", lang)
+                else -> TaskTranslations.t(context, "schedule_and_tasks", lang)
             }
             views.setTextViewText(R.id.widget_schedule_title, headerTitle)
             views.setTextColor(R.id.widget_schedule_title, palette.textPrimary)
 
             val summaryParts = ArrayList<String>()
-            summaryParts.add("${snapshot.dueTodayCount} due today")
+            summaryParts.add("${snapshot.dueTodayCount} ${TaskTranslations.t(context, "due_today", lang)}")
             if (snapshot.overdueCount > 0) {
-                summaryParts.add("${snapshot.overdueCount} overdue")
+                summaryParts.add("${snapshot.overdueCount} ${TaskTranslations.t(context, "overdue", lang)}")
             } else if (snapshot.completedTodayCount > 0) {
-                summaryParts.add("${snapshot.completedTodayCount} done")
+                summaryParts.add("${snapshot.completedTodayCount} ${TaskTranslations.t(context, "done", lang)}")
             }
             if (snapshot.bestHabitStreak > 0) {
-                summaryParts.add("🔥 ${snapshot.bestHabitStreak}d")
+                summaryParts.add("🔥 ${snapshot.bestHabitStreak}${TaskTranslations.t(context, "day_short", lang)}")
             }
             views.setTextViewText(R.id.widget_schedule_subtitle, summaryParts.joinToString(" • "))
             views.setTextColor(R.id.widget_schedule_subtitle, palette.textSecondary)
 
             val filterDisplay = when (filter) {
-                "TODAY" -> "Today ▾"
-                "LISTS" -> "Lists ▾"
-                "HABITS" -> "Habits ▾"
-                else -> "All ▾"
+                "TODAY" -> TaskTranslations.t(context, "filter_today", lang)
+                "LISTS" -> TaskTranslations.t(context, "filter_lists", lang)
+                "HABITS" -> TaskTranslations.t(context, "filter_habits", lang)
+                else -> TaskTranslations.t(context, "filter_all", lang)
             }
             views.setTextViewText(R.id.widget_schedule_filter_text, filterDisplay)
             views.setTextColor(R.id.widget_schedule_filter_text, palette.textPrimary)
 
+            views.setTextViewText(R.id.widget_schedule_empty_title, TaskTranslations.t(context, "all_caught_up", lang))
+            views.setTextViewText(R.id.widget_schedule_empty_subtitle, TaskTranslations.t(context, "empty_schedule_sub", lang))
             views.setTextColor(R.id.widget_schedule_empty_title, palette.textPrimary)
             views.setTextColor(R.id.widget_schedule_empty_subtitle, palette.textMuted)
 

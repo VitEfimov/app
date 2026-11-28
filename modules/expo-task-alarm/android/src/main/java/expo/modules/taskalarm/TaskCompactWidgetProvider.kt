@@ -48,8 +48,10 @@ class TaskCompactWidgetProvider : AppWidgetProvider() {
             views.setInt(R.id.widget_compact_date_bg, "setColorFilter", palette.accentColor)
             views.setInt(R.id.widget_compact_add_bg, "setColorFilter", palette.accentColor)
 
+            val lang = snapshot.language
+            val locale = TaskTranslations.getLocale(lang)
             val now = Date()
-            val dowStr = SimpleDateFormat("EEE", Locale.US).format(now).uppercase(Locale.US)
+            val dowStr = SimpleDateFormat("EEE", locale).format(now).uppercase(locale)
             val dayNumStr = SimpleDateFormat("d", Locale.US).format(now)
             views.setTextViewText(R.id.widget_compact_dow, dowStr)
             views.setTextViewText(R.id.widget_compact_day_num, dayNumStr)
@@ -70,12 +72,24 @@ class TaskCompactWidgetProvider : AppWidgetProvider() {
                 .firstOrNull()
 
             val totalToday = snapshot.dueTodayCount + snapshot.completedTodayCount
-            val progressTag = if (totalToday > 0) "${snapshot.completedTodayCount}/$totalToday DONE" else "0 DUE"
-            val streakTag = if (snapshot.bestHabitStreak > 0) " • 🔥 ${snapshot.bestHabitStreak}d" else ""
+            val progressTag = if (totalToday > 0) {
+                "${snapshot.completedTodayCount}/$totalToday ${TaskTranslations.t(context, "done_upper", lang)}"
+            } else {
+                "0 ${TaskTranslations.t(context, "due_upper", lang)}"
+            }
+            val streakTag = if (snapshot.bestHabitStreak > 0) {
+                " • 🔥 ${snapshot.bestHabitStreak}${TaskTranslations.t(context, "day_short", lang)}"
+            } else {
+                ""
+            }
 
             if (nextTask != null) {
                 val isOverdue = nextTask.dateKey.isNotEmpty() && nextTask.dateKey < todayKey
-                val statusPrefix = if (isOverdue) "OVERDUE" else "UP NEXT"
+                val statusPrefix = if (isOverdue) {
+                    TaskTranslations.t(context, "overdue_upper", lang)
+                } else {
+                    TaskTranslations.t(context, "up_next_upper", lang)
+                }
                 views.setTextViewText(R.id.widget_compact_status_text, "$statusPrefix • $progressTag$streakTag")
                 views.setTextColor(
                     R.id.widget_compact_status_text,
@@ -124,11 +138,14 @@ class TaskCompactWidgetProvider : AppWidgetProvider() {
                     PendingIntent.getBroadcast(context, 7502, openTaskIntent, immutableFlags())
                 )
             } else {
-                views.setTextViewText(R.id.widget_compact_status_text, "ALL CAUGHT UP • $progressTag$streakTag")
+                views.setTextViewText(
+                    R.id.widget_compact_status_text,
+                    "${TaskTranslations.t(context, "all_caught_up_upper", lang)} • $progressTag$streakTag"
+                )
                 views.setTextColor(R.id.widget_compact_status_text, palette.successColor)
-                views.setTextViewText(R.id.widget_compact_task_title, "All caught up for today!")
+                views.setTextViewText(R.id.widget_compact_task_title, TaskTranslations.t(context, "all_caught_up_today", lang))
                 views.setTextColor(R.id.widget_compact_task_title, palette.textPrimary)
-                views.setTextViewText(R.id.widget_compact_task_meta, "Tap + to schedule a new task")
+                views.setTextViewText(R.id.widget_compact_task_meta, TaskTranslations.t(context, "tap_plus_schedule", lang))
                 views.setTextColor(R.id.widget_compact_task_meta, palette.textSecondary)
                 views.setViewVisibility(R.id.widget_compact_check_btn, View.GONE)
 

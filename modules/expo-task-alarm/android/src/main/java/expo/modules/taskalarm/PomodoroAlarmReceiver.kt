@@ -9,8 +9,9 @@ import androidx.core.app.NotificationManagerCompat
 
 class PomodoroAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val title = intent.getStringExtra("title") ?: "Pomodoro"
-        val body = intent.getStringExtra("body") ?: "Session Complete"
+        val lang = TaskTranslations.getSavedLanguage(context)
+        val title = intent.getStringExtra("title") ?: TaskTranslations.t(context, "pomodoro", lang)
+        val body = intent.getStringExtra("body") ?: TaskTranslations.t(context, "session_complete", lang)
         val channelId = intent.getStringExtra("channelId") ?: "task_default_system_sound_v16"
         val requestCode = intent.getIntExtra("requestCode", 0)
 

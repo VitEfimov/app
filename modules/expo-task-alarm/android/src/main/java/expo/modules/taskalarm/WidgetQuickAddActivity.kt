@@ -62,25 +62,33 @@ class WidgetQuickAddActivity : Activity() {
 
         val snapshot = TaskWidgetDataStore.loadSnapshot(this)
         val palette = TaskWidgetDataStore.resolvePalette(this, snapshot)
+        val lang = snapshot.language
 
         val incomingDate = intent?.getStringExtra(TaskWidgetActionReceiver.EXTRA_DATE_KEY)
         if (!incomingDate.isNullOrBlank() && incomingDate.matches(Regex("""^\d{4}-\d{2}-\d{2}$"""))) {
             selectedDateKey = incomingDate
         }
 
+        val mainLabel = TaskTranslations.t(this, "board_main", lang)
+        selectedBoardName = mainLabel
+
         // Discover available boards from current snapshot + standard defaults
         val boardOptions = LinkedHashMap<String, Triple<String, String, String>>()
-        boardOptions["main"] = Triple("main", "Main", "standard")
+        boardOptions["main"] = Triple("main", mainLabel, "standard")
         for (t in snapshot.tasks) {
             if (t.boardId.isNotBlank() && !boardOptions.containsKey(t.boardId)) {
-                boardOptions[t.boardId] = Triple(t.boardId, t.boardName.ifBlank { "Tasks" }, t.boardType.ifBlank { "standard" })
+                boardOptions[t.boardId] = Triple(
+                    t.boardId,
+                    t.boardName.ifBlank { TaskTranslations.t(this, "tasks_default", lang) },
+                    t.boardType.ifBlank { "standard" }
+                )
             }
         }
         if (!boardOptions.values.any { it.third == "grocery" }) {
-            boardOptions["grocery_default"] = Triple("main", "Groceries", "grocery")
+            boardOptions["grocery_default"] = Triple("main", TaskTranslations.t(this, "board_groceries", lang), "grocery")
         }
         if (!boardOptions.values.any { it.third == "habits" }) {
-            boardOptions["habits_default"] = Triple("main", "Habits", "habits")
+            boardOptions["habits_default"] = Triple("main", TaskTranslations.t(this, "board_habits", lang), "habits")
         }
 
         val rootCard = LinearLayout(this).apply {
@@ -100,7 +108,7 @@ class WidgetQuickAddActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val headerTitle = TextView(this).apply {
-            text = "Quick Add to TaskCalendar"
+            text = TaskTranslations.t(this@WidgetQuickAddActivity, "quick_add_header", lang)
             setTextColor(palette.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -120,7 +128,7 @@ class WidgetQuickAddActivity : Activity() {
 
         // 2. Task Title Input
         val inputBox = EditText(this).apply {
-            hint = "Task name (or 'Milk ×2 $4.50')..."
+            hint = TaskTranslations.t(this@WidgetQuickAddActivity, "quick_add_hint", lang)
             setHintTextColor(palette.textMuted)
             setTextColor(palette.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
@@ -156,7 +164,7 @@ class WidgetQuickAddActivity : Activity() {
         }
 
         val dateChip = TextView(this).apply {
-            text = "📅 ${TaskWidgetDataStore.formatShortHeaderDate(selectedDateKey)}"
+            text = "📅 ${TaskWidgetDataStore.formatShortHeaderDate(selectedDateKey, lang)}"
             setTextColor(palette.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -172,7 +180,7 @@ class WidgetQuickAddActivity : Activity() {
                     this@WidgetQuickAddActivity,
                     { _, y, m, d ->
                         selectedDateKey = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)
-                        text = "📅 ${TaskWidgetDataStore.formatShortHeaderDate(selectedDateKey)}"
+                        text = "📅 ${TaskWidgetDataStore.formatShortHeaderDate(selectedDateKey, lang)}"
                     },
                     cal.get(Calendar.YEAR),
                     cal.get(Calendar.MONTH),
@@ -182,7 +190,7 @@ class WidgetQuickAddActivity : Activity() {
         }
 
         val timeChip = TextView(this).apply {
-            text = "🕒 + Time"
+            text = "🕒 ${TaskTranslations.t(this@WidgetQuickAddActivity, "add_time_chip", lang)}"
             setTextColor(palette.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -230,10 +238,10 @@ class WidgetQuickAddActivity : Activity() {
         }
 
         val priorities = listOf(
-            Triple("none", "Normal", palette.accentColor),
-            Triple("low", "Low", palette.infoColor),
-            Triple("medium", "Medium", palette.warningColor),
-            Triple("high", "High", palette.dangerColor)
+            Triple("none", TaskTranslations.t(this, "priority_normal", lang), palette.accentColor),
+            Triple("low", TaskTranslations.t(this, "priority_low", lang), palette.infoColor),
+            Triple("medium", TaskTranslations.t(this, "priority_medium", lang), palette.warningColor),
+            Triple("high", TaskTranslations.t(this, "priority_high", lang), palette.dangerColor)
         )
         val priorityViews = ArrayList<Pair<String, TextView>>()
 
@@ -345,7 +353,7 @@ class WidgetQuickAddActivity : Activity() {
         }
 
         val cancelBtn = TextView(this).apply {
-            text = "Cancel"
+            text = TaskTranslations.t(this@WidgetQuickAddActivity, "cancel", lang)
             setTextColor(palette.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -356,7 +364,7 @@ class WidgetQuickAddActivity : Activity() {
         fun commitQuickAdd() {
             val rawTitle = inputBox.text?.toString()?.trim() ?: ""
             if (rawTitle.isEmpty()) {
-                inputBox.error = "Enter a task name"
+                inputBox.error = TaskTranslations.t(this@WidgetQuickAddActivity, "enter_task_name_error", lang)
                 return
             }
             TaskWidgetDataStore.addTaskFromWidget(
@@ -374,7 +382,7 @@ class WidgetQuickAddActivity : Activity() {
         }
 
         val saveBtn = TextView(this).apply {
-            text = "+ Add Task"
+            text = TaskTranslations.t(this@WidgetQuickAddActivity, "add_task_btn", lang)
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)

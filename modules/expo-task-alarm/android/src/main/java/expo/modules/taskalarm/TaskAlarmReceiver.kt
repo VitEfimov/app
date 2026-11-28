@@ -16,7 +16,8 @@ import androidx.core.app.NotificationManagerCompat
 
 class TaskAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val taskName = intent.getStringExtra("taskName") ?: "Task Alarm"
+        val lang = TaskTranslations.getSavedLanguage(context)
+        val taskName = intent.getStringExtra("taskName") ?: TaskTranslations.t(context, "task_alarm", lang)
         val channelId = intent.getStringExtra("channelId") ?: "task_alarm_channel"
         val requestCode = intent.getIntExtra("requestCode", 0)
         val taskId = intent.getStringExtra("taskId") ?: ""
@@ -103,10 +104,10 @@ class TaskAlarmReceiver : BroadcastReceiver() {
                     .build()
                 val fallbackChannel = NotificationChannel(
                     activeChannelId,
-                    if (isCar) "Car / Driving notifications" else "Task alarms",
+                    if (isCar) TaskTranslations.t(context, "channel_car_silent", lang) else TaskTranslations.t(context, "channel_task_alarms", lang),
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = if (isCar) "Silent notifications when connected to Car" else "Urgent task alarms with sound and vibration"
+                    description = if (isCar) TaskTranslations.t(context, "channel_car_silent_desc", lang) else TaskTranslations.t(context, "channel_task_alarms_desc", lang)
                     if (isCar) {
                         setSound(null, null)
                         enableVibration(false)
@@ -126,7 +127,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
 
         val notificationBuilder = NotificationCompat.Builder(context, activeChannelId)
             .setSmallIcon(iconResId)
-            .setContentTitle("Task Alarm")
+            .setContentTitle(TaskTranslations.t(context, "task_alarm", lang))
             .setContentText(taskName)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -135,8 +136,8 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             .setOngoing(true)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .addAction(0, "Snooze", snoozePendingIntent)
-            .addAction(0, "Stop", stopPendingIntent)
+            .addAction(0, TaskTranslations.t(context, "snooze", lang), snoozePendingIntent)
+            .addAction(0, TaskTranslations.t(context, "stop", lang), stopPendingIntent)
 
         if (isCar) {
             notificationBuilder.setSound(null)
@@ -165,7 +166,7 @@ class TaskAlarmReceiver : BroadcastReceiver() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-                val beforeSuffixRegex = Regex("""\s*\(\d+\s*(?:min|minute|mins|minutes|hr|hour|hrs|hours|day|days)\s*before\)\s*$""", RegexOption.IGNORE_CASE)
+                val beforeSuffixRegex = TaskTranslations.BEFORE_SUFFIX_REGEX
                 if (nm != null) {
                     for (sbn in nm.activeNotifications) {
                         val activeTag = sbn.tag ?: ""

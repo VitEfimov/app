@@ -14,16 +14,17 @@ class AlarmActionReceiver : BroadcastReceiver() {
 
     companion object {
         fun postSilentPersistentReminder(context: Context, notificationId: Int, taskName: String, taskId: String) {
+            val lang = TaskTranslations.getSavedLanguage(context)
             val channelId = "task_persistent_silent_channel"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
                 if (nm != null && nm.getNotificationChannel(channelId) == null) {
                     val channel = android.app.NotificationChannel(
                         channelId,
-                        "Persistent Reminders",
+                        TaskTranslations.t(context, "channel_persistent", lang),
                         android.app.NotificationManager.IMPORTANCE_LOW
                     ).apply {
-                        description = "Silent all-day reminders for tasks"
+                        description = TaskTranslations.t(context, "channel_persistent_desc", lang)
                         setSound(null, null)
                         enableVibration(false)
                     }
@@ -68,7 +69,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
 
             val notification = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(iconResId)
-                .setContentTitle("Task Reminder")
+                .setContentTitle(TaskTranslations.t(context, "task_reminder", lang))
                 .setContentText(taskName)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -77,7 +78,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
                 .setAutoCancel(false)
                 .setSound(null)
                 .setVibrate(null)
-                .addAction(0, "Dismiss", dismissPendingIntent)
+                .addAction(0, TaskTranslations.t(context, "dismiss", lang), dismissPendingIntent)
                 .build()
 
             try {

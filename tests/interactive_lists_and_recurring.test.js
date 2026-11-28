@@ -774,14 +774,14 @@ describe('Localization Parity Across All 10 Supported Languages', () => {
     }
 
     const enCount = Object.keys(loaded['en']).length;
-    assert.strictEqual(enCount, 923, `English locale must contain 923 keys, got ${enCount}`);
+    assert.strictEqual(enCount, 991, `English locale must contain 991 keys, got ${enCount}`);
 
     for (const lang of languages) {
       const count = Object.keys(loaded[lang]).length;
       assert.strictEqual(
         count,
-        923,
-        `Language ${lang} has ${count} keys, expected 923 (matching EN)`
+        991,
+        `Language ${lang} has ${count} keys, expected 991 (matching EN)`
       );
     }
   });
@@ -840,7 +840,7 @@ describe('Task Alarm Single Sound Integrity & Rescheduling Engine', () => {
     assert.match(ktContent, /deleteNotificationChannel\(ch\.id\)/, 'Must purge legacy silent _fs_v / _popup_v channels');
     assert.match(ktContent, /AudioAttributes\.USAGE_ALARM/, 'Alarm channel must use USAGE_ALARM audio attributes');
     assert.match(ktContent, /setSound\(soundUri,\s*audioAttributes\)/, 'Alarm channel must configure soundUri with audioAttributes');
-    assert.match(ktContent, /NotificationChannel\(resolvedChannelId,\s*"Task alarms",\s*NotificationManager\.IMPORTANCE_HIGH\)/, 'Alarm channel must be IMPORTANCE_HIGH');
+    assert.match(ktContent, /NotificationChannel\(\s*resolvedChannelId,\s*(?:"Task alarms"|TaskTranslations\.t\(context,\s*"channel_task_alarms"\)),\s*NotificationManager\.IMPORTANCE_HIGH\s*\)/, 'Alarm channel must be IMPORTANCE_HIGH');
   });
 
   test('receiverIntent and TaskAlarmReceiver configure single-stream audio with AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK over Amazon Music and YouTube', () => {
@@ -3490,6 +3490,67 @@ describe('Modern Performance Architecture: MMKV JSI & Fast Storage Engine', () =
       assert.strictEqual(groceryWidgetItem.badgeText, '$6.00', 'Widget grocery item badge must display computed total price');
       const habitWidgetItem = snapshot.tasks.find((item) => item.id === 't3');
       assert.match(habitWidgetItem.badgeText, /🔥\s*1d/, 'Widget habit item badge must display current streak');
+
+      // 18. Multi-language Translations on Widgets, Notifications, and Alarms (all 10 languages: en, ru, es, zh, ja, fr, de, it, hi, ko)
+      const ruSnapshot = widgetSyncMod.buildWidgetSnapshotFromState(
+        {
+          themeReducer: { themeMode: 'dark', sourceColor: '#6C5CE7', currency: 'USD', timeFormat: '24h', weekStartDay: 1 },
+          userReducer: {
+            activeBoardId: 'main',
+            boards: [
+              { id: 'main', name: 'Main', type: 'standard' },
+              { id: 'g1', name: 'Покупки', type: 'grocery' },
+              { id: 'h1', name: 'Привычки', type: 'habits' },
+            ],
+          },
+          taskReducer: {
+            tasks: [
+              { id: 't1', boardId: 'main', taskname: 'Позвонить врачу', completionDate: todayStr, priority: 'high', isAlarm: true, completed: false, subtasks: [{ completed: true }, { completed: false }] },
+              { id: 't2', boardId: 'g1', taskname: 'Молоко', completionDate: todayStr, itemQuantity: 2, itemPrice: 2.5, completed: false },
+              { id: 't3', boardId: 'h1', taskname: 'Зарядка', completionDate: todayStr, time: '07:00', habitCompletedDates: [todayStr], completed: true },
+            ],
+          },
+        },
+        { language: 'ru' }
+      );
+      assert.strictEqual(ruSnapshot.language, 'ru', 'Russian widget snapshot must set language="ru"');
+      assert.strictEqual(ruSnapshot.activeBoardName, 'Главная', 'Main board name must translate to Главная in Russian widget snapshot');
+      const ruStdItem = ruSnapshot.tasks.find((item) => item.id === 't1');
+      assert.strictEqual(ruStdItem.badgeText, 'ВЫСОКИЙ', 'High priority badge must translate to ВЫСОКИЙ in Russian');
+      assert.ok(ruStdItem.metaText.includes('⏰ Будильник'), 'Alarm tag must translate to ⏰ Будильник in Russian');
+      assert.ok(ruStdItem.metaText.includes('1/2 подзадач'), 'Subtasks tag must translate to подзадач in Russian');
+      const ruGrocItem = ruSnapshot.tasks.find((item) => item.id === 't2');
+      assert.ok(ruGrocItem.metaText.includes('$2.50 шт'), 'Unit price suffix must translate to шт in Russian');
+      const ruHabitItem = ruSnapshot.tasks.find((item) => item.id === 't3');
+      assert.strictEqual(ruHabitItem.badgeText, '🔥 1дн', 'Habit streak badge must translate to дн in Russian');
+      assert.ok(ruHabitItem.metaText.includes('Утро'), 'Habit time-of-day must translate to Утро in Russian');
+
+      const translationsKt = fs.readFileSync(
+        path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/TaskTranslations.kt'),
+        'utf8'
+      );
+      for (const langCode of ['en', 'ru', 'es', 'zh', 'ja', 'fr', 'de', 'it', 'hi', 'ko']) {
+        assert.match(translationsKt, new RegExp(`"${langCode}"\\s*to\\s*`), `TaskTranslations.kt must define dictionary for ${langCode}`);
+      }
+      assert.match(translationsKt, /fun getWeekdayLabels/, 'TaskTranslations.kt must localize weekday header labels');
+
+      const alarmReceiverKt = fs.readFileSync(
+        path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/TaskAlarmReceiver.kt'),
+        'utf8'
+      );
+      assert.match(alarmReceiverKt, /TaskTranslations\.t\(context,\s*"task_alarm",\s*lang\)/, 'TaskAlarmReceiver.kt must localize alarm notification title');
+      assert.match(alarmReceiverKt, /TaskTranslations\.t\(context,\s*"snooze",\s*lang\)/, 'TaskAlarmReceiver.kt must localize Snooze action button');
+      assert.match(alarmReceiverKt, /TaskTranslations\.t\(context,\s*"stop",\s*lang\)/, 'TaskAlarmReceiver.kt must localize Stop action button');
+
+      const alarmActivityKt = fs.readFileSync(
+        path.resolve('modules/expo-task-alarm/android/src/main/java/expo/modules/taskalarm/AlarmActivity.kt'),
+        'utf8'
+      );
+      assert.match(alarmActivityKt, /TaskTranslations\.t\(this,\s*"stop",\s*lang\)/, 'AlarmActivity.kt must localize full-screen Stop button');
+      assert.match(alarmActivityKt, /TaskTranslations\.t\(this,\s*"snooze",\s*lang\)/, 'AlarmActivity.kt must localize full-screen Snooze button');
+
+      assert.match(notifSrc, /export function translateReminderOffsetLabel/, 'notifications.js must export translateReminderOffsetLabel');
+      assert.match(notifSrc, /export async function configureNotificationCategoriesAsync/, 'notifications.js must export configureNotificationCategoriesAsync');
     });
   });
 });

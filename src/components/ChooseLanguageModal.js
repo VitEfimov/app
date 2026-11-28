@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, useWind
 import Modal from 'react-native-modal';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CryptoStorage } from '../utils/cryptoStorage';
+import { setSavedAppLanguage } from '../../modules/expo-task-alarm';
 import { useTheme } from '../styles/ThemeContext';
 import Svg, { Path } from 'react-native-svg';
 
@@ -34,8 +36,16 @@ export default function ChooseLanguageModal({ isVisible, onClose }) {
   }, [isVisible, i18n.language]);
 
   const handleApply = async () => {
+    try {
+      setSavedAppLanguage(selectedLang);
+    } catch (e) {}
     await i18n.changeLanguage(selectedLang);
-    await AsyncStorage.setItem('appLanguage', selectedLang);
+    try {
+      await CryptoStorage.setItem('appLanguage', selectedLang);
+    } catch (e) {}
+    try {
+      await AsyncStorage.setItem('appLanguage', selectedLang);
+    } catch (e) {}
     onClose();
   };
 

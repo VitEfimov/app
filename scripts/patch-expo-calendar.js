@@ -569,9 +569,9 @@ const expoPresentationDelegatePatches = [
       val isTaskNotif = incomingId.startsWith("task_") || incomingTitle == "Task Reminder" || incomingTitle == "Task Alarm"
       if (!isTaskNotif) return
 
-      val beforeSuffixRegex = Regex("""\\s*\\(\\d+\\s*(?:min|minute|mins|minutes|hr|hour|hrs|hours|day|days)\\s*before\\)\\s*$""", RegexOption.IGNORE_CASE)
-      val prefixUrgentRegex = Regex("""^\\[(?:URGENT|OVERDUE)\\]\\s*""", RegexOption.IGNORE_CASE)
-      val dueNowSuffixRegex = Regex("""\\s+is due now$""", RegexOption.IGNORE_CASE)
+      val beforeSuffixRegex = Regex("""\\s*\\((?:\\d+\\s*(?:min|minute|mins|minutes|hr|hour|hrs|hours|h|std|stunde|stunden|ora|ore|мин|минут|минуты|час|часа|часов|дн|день|дня|дней|días|día|jours|jour|tag|tage|tagen|giorno|giorni|मिनट|घंटे|घंटा|दिन|분|시간|일|分|分間|時間|日|分钟|小时|天)\\s*(?:before|antes|avant|vorher|prima|до|पहले|전|前)|(?:за|提前)\\s*\\d+\\s*(?:мин|минут|минуты|ч|час|часа|часов|дн|день|дня|дней|分钟|小时|天))\\)\\s*$""", RegexOption.IGNORE_CASE)
+      val prefixUrgentRegex = Regex("""^\\[(?:URGENT|OVERDUE|СРОЧНО|ПРОСРОЧЕНО|URGENTE|VENCIDA|紧急|已逾期|緊急|期限切れ|EN RETARD|DRINGEND|ÜBERFÄLLIG|SCADUTA|अत्यावश्यक|अतिदेय|긴급|기한 지남)\\]\\s*""", RegexOption.IGNORE_CASE)
+      val dueNowSuffixRegex = Regex("""(?:\\s+is due now|\\s+vence ahora|\\s+arrive à échéance|\\s+ist jetzt fällig|\\s+è in scadenza ora|\\s+现已到期|\\s+の時間です|\\s+का समय हो गया है)$""", RegexOption.IGNORE_CASE)
 
       fun normalizeBaseText(text: String): String {
         return text

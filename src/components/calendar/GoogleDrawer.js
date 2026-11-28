@@ -286,18 +286,18 @@ export default function GoogleDrawer({
             {[
               {
                 id: 'schedule',
-                title: 'Schedule & Specialized Lists (4×3)',
-                desc: 'Google Calendar-style agenda with direct task check-off, filter tabs (All / Today / Lists / Habits), grocery totals & habit streaks.',
+                title: t('Schedule & Specialized Lists (4×3)') || 'Schedule & Specialized Lists (4×3)',
+                desc: t('Google Calendar-style agenda with direct task check-off, filter tabs (All / Today / Lists / Habits), grocery totals & habit streaks.') || 'Google Calendar-style agenda with direct task check-off, filter tabs (All / Today / Lists / Habits), grocery totals & habit streaks.',
               },
               {
                 id: 'month',
-                title: 'Month Grid & Day Preview (4×4)',
-                desc: 'Interactive monthly calendar with multi-color priority dots, day selection mini-agenda drawer, and month navigation.',
+                title: t('Month Grid & Day Preview (4×4)') || 'Month Grid & Day Preview (4×4)',
+                desc: t('Interactive monthly calendar with multi-color priority dots, day selection mini-agenda drawer, and month navigation.') || 'Interactive monthly calendar with multi-color priority dots, day selection mini-agenda drawer, and month navigation.',
               },
               {
                 id: 'compact',
-                title: 'Up Next & Focus Strip (4×1)',
-                desc: 'Compact Today date tile, next due task, one-tap complete button, daily completion counter & quick add.',
+                title: t('Up Next & Focus Strip (4×1)') || 'Up Next & Focus Strip (4×1)',
+                desc: t('Compact Today date tile, next due task, one-tap complete button, daily completion counter & quick add.') || 'Compact Today date tile, next due task, one-tap complete button, daily completion counter & quick add.',
               },
             ].map((w) => (
               <View
@@ -329,7 +329,7 @@ export default function GoogleDrawer({
                     }}
                   >
                     <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>
-                      + Pin to Home Screen
+                      {t('+ Pin to Home Screen') || '+ Pin to Home Screen'}
                     </Text>
                   </TouchableOpacity>
                 )}

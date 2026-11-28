@@ -16,6 +16,7 @@ import {
   schedulePomodoroAlarm,
   cancelPomodoroAlarm,
   scheduleLocalNotification,
+  tNotif,
 } from './notifications';
 
 export const SOUND_MAP = {
@@ -86,8 +87,8 @@ export const startPomodoroSession = async (dispatch, pomodoro) => {
   try {
     const channelId = await configurePomodoroChannel(soundKey, pomodoro.isBreak);
     if (channelId) {
-      const title = pomodoro.isBreak ? 'Break time is over!' : 'Work session complete!';
-      const body = pomodoro.isBreak ? 'Time to get back to work.' : 'Take a short break.';
+      const title = pomodoro.isBreak ? tNotif('Break time is over!') : tNotif('Work session complete!');
+      const body = pomodoro.isBreak ? tNotif('Time to get back to work.') : tNotif('Take a short break.');
       await schedulePomodoroAlarm('current', title, body, endTime, channelId);
     }
   } catch (err) {
@@ -137,8 +138,8 @@ export const handlePomodoroPeriodEnd = async (dispatch, pomodoro) => {
   } catch (e) {}
 
   // 3. Send notification & audio non-blockingly
-  const title = isBreak ? 'Break time is over!' : 'Work session complete!';
-  const body = isBreak ? 'Time to get back to work.' : 'Take a short break.';
+  const title = isBreak ? tNotif('Break time is over!') : tNotif('Work session complete!');
+  const body = isBreak ? tNotif('Time to get back to work.') : tNotif('Take a short break.');
 
   const soundKey = isBreak
     ? (pomodoro.breakSound || 'default')

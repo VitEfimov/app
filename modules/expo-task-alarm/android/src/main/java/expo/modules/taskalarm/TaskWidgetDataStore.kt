@@ -63,7 +63,8 @@ data class WidgetSnapshot(
     val dueTodayCount: Int,
     val completedTodayCount: Int,
     val overdueCount: Int,
-    val tasks: List<WidgetTaskItem>
+    val tasks: List<WidgetTaskItem>,
+    val language: String = "en"
 )
 
 sealed class WidgetListRow {
@@ -127,12 +128,13 @@ object TaskWidgetDataStore {
         return sdf.format(cal.time)
     }
 
-    fun formatShortHeaderDate(dateKey: String): String {
+    fun formatShortHeaderDate(dateKey: String, langCode: String = "en"): String {
         return try {
             val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US)
             val parsed = parser.parse(dateKey) ?: Date()
-            val fmt = SimpleDateFormat("EEE, MMM d", Locale.US)
-            fmt.format(parsed).uppercase(Locale.US)
+            val locale = TaskTranslations.getLocale(langCode)
+            val fmt = SimpleDateFormat("EEE, MMM d", locale)
+            fmt.format(parsed).uppercase(locale)
         } catch (_: Exception) {
             dateKey
         }
@@ -256,45 +258,49 @@ object TaskWidgetDataStore {
         val todayKey = getTodayDateKey()
         val themePrefs = context.getSharedPreferences("taskflow_theme", Context.MODE_PRIVATE)
         val fallbackThemeMode = themePrefs.getString("themeMode", "dark") ?: "dark"
+        val savedLang = TaskTranslations.getSavedLanguage(context)
 
         if (raw.isNullOrBlank()) {
+            val bMain = TaskTranslations.t(context, "board_main", savedLang)
+            val exMeta1 = TaskTranslations.t(context, "example_meta_1", savedLang)
+            val exMeta2 = TaskTranslations.t(context, "example_meta_2", savedLang)
             val exampleTasks = listOf(
                 WidgetTaskItem(
                     id = "widget_example_1",
-                    title = "Tap circle to complete task on widget",
+                    title = TaskTranslations.t(context, "example_task_1", savedLang),
                     dateKey = todayKey,
                     timeLabel = "09:00 AM",
                     sortTimeMinutes = 540,
                     completed = false,
                     priority = "high",
                     boardId = "main",
-                    boardName = "Main",
+                    boardName = bMain,
                     boardType = "standard",
                     isAlarm = false,
                     isRecurring = false,
                     subtaskSummary = "",
                     badgeText = "09:00 AM",
-                    metaText = "09:00 AM • Example Task • Main",
+                    metaText = "09:00 AM • $exMeta1 • $bMain",
                     priceTotal = 0.0,
                     streakDays = 0,
                     accentHex = "#6C5CE7"
                 ),
                 WidgetTaskItem(
                     id = "widget_example_2",
-                    title = "Tap + to add a task without opening app",
+                    title = TaskTranslations.t(context, "example_task_2", savedLang),
                     dateKey = todayKey,
                     timeLabel = "11:30 AM",
                     sortTimeMinutes = 690,
                     completed = false,
                     priority = "medium",
                     boardId = "main",
-                    boardName = "Main",
+                    boardName = bMain,
                     boardType = "standard",
                     isAlarm = false,
                     isRecurring = false,
                     subtaskSummary = "",
                     badgeText = "11:30 AM",
-                    metaText = "11:30 AM • Quick Add • Main",
+                    metaText = "11:30 AM • $exMeta2 • $bMain",
                     priceTotal = 0.0,
                     streakDays = 0,
                     accentHex = "#6C5CE7"
@@ -306,22 +312,25 @@ object TaskWidgetDataStore {
                 accentHex = "#6C5CE7",
                 weekStartDay = 0,
                 currencySymbol = "$",
-                activeBoardName = "All Tasks",
+                activeBoardName = TaskTranslations.t(context, "all_tasks", savedLang),
                 bestHabitStreak = 0,
                 dueTodayCount = 2,
                 completedTodayCount = 0,
                 overdueCount = 0,
-                tasks = exampleTasks
+                tasks = exampleTasks,
+                language = savedLang
             )
         }
 
         return try {
             val root = JSONObject(raw)
+            val lang = TaskTranslations.normalizeLangCode(root.optString("language", savedLang))
+            TaskTranslations.setSavedLanguage(context, lang)
             val themeMode = root.optString("themeMode", fallbackThemeMode)
             val accentHex = root.optString("accentHex", "#6C5CE7")
             val weekStartDay = root.optInt("weekStartDay", 0)
             val currencySymbol = root.optString("currencySymbol", "$")
-            val activeBoardName = root.optString("activeBoardName", "All Tasks")
+            val activeBoardName = root.optString("activeBoardName", TaskTranslations.t(context, "all_tasks", lang))
             val bestHabitStreak = root.optInt("bestHabitStreak", 0)
 
             val arr = root.optJSONArray("tasks") ?: JSONArray()
@@ -333,7 +342,7 @@ object TaskWidgetDataStore {
             for (i in 0 until arr.length()) {
                 val obj = arr.optJSONObject(i) ?: continue
                 val id = obj.optString("id", "").takeIf { it.isNotEmpty() } ?: continue
-                val title = obj.optString("title", "Untitled Task")
+                val title = obj.optString("title", TaskTranslations.t(context, "untitled_task", lang))
                 val dateKey = obj.optString("dateKey", todayKey)
                 val completed = obj.optBoolean("completed", false)
                 val boardType = obj.optString("boardType", "standard")
@@ -354,7 +363,7 @@ object TaskWidgetDataStore {
                         completed = completed,
                         priority = obj.optString("priority", "none"),
                         boardId = obj.optString("boardId", "main"),
-                        boardName = obj.optString("boardName", "Tasks"),
+                        boardName = obj.optString("boardName", TaskTranslations.t(context, "tasks_default", lang)),
                         boardType = boardType,
                         isAlarm = obj.optBoolean("isAlarm", false),
                         isRecurring = obj.optBoolean("isRecurring", false),
@@ -379,7 +388,8 @@ object TaskWidgetDataStore {
                 dueTodayCount = dueToday,
                 completedTodayCount = completedToday,
                 overdueCount = overdue,
-                tasks = items
+                tasks = items,
+                language = lang
             )
         } catch (_: Exception) {
             WidgetSnapshot(
@@ -388,12 +398,13 @@ object TaskWidgetDataStore {
                 accentHex = "#6C5CE7",
                 weekStartDay = 0,
                 currencySymbol = "$",
-                activeBoardName = "All Tasks",
+                activeBoardName = TaskTranslations.t(context, "all_tasks", savedLang),
                 bestHabitStreak = 0,
                 dueTodayCount = 0,
                 completedTodayCount = 0,
                 overdueCount = 0,
-                tasks = emptyList()
+                tasks = emptyList(),
+                language = savedLang
             )
         }
     }
@@ -419,6 +430,8 @@ object TaskWidgetDataStore {
 
     fun buildScheduleRows(context: Context, snapshot: WidgetSnapshot, palette: WidgetThemePalette): List<WidgetListRow> {
         val filter = getScheduleFilter(context)
+        val lang = snapshot.language
+        val locale = TaskTranslations.getLocale(lang)
         val todayKey = snapshot.todayKey
         val tomorrowKey = getTomorrowDateKey()
         val rows = ArrayList<WidgetListRow>()
@@ -448,8 +461,8 @@ object TaskWidgetDataStore {
                 if (overdueList.isNotEmpty()) {
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = "OVERDUE",
-                            rightSummary = "${overdueList.size} overdue",
+                            title = TaskTranslations.t(context, "overdue_upper", lang),
+                            rightSummary = "${overdueList.size} ${TaskTranslations.t(context, "overdue", lang)}",
                             dotColor = palette.dangerColor,
                             textColor = palette.dangerColor
                         )
@@ -461,8 +474,8 @@ object TaskWidgetDataStore {
                 if (todayActive.isNotEmpty()) {
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = "TODAY • ${formatShortHeaderDate(todayKey)}",
-                            rightSummary = "${todayActive.size} due",
+                            title = "${TaskTranslations.t(context, "today_upper", lang)} • ${formatShortHeaderDate(todayKey, lang)}",
+                            rightSummary = "${todayActive.size} ${TaskTranslations.t(context, "due", lang)}",
                             dotColor = palette.accentColor,
                             textColor = palette.textSecondary
                         )
@@ -474,8 +487,8 @@ object TaskWidgetDataStore {
                 if (todayDone.isNotEmpty()) {
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = "COMPLETED TODAY",
-                            rightSummary = "${todayDone.size} done",
+                            title = TaskTranslations.t(context, "completed_today_upper", lang),
+                            rightSummary = "${todayDone.size} ${TaskTranslations.t(context, "done", lang)}",
                             dotColor = palette.successColor,
                             textColor = palette.textMuted
                         )
@@ -491,21 +504,22 @@ object TaskWidgetDataStore {
 
                 for ((key, groupItems) in grouped) {
                     val bType = key.substringBefore("::")
-                    val bName = key.substringAfter("::").ifBlank { "List" }
+                    val bName = key.substringAfter("::").ifBlank { TaskTranslations.t(context, "list_default", lang) }
                     val sorted = groupItems.sortedWith(comparator)
                     val activeCount = sorted.count { !it.completed }
+                    val leftWord = TaskTranslations.t(context, "left", lang)
 
                     val rightSummary = when (bType) {
                         "grocery", "shopping", "expenses" -> {
                             val sum = sorted.filter { !it.completed }.sumOf { it.priceTotal }
                             if (sum > 0.0) {
-                                String.format(Locale.US, "%s%.2f • %d left", snapshot.currencySymbol, sum, activeCount)
+                                String.format(Locale.US, "%s%.2f • %d %s", snapshot.currencySymbol, sum, activeCount, leftWord)
                             } else {
-                                "$activeCount left"
+                                "$activeCount $leftWord"
                             }
                         }
-                        "packing" -> "${sorted.count { it.completed }}/${sorted.size} packed"
-                        else -> "$activeCount items"
+                        "packing" -> "${sorted.count { it.completed }}/${sorted.size} ${TaskTranslations.t(context, "packed", lang)}"
+                        else -> "$activeCount ${TaskTranslations.t(context, "items", lang)}"
                     }
 
                     val dotColor = when (bType) {
@@ -517,7 +531,7 @@ object TaskWidgetDataStore {
 
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = bName.uppercase(Locale.US),
+                            title = bName.uppercase(locale),
                             rightSummary = rightSummary,
                             dotColor = dotColor,
                             textColor = palette.textSecondary
@@ -533,8 +547,8 @@ object TaskWidgetDataStore {
                     val doneCount = habits.count { it.completed }
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = "DAILY HABITS",
-                            rightSummary = "$doneCount/${habits.size} today",
+                            title = TaskTranslations.t(context, "daily_habits_upper", lang),
+                            rightSummary = "$doneCount/${habits.size} ${TaskTranslations.t(context, "today_lower", lang)}",
                             dotColor = Color.parseColor("#FF7043"),
                             textColor = palette.textSecondary
                         )
@@ -553,8 +567,8 @@ object TaskWidgetDataStore {
                 if (overdueList.isNotEmpty()) {
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = "OVERDUE",
-                            rightSummary = "${overdueList.size} overdue",
+                            title = TaskTranslations.t(context, "overdue_upper", lang),
+                            rightSummary = "${overdueList.size} ${TaskTranslations.t(context, "overdue", lang)}",
                             dotColor = palette.dangerColor,
                             textColor = palette.dangerColor
                         )
@@ -567,8 +581,8 @@ object TaskWidgetDataStore {
                     val activeToday = todayTasks.count { !it.completed }
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = "TODAY • ${formatShortHeaderDate(todayKey)}",
-                            rightSummary = if (activeToday > 0) "$activeToday due" else "All done",
+                            title = "${TaskTranslations.t(context, "today_upper", lang)} • ${formatShortHeaderDate(todayKey, lang)}",
+                            rightSummary = if (activeToday > 0) "$activeToday ${TaskTranslations.t(context, "due", lang)}" else TaskTranslations.t(context, "all_done", lang),
                             dotColor = palette.accentColor,
                             textColor = palette.textSecondary
                         )
@@ -581,8 +595,8 @@ object TaskWidgetDataStore {
                     val activeTomorrow = tomorrowTasks.count { !it.completed }
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = "TOMORROW • ${formatShortHeaderDate(tomorrowKey)}",
-                            rightSummary = if (activeTomorrow > 0) "$activeTomorrow scheduled" else "All done",
+                            title = "${TaskTranslations.t(context, "tomorrow_upper", lang)} • ${formatShortHeaderDate(tomorrowKey, lang)}",
+                            rightSummary = if (activeTomorrow > 0) "$activeTomorrow ${TaskTranslations.t(context, "scheduled", lang)}" else TaskTranslations.t(context, "all_done", lang),
                             dotColor = palette.infoColor,
                             textColor = palette.textSecondary
                         )
@@ -600,7 +614,7 @@ object TaskWidgetDataStore {
                     if (upcomingCount >= 12) break
                     rows.add(
                         WidgetListRow.SectionHeader(
-                            title = formatShortHeaderDate(dKey),
+                            title = formatShortHeaderDate(dKey, lang),
                             rightSummary = "${dateItems.size}",
                             dotColor = palette.textMuted,
                             textColor = palette.textSecondary
@@ -767,13 +781,13 @@ object TaskWidgetDataStore {
         val badgeText = when {
             priceTotal > 0.0 -> String.format(Locale.US, "%s%.2f", snap.currencySymbol, priceTotal)
             timeLabel.isNotBlank() -> timeLabel
-            priority == "high" -> "HIGH"
+            priority == "high" -> TaskTranslations.t(context, "priority_high_upper", snap.language)
             else -> ""
         }
 
         val metaParts = ArrayList<String>()
         if (timeLabel.isNotBlank()) metaParts.add(timeLabel)
-        metaParts.add(boardName.ifBlank { "Main" })
+        metaParts.add(boardName.ifBlank { TaskTranslations.t(context, "board_main", snap.language) })
         val metaText = metaParts.joinToString(" • ")
 
         val newTaskJson = JSONObject().apply {
@@ -867,6 +881,13 @@ object TaskWidgetDataStore {
      */
     fun saveSnapshotFromJs(context: Context, jsonPayload: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        try {
+            val incomingLang = JSONObject(jsonPayload).optString("language", "")
+            if (incomingLang.isNotBlank()) {
+                TaskTranslations.setSavedLanguage(context, incomingLang)
+            }
+        } catch (_: Exception) {}
+
         val pendingRaw = prefs.getString(KEY_PENDING_ACTIONS, "[]") ?: "[]"
         val pendingArr = try { JSONArray(pendingRaw) } catch (_: Exception) { JSONArray() }
 
@@ -1033,8 +1054,12 @@ object TaskWidgetDataStore {
 
         val displayYear = cal.get(Calendar.YEAR)
         val displayMonth = cal.get(Calendar.MONTH) // 0..11
-        val monthFmt = SimpleDateFormat("MMMM yyyy", Locale.US)
-        val monthTitle = monthFmt.format(cal.time)
+        val locale = TaskTranslations.getLocale(snapshot.language)
+        val monthFmt = SimpleDateFormat("MMMM yyyy", locale)
+        val rawMonthTitle = monthFmt.format(cal.time)
+        val monthTitle = rawMonthTitle.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(locale) else it.toString()
+        }
         val monthPrefix = SimpleDateFormat("yyyy-MM", Locale.US).format(cal.time)
 
         val weekStart = if (snapshot.weekStartDay == 1) Calendar.MONDAY else Calendar.SUNDAY
@@ -1078,11 +1103,7 @@ object TaskWidgetDataStore {
             textAlign = Paint.Align.CENTER
         }
 
-        val dowLabels = if (snapshot.weekStartDay == 1) {
-            arrayOf("M", "T", "W", "T", "F", "S", "S")
-        } else {
-            arrayOf("S", "M", "T", "W", "T", "F", "S")
-        }
+        val dowLabels = TaskTranslations.getWeekdayLabels(snapshot.language, snapshot.weekStartDay)
 
         for (c in 0 until 7) {
             val cx = c * colWidth + colWidth / 2f

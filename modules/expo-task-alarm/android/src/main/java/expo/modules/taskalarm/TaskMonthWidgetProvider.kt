@@ -70,7 +70,10 @@ class TaskMonthWidgetProvider : AppWidgetProvider() {
             views.setInt(R.id.widget_month_add_bg, "setColorFilter", palette.accentColor)
             views.setInt(R.id.widget_month_drawer_bg, "setColorFilter", palette.headerBg)
 
+            val lang = snapshot.language
+
             views.setTextColor(R.id.widget_month_prev_text, palette.textPrimary)
+            views.setTextViewText(R.id.widget_month_today_text, TaskTranslations.t(context, "today_btn", lang))
             views.setTextColor(R.id.widget_month_today_text, palette.textPrimary)
             views.setTextColor(R.id.widget_month_next_text, palette.textPrimary)
 
@@ -99,9 +102,9 @@ class TaskMonthWidgetProvider : AppWidgetProvider() {
             views.setTextColor(R.id.widget_month_header_title, palette.textPrimary)
 
             val subtitleParts = ArrayList<String>()
-            subtitleParts.add("${gridRender.monthTaskCount} tasks in month")
+            subtitleParts.add("${gridRender.monthTaskCount} ${TaskTranslations.t(context, "tasks_in_month", lang)}")
             if (snapshot.bestHabitStreak > 0) {
-                subtitleParts.add("🔥 ${snapshot.bestHabitStreak}d streak")
+                subtitleParts.add("🔥 ${snapshot.bestHabitStreak}${TaskTranslations.t(context, "day_short", lang)} ${TaskTranslations.t(context, "streak", lang)}")
             }
             views.setTextViewText(R.id.widget_month_subtitle, subtitleParts.joinToString(" • "))
             views.setTextColor(R.id.widget_month_subtitle, palette.textSecondary)
@@ -170,22 +173,24 @@ class TaskMonthWidgetProvider : AppWidgetProvider() {
                 .sortedWith(compareBy<WidgetTaskItem> { it.completed }.thenBy { it.sortTimeMinutes })
 
             val dayLabelPrefix = if (selectedDateKey == snapshot.todayKey) {
-                "TODAY • ${TaskWidgetDataStore.formatShortHeaderDate(selectedDateKey)}"
+                "${TaskTranslations.t(context, "today_upper", lang)} • ${TaskWidgetDataStore.formatShortHeaderDate(selectedDateKey, lang)}"
             } else {
-                TaskWidgetDataStore.formatShortHeaderDate(selectedDateKey)
+                TaskWidgetDataStore.formatShortHeaderDate(selectedDateKey, lang)
             }
             val dueOnDay = dayTasks.count { !it.completed }
             views.setTextViewText(
                 R.id.widget_month_selected_title,
-                "$dayLabelPrefix • ${if (dueOnDay > 0) "$dueOnDay due" else "${dayTasks.size} tasks"}"
+                "$dayLabelPrefix • ${if (dueOnDay > 0) "$dueOnDay ${TaskTranslations.t(context, "due", lang)}" else "${dayTasks.size} ${TaskTranslations.t(context, "tasks_count", lang)}"}"
             )
             views.setTextColor(R.id.widget_month_selected_title, palette.accentColor)
+            views.setTextViewText(R.id.widget_month_open_day_btn, TaskTranslations.t(context, "open_day", lang))
             views.setTextColor(R.id.widget_month_open_day_btn, palette.textSecondary)
 
             if (dayTasks.isEmpty()) {
                 views.setViewVisibility(R.id.widget_month_row1, View.GONE)
                 views.setViewVisibility(R.id.widget_month_row2, View.GONE)
                 views.setViewVisibility(R.id.widget_month_empty_text, View.VISIBLE)
+                views.setTextViewText(R.id.widget_month_empty_text, TaskTranslations.t(context, "no_tasks_for_day", lang))
                 views.setTextColor(R.id.widget_month_empty_text, palette.textMuted)
             } else {
                 views.setViewVisibility(R.id.widget_month_empty_text, View.GONE)

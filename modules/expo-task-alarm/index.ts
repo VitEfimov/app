@@ -58,6 +58,24 @@ export function setSavedThemeMode(mode: string): boolean {
   }
 }
 
+export function getSavedAppLanguage(): string {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.getSavedAppLanguage !== 'function') return 'en';
+  try {
+    return ExpoTaskAlarm.getSavedAppLanguage() || 'en';
+  } catch (e) {
+    return 'en';
+  }
+}
+
+export function setSavedAppLanguage(langCode: string): boolean {
+  if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.setSavedAppLanguage !== 'function') return false;
+  try {
+    return Boolean(ExpoTaskAlarm.setSavedAppLanguage(langCode));
+  } catch (e) {
+    return false;
+  }
+}
+
 export function setSavedAndroidAutoMute(enabled: boolean): boolean {
   if (!ExpoTaskAlarm || typeof ExpoTaskAlarm.setSavedAndroidAutoMute !== 'function') return false;
   try {
